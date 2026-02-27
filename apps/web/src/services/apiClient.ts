@@ -10,6 +10,7 @@ import {
   QualityRiskSummaryResult,
   QualityTopRoutesResult,
   RoleSummary,
+  RouteStopSummary,
   RouteSummary,
   SettlementDetail,
   SettlementAdjustment,
@@ -23,6 +24,7 @@ import {
   ShipmentSummary,
   TariffSummary,
   UserSummary,
+  DriverRouteMeResponse,
 } from '../core/api/types';
 import { sessionStore } from '../core/auth/sessionStore';
 import { mockApi } from '../mocks/mockApi';
@@ -228,6 +230,27 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parsePaginatedData<RouteSummary>(response);
+  },
+
+  async getRouteStops(routeId: string): Promise<RouteStopSummary[]> {
+    if (USE_MOCK) return mockApi.getRouteStops(routeId);
+    const response = await fetch(`${API_BASE_URL}/routes/${routeId}/stops`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parseData<RouteStopSummary>(response);
+  },
+
+  async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
+    if (USE_MOCK) return mockApi.getMyDriverRoute(filters);
+    const params = new URLSearchParams();
+    if (filters.routeDate) params.set('route_date', filters.routeDate);
+    if (filters.status) params.set('status', filters.status);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/driver/me/route${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data ?? { route: null, stops: [] };
   },
 
   async getQualitySnapshots(filters: {

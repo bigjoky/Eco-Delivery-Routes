@@ -38,6 +38,36 @@ export type RouteSummary = {
   stops_count?: number;
 };
 
+export type RouteStopSummary = {
+  id: string;
+  route_id: string;
+  sequence: number;
+  stop_type: 'DELIVERY' | 'PICKUP';
+  status: string;
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  entity_type: 'shipment' | 'pickup';
+  entity_id: string;
+  reference?: string | null;
+  planned_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type DriverRouteMeResponse = {
+  driver?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  route?: {
+    id: string;
+    code: string;
+    route_date: string;
+    status: string;
+  } | null;
+  stops: RouteStopSummary[];
+};
+
 export type QualitySnapshot = {
   id: string;
   scope_type: 'driver' | 'subcontractor' | 'route';

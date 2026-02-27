@@ -31,6 +31,13 @@ paths:
     get:
       tags: [Driver]
       summary: Obtener ruta actual del driver autenticado con paradas
+      parameters:
+        - in: query
+          name: route_date
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema: { type: string }
       responses:
         '200':
           description: OK
@@ -780,7 +787,17 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DriverRouteStop'
 
   /pickups:
     get:

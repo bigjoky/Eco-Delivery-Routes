@@ -109,6 +109,56 @@ export const mockApi = {
     return rows;
   },
 
+  async getRouteStops(routeId: string) {
+    const all = [
+      {
+        id: 'st-1',
+        route_id: 'r-1',
+        sequence: 1,
+        stop_type: 'DELIVERY',
+        status: 'in_progress',
+        shipment_id: '00000000-0000-0000-0000-000000000101',
+        pickup_id: null,
+        entity_type: 'shipment',
+        entity_id: '00000000-0000-0000-0000-000000000101',
+        reference: 'SHP-AGP-0001',
+      },
+      {
+        id: 'st-2',
+        route_id: 'r-1',
+        sequence: 2,
+        stop_type: 'PICKUP',
+        status: 'planned',
+        shipment_id: null,
+        pickup_id: '00000000-0000-0000-0000-000000000201',
+        entity_type: 'pickup',
+        entity_id: '00000000-0000-0000-0000-000000000201',
+        reference: 'PCK-AGP-0001',
+      },
+    ];
+    return all.filter((row) => row.route_id === routeId);
+  },
+
+  async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
+    const route = {
+      id: 'r-1',
+      code: 'R-AGP-20260227',
+      route_date: '2026-02-27',
+      status: 'in_progress',
+    };
+    if (filters.routeDate && filters.routeDate !== route.route_date) {
+      return { route: null, stops: [] };
+    }
+    if (filters.status && filters.status !== route.status) {
+      return { route: null, stops: [] };
+    }
+    return {
+      driver: { id: 'drv-1', code: 'DRV-AGP-001', name: 'Driver Demo' },
+      route,
+      stops: await this.getRouteStops(route.id),
+    };
+  },
+
   async getQualitySnapshots(filters: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
     scopeId?: string;
