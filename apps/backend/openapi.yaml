@@ -469,6 +469,21 @@ paths:
         '404': { description: Liquidacion no encontrada }
         '422': { description: Estado invalido para aprobacion }
 
+  /settlements/{id}/recalculate:
+    post:
+      tags: [Settlements]
+      summary: Recalcular liquidacion draft (lineas, anticipos y totales)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Liquidacion recalculada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Solo liquidaciones draft pueden recalcularse }
+
   /settlements/{id}/export.csv:
     get:
       tags: [Settlements]
