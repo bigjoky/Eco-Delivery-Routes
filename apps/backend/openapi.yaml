@@ -1076,6 +1076,25 @@ paths:
       responses:
         '200': { description: OK }
 
+  /kpis/quality/routes/{routeId}/breakdown:
+    get:
+      tags: [Quality]
+      summary: Obtener desglose auditable de calidad por ruta
+      parameters:
+        - in: path
+          name: routeId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+        '404': { description: Ruta no encontrada }
+
   /kpis/quality/export.csv:
     get:
       tags: [Quality]

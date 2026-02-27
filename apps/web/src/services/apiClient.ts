@@ -9,6 +9,7 @@ import {
   PaginatedResult,
   QualitySnapshot,
   QualityRiskSummaryResult,
+  QualityRouteBreakdown,
   QualityTopRoutesResult,
   RoleSummary,
   RouteStopSummary,
@@ -458,6 +459,22 @@ export const apiClient = {
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  async getQualityRouteBreakdown(routeId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+  } = {}): Promise<QualityRouteBreakdown> {
+    if (USE_MOCK) return mockApi.getQualityRouteBreakdown(routeId, filters) as Promise<QualityRouteBreakdown>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/routes/${routeId}/breakdown${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityRouteBreakdown;
   },
 
   async getIncidents(): Promise<IncidentSummary[]> {

@@ -57,6 +57,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('kpis/quality'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/top-routes-under-threshold'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/risk-summary'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/routes/{routeId}/breakdown'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.pdf'", $contents);
     }
@@ -115,6 +116,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/advances/{id}/approve:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/top-routes-under-threshold:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/risk-summary:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/routes/{routeId}/breakdown:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

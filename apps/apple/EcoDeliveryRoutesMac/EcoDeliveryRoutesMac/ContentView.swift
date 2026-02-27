@@ -38,6 +38,8 @@ struct ContentView: View {
     }()
     @State private var routeStatusFilter: String = ""
     @State private var routeQuality: [QualitySnapshot] = []
+    @State private var selectedQualityRouteId: String?
+    @State private var selectedRouteBreakdown: QualityRouteBreakdown?
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -170,20 +172,58 @@ struct ContentView: View {
 
     private var qualityTab: some View {
         NavigationStack {
-            List(routeQuality) { snapshot in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(snapshot.scopeLabel ?? snapshot.scopeId)
-                        .font(.headline)
-                    Text("Score: \(snapshot.serviceQualityScore, specifier: "%.2f")%")
-                        .font(.subheadline)
-                    Text("Periodo: \(snapshot.periodStart) - \(snapshot.periodEnd)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 16) {
+                    List(routeQuality) { snapshot in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(snapshot.scopeLabel ?? snapshot.scopeId)
+                                    .font(.headline)
+                                Spacer()
+                                Button("Detalle") {
+                                    selectedQualityRouteId = snapshot.scopeId
+                                    Task { await loadRouteBreakdown(routeId: snapshot.scopeId) }
+                                }
+                            }
+                            Text("Score: \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                .font(.subheadline)
+                            Text("Periodo: \(snapshot.periodStart) - \(snapshot.periodEnd)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(minHeight: 260)
+
+                    if let breakdown = selectedRouteBreakdown {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Desglose ruta \(breakdown.routeCode ?? breakdown.routeId)")
+                                .font(.headline)
+                            Text("Score agregado: \(breakdown.serviceQualityScore, specifier: "%.2f")%")
+                            Text("Snapshots: \(breakdown.snapshotsCount)")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Text("Asignados: \(breakdown.components.assignedWithAttempt)")
+                            Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
+                            Text("Fallidas: \(breakdown.components.failedCount) · Ausencias: \(breakdown.components.absentCount) · Reintentos: \(breakdown.components.retryCount)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Text(selectedQualityRouteId == nil ? "Selecciona una ruta para ver el desglose KPI." : "Sin desglose disponible para esta ruta.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                    }
                 }
-                .padding(.vertical, 4)
             }
             .navigationTitle("Calidad por ruta")
             .toolbar {
@@ -273,6 +313,20 @@ struct ContentView: View {
 
     private func loadRouteQuality() async {
         routeQuality = (try? await apiClient.qualitySnapshots(scopeType: "route")) ?? []
+        if selectedQualityRouteId == nil {
+            selectedQualityRouteId = routeQuality.first?.scopeId
+        }
+        if let selectedQualityRouteId {
+            await loadRouteBreakdown(routeId: selectedQualityRouteId)
+        }
+    }
+
+    private func loadRouteBreakdown(routeId: String) async {
+        selectedRouteBreakdown = try? await apiClient.qualityRouteBreakdown(
+            routeId: routeId,
+            periodStart: nil,
+            periodEnd: nil
+        )
     }
 
     private func loadAdvances() async {

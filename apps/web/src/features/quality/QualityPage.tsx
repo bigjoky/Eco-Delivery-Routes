@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityRiskSummaryRow, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { severityFromScore, severityLabel } from './risk';
 
@@ -23,6 +24,8 @@ export function QualityPage() {
   const [underThresholdRoutes, setUnderThresholdRoutes] = useState<QualitySnapshot[]>([]);
   const [riskGroupBy, setRiskGroupBy] = useState<'hub' | 'subcontractor'>('hub');
   const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -69,6 +72,19 @@ export function QualityPage() {
       })
       .then((result) => setRiskSummary(result.data));
   }, [threshold, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
+
+  useEffect(() => {
+    if (!selectedRouteId) {
+      setRouteBreakdown(null);
+      return;
+    }
+    apiClient
+      .getQualityRouteBreakdown(selectedRouteId, {
+        periodStart: periodStart || undefined,
+        periodEnd: periodEnd || undefined,
+      })
+      .then(setRouteBreakdown);
+  }, [selectedRouteId, periodStart, periodEnd]);
 
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
@@ -168,6 +184,7 @@ export function QualityPage() {
                   <TableHead>Score</TableHead>
                   <TableHead>Intentados</TableHead>
                   <TableHead>Completados</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,11 +199,58 @@ export function QualityPage() {
                     </TableCell>
                     <TableCell>{item.assigned_with_attempt}</TableCell>
                     <TableCell>{item.delivered_completed + item.pickups_completed}</TableCell>
+                    <TableCell>
+                      {item.scope_type === 'route' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSelectedRouteId(item.scope_id)}
+                        >
+                          Ver detalle ruta
+                        </Button>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableWrapper>
+
+          {routeBreakdown && (
+            <>
+              <h3>Detalle KPI por ruta</h3>
+              <div className="inline-actions">
+                <Badge variant={routeBreakdown.service_quality_score >= 95 ? 'success' : 'warning'}>
+                  {routeBreakdown.service_quality_score}%
+                </Badge>
+                <span>Ruta: {routeBreakdown.route_code ?? routeBreakdown.route_id}</span>
+                <span>Snapshots: {routeBreakdown.snapshots_count}</span>
+                <Link to={`/routes/${routeBreakdown.route_id}`}>Abrir ruta</Link>
+              </div>
+              <TableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow><TableCell>Asignados con intento</TableCell><TableCell>{routeBreakdown.components.assigned_with_attempt}</TableCell></TableRow>
+                    <TableRow><TableCell>Entregas completadas</TableCell><TableCell>{routeBreakdown.components.delivered_completed}</TableCell></TableRow>
+                    <TableRow><TableCell>Recogidas completadas</TableCell><TableCell>{routeBreakdown.components.pickups_completed}</TableCell></TableRow>
+                    <TableRow><TableCell>Total completados</TableCell><TableCell>{routeBreakdown.components.completed_total}</TableCell></TableRow>
+                    <TableRow><TableCell>Fallidas</TableCell><TableCell>{routeBreakdown.components.failed_count}</TableCell></TableRow>
+                    <TableRow><TableCell>Ausencias</TableCell><TableCell>{routeBreakdown.components.absent_count}</TableCell></TableRow>
+                    <TableRow><TableCell>Reintentos</TableCell><TableCell>{routeBreakdown.components.retry_count}</TableCell></TableRow>
+                    <TableRow><TableCell>Ratio completitud</TableCell><TableCell>{routeBreakdown.components.completion_ratio}%</TableCell></TableRow>
+                  </TableBody>
+                </Table>
+              </TableWrapper>
+            </>
+          )}
 
           <h3>Rutas bajo umbral</h3>
           <TableWrapper>

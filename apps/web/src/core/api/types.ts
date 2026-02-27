@@ -136,6 +136,28 @@ export type QualityRiskSummaryResult = {
   };
 };
 
+export type QualityRouteBreakdown = {
+  route_id: string;
+  route_code?: string | null;
+  hub_id?: string | null;
+  subcontractor_id?: string | null;
+  latest_snapshot_id?: string | null;
+  latest_period_start?: string | null;
+  latest_period_end?: string | null;
+  snapshots_count: number;
+  service_quality_score: number;
+  components: {
+    assigned_with_attempt: number;
+    delivered_completed: number;
+    pickups_completed: number;
+    failed_count: number;
+    absent_count: number;
+    retry_count: number;
+    completed_total: number;
+    completion_ratio: number;
+  };
+};
+
 export type IncidentSummary = {
   id: string;
   incidentable_type: 'shipment' | 'pickup';

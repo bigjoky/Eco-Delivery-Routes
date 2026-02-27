@@ -211,6 +211,9 @@ export const mockApi = {
         assigned_with_attempt: 450,
         delivered_completed: 430,
         pickups_completed: 3,
+        failed_count: 8,
+        absent_count: 6,
+        retry_count: 3,
       },
       {
         id: 'q-2',
@@ -225,6 +228,9 @@ export const mockApi = {
         assigned_with_attempt: 120,
         delivered_completed: 110,
         pickups_completed: 3,
+        failed_count: 4,
+        absent_count: 2,
+        retry_count: 1,
       },
     ];
     if (filters.scopeType) {
@@ -351,6 +357,65 @@ export const mockApi = {
     periodEnd?: string;
   }) {
     return;
+  },
+
+  async getQualityRouteBreakdown(routeId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+  } = {}) {
+    const rows = await this.getQualitySnapshots({
+      scopeType: 'route',
+      scopeId: routeId,
+      periodStart: filters.periodStart,
+      periodEnd: filters.periodEnd,
+    }) as Array<{
+      id: string;
+      scope_id: string;
+      scope_label?: string;
+      hub_id?: string;
+      subcontractor_id?: string;
+      period_start: string;
+      period_end: string;
+      service_quality_score: number;
+      assigned_with_attempt: number;
+      delivered_completed: number;
+      pickups_completed: number;
+      failed_count?: number;
+      absent_count?: number;
+      retry_count?: number;
+    }>;
+
+    const assigned = rows.reduce((acc, row) => acc + row.assigned_with_attempt, 0);
+    const delivered = rows.reduce((acc, row) => acc + row.delivered_completed, 0);
+    const pickups = rows.reduce((acc, row) => acc + row.pickups_completed, 0);
+    const failed = rows.reduce((acc, row) => acc + (row.failed_count ?? 0), 0);
+    const absent = rows.reduce((acc, row) => acc + (row.absent_count ?? 0), 0);
+    const retry = rows.reduce((acc, row) => acc + (row.retry_count ?? 0), 0);
+    const completed = delivered + pickups;
+    const ratio = assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
+    const latest = rows[0];
+
+    return {
+      route_id: routeId,
+      route_code: latest?.scope_label ?? routeId,
+      hub_id: latest?.hub_id ?? null,
+      subcontractor_id: latest?.subcontractor_id ?? null,
+      latest_snapshot_id: latest?.id ?? null,
+      latest_period_start: latest?.period_start ?? null,
+      latest_period_end: latest?.period_end ?? null,
+      snapshots_count: rows.length,
+      service_quality_score: ratio,
+      components: {
+        assigned_with_attempt: assigned,
+        delivered_completed: delivered,
+        pickups_completed: pickups,
+        failed_count: failed,
+        absent_count: absent,
+        retry_count: retry,
+        completed_total: completed,
+        completion_ratio: ratio,
+      },
+    };
   },
 
   async getIncidents() {

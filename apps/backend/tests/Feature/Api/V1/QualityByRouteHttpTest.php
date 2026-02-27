@@ -271,6 +271,44 @@ class QualityByRouteHttpTest extends TestCase
         $risk->assertJsonPath('data.0.routes_count', 1);
     }
 
+    public function test_route_breakdown_returns_component_totals_for_specific_route(): void
+    {
+        $routeId = (string) DB::table('routes')->value('id');
+        $this->assertNotEmpty($routeId);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'route',
+            'scope_id' => $routeId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 100,
+            'delivered_completed' => 80,
+            'failed_count' => 6,
+            'absent_count' => 4,
+            'retry_count' => 3,
+            'pickups_completed' => 5,
+            'service_quality_score' => 85.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/kpis/quality/routes/' . $routeId . '/breakdown?period_start=2026-02-01&period_end=2026-02-28');
+        $response->assertOk();
+        $response->assertJsonPath('data.route_id', $routeId);
+        $response->assertJsonPath('data.components.assigned_with_attempt', 100);
+        $response->assertJsonPath('data.components.delivered_completed', 80);
+        $response->assertJsonPath('data.components.pickups_completed', 5);
+        $response->assertJsonPath('data.components.failed_count', 6);
+        $response->assertJsonPath('data.components.absent_count', 4);
+        $response->assertJsonPath('data.components.retry_count', 3);
+        $response->assertJsonPath('data.components.completed_total', 85);
+        $response->assertJsonPath('data.components.completion_ratio', 85);
+    }
+
     public function test_risk_summary_requires_dashboard_quality_permission(): void
     {
         /** @var \App\Models\User|null $user */

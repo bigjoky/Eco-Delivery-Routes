@@ -118,6 +118,64 @@ class QualityController extends Controller
         ]);
     }
 
+    public function routeBreakdown(Request $request, string $routeId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboardQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $routeId)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_ROUTE_NOT_FOUND',
+                    'message' => 'Route not found.',
+                ],
+            ], 404);
+        }
+
+        $rows = $this->fetchEnrichedQuality($request, 2000)
+            ->filter(fn ($row) => $row->scope_type === 'route' && (string) $row->scope_id === $routeId)
+            ->sortByDesc('period_end')
+            ->values();
+
+        $latest = $rows->first();
+        $assigned = (int) $rows->sum(fn ($row) => (int) ($row->assigned_with_attempt ?? 0));
+        $delivered = (int) $rows->sum(fn ($row) => (int) ($row->delivered_completed ?? 0));
+        $pickups = (int) $rows->sum(fn ($row) => (int) ($row->pickups_completed ?? 0));
+        $failed = (int) $rows->sum(fn ($row) => (int) ($row->failed_count ?? 0));
+        $absent = (int) $rows->sum(fn ($row) => (int) ($row->absent_count ?? 0));
+        $retry = (int) $rows->sum(fn ($row) => (int) ($row->retry_count ?? 0));
+        $completed = $delivered + $pickups;
+        $score = $assigned > 0 ? round(($completed / $assigned) * 100, 2) : 0.0;
+
+        return response()->json([
+            'data' => [
+                'route_id' => $routeId,
+                'route_code' => $route->code,
+                'hub_id' => $route->hub_id,
+                'subcontractor_id' => $route->subcontractor_id,
+                'latest_snapshot_id' => $latest->id ?? null,
+                'latest_period_start' => $latest->period_start ?? null,
+                'latest_period_end' => $latest->period_end ?? null,
+                'snapshots_count' => $rows->count(),
+                'service_quality_score' => $score,
+                'components' => [
+                    'assigned_with_attempt' => $assigned,
+                    'delivered_completed' => $delivered,
+                    'pickups_completed' => $pickups,
+                    'failed_count' => $failed,
+                    'absent_count' => $absent,
+                    'retry_count' => $retry,
+                    'completed_total' => $completed,
+                    'completion_ratio' => $score,
+                ],
+            ],
+        ]);
+    }
+
     public function exportCsv(Request $request): Response|JsonResponse
     {
         /** @var User $actor */
