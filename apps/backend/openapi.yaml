@@ -755,6 +755,32 @@ paths:
       responses:
         '200': { description: OK }
 
+  /kpis/quality/risk-summary:
+    get:
+      tags: [Quality]
+      summary: Obtener riesgo agregado de calidad por hub o subcontrata
+      parameters:
+        - in: query
+          name: threshold
+          schema: { type: number, default: 95 }
+        - in: query
+          name: group_by
+          schema: { type: string, enum: [hub, subcontractor], default: hub }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
   /kpis/quality/export.csv:
     get:
       tags: [Quality]

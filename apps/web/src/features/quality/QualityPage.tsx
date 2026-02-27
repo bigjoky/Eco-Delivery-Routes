@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { QualityRiskSummaryRow, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
+import { severityFromScore, severityLabel } from './risk';
 
 export function QualityPage() {
   const [items, setItems] = useState<QualitySnapshot[]>([]);
@@ -18,6 +19,8 @@ export function QualityPage() {
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [threshold, setThreshold] = useState('95');
   const [underThresholdRoutes, setUnderThresholdRoutes] = useState<QualitySnapshot[]>([]);
+  const [riskGroupBy, setRiskGroupBy] = useState<'hub' | 'subcontractor'>('hub');
+  const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -48,19 +51,23 @@ export function QualityPage() {
       .then((result) => setUnderThresholdRoutes(result.data));
   }, [threshold, hubId, subcontractorId, periodStart, periodEnd]);
 
+  useEffect(() => {
+    apiClient
+      .getQualityRiskSummary({
+        threshold: Number(threshold),
+        groupBy: riskGroupBy,
+        hubId: hubId || undefined,
+        subcontractorId: subcontractorId || undefined,
+        periodStart: periodStart || undefined,
+        periodEnd: periodEnd || undefined,
+      })
+      .then((result) => setRiskSummary(result.data));
+  }, [threshold, riskGroupBy, hubId, subcontractorId, periodStart, periodEnd]);
+
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
     return items.reduce((acc, item) => acc + item.service_quality_score, 0) / items.length;
   }, [items]);
-
-  const operationalRiskRows = useMemo(() => {
-    return underThresholdRoutes.map((item) => {
-      let severity: 'high' | 'medium' | 'low' = 'low';
-      if (item.service_quality_score < 90) severity = 'high';
-      else if (item.service_quality_score < 93) severity = 'medium';
-      return { ...item, severity };
-    });
-  }, [underThresholdRoutes]);
 
   return (
     <section className="page-grid">
@@ -188,27 +195,40 @@ export function QualityPage() {
           </TableWrapper>
 
           <h3>Riesgo operativo</h3>
+          <div className="form-row">
+            <Select value={riskGroupBy} onChange={(e) => setRiskGroupBy(e.target.value as 'hub' | 'subcontractor')}>
+              <option value="hub">Agrupar por hub</option>
+              <option value="subcontractor">Agrupar por subcontrata</option>
+            </Select>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ruta</TableHead>
+                  <TableHead>Grupo</TableHead>
+                  <TableHead>Rutas bajo umbral</TableHead>
+                  <TableHead>Ratio</TableHead>
+                  <TableHead>Media score</TableHead>
                   <TableHead>Severidad</TableHead>
-                  <TableHead>Score</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {operationalRiskRows.map((item) => (
-                  <TableRow key={`risk-${item.id}`}>
-                    <TableCell>{item.scope_label ?? item.scope_id}</TableCell>
-                    <TableCell>
-                      <Badge variant={item.severity === 'high' ? 'destructive' : item.severity === 'medium' ? 'warning' : 'secondary'}>
-                        {item.severity === 'high' ? 'Alto' : item.severity === 'medium' ? 'Medio' : 'Bajo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.service_quality_score}%</TableCell>
-                  </TableRow>
-                ))}
+                {riskSummary.map((item) => {
+                  const severity = severityFromScore(item.avg_score);
+                  return (
+                    <TableRow key={`risk-${item.group_id}-${item.group_type}`}>
+                      <TableCell>{item.group_label}</TableCell>
+                      <TableCell>{item.routes_under_threshold}/{item.routes_count}</TableCell>
+                      <TableCell>{item.under_threshold_ratio}%</TableCell>
+                      <TableCell>{item.avg_score}%</TableCell>
+                      <TableCell>
+                        <Badge variant={severity === 'high' ? 'destructive' : severity === 'medium' ? 'warning' : 'secondary'}>
+                          {severityLabel(severity)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableWrapper>

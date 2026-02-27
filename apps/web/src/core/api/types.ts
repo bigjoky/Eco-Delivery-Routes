@@ -61,6 +61,27 @@ export type QualityTopRoutesResult = {
   };
 };
 
+export type QualityRiskSummaryRow = {
+  group_type: 'hub' | 'subcontractor';
+  group_id: string;
+  group_label: string;
+  routes_count: number;
+  routes_under_threshold: number;
+  under_threshold_ratio: number;
+  avg_score: number;
+  worst_route_id?: string | null;
+  worst_route_label?: string | null;
+  worst_route_score?: number | null;
+};
+
+export type QualityRiskSummaryResult = {
+  data: QualityRiskSummaryRow[];
+  meta: {
+    threshold: number;
+    group_by: 'hub' | 'subcontractor';
+  };
+};
+
 export type IncidentSummary = {
   id: string;
   incidentable_type: 'shipment' | 'pickup';

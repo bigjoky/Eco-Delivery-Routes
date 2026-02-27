@@ -156,6 +156,58 @@ export const mockApi = {
     };
   },
 
+  async getQualityRiskSummary(filters: {
+    threshold?: number;
+    groupBy?: 'hub' | 'subcontractor';
+    hubId?: string;
+    subcontractorId?: string;
+    periodStart?: string;
+    periodEnd?: string;
+  } = {}) {
+    const threshold = filters.threshold ?? 95;
+    const groupBy = filters.groupBy ?? 'hub';
+    const rows = await this.getQualitySnapshots({
+      scopeType: 'route',
+      hubId: filters.hubId,
+      subcontractorId: filters.subcontractorId,
+      periodStart: filters.periodStart,
+      periodEnd: filters.periodEnd,
+    });
+
+    const groups = new Map<string, typeof rows>();
+    rows.forEach((row) => {
+      const key = groupBy === 'hub' ? row.hub_id ?? 'unknown' : row.subcontractor_id ?? 'unknown';
+      const current = groups.get(key) ?? [];
+      current.push(row);
+      groups.set(key, current);
+    });
+
+    const data = Array.from(groups.entries()).map(([groupId, groupRows]) => {
+      const under = groupRows.filter((row) => row.service_quality_score < threshold);
+      const worst = groupRows.slice().sort((a, b) => a.service_quality_score - b.service_quality_score)[0];
+      return {
+        group_type: groupBy,
+        group_id: groupId,
+        group_label: groupBy === 'hub' ? (groupId === 'unknown' ? groupId : 'AGP-HUB-01') : (groupId === 'unknown' ? groupId : 'Ruta Sur Express SL'),
+        routes_count: groupRows.length,
+        routes_under_threshold: under.length,
+        under_threshold_ratio: groupRows.length > 0 ? Number(((under.length / groupRows.length) * 100).toFixed(2)) : 0,
+        avg_score: groupRows.length > 0 ? Number((groupRows.reduce((acc, row) => acc + row.service_quality_score, 0) / groupRows.length).toFixed(2)) : 0,
+        worst_route_id: worst?.scope_id ?? null,
+        worst_route_label: worst?.scope_label ?? worst?.scope_id ?? null,
+        worst_route_score: worst?.service_quality_score ?? null,
+      };
+    });
+
+    return {
+      data,
+      meta: {
+        threshold,
+        group_by: groupBy,
+      },
+    };
+  },
+
   async exportQualityCsv(_: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
     hubId?: string;

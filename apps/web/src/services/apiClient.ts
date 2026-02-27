@@ -6,6 +6,7 @@ import {
   LoginResponse,
   PaginatedResult,
   QualitySnapshot,
+  QualityRiskSummaryResult,
   QualityTopRoutesResult,
   RoleSummary,
   RouteSummary,
@@ -222,6 +223,33 @@ export const apiClient = {
     return {
       data: json.data ?? [],
       meta: json.meta ?? { threshold: filters.threshold ?? 95, count: 0 },
+    };
+  },
+
+  async getQualityRiskSummary(filters: {
+    threshold?: number;
+    groupBy?: 'hub' | 'subcontractor';
+    hubId?: string;
+    subcontractorId?: string;
+    periodStart?: string;
+    periodEnd?: string;
+  } = {}): Promise<QualityRiskSummaryResult> {
+    if (USE_MOCK) return mockApi.getQualityRiskSummary(filters) as Promise<QualityRiskSummaryResult>;
+    const params = new URLSearchParams();
+    if (filters.threshold !== undefined) params.set('threshold', String(filters.threshold));
+    if (filters.groupBy) params.set('group_by', filters.groupBy);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/risk-summary${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return {
+      data: json.data ?? [],
+      meta: json.meta ?? { threshold: filters.threshold ?? 95, group_by: filters.groupBy ?? 'hub' },
     };
   },
 
