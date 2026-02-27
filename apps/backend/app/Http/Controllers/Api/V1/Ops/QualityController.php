@@ -289,6 +289,114 @@ class QualityController extends Controller
         ]);
     }
 
+    public function driverBreakdownExportCsv(Request $request, string $driverId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $driver = DB::table('drivers')->where('id', $driverId)->first();
+        if (!$driver) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_DRIVER_NOT_FOUND',
+                    'message' => 'Driver not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'driver', $driverId),
+            scopeKey: 'driver',
+            scopeId: $driverId,
+            scopeLabel: $driver->code ?? $driver->name ?? $driverId,
+            hubId: $driver->home_hub_id ?? null,
+            subcontractorId: $driver->subcontractor_id ?? null,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $csvRows = [
+            'scope_type,scope_id,scope_label,granularity,period_key,period_start,period_end,assigned_with_attempt,delivered_completed,pickups_completed,failed_count,absent_count,retry_count,completed_total,completion_ratio',
+        ];
+        foreach ($payload['periods'] as $period) {
+            $csvRows[] = implode(',', [
+                $this->csv((string) $payload['scope_type']),
+                $this->csv((string) $payload['scope_id']),
+                $this->csv((string) ($payload['scope_label'] ?? '')),
+                $this->csv((string) $payload['granularity']),
+                $this->csv((string) ($period['period_key'] ?? '')),
+                $this->csv((string) ($period['period_start'] ?? '')),
+                $this->csv((string) ($period['period_end'] ?? '')),
+                (string) ($period['components']['assigned_with_attempt'] ?? 0),
+                (string) ($period['components']['delivered_completed'] ?? 0),
+                (string) ($period['components']['pickups_completed'] ?? 0),
+                (string) ($period['components']['failed_count'] ?? 0),
+                (string) ($period['components']['absent_count'] ?? 0),
+                (string) ($period['components']['retry_count'] ?? 0),
+                (string) ($period['components']['completed_total'] ?? 0),
+                (string) ($period['components']['completion_ratio'] ?? 0),
+            ]);
+        }
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="quality_driver_breakdown.csv"',
+        ]);
+    }
+
+    public function driverBreakdownExportPdf(Request $request, string $driverId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $driver = DB::table('drivers')->where('id', $driverId)->first();
+        if (!$driver) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_DRIVER_NOT_FOUND',
+                    'message' => 'Driver not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'driver', $driverId),
+            scopeKey: 'driver',
+            scopeId: $driverId,
+            scopeLabel: $driver->code ?? $driver->name ?? $driverId,
+            hubId: $driver->home_hub_id ?? null,
+            subcontractorId: $driver->subcontractor_id ?? null,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $lines = [
+            'Eco Delivery Routes - Driver Breakdown',
+            sprintf('Driver: %s', (string) ($payload['scope_label'] ?? $payload['scope_id'])),
+            sprintf('Granularity: %s', (string) $payload['granularity']),
+            sprintf('Quality score: %.2f%%', (float) $payload['service_quality_score']),
+            sprintf('Assigned: %d | Completed: %d', (int) $payload['components']['assigned_with_attempt'], (int) $payload['components']['completed_total']),
+        ];
+        foreach ($payload['periods'] as $period) {
+            $lines[] = sprintf(
+                '%s | %.2f%% | completed %d/%d',
+                (string) ($period['period_key'] ?? ''),
+                (float) ($period['components']['completion_ratio'] ?? 0),
+                (int) ($period['components']['completed_total'] ?? 0),
+                (int) ($period['components']['assigned_with_attempt'] ?? 0)
+            );
+        }
+
+        return response($this->buildSimplePdf($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="quality_driver_breakdown.pdf"',
+        ]);
+    }
+
     public function exportCsv(Request $request): Response|JsonResponse
     {
         /** @var User $actor */

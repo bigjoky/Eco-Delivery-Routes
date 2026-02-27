@@ -550,6 +550,58 @@ export const apiClient = {
     return json.data as QualityDriverBreakdown;
   },
 
+  async exportQualityDriverBreakdownCsv(driverId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityDriverBreakdownCsv(driverId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_driver_${driverId}_breakdown.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportQualityDriverBreakdownPdf(driverId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityDriverBreakdownPdf(driverId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_driver_${driverId}_breakdown.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   async getIncidents(): Promise<IncidentSummary[]> {
     if (USE_MOCK) return mockApi.getIncidents();
     const response = await fetch(`${API_BASE_URL}/incidents`, {

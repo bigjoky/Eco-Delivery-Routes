@@ -4,7 +4,9 @@
 - Backend: endpoint `GET /api/v1/kpis/quality/routes/{routeId}/breakdown`.
 - Backend: endpoint `GET /api/v1/kpis/quality/drivers/{driverId}/breakdown`.
 - Backend: exportes `GET /api/v1/kpis/quality/routes/{routeId}/breakdown/export.csv|pdf`.
+- Backend: exportes `GET /api/v1/kpis/quality/drivers/{driverId}/breakdown/export.csv|pdf`.
 - Web: drill-down desde `Calidad` a desglose por ruta con componentes KPI.
+- Web: drill-down desde `Calidad` a desglose por conductor con componentes KPI.
 - Apple macOS: panel de calidad con detalle auditable de ruta seleccionada.
 - Apple tvOS: dashboard solo lectura con desglose de ruta en riesgo.
 
@@ -23,12 +25,16 @@
 6. macOS: al pulsar `Detalle` en una ruta, actualiza el panel de componentes.
 7. tvOS: muestra desglose de la ruta con menor score cuando hay datos API.
 8. tvOS/macOS: fallback mock visible si API no responde.
+9. Web: al pulsar `Ver detalle conductor`, se carga desglose por conductor y permite export CSV/PDF.
+10. Endpoint conductor admite filtros `hub_id` y `subcontractor_id`.
 
 ## QA Contract/API
 - [x] OpenAPI incluye `/kpis/quality/routes/{routeId}/breakdown`.
 - [x] OpenAPI incluye exportes `/kpis/quality/routes/{routeId}/breakdown/export.csv|pdf`.
 - [x] OpenAPI incluye `/kpis/quality/drivers/{driverId}/breakdown`.
+- [x] OpenAPI incluye exportes `/kpis/quality/drivers/{driverId}/breakdown/export.csv|pdf`.
 - [x] OpenAPI documenta query params `period_start`, `period_end`, `granularity`.
+- [x] OpenAPI documenta `hub_id` y `subcontractor_id` para breakdown de conductor.
 - [x] Tests backend pasan: `QualityByRouteHttpTest`, `OpsEndpointsTest`.
 
 ## Build/Test Evidence
@@ -38,3 +44,4 @@
 - [x] Web: `npm run build`
 - [x] Apple SharedCore: `swift test`
 - [x] Android: `./gradlew :app:assembleDebug`
+- [x] Web regression: `src/features/quality/breakdownChart.test.ts`

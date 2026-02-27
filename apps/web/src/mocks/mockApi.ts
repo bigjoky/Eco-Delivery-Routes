@@ -529,7 +529,22 @@ export const mockApi = {
       latest_period_end: latest?.period_end ?? null,
       snapshots_count: rows.length,
       service_quality_score: ratio,
-      periods: [],
+      periods: [{
+        period_key: granularity === 'week' ? '2026-W08' : '2026-02',
+        period_start: rows[rows.length - 1]?.period_start ?? '2026-02-01',
+        period_end: rows[0]?.period_end ?? '2026-02-28',
+        service_quality_score: ratio,
+        components: {
+          assigned_with_attempt: assigned,
+          delivered_completed: delivered,
+          pickups_completed: pickups,
+          failed_count: failed,
+          absent_count: absent,
+          retry_count: retry,
+          completed_total: completed,
+          completion_ratio: ratio,
+        },
+      }],
       components: {
         assigned_with_attempt: assigned,
         delivered_completed: delivered,
@@ -541,6 +556,22 @@ export const mockApi = {
         completion_ratio: ratio,
       },
     };
+  },
+
+  async exportQualityDriverBreakdownCsv(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
+  },
+
+  async exportQualityDriverBreakdownPdf(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
   },
 
   async getIncidents() {

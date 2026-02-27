@@ -322,7 +322,9 @@ class QualityByRouteHttpTest extends TestCase
     public function test_driver_breakdown_returns_aggregate_for_driver_scope(): void
     {
         $driverId = (string) DB::table('drivers')->value('id');
+        $driver = DB::table('drivers')->where('id', $driverId)->first();
         $this->assertNotEmpty($driverId);
+        $this->assertNotNull($driver);
 
         DB::table('quality_snapshots')->insert([
             'id' => (string) Str::uuid(),
@@ -350,6 +352,22 @@ class QualityByRouteHttpTest extends TestCase
         $response->assertJsonPath('data.scope_type', 'driver');
         $response->assertJsonPath('data.components.assigned_with_attempt', 75);
         $response->assertJsonPath('data.components.completed_total', 69);
+
+        $filtered = $this->getJson(
+            '/api/v1/kpis/quality/drivers/' . $driverId . '/breakdown'
+            . '?hub_id=' . $driver->home_hub_id
+            . '&subcontractor_id=' . $driver->subcontractor_id
+        );
+        $filtered->assertOk();
+        $filtered->assertJsonPath('data.components.assigned_with_attempt', 75);
+
+        $csv = $this->get('/api/v1/kpis/quality/drivers/' . $driverId . '/breakdown/export.csv?granularity=month');
+        $csv->assertOk();
+        $csv->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $pdf = $this->get('/api/v1/kpis/quality/drivers/' . $driverId . '/breakdown/export.pdf?granularity=week');
+        $pdf->assertOk();
+        $pdf->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_risk_summary_requires_dashboard_quality_permission(): void
