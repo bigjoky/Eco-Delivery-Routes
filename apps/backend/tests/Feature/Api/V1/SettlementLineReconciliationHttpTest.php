@@ -209,6 +209,41 @@ class SettlementLineReconciliationHttpTest extends TestCase
         $response->assertJsonPath('data.0.lines_count', 1);
     }
 
+    public function test_reconciliation_summary_supports_hub_filter(): void
+    {
+        $this->actingAs($this->createUserWithRole('accountant'), 'sanctum');
+        [$settlementId, $targetPickupLineId, $otherPickupLineId, , , $hubId] = $this->seedDraftSettlementWithRouteLinkedPickupLinesAcrossHubs();
+
+        $this->patchJson("/api/v1/settlements/{$settlementId}/lines/{$targetPickupLineId}/reconcile", [
+            'status' => 'excluded',
+            'exclusion_code' => 'ABSENCE_NOT_PAYABLE',
+        ])->assertOk();
+        $this->patchJson("/api/v1/settlements/{$settlementId}/lines/{$otherPickupLineId}/reconcile", [
+            'status' => 'excluded',
+            'exclusion_code' => 'RETRY_NOT_PAYABLE',
+        ])->assertOk();
+
+        $response = $this->getJson("/api/v1/settlements/reconciliation-summary?settlement_id={$settlementId}&hub_id={$hubId}");
+        $response->assertOk();
+        $this->assertSame('ABSENCE_NOT_PAYABLE', $response->json('data.0.exclusion_code'));
+        $this->assertSame(1, $response->json('data.0.lines_count'));
+    }
+
+    public function test_reconciliation_summary_csv_export_returns_file(): void
+    {
+        $this->actingAs($this->createUserWithRole('accountant'), 'sanctum');
+        [$settlementId, $lineId] = $this->seedDraftSettlementWithLine('payable');
+        $this->patchJson("/api/v1/settlements/{$settlementId}/lines/{$lineId}/reconcile", [
+            'status' => 'excluded',
+            'exclusion_code' => 'MANUAL_AUDIT',
+        ])->assertOk();
+
+        $response = $this->get("/api/v1/settlements/reconciliation-summary/export.csv?settlement_id={$settlementId}");
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $response->assertSee('exclusion_code,lines_count,excluded_amount_cents');
+    }
+
     /**
      * @return array{0:string,1:string}
      */
@@ -449,6 +484,39 @@ class SettlementLineReconciliationHttpTest extends TestCase
         ]);
 
         return [$settlementId, $lineA, $lineB, $routeA, $subcontractorId];
+    }
+
+    /**
+     * @return array{0:string,1:string,2:string,3:string,4:string,5:string}
+     */
+    private function seedDraftSettlementWithRouteLinkedPickupLinesAcrossHubs(): array
+    {
+        [$settlementId, $lineA, $lineB, $routeA, $subcontractorId] = $this->seedDraftSettlementWithRouteLinkedPickupLines();
+        $otherHubId = (string) \Illuminate\Support\Str::uuid();
+
+        DB::table('hubs')->insert([
+            'id' => $otherHubId,
+            'code' => 'HUB-OTHER-01',
+            'name' => 'Hub Other',
+            'city' => 'Sevilla',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $pickupBId = DB::table('settlement_lines')->where('id', $lineB)->value('source_id');
+        if ($pickupBId) {
+            DB::table('pickups')->where('id', $pickupBId)->update([
+                'hub_id' => $otherHubId,
+                'updated_at' => now(),
+            ]);
+        }
+
+        $hubId = (string) DB::table('pickups')
+            ->where('id', DB::table('settlement_lines')->where('id', $lineA)->value('source_id'))
+            ->value('hub_id');
+
+        return [$settlementId, $lineA, $lineB, $routeA, $subcontractorId, $hubId];
     }
 
     private function createUserWithRole(string $roleCode): User

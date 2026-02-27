@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -110,41 +111,44 @@ class SettlementController extends Controller
             ], 403);
         }
 
-        $query = DB::table('settlement_lines')
-            ->join('settlements', 'settlements.id', '=', 'settlement_lines.settlement_id')
-            ->select(
-                DB::raw("coalesce(json_extract(settlement_lines.metadata, '$.exclusion_code'), 'UNKNOWN') as exclusion_code"),
-                DB::raw('count(*) as lines_count'),
-                DB::raw('sum(abs(settlement_lines.line_total_cents)) as excluded_amount_cents')
-            )
-            ->where('settlement_lines.status', 'excluded');
-
-        if ($request->filled('period')) {
-            $period = (string) $request->query('period');
-            if (preg_match('/^\d{4}-\d{2}$/', $period) === 1) {
-                $periodStart = $period . '-01';
-                $periodEnd = date('Y-m-t', strtotime($periodStart));
-                $query
-                    ->whereDate('settlements.period_start', $periodStart)
-                    ->whereDate('settlements.period_end', $periodEnd);
-            }
-        }
-
-        if ($request->filled('subcontractor_id')) {
-            $query->where('settlements.subcontractor_id', (string) $request->query('subcontractor_id'));
-        }
-
-        if ($request->filled('settlement_id')) {
-            $query->where('settlement_lines.settlement_id', (string) $request->query('settlement_id'));
-        }
-
-        $rows = $query
+        $rows = $this->buildReconciliationSummaryQuery($request)
             ->groupBy('exclusion_code')
             ->orderByDesc('lines_count')
             ->get();
 
         return response()->json([
             'data' => $rows,
+        ]);
+    }
+
+    public function reconciliationSummaryExportCsv(Request $request): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $rows = $this->buildReconciliationSummaryQuery($request)
+            ->groupBy('exclusion_code')
+            ->orderByDesc('lines_count')
+            ->get();
+
+        $csvRows = [];
+        $csvRows[] = 'exclusion_code,lines_count,excluded_amount_cents';
+        foreach ($rows as $row) {
+            $csvRows[] = implode(',', [
+                $this->csvValue((string) $row->exclusion_code),
+                (int) $row->lines_count,
+                (int) $row->excluded_amount_cents,
+            ]);
+        }
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="settlement_reconciliation_summary.csv"',
         ]);
     }
 
@@ -1221,6 +1225,57 @@ class SettlementController extends Controller
         }
 
         return (string) $row->name;
+    }
+
+    private function buildReconciliationSummaryQuery(Request $request): Builder
+    {
+        $query = DB::table('settlement_lines')
+            ->join('settlements', 'settlements.id', '=', 'settlement_lines.settlement_id')
+            ->join('subcontractors', 'subcontractors.id', '=', 'settlements.subcontractor_id')
+            ->leftJoin('shipments', function ($join): void {
+                $join->on('shipments.id', '=', 'settlement_lines.source_id')
+                    ->where('settlement_lines.line_type', '=', 'shipment_delivery');
+            })
+            ->leftJoin('pickups', function ($join): void {
+                $join->on('pickups.id', '=', 'settlement_lines.source_id')
+                    ->whereIn('settlement_lines.line_type', ['pickup_normal', 'pickup_return']);
+            })
+            ->select(
+                DB::raw("coalesce(json_extract(settlement_lines.metadata, '$.exclusion_code'), 'UNKNOWN') as exclusion_code"),
+                DB::raw('count(*) as lines_count'),
+                DB::raw('sum(abs(settlement_lines.line_total_cents)) as excluded_amount_cents')
+            )
+            ->where('settlement_lines.status', 'excluded');
+
+        if ($request->filled('period')) {
+            $period = (string) $request->query('period');
+            if (preg_match('/^\d{4}-\d{2}$/', $period) === 1) {
+                $periodStart = $period . '-01';
+                $periodEnd = date('Y-m-t', strtotime($periodStart));
+                $query
+                    ->whereDate('settlements.period_start', $periodStart)
+                    ->whereDate('settlements.period_end', $periodEnd);
+            }
+        }
+
+        if ($request->filled('subcontractor_id')) {
+            $query->where('settlements.subcontractor_id', (string) $request->query('subcontractor_id'));
+        }
+
+        if ($request->filled('settlement_id')) {
+            $query->where('settlement_lines.settlement_id', (string) $request->query('settlement_id'));
+        }
+
+        if ($request->filled('hub_id')) {
+            $hubId = (string) $request->query('hub_id');
+            $query->where(function ($where) use ($hubId): void {
+                $where
+                    ->where('shipments.hub_id', $hubId)
+                    ->orWhere('pickups.hub_id', $hubId);
+            });
+        }
+
+        return $query;
     }
 
     private function validateBulkReconcilePayload(Request $request): array

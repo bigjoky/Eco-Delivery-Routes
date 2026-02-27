@@ -352,8 +352,32 @@ paths:
         - in: query
           name: settlement_id
           schema: { type: string, format: uuid }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
       responses:
         '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements/reconciliation-summary/export.csv:
+    get:
+      tags: [Settlements]
+      summary: Exportar resumen de exclusiones por motivo a CSV
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: settlement_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: CSV export }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /settlements/{id}:

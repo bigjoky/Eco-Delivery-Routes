@@ -80,6 +80,7 @@ Route::prefix('v1')->group(function () {
         Route::get('settlements', [SettlementController::class, 'index']);
         Route::get('settlements/reconciliation-reasons', [SettlementController::class, 'reconciliationReasons']);
         Route::get('settlements/reconciliation-summary', [SettlementController::class, 'reconciliationSummary']);
+        Route::get('settlements/reconciliation-summary/export.csv', [SettlementController::class, 'reconciliationSummaryExportCsv']);
         Route::get('settlements/preview', [SettlementController::class, 'preview']);
         Route::post('settlements/finalize', [SettlementController::class, 'finalize']);
         Route::get('settlements/{id}', [SettlementController::class, 'show']);

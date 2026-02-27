@@ -18,6 +18,7 @@ function statusVariant(status: SettlementSummary['status']): 'outline' | 'second
 export function SettlementsPage() {
   const [status, setStatus] = useState('');
   const [period, setPeriod] = useState('');
+  const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
   const [subcontractorQuery, setSubcontractorQuery] = useState('');
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
@@ -55,6 +56,7 @@ export function SettlementsPage() {
         perPage: meta.per_page,
       }),
       apiClient.getSettlementReconciliationSummary({
+        hubId: hubId || undefined,
         period: period || undefined,
         subcontractorId: subcontractorId || undefined,
       }),
@@ -100,6 +102,9 @@ export function SettlementsPage() {
                   <option key={item.id} value={item.id}>{item.legal_name}</option>
                 ))}
               </Select>
+            </div>
+            <div className="form-row">
+              <Input value={hubId} onChange={(e) => setHubId(e.target.value)} placeholder="Hub ID (uuid, opcional)" />
             </div>
             <Button type="submit">Buscar</Button>
           </form>
@@ -148,6 +153,19 @@ export function SettlementsPage() {
           <CardDescription>Reporting contable de lineas excluidas agrupadas por `exclusion_code`.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => apiClient.exportSettlementReconciliationSummaryCsv({
+                period: period || undefined,
+                subcontractorId: subcontractorId || undefined,
+                hubId: hubId || undefined,
+              })}
+            >
+              Exportar CSV resumen
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>

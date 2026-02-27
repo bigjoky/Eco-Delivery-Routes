@@ -659,6 +659,7 @@ export const apiClient = {
     period?: string;
     subcontractorId?: string;
     settlementId?: string;
+    hubId?: string;
   } = {}): Promise<SettlementReconciliationSummaryRow[]> {
     if (USE_MOCK) return mockApi.getSettlementReconciliationSummary(filters) as Promise<SettlementReconciliationSummaryRow[]>;
 
@@ -666,12 +667,42 @@ export const apiClient = {
     if (filters.period) params.set('period', filters.period);
     if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.settlementId) params.set('settlement_id', filters.settlementId);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
 
     const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-summary${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<SettlementReconciliationSummaryRow>(response);
+  },
+
+  async exportSettlementReconciliationSummaryCsv(filters: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+    hubId?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportSettlementReconciliationSummaryCsv(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.settlementId) params.set('settlement_id', filters.settlementId);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-summary/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'settlement_reconciliation_summary.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   async createSettlementAdjustment(

@@ -460,11 +460,21 @@ export const mockApi = {
     period?: string;
     subcontractorId?: string;
     settlementId?: string;
+    hubId?: string;
   }) {
     return [
       { exclusion_code: 'MANUAL_AUDIT', lines_count: 3, excluded_amount_cents: 760 },
       { exclusion_code: 'RETRY_NOT_PAYABLE', lines_count: 2, excluded_amount_cents: 380 },
     ];
+  },
+
+  async exportSettlementReconciliationSummaryCsv(_: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+    hubId?: string;
+  }) {
+    return;
   },
 
   async createSettlementAdjustment(_: string, __: { amount_cents: number; reason: string }) {

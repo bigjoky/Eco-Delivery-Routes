@@ -21,3 +21,13 @@ Se incluye esqueleto SwiftUI con:
 - `API_TOKEN` (opcional): bearer token para endpoints protegidos.
 
 Si no existe `API_BASE_URL` o falla la conexión, el dashboard usa datos mock.
+
+## macOS Widget: Reconciliacion
+
+Se incluye el widget SwiftUI:
+- `EcoDeliveryRoutesMac/WarehouseReconciliationWidget.swift`
+
+Uso previsto en backoffice macOS:
+- monitor de exclusiones por `exclusion_code`,
+- filtros por `period` y `hub_id`,
+- refresco manual y fallback mock si no hay API.
