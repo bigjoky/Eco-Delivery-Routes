@@ -1091,9 +1091,78 @@ paths:
         - in: query
           name: period_end
           schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
       responses:
         '200': { description: OK }
         '404': { description: Ruta no encontrada }
+
+  /kpis/quality/routes/{routeId}/breakdown/export.csv:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por ruta a CSV
+      parameters:
+        - in: path
+          name: routeId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: CSV export }
+        '404': { description: Ruta no encontrada }
+
+  /kpis/quality/routes/{routeId}/breakdown/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por ruta a PDF
+      parameters:
+        - in: path
+          name: routeId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: PDF export }
+        '404': { description: Ruta no encontrada }
+
+  /kpis/quality/drivers/{driverId}/breakdown:
+    get:
+      tags: [Quality]
+      summary: Obtener desglose auditable de calidad por conductor
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: OK }
+        '404': { description: Conductor no encontrado }
 
   /kpis/quality/export.csv:
     get:
