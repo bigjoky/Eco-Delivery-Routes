@@ -24,6 +24,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::post('advances'", $contents);
         $this->assertStringContainsString("Route::patch('advances/{id}'", $contents);
         $this->assertStringContainsString("Route::post('advances/{id}/approve'", $contents);
+        $this->assertStringContainsString("Route::get('hubs'", $contents);
         $this->assertStringContainsString("Route::get('settlements/preview'", $contents);
         $this->assertStringContainsString("Route::get('subcontractors'", $contents);
         $this->assertStringContainsString("Route::post('settlements/finalize'", $contents);
@@ -45,6 +46,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('settlements/reconciliation-reasons'", $contents);
         $this->assertStringContainsString("Route::get('settlements/reconciliation-summary'", $contents);
         $this->assertStringContainsString("Route::get('settlements/reconciliation-summary/export.csv'", $contents);
+        $this->assertStringContainsString("Route::get('settlements/reconciliation-summary/export.pdf'", $contents);
+        $this->assertStringContainsString("Route::get('settlements/reconciliation-trends'", $contents);
         $this->assertStringContainsString("Route::get('settlements/{id}'", $contents);
         $this->assertStringContainsString("Route::get('shipments'", $contents);
         $this->assertStringContainsString("Route::get('routes'", $contents);
@@ -104,6 +107,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("driver/me/route", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/audit-logs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/audit-logs/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/hubs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("tariffs", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/advances:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/advances/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
@@ -129,6 +133,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/settlements/reconciliation-reasons:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/settlements/reconciliation-summary:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/settlements/reconciliation-summary/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/settlements/reconciliation-summary/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/settlements/reconciliation-trends:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/{id}/export.csv", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/{id}/export.pdf", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/{id}/mark-paid", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

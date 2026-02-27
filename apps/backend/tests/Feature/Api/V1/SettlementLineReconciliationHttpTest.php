@@ -244,6 +244,35 @@ class SettlementLineReconciliationHttpTest extends TestCase
         $response->assertSee('exclusion_code,lines_count,excluded_amount_cents');
     }
 
+    public function test_reconciliation_summary_pdf_export_returns_file(): void
+    {
+        $this->actingAs($this->createUserWithRole('accountant'), 'sanctum');
+        [$settlementId, $lineId] = $this->seedDraftSettlementWithLine('payable');
+        $this->patchJson("/api/v1/settlements/{$settlementId}/lines/{$lineId}/reconcile", [
+            'status' => 'excluded',
+            'exclusion_code' => 'MANUAL_AUDIT',
+        ])->assertOk();
+
+        $response = $this->get("/api/v1/settlements/reconciliation-summary/export.pdf?settlement_id={$settlementId}");
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_reconciliation_trends_returns_rows_for_month_granularity(): void
+    {
+        $this->actingAs($this->createUserWithRole('accountant'), 'sanctum');
+        [$settlementId, $lineId] = $this->seedDraftSettlementWithLine('payable');
+        $this->patchJson("/api/v1/settlements/{$settlementId}/lines/{$lineId}/reconcile", [
+            'status' => 'excluded',
+            'exclusion_code' => 'MANUAL_AUDIT',
+        ])->assertOk();
+
+        $response = $this->getJson('/api/v1/settlements/reconciliation-trends?granularity=month&limit=12');
+        $response->assertOk();
+        $response->assertJsonPath('meta.granularity', 'month');
+        $this->assertIsArray($response->json('data'));
+    }
+
     /**
      * @return array{0:string,1:string}
      */

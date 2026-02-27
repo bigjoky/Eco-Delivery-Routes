@@ -152,6 +152,78 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function reconciliationSummaryExportPdf(Request $request): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $rows = $this->buildReconciliationSummaryQuery($request)
+            ->groupBy('exclusion_code')
+            ->orderByDesc('lines_count')
+            ->get();
+
+        $lines = [
+            'Eco Delivery Routes - Reconciliation Summary',
+            sprintf('Filters: period=%s subcontractor=%s hub=%s', (string) $request->query('period', '-'), (string) $request->query('subcontractor_id', '-'), (string) $request->query('hub_id', '-')),
+            '---',
+        ];
+        foreach ($rows as $row) {
+            $lines[] = sprintf(
+                '%s | lines=%d | excluded=%.2f EUR',
+                (string) $row->exclusion_code,
+                (int) $row->lines_count,
+                ((int) $row->excluded_amount_cents) / 100
+            );
+        }
+        if ($rows->isEmpty()) {
+            $lines[] = 'No data for current filters.';
+        }
+
+        return response($this->buildSimplePdf($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="settlement_reconciliation_summary.pdf"',
+        ]);
+    }
+
+    public function reconciliationTrends(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $granularity = (string) $request->query('granularity', 'month');
+        if (!in_array($granularity, ['week', 'month'], true)) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Granularity must be week or month.'],
+            ], 422);
+        }
+        $limit = max(1, min((int) $request->query('limit', 24), 104));
+
+        $rows = $this->buildReconciliationTrendsQuery($request, $granularity)
+            ->groupBy('period_bucket', 'exclusion_code')
+            ->orderByDesc('period_bucket')
+            ->orderByDesc('lines_count')
+            ->limit($limit * 10)
+            ->get();
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'granularity' => $granularity,
+                'limit' => $limit,
+            ],
+        ]);
+    }
+
     public function show(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
@@ -1264,6 +1336,57 @@ class SettlementController extends Controller
 
         if ($request->filled('settlement_id')) {
             $query->where('settlement_lines.settlement_id', (string) $request->query('settlement_id'));
+        }
+
+        if ($request->filled('hub_id')) {
+            $hubId = (string) $request->query('hub_id');
+            $query->where(function ($where) use ($hubId): void {
+                $where
+                    ->where('shipments.hub_id', $hubId)
+                    ->orWhere('pickups.hub_id', $hubId);
+            });
+        }
+
+        return $query;
+    }
+
+    private function buildReconciliationTrendsQuery(Request $request, string $granularity): Builder
+    {
+        $bucketExpression = $granularity === 'week'
+            ? "strftime('%Y-W%W', settlement_lines.updated_at)"
+            : "strftime('%Y-%m', settlement_lines.updated_at)";
+
+        $query = DB::table('settlement_lines')
+            ->join('settlements', 'settlements.id', '=', 'settlement_lines.settlement_id')
+            ->leftJoin('shipments', function ($join): void {
+                $join->on('shipments.id', '=', 'settlement_lines.source_id')
+                    ->where('settlement_lines.line_type', '=', 'shipment_delivery');
+            })
+            ->leftJoin('pickups', function ($join): void {
+                $join->on('pickups.id', '=', 'settlement_lines.source_id')
+                    ->whereIn('settlement_lines.line_type', ['pickup_normal', 'pickup_return']);
+            })
+            ->select(
+                DB::raw($bucketExpression . ' as period_bucket'),
+                DB::raw("coalesce(json_extract(settlement_lines.metadata, '$.exclusion_code'), 'UNKNOWN') as exclusion_code"),
+                DB::raw('count(*) as lines_count'),
+                DB::raw('sum(abs(settlement_lines.line_total_cents)) as excluded_amount_cents')
+            )
+            ->where('settlement_lines.status', 'excluded');
+
+        if ($request->filled('period')) {
+            $period = (string) $request->query('period');
+            if (preg_match('/^\d{4}-\d{2}$/', $period) === 1) {
+                $periodStart = $period . '-01';
+                $periodEnd = date('Y-m-t', strtotime($periodStart));
+                $query
+                    ->whereDate('settlements.period_start', $periodStart)
+                    ->whereDate('settlements.period_end', $periodEnd);
+            }
+        }
+
+        if ($request->filled('subcontractor_id')) {
+            $query->where('settlements.subcontractor_id', (string) $request->query('subcontractor_id'));
         }
 
         if ($request->filled('hub_id')) {

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { PaginationMeta, SettlementReconciliationSummaryRow, SettlementSummary, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, PaginationMeta, SettlementReconciliationSummaryRow, SettlementReconciliationTrendRow, SettlementSummary, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 function statusVariant(status: SettlementSummary['status']): 'outline' | 'secondary' | 'success' {
@@ -18,23 +18,29 @@ function statusVariant(status: SettlementSummary['status']): 'outline' | 'second
 export function SettlementsPage() {
   const [status, setStatus] = useState('');
   const [period, setPeriod] = useState('');
+  const [trendGranularity, setTrendGranularity] = useState<'week' | 'month'>('month');
   const [hubId, setHubId] = useState('');
+  const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [subcontractorId, setSubcontractorId] = useState('');
   const [subcontractorQuery, setSubcontractorQuery] = useState('');
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [items, setItems] = useState<SettlementSummary[]>([]);
   const [reconciliationSummary, setReconciliationSummary] = useState<SettlementReconciliationSummaryRow[]>([]);
+  const [reconciliationTrends, setReconciliationTrends] = useState<SettlementReconciliationTrendRow[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
+    apiClient.getHubs({ onlyActive: true }).then(setHubs);
     Promise.all([
       apiClient.getSettlements({ page: 1, perPage: 10 }),
       apiClient.getSettlementReconciliationSummary({}),
-    ]).then(([settlementsResult, summaryResult]) => {
+      apiClient.getSettlementReconciliationTrends({ granularity: 'month', limit: 12 }),
+    ]).then(([settlementsResult, summaryResult, trendsResult]) => {
       setItems(settlementsResult.data);
       setMeta(settlementsResult.meta);
       setReconciliationSummary(summaryResult);
+      setReconciliationTrends(trendsResult);
     });
   }, []);
 
@@ -47,7 +53,7 @@ export function SettlementsPage() {
   }, [subcontractorQuery]);
 
   const search = async (page: number) => {
-    const [result, summary] = await Promise.all([
+    const [result, summary, trends] = await Promise.all([
       apiClient.getSettlements({
         status: status || undefined,
         period: period || undefined,
@@ -60,10 +66,18 @@ export function SettlementsPage() {
         period: period || undefined,
         subcontractorId: subcontractorId || undefined,
       }),
+      apiClient.getSettlementReconciliationTrends({
+        granularity: trendGranularity,
+        limit: 12,
+        hubId: hubId || undefined,
+        period: period || undefined,
+        subcontractorId: subcontractorId || undefined,
+      }),
     ]);
     setItems(result.data);
     setMeta(result.meta);
     setReconciliationSummary(summary);
+    setReconciliationTrends(trends);
   };
 
   const onSearch = async (event: React.FormEvent) => {
@@ -104,7 +118,16 @@ export function SettlementsPage() {
               </Select>
             </div>
             <div className="form-row">
-              <Input value={hubId} onChange={(e) => setHubId(e.target.value)} placeholder="Hub ID (uuid, opcional)" />
+              <Select value={hubId} onChange={(e) => setHubId(e.target.value)}>
+                <option value="">todos los hubs</option>
+                {hubs.map((hub) => (
+                  <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+                ))}
+              </Select>
+              <Select value={trendGranularity} onChange={(e) => setTrendGranularity(e.target.value as 'week' | 'month')}>
+                <option value="month">Tendencia mensual</option>
+                <option value="week">Tendencia semanal</option>
+              </Select>
             </div>
             <Button type="submit">Buscar</Button>
           </form>
@@ -165,6 +188,17 @@ export function SettlementsPage() {
             >
               Exportar CSV resumen
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => apiClient.exportSettlementReconciliationSummaryPdf({
+                period: period || undefined,
+                subcontractorId: subcontractorId || undefined,
+                hubId: hubId || undefined,
+              })}
+            >
+              Exportar PDF resumen
+            </Button>
           </div>
           <TableWrapper>
             <Table>
@@ -183,6 +217,42 @@ export function SettlementsPage() {
                 )}
                 {reconciliationSummary.map((row) => (
                   <TableRow key={row.exclusion_code}>
+                    <TableCell>{row.exclusion_code}</TableCell>
+                    <TableCell>{row.lines_count}</TableCell>
+                    <TableCell>{(row.excluded_amount_cents / 100).toFixed(2)} EUR</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tendencias exclusiones</CardTitle>
+          <CardDescription>Evolucion por periodo y motivo (`{trendGranularity}`).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Periodo</TableHead>
+                  <TableHead>Motivo</TableHead>
+                  <TableHead>Lineas</TableHead>
+                  <TableHead>Importe</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reconciliationTrends.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4}>Sin tendencias para filtros actuales.</TableCell>
+                  </TableRow>
+                )}
+                {reconciliationTrends.map((row) => (
+                  <TableRow key={`${row.period_bucket}-${row.exclusion_code}`}>
+                    <TableCell>{row.period_bucket}</TableCell>
                     <TableCell>{row.exclusion_code}</TableCell>
                     <TableCell>{row.lines_count}</TableCell>
                     <TableCell>{(row.excluded_amount_cents / 100).toFixed(2)} EUR</TableCell>

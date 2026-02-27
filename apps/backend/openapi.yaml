@@ -129,6 +129,18 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /hubs:
+    get:
+      tags: [Operations]
+      summary: Listar hubs (activos por defecto)
+      parameters:
+        - in: query
+          name: only_active
+          schema: { type: boolean, default: true }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /tariffs/{id}:
     patch:
       tags: [Tariffs]
@@ -378,6 +390,51 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements/reconciliation-summary/export.pdf:
+    get:
+      tags: [Settlements]
+      summary: Exportar resumen de exclusiones por motivo a PDF
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: settlement_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements/reconciliation-trends:
+    get:
+      tags: [Settlements]
+      summary: Tendencia de exclusiones por motivo (week/month)
+      parameters:
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 104, default: 24 }
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /settlements/{id}:

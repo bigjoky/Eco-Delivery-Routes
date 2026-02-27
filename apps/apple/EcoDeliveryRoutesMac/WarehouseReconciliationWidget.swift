@@ -2,10 +2,11 @@ import SwiftUI
 
 struct WarehouseReconciliationWidget: View {
     @State private var rows: [ExclusionSummaryRow] = []
+    @State private var hubs: [HubOption] = []
+    @State private var selectedHubId = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var period = ""
-    @State private var hubId = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -19,8 +20,13 @@ struct WarehouseReconciliationWidget: View {
             HStack(spacing: 8) {
                 TextField("Periodo (YYYY-MM)", text: $period)
                     .textFieldStyle(.roundedBorder)
-                TextField("Hub ID (opcional)", text: $hubId)
-                    .textFieldStyle(.roundedBorder)
+                Picker("Hub", selection: $selectedHubId) {
+                    Text("Todos los hubs").tag("")
+                    ForEach(hubs) { hub in
+                        Text("\(hub.code) · \(hub.name)").tag(hub.id)
+                    }
+                }
+                .pickerStyle(.menu)
                 Button("Refrescar") {
                     Task { await loadSummary() }
                 }
@@ -48,6 +54,7 @@ struct WarehouseReconciliationWidget: View {
         }
         .padding()
         .task {
+            await loadHubs()
             await loadSummary()
         }
     }
@@ -58,10 +65,21 @@ struct WarehouseReconciliationWidget: View {
         defer { isLoading = false }
 
         do {
-            rows = try await ExclusionSummaryClient().fetchSummary(period: period.trimmedOrNil, hubId: hubId.trimmedOrNil)
+            rows = try await ExclusionSummaryClient().fetchSummary(
+                period: period.trimmedOrNil,
+                hubId: selectedHubId.trimmedOrNil
+            )
         } catch {
             errorMessage = "No se pudo cargar resumen de conciliacion."
             rows = ExclusionSummaryRow.mock
+        }
+    }
+
+    private func loadHubs() async {
+        do {
+            hubs = try await ExclusionSummaryClient().fetchHubs()
+        } catch {
+            hubs = HubOption.mock
         }
     }
 
@@ -105,10 +123,40 @@ private struct ExclusionSummaryClient {
         let decoded = try JSONDecoder.eco().decode(ExclusionSummaryEnvelope.self, from: data)
         return decoded.data
     }
+
+    func fetchHubs() async throws -> [HubOption] {
+        guard let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] else {
+            return HubOption.mock
+        }
+        var normalized = baseURL
+        if normalized.hasSuffix("/api") {
+            normalized += "/v1"
+        } else if !normalized.hasSuffix("/api/v1") {
+            normalized += "/api/v1"
+        }
+        guard let url = URL(string: normalized + "/hubs?only_active=1") else {
+            return HubOption.mock
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        if let token = ProcessInfo.processInfo.environment["API_TOKEN"], !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
+            throw URLError(.badServerResponse)
+        }
+        let decoded = try JSONDecoder.eco().decode(HubEnvelope.self, from: data)
+        return decoded.data
+    }
 }
 
 private struct ExclusionSummaryEnvelope: Decodable {
     let data: [ExclusionSummaryRow]
+}
+
+private struct HubEnvelope: Decodable {
+    let data: [HubOption]
 }
 
 private struct ExclusionSummaryRow: Decodable, Identifiable {
@@ -130,6 +178,17 @@ private struct ExclusionSummaryRow: Decodable, Identifiable {
     ]
 }
 
+private struct HubOption: Decodable, Identifiable {
+    let id: String
+    let code: String
+    let name: String
+
+    static let mock: [HubOption] = [
+        .init(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro"),
+        .init(id: "hub-2", code: "SEV-HUB-01", name: "Hub Sevilla Norte"),
+    ]
+}
+
 private extension JSONDecoder {
     static func eco() -> JSONDecoder {
         let decoder = JSONDecoder()
@@ -144,4 +203,3 @@ private extension String {
         return value.isEmpty ? nil : value
     }
 }
-

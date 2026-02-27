@@ -71,6 +71,13 @@ export const mockApi = {
     ];
   },
 
+  async getHubs(_: { onlyActive?: boolean } = {}) {
+    return [
+      { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true },
+      { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true },
+    ];
+  },
+
   async getShipments(filters: { status?: string } = {}) {
     const rows = [
       { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo' },
@@ -475,6 +482,29 @@ export const mockApi = {
     hubId?: string;
   }) {
     return;
+  },
+
+  async exportSettlementReconciliationSummaryPdf(_: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+    hubId?: string;
+  }) {
+    return;
+  },
+
+  async getSettlementReconciliationTrends(_: {
+    granularity?: 'week' | 'month';
+    limit?: number;
+    period?: string;
+    subcontractorId?: string;
+    hubId?: string;
+  } = {}) {
+    return [
+      { period_bucket: '2026-02', exclusion_code: 'MANUAL_AUDIT', lines_count: 3, excluded_amount_cents: 760 },
+      { period_bucket: '2026-02', exclusion_code: 'RETRY_NOT_PAYABLE', lines_count: 2, excluded_amount_cents: 380 },
+      { period_bucket: '2026-01', exclusion_code: 'MANUAL_AUDIT', lines_count: 1, excluded_amount_cents: 250 },
+    ];
   },
 
   async createSettlementAdjustment(_: string, __: { amount_cents: number; reason: string }) {

@@ -2,6 +2,7 @@ import {
   AuditLogEntry,
   AdvanceSummary,
   CurrentUserProfile,
+  HubSummary,
   IncidentCatalogItem,
   IncidentSummary,
   LoginResponse,
@@ -19,6 +20,7 @@ import {
   SettlementPreview,
   SettlementReconciliationReason,
   SettlementReconciliationSummaryRow,
+  SettlementReconciliationTrendRow,
   SettlementRecalculatePreview,
   SubcontractorSummary,
   ShipmentSummary,
@@ -176,6 +178,18 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<RoleSummary>(response);
+  },
+
+  async getHubs(filters: { onlyActive?: boolean } = {}): Promise<HubSummary[]> {
+    if (USE_MOCK) return mockApi.getHubs(filters) as Promise<HubSummary[]>;
+
+    const params = new URLSearchParams();
+    if (filters.onlyActive !== undefined) params.set('only_active', filters.onlyActive ? '1' : '0');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/hubs${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parseData<HubSummary>(response);
   },
 
   async getShipments(filters: {
@@ -676,6 +690,29 @@ export const apiClient = {
     return parseData<SettlementReconciliationSummaryRow>(response);
   },
 
+  async getSettlementReconciliationTrends(filters: {
+    granularity?: 'week' | 'month';
+    limit?: number;
+    period?: string;
+    subcontractorId?: string;
+    hubId?: string;
+  } = {}): Promise<SettlementReconciliationTrendRow[]> {
+    if (USE_MOCK) return mockApi.getSettlementReconciliationTrends(filters) as Promise<SettlementReconciliationTrendRow[]>;
+
+    const params = new URLSearchParams();
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.period) params.set('period', filters.period);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-trends${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parseData<SettlementReconciliationTrendRow>(response);
+  },
+
   async exportSettlementReconciliationSummaryCsv(filters: {
     period?: string;
     subcontractorId?: string;
@@ -699,6 +736,35 @@ export const apiClient = {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = 'settlement_reconciliation_summary.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportSettlementReconciliationSummaryPdf(filters: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+    hubId?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportSettlementReconciliationSummaryPdf(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.settlementId) params.set('settlement_id', filters.settlementId);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-summary/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'settlement_reconciliation_summary.pdf';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();

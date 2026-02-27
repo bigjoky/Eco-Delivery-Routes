@@ -38,6 +38,14 @@ export type RouteSummary = {
   stops_count?: number;
 };
 
+export type HubSummary = {
+  id: string;
+  code: string;
+  name: string;
+  city?: string | null;
+  is_active: boolean;
+};
+
 export type RouteStopSummary = {
   id: string;
   route_id: string;
@@ -246,6 +254,13 @@ export type SettlementReconciliationReason = {
 };
 
 export type SettlementReconciliationSummaryRow = {
+  exclusion_code: string;
+  lines_count: number;
+  excluded_amount_cents: number;
+};
+
+export type SettlementReconciliationTrendRow = {
+  period_bucket: string;
   exclusion_code: string;
   lines_count: number;
   excluded_amount_cents: number;

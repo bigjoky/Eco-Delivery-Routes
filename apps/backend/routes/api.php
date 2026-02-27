@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Ops\AdvanceController;
 use App\Http\Controllers\Api\V1\Ops\DriverRouteController;
+use App\Http\Controllers\Api\V1\Ops\HubController;
 use App\Http\Controllers\Api\V1\Ops\IncidentController;
 use App\Http\Controllers\Api\V1\Ops\PickupController;
 use App\Http\Controllers\Api\V1\Ops\PodController;
@@ -45,6 +46,7 @@ Route::prefix('v1')->group(function () {
         Route::get('shipments', [ShipmentController::class, 'index']);
         Route::post('shipments', [ShipmentController::class, 'store']);
         Route::post('shipments/{id}/deliver', [ShipmentController::class, 'markDelivered']);
+        Route::get('hubs', [HubController::class, 'index']);
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::post('routes', [RouteController::class, 'store']);
@@ -81,6 +83,8 @@ Route::prefix('v1')->group(function () {
         Route::get('settlements/reconciliation-reasons', [SettlementController::class, 'reconciliationReasons']);
         Route::get('settlements/reconciliation-summary', [SettlementController::class, 'reconciliationSummary']);
         Route::get('settlements/reconciliation-summary/export.csv', [SettlementController::class, 'reconciliationSummaryExportCsv']);
+        Route::get('settlements/reconciliation-summary/export.pdf', [SettlementController::class, 'reconciliationSummaryExportPdf']);
+        Route::get('settlements/reconciliation-trends', [SettlementController::class, 'reconciliationTrends']);
         Route::get('settlements/preview', [SettlementController::class, 'preview']);
         Route::post('settlements/finalize', [SettlementController::class, 'finalize']);
         Route::get('settlements/{id}', [SettlementController::class, 'show']);
