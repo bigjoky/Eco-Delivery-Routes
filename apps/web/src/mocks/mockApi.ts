@@ -363,6 +363,44 @@ export const mockApi = {
     return { id: 'sa-new' };
   },
 
+  async previewSettlementRecalculate(
+    _: string,
+    payload: { manual_adjustments?: Array<{ amount_cents: number; reason: string }> } = {}
+  ) {
+    const baseGross = 12950;
+    const baseAdvances = 5000;
+    const adjustments = (payload.manual_adjustments ?? []).reduce((acc, item) => acc + item.amount_cents, 0);
+    return {
+      settlement: {
+        id: 'st-1',
+        subcontractor_id: 'sc-1',
+        period_start: '2026-02-01',
+        period_end: '2026-02-28',
+        status: 'draft',
+        currency: 'EUR',
+      },
+      totals: {
+        gross_amount_cents: baseGross,
+        advances_amount_cents: baseAdvances,
+        adjustments_amount_cents: adjustments,
+        net_amount_cents: baseGross - baseAdvances + adjustments,
+      },
+      manual_adjustments: (payload.manual_adjustments ?? []).map((item, index) => ({
+        id: `preview-adjustment-${index + 1}`,
+        line_type: 'manual_adjustment',
+        source_ref: item.reason,
+        line_total_cents: item.amount_cents,
+        status: 'payable',
+        exclusion_reason: null,
+      })),
+      lines_count: 3 + (payload.manual_adjustments?.length ?? 0),
+    };
+  },
+
+  async recalculateSettlement(_: string) {
+    return;
+  },
+
   async updateSettlementAdjustment(_: string, __: string, ___: { amount_cents?: number; reason?: string }) {
     return;
   },

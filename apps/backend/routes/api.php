@@ -87,6 +87,7 @@ Route::prefix('v1')->group(function () {
         Route::post('settlements/{id}/adjustments/{adjustmentId}/approve', [SettlementAdjustmentController::class, 'approve']);
         Route::post('settlements/{id}/adjustments/{adjustmentId}/reject', [SettlementAdjustmentController::class, 'reject']);
         Route::post('settlements/{id}/approve', [SettlementController::class, 'approve']);
+        Route::post('settlements/{id}/preview-recalculate', [SettlementController::class, 'previewRecalculate']);
         Route::post('settlements/{id}/recalculate', [SettlementController::class, 'recalculate']);
         Route::get('settlements/{id}/export.csv', [SettlementController::class, 'exportCsv']);
         Route::get('settlements/{id}/export.pdf', [SettlementController::class, 'exportPdf']);

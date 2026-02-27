@@ -14,6 +14,7 @@ import {
   SettlementAdjustment,
   SettlementSummary,
   SettlementPreview,
+  SettlementRecalculatePreview,
   SubcontractorSummary,
   ShipmentSummary,
   TariffSummary,
@@ -440,6 +441,35 @@ export const apiClient = {
     if (USE_MOCK) return;
 
     await fetch(`${API_BASE_URL}/settlements/${settlementId}/approve`, {
+      method: 'POST',
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+  },
+
+  async previewSettlementRecalculate(
+    settlementId: string,
+    payload: { manual_adjustments?: Array<{ amount_cents: number; reason: string }> } = {}
+  ): Promise<SettlementRecalculatePreview> {
+    if (USE_MOCK) {
+      return mockApi.previewSettlementRecalculate(settlementId, payload) as Promise<SettlementRecalculatePreview>;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/settlements/${settlementId}/preview-recalculate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return data.data as SettlementRecalculatePreview;
+  },
+
+  async recalculateSettlement(settlementId: string): Promise<void> {
+    if (USE_MOCK) return mockApi.recalculateSettlement(settlementId) as Promise<void>;
+
+    await fetch(`${API_BASE_URL}/settlements/${settlementId}/recalculate`, {
       method: 'POST',
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });

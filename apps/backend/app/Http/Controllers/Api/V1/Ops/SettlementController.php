@@ -434,6 +434,96 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function previewRecalculate(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $settlement = DB::table('settlements')->where('id', $id)->first();
+        if (!$settlement) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Settlement not found.'],
+            ], 404);
+        }
+        if ($settlement->status !== 'draft') {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Only draft settlements can be preview recalculated.'],
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'manual_adjustments' => ['sometimes', 'array', 'max:25'],
+            'manual_adjustments.*.amount_cents' => ['required_with:manual_adjustments', 'integer'],
+            'manual_adjustments.*.reason' => ['required_with:manual_adjustments', 'string', 'max:200'],
+        ]);
+        /** @var array<int,array{amount_cents:int,reason:string}> $manualAdjustments */
+        $manualAdjustments = $payload['manual_adjustments'] ?? [];
+
+        $input = $this->buildPreviewInput(
+            (string) $settlement->subcontractor_id,
+            (string) $settlement->period_start,
+            (string) $settlement->period_end
+        );
+        if ($input === null) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Subcontractor not found.'],
+            ], 404);
+        }
+
+        $preview = $this->previewBuilder->build(
+            $input['shipments'],
+            $input['pickups'],
+            $input['advances'],
+            $input['tariffs']
+        );
+
+        $adjustmentsTotal = 0;
+        $normalizedAdjustments = [];
+        foreach ($manualAdjustments as $idx => $adjustment) {
+            $amount = (int) $adjustment['amount_cents'];
+            $reason = (string) $adjustment['reason'];
+            $adjustmentsTotal += $amount;
+            $normalizedAdjustments[] = [
+                'id' => 'preview-adjustment-' . ($idx + 1),
+                'line_type' => 'manual_adjustment',
+                'source_ref' => mb_substr($reason, 0, 80),
+                'line_total_cents' => $amount,
+                'status' => 'payable',
+                'exclusion_reason' => null,
+            ];
+        }
+
+        $gross = (int) ($preview['totals']['gross_amount_cents'] ?? 0);
+        $advances = (int) ($preview['totals']['advances_amount_cents'] ?? 0);
+        $net = $gross - $advances + $adjustmentsTotal;
+
+        return response()->json([
+            'data' => [
+                'settlement' => [
+                    'id' => $settlement->id,
+                    'subcontractor_id' => $settlement->subcontractor_id,
+                    'period_start' => $settlement->period_start,
+                    'period_end' => $settlement->period_end,
+                    'status' => $settlement->status,
+                    'currency' => $settlement->currency,
+                ],
+                'totals' => [
+                    'gross_amount_cents' => $gross,
+                    'advances_amount_cents' => $advances,
+                    'adjustments_amount_cents' => $adjustmentsTotal,
+                    'net_amount_cents' => $net,
+                ],
+                'manual_adjustments' => $normalizedAdjustments,
+                'lines_count' => count($preview['lines']) + count($normalizedAdjustments),
+            ],
+        ]);
+    }
+
     public function exportCsv(Request $request, string $id): Response|JsonResponse
     {
         /** @var User $actor */

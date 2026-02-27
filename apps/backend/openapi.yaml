@@ -484,6 +484,36 @@ paths:
         '404': { description: Liquidacion no encontrada }
         '422': { description: Solo liquidaciones draft pueden recalcularse }
 
+  /settlements/{id}/preview-recalculate:
+    post:
+      tags: [Settlements]
+      summary: Previsualizar recálculo de liquidación draft incluyendo ajustes manuales ad-hoc
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                manual_adjustments:
+                  type: array
+                  items:
+                    type: object
+                    required: [amount_cents, reason]
+                    properties:
+                      amount_cents: { type: integer }
+                      reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Previsualización calculada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Solo liquidaciones draft pueden previsualizarse }
+
   /settlements/{id}/export.csv:
     get:
       tags: [Settlements]

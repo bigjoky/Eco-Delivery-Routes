@@ -82,6 +82,38 @@ class SettlementRecalculateHttpTest extends TestCase
         $response->assertStatus(422)->assertJsonPath('error.code', 'VALIDATION_ERROR');
     }
 
+    public function test_preview_recalculate_supports_manual_adjustments_without_persisting(): void
+    {
+        $subcontractorId = (string) DB::table('subcontractors')->value('id');
+        $period = now()->format('Y-m');
+
+        $finalize = $this->postJson('/api/v1/settlements/finalize', [
+            'subcontractor_id' => $subcontractorId,
+            'period' => $period,
+        ]);
+        $finalize->assertCreated();
+        $settlementId = (string) $finalize->json('data.settlement.id');
+
+        $preview = $this->postJson("/api/v1/settlements/{$settlementId}/preview-recalculate", [
+            'manual_adjustments' => [
+                ['amount_cents' => 1000, 'reason' => 'Bono puntual'],
+                ['amount_cents' => -250, 'reason' => 'Correccion'],
+            ],
+        ]);
+        $preview->assertOk();
+        $preview->assertJsonPath('data.totals.adjustments_amount_cents', 750);
+        $previewTotals = $preview->json('data.totals');
+        $this->assertIsArray($previewTotals);
+        $this->assertSame(
+            (int) $previewTotals['gross_amount_cents'] - (int) $previewTotals['advances_amount_cents'] + (int) $previewTotals['adjustments_amount_cents'],
+            (int) $previewTotals['net_amount_cents']
+        );
+        $preview->assertJsonPath('data.settlement.status', 'draft');
+
+        $persistedAdjustments = DB::table('settlement_adjustments')->where('settlement_id', $settlementId)->count();
+        $this->assertSame(0, $persistedAdjustments);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */
