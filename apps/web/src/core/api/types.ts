@@ -38,6 +38,36 @@ export type RouteSummary = {
   stops_count?: number;
 };
 
+export type RouteStopSummary = {
+  id: string;
+  route_id: string;
+  sequence: number;
+  stop_type: 'DELIVERY' | 'PICKUP';
+  status: string;
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  entity_type: 'shipment' | 'pickup';
+  entity_id: string;
+  reference?: string | null;
+  planned_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type DriverRouteMeResponse = {
+  driver?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  route?: {
+    id: string;
+    code: string;
+    route_date: string;
+    status: string;
+  } | null;
+  stops: RouteStopSummary[];
+};
+
 export type QualitySnapshot = {
   id: string;
   scope_type: 'driver' | 'subcontractor' | 'route';
@@ -161,6 +191,7 @@ export type SettlementDetail = {
   lines: Array<{
     id: string;
     line_type: string;
+    source_id?: string | null;
     source_ref?: string | null;
     status: 'payable' | 'excluded';
     line_total_cents: number;
@@ -205,6 +236,42 @@ export type SettlementAdjustment = {
   created_by_user_id?: string | null;
   approved_at?: string | null;
   approved_by_user_id?: string | null;
+};
+
+export type SettlementReconciliationReason = {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+};
+
+export type SettlementReconciliationSummaryRow = {
+  exclusion_code: string;
+  lines_count: number;
+  excluded_amount_cents: number;
+};
+
+export type SettlementBulkReconcilePreview = {
+  affected_count: number;
+  before_totals: {
+    gross_amount_cents: number;
+    advances_amount_cents: number;
+    adjustments_amount_cents: number;
+    net_amount_cents: number;
+  };
+  after_totals: {
+    gross_amount_cents: number;
+    advances_amount_cents: number;
+    adjustments_amount_cents: number;
+    net_amount_cents: number;
+  };
+  filters: {
+    line_type?: string | null;
+    current_status?: string | null;
+    route_id?: string | null;
+    subcontractor_id?: string | null;
+    line_ids_count: number;
+  };
 };
 
 export type SubcontractorSummary = {

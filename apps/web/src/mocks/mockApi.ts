@@ -71,17 +71,92 @@ export const mockApi = {
     ];
   },
 
-  async getShipments() {
-    return [
+  async getShipments(filters: { status?: string } = {}) {
+    const rows = [
       { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo' },
       { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro' },
     ];
+    if (!filters.status) return rows;
+    return rows.filter((row) => row.status === filters.status);
   },
 
-  async getRoutes() {
-    return [
+  async getRoutes(filters: {
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  } = {}) {
+    let rows = [
       { id: 'r-1', code: 'R-AGP-20260227', route_date: '2026-02-27', status: 'in_progress', stops_count: 28 },
+      { id: 'r-2', code: 'R-AGP-20260228', route_date: '2026-02-28', status: 'planned', stops_count: 24 },
+      { id: 'r-3', code: 'R-AGP-20260301', route_date: '2026-03-01', status: 'completed', stops_count: 31 },
     ];
+    if (filters.status) {
+      rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.dateFrom) {
+      const from = filters.dateFrom;
+      rows = rows.filter((row) => row.route_date >= from);
+    }
+    if (filters.dateTo) {
+      const to = filters.dateTo;
+      rows = rows.filter((row) => row.route_date <= to);
+    }
+    const sortKey = filters.sort === 'code' ? 'code' : 'route_date';
+    const dir = filters.dir === 'asc' ? 1 : -1;
+    rows = rows.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? dir : -dir));
+    return rows;
+  },
+
+  async getRouteStops(routeId: string) {
+    const all = [
+      {
+        id: 'st-1',
+        route_id: 'r-1',
+        sequence: 1,
+        stop_type: 'DELIVERY',
+        status: 'in_progress',
+        shipment_id: '00000000-0000-0000-0000-000000000101',
+        pickup_id: null,
+        entity_type: 'shipment',
+        entity_id: '00000000-0000-0000-0000-000000000101',
+        reference: 'SHP-AGP-0001',
+      },
+      {
+        id: 'st-2',
+        route_id: 'r-1',
+        sequence: 2,
+        stop_type: 'PICKUP',
+        status: 'planned',
+        shipment_id: null,
+        pickup_id: '00000000-0000-0000-0000-000000000201',
+        entity_type: 'pickup',
+        entity_id: '00000000-0000-0000-0000-000000000201',
+        reference: 'PCK-AGP-0001',
+      },
+    ];
+    return all.filter((row) => row.route_id === routeId);
+  },
+
+  async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
+    const route = {
+      id: 'r-1',
+      code: 'R-AGP-20260227',
+      route_date: '2026-02-27',
+      status: 'in_progress',
+    };
+    if (filters.routeDate && filters.routeDate !== route.route_date) {
+      return { route: null, stops: [] };
+    }
+    if (filters.status && filters.status !== route.status) {
+      return { route: null, stops: [] };
+    }
+    return {
+      driver: { id: 'drv-1', code: 'DRV-AGP-001', name: 'Driver Demo' },
+      route,
+      stops: await this.getRouteStops(route.id),
+    };
   },
 
   async getQualitySnapshots(filters: {
@@ -371,6 +446,27 @@ export const mockApi = {
     ];
   },
 
+  async getSettlementReconciliationReasons() {
+    return [
+      { id: 'sr-1', code: 'NO_POD', name: 'Sin POD valido', is_active: true },
+      { id: 'sr-2', code: 'RETRY_NOT_PAYABLE', name: 'Reintento no pagable', is_active: true },
+      { id: 'sr-3', code: 'ABSENCE_NOT_PAYABLE', name: 'Ausencia no pagable', is_active: true },
+      { id: 'sr-4', code: 'INCIDENT_REVIEW', name: 'Incidencia en revision contable', is_active: true },
+      { id: 'sr-5', code: 'MANUAL_AUDIT', name: 'Ajuste manual de auditoria', is_active: true },
+    ];
+  },
+
+  async getSettlementReconciliationSummary(_: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+  }) {
+    return [
+      { exclusion_code: 'MANUAL_AUDIT', lines_count: 3, excluded_amount_cents: 760 },
+      { exclusion_code: 'RETRY_NOT_PAYABLE', lines_count: 2, excluded_amount_cents: 380 },
+    ];
+  },
+
   async createSettlementAdjustment(_: string, __: { amount_cents: number; reason: string }) {
     return { id: 'sa-new' };
   },
@@ -422,6 +518,69 @@ export const mockApi = {
   },
 
   async rejectSettlementAdjustment(_: string, __: string, ___: string) {
+    return;
+  },
+
+  async reconcileSettlementLine(
+    _: string,
+    __: string,
+    ___: { status: 'payable' | 'excluded'; exclusion_code?: string | null }
+  ) {
+    return;
+  },
+
+  async reconcileSettlementLinesBulk(
+    _: string,
+    __: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
+      line_ids?: string[];
+    }
+  ) {
+    return { affected_count: 1 };
+  },
+
+  async previewReconcileSettlementLinesBulk(
+    _: string,
+    __: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
+      line_ids?: string[];
+    }
+  ) {
+    return {
+      affected_count: 1,
+      before_totals: {
+        gross_amount_cents: 12950,
+        advances_amount_cents: 5000,
+        adjustments_amount_cents: -250,
+        net_amount_cents: 7700,
+      },
+      after_totals: {
+        gross_amount_cents: 12760,
+        advances_amount_cents: 5000,
+        adjustments_amount_cents: -250,
+        net_amount_cents: 7510,
+      },
+      filters: {
+        line_type: 'pickup_normal',
+        current_status: 'payable',
+        route_id: null,
+        subcontractor_id: null,
+        line_ids_count: 0,
+      },
+    };
+  },
+
+  async exportSettlementCsv(_: string) {
     return;
   },
 

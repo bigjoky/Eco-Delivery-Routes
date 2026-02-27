@@ -31,8 +31,20 @@ paths:
     get:
       tags: [Driver]
       summary: Obtener ruta actual del driver autenticado con paradas
+      parameters:
+        - in: query
+          name: route_date
+          schema: { type: string, format: date }
+        - in: query
+          name: status
+          schema: { type: string }
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriverRouteMeResponse'
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /audit-logs:
@@ -318,6 +330,32 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /settlements/reconciliation-reasons:
+    get:
+      tags: [Settlements]
+      summary: Obtener catalogo de motivos de exclusion para conciliacion manual
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements/reconciliation-summary:
+    get:
+      tags: [Settlements]
+      summary: Resumen de lineas excluidas agrupadas por exclusion_code
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: settlement_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /settlements/{id}:
     get:
       tags: [Settlements]
@@ -484,6 +522,99 @@ paths:
         '404': { description: Liquidacion no encontrada }
         '422': { description: Solo liquidaciones draft pueden recalcularse }
 
+  /settlements/{id}/lines/{lineId}/reconcile:
+    patch:
+      tags: [Settlements]
+      summary: Conciliar manualmente una linea de liquidacion draft (payable/excluded)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: lineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [payable, excluded] }
+                exclusion_code: { type: string, maxLength: 40 }
+      responses:
+        '200': { description: Linea conciliada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion o linea no encontrada }
+        '422': { description: Solo en draft y con reglas de conciliacion validas }
+
+  /settlements/{id}/lines/reconcile-bulk:
+    post:
+      tags: [Settlements]
+      summary: Conciliar en bloque lineas de una liquidacion draft por filtros
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [payable, excluded] }
+                exclusion_code: { type: string, maxLength: 40 }
+                line_type: { type: string, enum: [shipment_delivery, pickup_normal, pickup_return, manual_adjustment] }
+                current_status: { type: string, enum: [payable, excluded] }
+                route_id: { type: string, format: uuid }
+                subcontractor_id: { type: string, format: uuid }
+                line_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Conciliacion masiva aplicada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Solo en draft y con reglas de conciliacion validas }
+
+  /settlements/{id}/lines/reconcile-bulk/preview:
+    post:
+      tags: [Settlements]
+      summary: Previsualizar impacto de conciliacion masiva sobre totales de liquidacion
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [payable, excluded] }
+                exclusion_code: { type: string, maxLength: 40 }
+                line_type: { type: string, enum: [shipment_delivery, pickup_normal, pickup_return, manual_adjustment] }
+                current_status: { type: string, enum: [payable, excluded] }
+                route_id: { type: string, format: uuid }
+                subcontractor_id: { type: string, format: uuid }
+                line_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Preview calculado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Solo en draft y con reglas de conciliacion validas }
+
   /settlements/{id}/preview-recalculate:
     post:
       tags: [Settlements]
@@ -610,6 +741,28 @@ paths:
     get:
       tags: [Routes]
       summary: Listar rutas
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [route_date, code, status, created_at] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
       responses:
         '200': { description: OK }
     post:
@@ -634,7 +787,17 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DriverRouteStop'
 
   /pickups:
     get:
@@ -967,6 +1130,43 @@ components:
         scope_id: { type: string, format: uuid }
         period_start: { type: string, format: date }
         period_end: { type: string, format: date }
+    DriverRouteMeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            driver:
+              type: object
+              nullable: true
+              properties:
+                id: { type: string, format: uuid }
+                code: { type: string }
+                name: { type: string }
+            route:
+              type: object
+              nullable: true
+              additionalProperties: true
+            stops:
+              type: array
+              items:
+                $ref: '#/components/schemas/DriverRouteStop'
+    DriverRouteStop:
+      type: object
+      required: [id, route_id, sequence, stop_type, status, entity_type, entity_id]
+      properties:
+        id: { type: string, format: uuid }
+        route_id: { type: string, format: uuid }
+        sequence: { type: integer, minimum: 1 }
+        stop_type: { type: string, enum: [DELIVERY, PICKUP] }
+        status: { type: string }
+        shipment_id: { type: string, format: uuid, nullable: true }
+        pickup_id: { type: string, format: uuid, nullable: true }
+        entity_type: { type: string, enum: [shipment, pickup] }
+        entity_id: { type: string, format: uuid }
+        reference: { type: string, nullable: true }
+        planned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
     CreateTariffRequest:
       type: object
       required: [service_type, amount_cents, currency, valid_from]

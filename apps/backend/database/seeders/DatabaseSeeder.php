@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             IncidentCatalogSeeder::class,
             TariffSeeder::class,
             AdvanceSeeder::class,
+            SettlementExclusionReasonSeeder::class,
         ]);
     }
 }
