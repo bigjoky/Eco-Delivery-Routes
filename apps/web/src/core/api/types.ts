@@ -137,15 +137,37 @@ export type QualityRiskSummaryResult = {
 };
 
 export type QualityRouteBreakdown = {
+  scope_type: 'route' | 'driver';
+  scope_id: string;
+  scope_label?: string | null;
   route_id: string;
   route_code?: string | null;
+  driver_id?: string | null;
+  driver_code?: string | null;
   hub_id?: string | null;
   subcontractor_id?: string | null;
+  granularity: 'week' | 'month';
   latest_snapshot_id?: string | null;
   latest_period_start?: string | null;
   latest_period_end?: string | null;
   snapshots_count: number;
   service_quality_score: number;
+  periods: Array<{
+    period_key: string;
+    period_start: string;
+    period_end: string;
+    service_quality_score: number;
+    components: {
+      assigned_with_attempt: number;
+      delivered_completed: number;
+      pickups_completed: number;
+      failed_count: number;
+      absent_count: number;
+      retry_count: number;
+      completed_total: number;
+      completion_ratio: number;
+    };
+  }>;
   components: {
     assigned_with_attempt: number;
     delivered_completed: number;
