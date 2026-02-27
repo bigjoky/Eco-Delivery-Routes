@@ -1,0 +1,919 @@
+openapi: 3.0.3
+info:
+  title: Eco Delivery Routes API
+  version: 1.1.0
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                device_name: { type: string }
+      responses:
+        '200': { description: Login correcto }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /driver/me/route:
+    get:
+      tags: [Driver]
+      summary: Obtener ruta actual del driver autenticado con paradas
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: Listar auditoria filtrable por recurso
+      parameters:
+        - in: query
+          name: resource
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+        - in: query
+          name: id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: event
+          schema: { type: string }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /audit-logs/export.csv:
+    get:
+      tags: [Audit]
+      summary: Exportar auditoria filtrada a CSV
+      parameters:
+        - in: query
+          name: resource
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+        - in: query
+          name: id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: event
+          schema: { type: string }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /tariffs:
+    get:
+      tags: [Tariffs]
+      summary: Listar tarifas
+      parameters:
+        - in: query
+          name: service_type
+          schema: { type: string, enum: [delivery, pickup_normal, pickup_return] }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Tariffs]
+      summary: Crear tarifa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTariffRequest'
+      responses:
+        '201': { description: Creado }
+
+  /tariffs/{id}:
+    patch:
+      tags: [Tariffs]
+      summary: Editar tarifa existente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount_cents: { type: integer, minimum: 0 }
+                currency: { type: string, minLength: 3, maxLength: 3 }
+                valid_from: { type: string, format: date }
+                valid_to: { type: string, format: date }
+                is_active: { type: boolean }
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Tarifa no encontrada }
+
+  /advances:
+    get:
+      tags: [Advances]
+      summary: Listar anticipos
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [requested, approved, rejected, deducted] }
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [request_date, created_at, amount_cents, status] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Advances]
+      summary: Crear anticipo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdvanceRequest'
+      responses:
+        '201': { description: Creado }
+
+  /advances/export.csv:
+    get:
+      tags: [Advances]
+      summary: Exportar anticipos filtrados a CSV
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [requested, approved, rejected, deducted] }
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+      responses:
+        '200': { description: CSV export }
+
+  /advances/{id}:
+    patch:
+      tags: [Advances]
+      summary: Editar anticipo en estado requested
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount_cents: { type: integer, minimum: 1 }
+                currency: { type: string, minLength: 3, maxLength: 3 }
+                reason: { type: string, maxLength: 160 }
+                request_date: { type: string, format: date }
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Anticipo no encontrado }
+        '422': { description: Estado invalido para edicion }
+
+  /advances/{id}/approve:
+    post:
+      tags: [Advances]
+      summary: Aprobar anticipo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Aprobado }
+        '404': { description: Anticipo no encontrado }
+        '422': { description: Estado invalido para aprobacion }
+
+  /tariffs/current:
+    get:
+      tags: [Tariffs]
+      summary: Obtener tarifas vigentes por tipo de servicio
+      parameters:
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: on_date
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+
+  /settlements/preview:
+    get:
+      tags: [Settlements]
+      summary: Previsualizar liquidacion mensual de subcontrata
+      parameters:
+        - in: query
+          name: subcontractor_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period
+          required: true
+          schema: { type: string, example: "2026-02" }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Subcontrata no encontrada }
+
+  /subcontractors:
+    get:
+      tags: [Settlements]
+      summary: Busqueda rapida de subcontratas para filtros operativos y de liquidacion
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements:
+    get:
+      tags: [Settlements]
+      summary: Listar liquidaciones con filtros
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, approved, exported, paid] }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period
+          schema: { type: string, example: "2026-02" }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [period_start, period_end, created_at, net_amount_cents, status] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /settlements/{id}:
+    get:
+      tags: [Settlements]
+      summary: Obtener detalle de liquidacion con lineas
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+
+  /settlements/{id}/adjustments:
+    get:
+      tags: [Settlements]
+      summary: Listar ajustes manuales de liquidacion
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Settlements]
+      summary: Crear ajuste manual pendiente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_cents, reason]
+              properties:
+                amount_cents: { type: integer }
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '201': { description: Creado }
+        '422': { description: Solo en settlement draft }
+
+  /settlements/{id}/adjustments/{adjustmentId}:
+    patch:
+      tags: [Settlements]
+      summary: Editar ajuste manual pendiente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: adjustmentId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount_cents: { type: integer }
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Actualizado }
+        '422': { description: Solo ajustes pending en settlement draft }
+
+  /settlements/{id}/adjustments/{adjustmentId}/approve:
+    post:
+      tags: [Settlements]
+      summary: Aprobar ajuste manual y aplicarlo a settlement_lines
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: adjustmentId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Aprobado y aplicado }
+        '422': { description: Solo ajustes pending en settlement draft }
+
+  /settlements/{id}/adjustments/{adjustmentId}/reject:
+    post:
+      tags: [Settlements]
+      summary: Rechazar ajuste manual pendiente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: adjustmentId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Rechazado }
+        '422': { description: Solo ajustes pending en settlement draft }
+
+  /settlements/finalize:
+    post:
+      tags: [Settlements]
+      summary: Persistir la liquidacion mensual en estado draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subcontractor_id, period]
+              properties:
+                subcontractor_id: { type: string, format: uuid }
+                period: { type: string, example: "2026-02" }
+      responses:
+        '201': { description: Liquidacion creada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Subcontrata no encontrada }
+        '422': { description: Liquidacion ya existente o datos invalidos }
+
+  /settlements/{id}/approve:
+    post:
+      tags: [Settlements]
+      summary: Aprobar liquidacion en draft
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Liquidacion aprobada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Estado invalido para aprobacion }
+
+  /settlements/{id}/export.csv:
+    get:
+      tags: [Settlements]
+      summary: Exportar liquidacion aprobada a CSV
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Debe estar aprobada para exportar }
+
+  /settlements/{id}/export.pdf:
+    get:
+      tags: [Settlements]
+      summary: Exportar liquidacion a PDF con KPI y auditoria
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Debe estar aprobada para exportar }
+
+  /settlements/{id}/mark-paid:
+    post:
+      tags: [Settlements]
+      summary: Marcar liquidacion como pagada
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Liquidacion marcada como pagada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion no encontrada }
+        '422': { description: Estado invalido para marcar como pagada }
+
+  /shipments:
+    get:
+      tags: [Shipments]
+      summary: Listar envíos
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [created_at, scheduled_at, reference, status] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Shipments]
+      summary: Crear envío
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShipmentRequest'
+      responses:
+        '201': { description: Creado }
+
+  /shipments/{id}/deliver:
+    post:
+      tags: [Shipments]
+      summary: Marcar entrega como delivered
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
+  /routes:
+    get:
+      tags: [Routes]
+      summary: Listar rutas
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Routes]
+      summary: Crear ruta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+      responses:
+        '201': { description: Creado }
+
+  /routes/{id}/stops:
+    get:
+      tags: [Routes]
+      summary: Listar paradas de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
+  /pickups:
+    get:
+      tags: [Pickups]
+      summary: Listar recogidas
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Pickups]
+      summary: Crear recogida
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePickupRequest'
+      responses:
+        '201': { description: Creado }
+
+  /pickups/{id}/complete:
+    post:
+      tags: [Pickups]
+      summary: Completar recogida
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
+  /tracking-events:
+    post:
+      tags: [Tracking]
+      summary: Registrar evento de tracking/scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrackingEventRequest'
+      responses:
+        '201': { description: Creado }
+
+  /pods:
+    post:
+      tags: [POD]
+      summary: Registrar POD de entrega o recogida
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePodRequest'
+      responses:
+        '201': { description: Creado }
+
+  /incidents:
+    get:
+      tags: [Incidents]
+      summary: Listar incidencias
+      parameters:
+        - in: query
+          name: incidentable_type
+          schema: { type: string, enum: [shipment, pickup] }
+        - in: query
+          name: category
+          schema: { type: string, enum: [failed, absent, retry, general] }
+        - in: query
+          name: catalog_code
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Incidents]
+      summary: Registrar incidencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIncidentRequest'
+      responses:
+        '201': { description: Creado }
+        '422': { description: Codigo/catalogo invalido }
+
+  /incidents/catalog:
+    get:
+      tags: [Incidents]
+      summary: Obtener catalogo de incidencias activo versionado
+      responses:
+        '200': { description: OK }
+
+  /incidents/{id}/resolve:
+    patch:
+      tags: [Incidents]
+      summary: Resolver incidencia
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /kpis/quality:
+    get:
+      tags: [Quality]
+      summary: Listar snapshots de calidad
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [driver, subcontractor, route] }
+        - in: query
+          name: scope_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+
+  /kpis/quality/top-routes-under-threshold:
+    get:
+      tags: [Quality]
+      summary: Obtener rutas con KPI por debajo del umbral
+      parameters:
+        - in: query
+          name: threshold
+          schema: { type: number, default: 95 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
+  /kpis/quality/export.csv:
+    get:
+      tags: [Quality]
+      summary: Exportar snapshots de calidad a CSV
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [driver, subcontractor, route] }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: CSV export }
+
+  /kpis/quality/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar resumen de calidad por ruta a PDF
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [route], default: route }
+        - in: query
+          name: threshold
+          schema: { type: number, default: 95 }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: PDF export }
+
+  /kpis/quality/recalculate:
+    post:
+      tags: [Quality]
+      summary: Recalcular snapshot de calidad (auditable)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecalculateQualityRequest'
+      responses:
+        '201': { description: Creado }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+  responses:
+    Unauthorized:
+      description: No autenticado
+    Forbidden:
+      description: No autorizado
+  schemas:
+    CreateShipmentRequest:
+      type: object
+      required: [hub_id, reference]
+      properties:
+        hub_id: { type: string, format: uuid }
+        reference: { type: string }
+        consignee_name: { type: string }
+        address_line: { type: string }
+        scheduled_at: { type: string, format: date-time }
+    CreateRouteRequest:
+      type: object
+      required: [hub_id, code, route_date]
+      properties:
+        hub_id: { type: string, format: uuid }
+        code: { type: string }
+        route_date: { type: string, format: date }
+        driver_id: { type: string, format: uuid }
+        subcontractor_id: { type: string, format: uuid }
+    CreatePickupRequest:
+      type: object
+      required: [hub_id, reference, pickup_type]
+      properties:
+        hub_id: { type: string, format: uuid }
+        reference: { type: string }
+        pickup_type: { type: string, enum: [NORMAL, RETURN] }
+        requester_name: { type: string }
+        address_line: { type: string }
+        scheduled_at: { type: string, format: date-time }
+    CreateTrackingEventRequest:
+      type: object
+      required: [trackable_type, trackable_id, event_code, occurred_at]
+      properties:
+        trackable_type: { type: string, enum: [shipment, parcel, pickup] }
+        trackable_id: { type: string, format: uuid }
+        event_code: { type: string }
+        status_to: { type: string }
+        scan_code: { type: string }
+        source: { type: string }
+        metadata: { type: object, additionalProperties: true }
+        occurred_at: { type: string, format: date-time }
+    CreatePodRequest:
+      type: object
+      required: [evidenceable_type, evidenceable_id]
+      properties:
+        evidenceable_type: { type: string, enum: [shipment, pickup] }
+        evidenceable_id: { type: string, format: uuid }
+        signature_name: { type: string }
+        photo_url: { type: string }
+        geo_lat: { type: number }
+        geo_lng: { type: number }
+    CreateIncidentRequest:
+      type: object
+      required: [incidentable_type, incidentable_id, catalog_code, category]
+      properties:
+        incidentable_type: { type: string, enum: [shipment, pickup] }
+        incidentable_id: { type: string, format: uuid }
+        catalog_code: { type: string }
+        category: { type: string, enum: [failed, absent, retry, general] }
+        notes: { type: string }
+    RecalculateQualityRequest:
+      type: object
+      required: [scope_type, scope_id, period_start, period_end]
+      properties:
+        scope_type: { type: string, enum: [driver, subcontractor, route] }
+        scope_id: { type: string, format: uuid }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+    CreateTariffRequest:
+      type: object
+      required: [service_type, amount_cents, currency, valid_from]
+      properties:
+        service_type: { type: string, enum: [delivery, pickup_normal, pickup_return] }
+        amount_cents: { type: integer, minimum: 0 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        valid_from: { type: string, format: date }
+        valid_to: { type: string, format: date }
+        hub_id: { type: string, format: uuid }
+        subcontractor_id: { type: string, format: uuid }
+        is_active: { type: boolean }
+    CreateAdvanceRequest:
+      type: object
+      required: [subcontractor_id, amount_cents, currency, request_date]
+      properties:
+        subcontractor_id: { type: string, format: uuid }
+        amount_cents: { type: integer, minimum: 1 }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        reason: { type: string, maxLength: 160 }
+        request_date: { type: string, format: date }
