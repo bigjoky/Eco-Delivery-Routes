@@ -215,6 +215,35 @@ export type SettlementReconciliationReason = {
   is_active: boolean;
 };
 
+export type SettlementReconciliationSummaryRow = {
+  exclusion_code: string;
+  lines_count: number;
+  excluded_amount_cents: number;
+};
+
+export type SettlementBulkReconcilePreview = {
+  affected_count: number;
+  before_totals: {
+    gross_amount_cents: number;
+    advances_amount_cents: number;
+    adjustments_amount_cents: number;
+    net_amount_cents: number;
+  };
+  after_totals: {
+    gross_amount_cents: number;
+    advances_amount_cents: number;
+    adjustments_amount_cents: number;
+    net_amount_cents: number;
+  };
+  filters: {
+    line_type?: string | null;
+    current_status?: string | null;
+    route_id?: string | null;
+    subcontractor_id?: string | null;
+    line_ids_count: number;
+  };
+};
+
 export type SubcontractorSummary = {
   id: string;
   legal_name: string;

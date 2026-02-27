@@ -80,13 +80,33 @@ export const mockApi = {
     return rows.filter((row) => row.status === filters.status);
   },
 
-  async getRoutes(filters: { status?: string } = {}) {
-    const rows = [
+  async getRoutes(filters: {
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  } = {}) {
+    let rows = [
       { id: 'r-1', code: 'R-AGP-20260227', route_date: '2026-02-27', status: 'in_progress', stops_count: 28 },
       { id: 'r-2', code: 'R-AGP-20260228', route_date: '2026-02-28', status: 'planned', stops_count: 24 },
+      { id: 'r-3', code: 'R-AGP-20260301', route_date: '2026-03-01', status: 'completed', stops_count: 31 },
     ];
-    if (!filters.status) return rows;
-    return rows.filter((row) => row.status === filters.status);
+    if (filters.status) {
+      rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.dateFrom) {
+      const from = filters.dateFrom;
+      rows = rows.filter((row) => row.route_date >= from);
+    }
+    if (filters.dateTo) {
+      const to = filters.dateTo;
+      rows = rows.filter((row) => row.route_date <= to);
+    }
+    const sortKey = filters.sort === 'code' ? 'code' : 'route_date';
+    const dir = filters.dir === 'asc' ? 1 : -1;
+    rows = rows.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? dir : -dir));
+    return rows;
   },
 
   async getQualitySnapshots(filters: {
@@ -386,6 +406,17 @@ export const mockApi = {
     ];
   },
 
+  async getSettlementReconciliationSummary(_: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+  }) {
+    return [
+      { exclusion_code: 'MANUAL_AUDIT', lines_count: 3, excluded_amount_cents: 760 },
+      { exclusion_code: 'RETRY_NOT_PAYABLE', lines_count: 2, excluded_amount_cents: 380 },
+    ];
+  },
+
   async createSettlementAdjustment(_: string, __: { amount_cents: number; reason: string }) {
     return { id: 'sa-new' };
   },
@@ -455,10 +486,48 @@ export const mockApi = {
       exclusion_code?: string | null;
       line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
       current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
       line_ids?: string[];
     }
   ) {
     return { affected_count: 1 };
+  },
+
+  async previewReconcileSettlementLinesBulk(
+    _: string,
+    __: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
+      line_ids?: string[];
+    }
+  ) {
+    return {
+      affected_count: 1,
+      before_totals: {
+        gross_amount_cents: 12950,
+        advances_amount_cents: 5000,
+        adjustments_amount_cents: -250,
+        net_amount_cents: 7700,
+      },
+      after_totals: {
+        gross_amount_cents: 12760,
+        advances_amount_cents: 5000,
+        adjustments_amount_cents: -250,
+        net_amount_cents: 7510,
+      },
+      filters: {
+        line_type: 'pickup_normal',
+        current_status: 'payable',
+        route_id: null,
+        subcontractor_id: null,
+        line_ids_count: 0,
+      },
+    };
   },
 
   async exportSettlementCsv(_: string) {

@@ -100,6 +100,54 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function reconciliationSummary(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $query = DB::table('settlement_lines')
+            ->join('settlements', 'settlements.id', '=', 'settlement_lines.settlement_id')
+            ->select(
+                DB::raw("coalesce(json_extract(settlement_lines.metadata, '$.exclusion_code'), 'UNKNOWN') as exclusion_code"),
+                DB::raw('count(*) as lines_count'),
+                DB::raw('sum(abs(settlement_lines.line_total_cents)) as excluded_amount_cents')
+            )
+            ->where('settlement_lines.status', 'excluded');
+
+        if ($request->filled('period')) {
+            $period = (string) $request->query('period');
+            if (preg_match('/^\d{4}-\d{2}$/', $period) === 1) {
+                $periodStart = $period . '-01';
+                $periodEnd = date('Y-m-t', strtotime($periodStart));
+                $query
+                    ->whereDate('settlements.period_start', $periodStart)
+                    ->whereDate('settlements.period_end', $periodEnd);
+            }
+        }
+
+        if ($request->filled('subcontractor_id')) {
+            $query->where('settlements.subcontractor_id', (string) $request->query('subcontractor_id'));
+        }
+
+        if ($request->filled('settlement_id')) {
+            $query->where('settlement_lines.settlement_id', (string) $request->query('settlement_id'));
+        }
+
+        $rows = $query
+            ->groupBy('exclusion_code')
+            ->orderByDesc('lines_count')
+            ->get();
+
+        return response()->json([
+            'data' => $rows,
+        ]);
+    }
+
     public function show(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
@@ -636,6 +684,80 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function previewReconcileLinesBulk(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $settlement = DB::table('settlements')->where('id', $id)->first();
+        if (!$settlement) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Settlement not found.'],
+            ], 404);
+        }
+        if ($settlement->status !== 'draft') {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Only draft settlements can be reconciled.'],
+            ], 422);
+        }
+
+        $payload = $this->validateBulkReconcilePayload($request);
+        $status = (string) $payload['status'];
+        $exclusionCode = $status === 'excluded' ? (string) ($payload['exclusion_code'] ?? '') : null;
+        $exclusionReason = $this->resolveExclusionReasonLabel($status, $exclusionCode);
+        if ($status === 'excluded' && $exclusionReason === null) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid exclusion code.'],
+            ], 422);
+        }
+
+        $targetIds = $this->buildBulkReconcileTargetIds($id, $payload);
+
+        $before = $this->summarizeSettlementLineImpact($id, $targetIds);
+        $after = [
+            'gross_amount_cents' => $before['gross_amount_cents'],
+            'advances_amount_cents' => $before['advances_amount_cents'],
+            'adjustments_amount_cents' => $before['adjustments_amount_cents'],
+            'net_amount_cents' => $before['net_amount_cents'],
+        ];
+
+        if (!empty($targetIds)) {
+            if ($status === 'excluded') {
+                $after['gross_amount_cents'] = $before['gross_amount_cents'] - $before['target_delivery_pickup_payable_cents'];
+                $after['adjustments_amount_cents'] = $before['adjustments_amount_cents'] - $before['target_manual_adjustment_payable_cents'];
+            } else {
+                $after['gross_amount_cents'] = $before['gross_amount_cents'] + $before['target_delivery_pickup_excluded_cents'];
+                $after['adjustments_amount_cents'] = $before['adjustments_amount_cents'] + $before['target_manual_adjustment_excluded_cents'];
+            }
+            $after['net_amount_cents'] = $after['gross_amount_cents'] - $after['advances_amount_cents'] + $after['adjustments_amount_cents'];
+        }
+
+        return response()->json([
+            'data' => [
+                'affected_count' => count($targetIds),
+                'before_totals' => [
+                    'gross_amount_cents' => $before['gross_amount_cents'],
+                    'advances_amount_cents' => $before['advances_amount_cents'],
+                    'adjustments_amount_cents' => $before['adjustments_amount_cents'],
+                    'net_amount_cents' => $before['net_amount_cents'],
+                ],
+                'after_totals' => $after,
+                'filters' => [
+                    'line_type' => $payload['line_type'] ?? null,
+                    'current_status' => $payload['current_status'] ?? null,
+                    'route_id' => $payload['route_id'] ?? null,
+                    'subcontractor_id' => $payload['subcontractor_id'] ?? null,
+                    'line_ids_count' => count($payload['line_ids'] ?? []),
+                ],
+            ],
+        ]);
+    }
+
     public function reconcileLinesBulk(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
@@ -658,14 +780,7 @@ class SettlementController extends Controller
             ], 422);
         }
 
-        $payload = $request->validate([
-            'status' => ['required', 'in:payable,excluded'],
-            'exclusion_code' => ['nullable', 'string', 'max:40', 'required_if:status,excluded'],
-            'line_type' => ['nullable', 'in:shipment_delivery,pickup_normal,pickup_return,manual_adjustment'],
-            'current_status' => ['nullable', 'in:payable,excluded'],
-            'line_ids' => ['nullable', 'array', 'max:500'],
-            'line_ids.*' => ['uuid'],
-        ]);
+        $payload = $this->validateBulkReconcilePayload($request);
 
         $status = (string) $payload['status'];
         $exclusionCode = $status === 'excluded' ? (string) ($payload['exclusion_code'] ?? '') : null;
@@ -676,22 +791,7 @@ class SettlementController extends Controller
             ], 422);
         }
 
-        $lineIds = $payload['line_ids'] ?? [];
-        $query = DB::table('settlement_lines')
-            ->where('settlement_id', $id)
-            ->where('line_type', '!=', 'advance_deduction');
-
-        if (!empty($lineIds)) {
-            $query->whereIn('id', $lineIds);
-        }
-        if (isset($payload['line_type'])) {
-            $query->where('line_type', $payload['line_type']);
-        }
-        if (isset($payload['current_status'])) {
-            $query->where('status', $payload['current_status']);
-        }
-
-        $targetIds = $query->pluck('id')->all();
+        $targetIds = $this->buildBulkReconcileTargetIds($id, $payload);
         if (empty($targetIds)) {
             return response()->json([
                 'data' => [
@@ -727,6 +827,8 @@ class SettlementController extends Controller
                     'filters' => [
                         'line_type' => $payload['line_type'] ?? null,
                         'current_status' => $payload['current_status'] ?? null,
+                        'route_id' => $payload['route_id'] ?? null,
+                        'subcontractor_id' => $payload['subcontractor_id'] ?? null,
                         'line_ids_count' => count($payload['line_ids'] ?? []),
                     ],
                 ]),
@@ -1119,6 +1221,142 @@ class SettlementController extends Controller
         }
 
         return (string) $row->name;
+    }
+
+    private function validateBulkReconcilePayload(Request $request): array
+    {
+        return $request->validate([
+            'status' => ['required', 'in:payable,excluded'],
+            'exclusion_code' => ['nullable', 'string', 'max:40', 'required_if:status,excluded'],
+            'line_type' => ['nullable', 'in:shipment_delivery,pickup_normal,pickup_return,manual_adjustment'],
+            'current_status' => ['nullable', 'in:payable,excluded'],
+            'route_id' => ['nullable', 'uuid'],
+            'subcontractor_id' => ['nullable', 'uuid'],
+            'line_ids' => ['nullable', 'array', 'max:500'],
+            'line_ids.*' => ['uuid'],
+        ]);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<int,string>
+     */
+    private function buildBulkReconcileTargetIds(string $settlementId, array $payload): array
+    {
+        $lineIds = $payload['line_ids'] ?? [];
+        $query = DB::table('settlement_lines')
+            ->where('settlement_id', $settlementId)
+            ->where('line_type', '!=', 'advance_deduction');
+
+        if (!empty($lineIds)) {
+            $query->whereIn('id', $lineIds);
+        }
+        if (isset($payload['line_type'])) {
+            $query->where('line_type', $payload['line_type']);
+        }
+        if (isset($payload['current_status'])) {
+            $query->where('status', $payload['current_status']);
+        }
+
+        if (isset($payload['subcontractor_id'])) {
+            $query->whereExists(function ($sub) use ($payload): void {
+                $sub->select(DB::raw(1))
+                    ->from('settlements')
+                    ->whereColumn('settlements.id', 'settlement_lines.settlement_id')
+                    ->where('settlements.subcontractor_id', $payload['subcontractor_id']);
+            });
+        }
+
+        if (isset($payload['route_id'])) {
+            $query->where(function ($outer) use ($payload): void {
+                $outer
+                    ->where(function ($s) use ($payload): void {
+                        $s->where('settlement_lines.line_type', 'shipment_delivery')
+                            ->whereExists(function ($sub) use ($payload): void {
+                                $sub->select(DB::raw(1))
+                                    ->from('shipments')
+                                    ->whereColumn('shipments.id', 'settlement_lines.source_id')
+                                    ->where('shipments.route_id', $payload['route_id']);
+                            });
+                    })
+                    ->orWhere(function ($p) use ($payload): void {
+                        $p->whereIn('settlement_lines.line_type', ['pickup_normal', 'pickup_return'])
+                            ->whereExists(function ($sub) use ($payload): void {
+                                $sub->select(DB::raw(1))
+                                    ->from('pickups')
+                                    ->whereColumn('pickups.id', 'settlement_lines.source_id')
+                                    ->where('pickups.route_id', $payload['route_id']);
+                            });
+                    });
+            });
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
+     * @param array<int,string> $targetIds
+     * @return array<string,int>
+     */
+    private function summarizeSettlementLineImpact(string $settlementId, array $targetIds): array
+    {
+        $gross = (int) DB::table('settlement_lines')
+            ->where('settlement_id', $settlementId)
+            ->whereIn('line_type', ['shipment_delivery', 'pickup_normal', 'pickup_return'])
+            ->where('status', 'payable')
+            ->sum('line_total_cents');
+
+        $advanceDeductions = (int) DB::table('settlement_lines')
+            ->where('settlement_id', $settlementId)
+            ->where('line_type', 'advance_deduction')
+            ->sum('line_total_cents');
+
+        $adjustments = (int) DB::table('settlement_lines')
+            ->where('settlement_id', $settlementId)
+            ->where('line_type', 'manual_adjustment')
+            ->where('status', 'payable')
+            ->sum('line_total_cents');
+
+        $targetDeliveryPickupPayable = 0;
+        $targetManualAdjustmentPayable = 0;
+        $targetDeliveryPickupExcluded = 0;
+        $targetManualAdjustmentExcluded = 0;
+
+        if (!empty($targetIds)) {
+            $targetDeliveryPickupPayable = (int) DB::table('settlement_lines')
+                ->whereIn('id', $targetIds)
+                ->whereIn('line_type', ['shipment_delivery', 'pickup_normal', 'pickup_return'])
+                ->where('status', 'payable')
+                ->sum('line_total_cents');
+            $targetManualAdjustmentPayable = (int) DB::table('settlement_lines')
+                ->whereIn('id', $targetIds)
+                ->where('line_type', 'manual_adjustment')
+                ->where('status', 'payable')
+                ->sum('line_total_cents');
+            $targetDeliveryPickupExcluded = (int) DB::table('settlement_lines')
+                ->whereIn('id', $targetIds)
+                ->whereIn('line_type', ['shipment_delivery', 'pickup_normal', 'pickup_return'])
+                ->where('status', 'excluded')
+                ->sum('line_total_cents');
+            $targetManualAdjustmentExcluded = (int) DB::table('settlement_lines')
+                ->whereIn('id', $targetIds)
+                ->where('line_type', 'manual_adjustment')
+                ->where('status', 'excluded')
+                ->sum('line_total_cents');
+        }
+
+        $advancesAmount = abs($advanceDeductions);
+
+        return [
+            'gross_amount_cents' => $gross,
+            'advances_amount_cents' => $advancesAmount,
+            'adjustments_amount_cents' => $adjustments,
+            'net_amount_cents' => $gross - $advancesAmount + $adjustments,
+            'target_delivery_pickup_payable_cents' => $targetDeliveryPickupPayable,
+            'target_manual_adjustment_payable_cents' => $targetManualAdjustmentPayable,
+            'target_delivery_pickup_excluded_cents' => $targetDeliveryPickupExcluded,
+            'target_manual_adjustment_excluded_cents' => $targetManualAdjustmentExcluded,
+        ];
     }
 
     /**

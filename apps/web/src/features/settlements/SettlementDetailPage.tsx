@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { AuditLogEntry, SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview, SettlementReconciliationReason } from '../../core/api/types';
+import { AuditLogEntry, SettlementAdjustment, SettlementBulkReconcilePreview, SettlementDetail, SettlementRecalculatePreview, SettlementReconciliationReason } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasValidCatalogReason, normalizeBulkReconcileFilters } from './reconciliation';
 import { apiClient } from '../../services/apiClient';
@@ -30,6 +30,9 @@ export function SettlementDetailPage() {
   const [bulkLineType, setBulkLineType] = useState<'all' | 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment'>('all');
   const [bulkCurrentStatus, setBulkCurrentStatus] = useState<'all' | 'payable' | 'excluded'>('payable');
   const [bulkTargetStatus, setBulkTargetStatus] = useState<'payable' | 'excluded'>('excluded');
+  const [bulkRouteId, setBulkRouteId] = useState('');
+  const [bulkSubcontractorId, setBulkSubcontractorId] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<SettlementBulkReconcilePreview | null>(null);
 
   const reload = async () => {
     if (!settlementId) return;
@@ -169,10 +172,35 @@ export function SettlementDetailPage() {
       exclusion_code: bulkTargetStatus === 'excluded' ? selectedExclusionCode : undefined,
       line_type: normalized.line_type,
       current_status: normalized.current_status,
+      route_id: bulkRouteId.trim() || undefined,
+      subcontractor_id: bulkSubcontractorId.trim() || undefined,
     });
     setFeedback(`Conciliacion masiva aplicada: ${result.affected_count} lineas.`);
+    setBulkPreview(null);
     await reload();
     await loadAudit();
+  };
+
+  const onPreviewBulkReconcile = async () => {
+    if (!settlementId) return;
+    if (!hasValidCatalogReason(bulkTargetStatus, selectedExclusionCode)) {
+      setFeedback('Selecciona un motivo de exclusion para previsualizar conciliacion masiva.');
+      return;
+    }
+    const normalized = normalizeBulkReconcileFilters({
+      lineType: bulkLineType,
+      currentStatus: bulkCurrentStatus,
+    });
+    const previewData = await apiClient.previewReconcileSettlementLinesBulk(settlementId, {
+      status: bulkTargetStatus,
+      exclusion_code: bulkTargetStatus === 'excluded' ? selectedExclusionCode : undefined,
+      line_type: normalized.line_type,
+      current_status: normalized.current_status,
+      route_id: bulkRouteId.trim() || undefined,
+      subcontractor_id: bulkSubcontractorId.trim() || undefined,
+    });
+    setBulkPreview(previewData);
+    setFeedback(`Preview masivo calculado: ${previewData.affected_count} lineas potenciales.`);
   };
 
   if (!detail) {
@@ -236,6 +264,20 @@ export function SettlementDetailPage() {
               <option value="excluded">Objetivo: excluded</option>
               <option value="payable">Objetivo: payable</option>
             </Select>
+          </div>
+          <div className="form-row">
+            <Input value={bulkRouteId} onChange={(e) => setBulkRouteId(e.target.value)} placeholder="Filtro route_id (uuid, opcional)" />
+            <Input value={bulkSubcontractorId} onChange={(e) => setBulkSubcontractorId(e.target.value)} placeholder="Filtro subcontractor_id (uuid, opcional)" />
+          </div>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onPreviewBulkReconcile}
+              disabled={!canReconcileLines || !isDraft}
+            >
+              Preview lote
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -245,6 +287,14 @@ export function SettlementDetailPage() {
               Conciliar en lote
             </Button>
           </div>
+          {bulkPreview && (
+            <div className="kpi-grid">
+              <div className="kpi-item"><div className="kpi-label">Lineas afectadas</div><div className="kpi-value">{bulkPreview.affected_count}</div></div>
+              <div className="kpi-item"><div className="kpi-label">Neto actual</div><div className="kpi-value">{(bulkPreview.before_totals.net_amount_cents / 100).toFixed(2)} EUR</div></div>
+              <div className="kpi-item"><div className="kpi-label">Neto post-conciliacion</div><div className="kpi-value">{(bulkPreview.after_totals.net_amount_cents / 100).toFixed(2)} EUR</div></div>
+              <div className="kpi-item"><div className="kpi-label">Delta neto</div><div className="kpi-value">{((bulkPreview.after_totals.net_amount_cents - bulkPreview.before_totals.net_amount_cents) / 100).toFixed(2)} EUR</div></div>
+            </div>
+          )}
 
           <TableWrapper>
             <Table>

@@ -13,9 +13,11 @@ import {
   RouteSummary,
   SettlementDetail,
   SettlementAdjustment,
+  SettlementBulkReconcilePreview,
   SettlementSummary,
   SettlementPreview,
   SettlementReconciliationReason,
+  SettlementReconciliationSummaryRow,
   SettlementRecalculatePreview,
   SubcontractorSummary,
   ShipmentSummary,
@@ -199,15 +201,33 @@ export const apiClient = {
     return parsePaginatedData<ShipmentSummary>(response);
   },
 
-  async getRoutes(filters: { status?: string } = {}): Promise<RouteSummary[]> {
-    if (USE_MOCK) return mockApi.getRoutes(filters);
+  async getRoutes(filters: {
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    perPage?: number;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  } = {}): Promise<PaginatedResult<RouteSummary>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 10;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getRoutes(filters), page, perPage);
+    }
     const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
     if (filters.status) params.set('status', filters.status);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.sort) params.set('sort', filters.sort);
+    if (filters.dir) params.set('dir', filters.dir);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/routes${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
-    return parseData<RouteSummary>(response);
+    return parsePaginatedData<RouteSummary>(response);
   },
 
   async getQualitySnapshots(filters: {
@@ -612,6 +632,25 @@ export const apiClient = {
     return parseData<SettlementReconciliationReason>(response);
   },
 
+  async getSettlementReconciliationSummary(filters: {
+    period?: string;
+    subcontractorId?: string;
+    settlementId?: string;
+  } = {}): Promise<SettlementReconciliationSummaryRow[]> {
+    if (USE_MOCK) return mockApi.getSettlementReconciliationSummary(filters) as Promise<SettlementReconciliationSummaryRow[]>;
+
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.settlementId) params.set('settlement_id', filters.settlementId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-summary${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parseData<SettlementReconciliationSummaryRow>(response);
+  },
+
   async createSettlementAdjustment(
     settlementId: string,
     payload: { amount_cents: number; reason: string }
@@ -693,6 +732,8 @@ export const apiClient = {
       exclusion_code?: string | null;
       line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
       current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
       line_ids?: string[];
     }
   ): Promise<{ affected_count: number }> {
@@ -708,6 +749,32 @@ export const apiClient = {
     });
     const data = await response.json();
     return { affected_count: data.data?.affected_count ?? 0 };
+  },
+
+  async previewReconcileSettlementLinesBulk(
+    settlementId: string,
+    payload: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      route_id?: string;
+      subcontractor_id?: string;
+      line_ids?: string[];
+    }
+  ): Promise<SettlementBulkReconcilePreview> {
+    if (USE_MOCK) return mockApi.previewReconcileSettlementLinesBulk(settlementId, payload) as Promise<SettlementBulkReconcilePreview>;
+
+    const response = await fetch(`${API_BASE_URL}/settlements/${settlementId}/lines/reconcile-bulk/preview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return data.data as SettlementBulkReconcilePreview;
   },
 
   async getSubcontractors(filters: { q?: string; limit?: number } = {}): Promise<SubcontractorSummary[]> {

@@ -79,6 +79,7 @@ Route::prefix('v1')->group(function () {
         Route::get('subcontractors', [SubcontractorController::class, 'index']);
         Route::get('settlements', [SettlementController::class, 'index']);
         Route::get('settlements/reconciliation-reasons', [SettlementController::class, 'reconciliationReasons']);
+        Route::get('settlements/reconciliation-summary', [SettlementController::class, 'reconciliationSummary']);
         Route::get('settlements/preview', [SettlementController::class, 'preview']);
         Route::post('settlements/finalize', [SettlementController::class, 'finalize']);
         Route::get('settlements/{id}', [SettlementController::class, 'show']);
@@ -91,6 +92,7 @@ Route::prefix('v1')->group(function () {
         Route::post('settlements/{id}/preview-recalculate', [SettlementController::class, 'previewRecalculate']);
         Route::post('settlements/{id}/recalculate', [SettlementController::class, 'recalculate']);
         Route::patch('settlements/{id}/lines/{lineId}/reconcile', [SettlementController::class, 'reconcileLine']);
+        Route::post('settlements/{id}/lines/reconcile-bulk/preview', [SettlementController::class, 'previewReconcileLinesBulk']);
         Route::post('settlements/{id}/lines/reconcile-bulk', [SettlementController::class, 'reconcileLinesBulk']);
         Route::get('settlements/{id}/export.csv', [SettlementController::class, 'exportCsv']);
         Route::get('settlements/{id}/export.pdf', [SettlementController::class, 'exportPdf']);
