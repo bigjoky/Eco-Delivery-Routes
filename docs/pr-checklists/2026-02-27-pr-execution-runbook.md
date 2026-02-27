@@ -7,6 +7,12 @@ git remote add origin <URL_DEL_REPO>
 git fetch origin
 ```
 
+Validar:
+
+```bash
+git remote -v
+```
+
 ## 1) Push rama actual
 
 ```bash
@@ -49,3 +55,26 @@ gh pr create --base main --head codex/monorepo-structure-v1 --title "Backend: Qu
 ```
 
 Si prefieres PRs por rama separada, crea ramas desde los commits por capa y usa `cherry-pick`.
+
+## 6) Split recomendado en 3 PRs (opcional, más limpio)
+
+Commits candidatos:
+- `36161b4` (quality API + web risk + RBAC approvals)
+- `7edc7f5` (CI Apple + SharedCore tests)
+
+Ejemplo:
+
+```bash
+git checkout -b codex/pr-backend-quality
+git cherry-pick 36161b4
+git push -u origin codex/pr-backend-quality
+gh pr create --base main --head codex/pr-backend-quality --title "Backend: quality risk summary + RBAC approvals" --body "Incluye endpoint risk-summary, OpenAPI y tests."
+```
+
+```bash
+git checkout main
+git checkout -b codex/pr-ci-apple
+git cherry-pick 7edc7f5
+git push -u origin codex/pr-ci-apple
+gh pr create --base main --head codex/pr-ci-apple --title "CI: apple matrix + SharedCore tests" --body "Agrega swift test de SharedCore y build matrix iOS/macOS/tvOS."
+```
