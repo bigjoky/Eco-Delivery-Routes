@@ -54,6 +54,70 @@ class QualityController extends Controller
         ]);
     }
 
+    public function riskSummary(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboardQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $threshold = (float) $request->query('threshold', 95);
+        $groupBy = (string) $request->query('group_by', 'hub');
+        if (!in_array($groupBy, ['hub', 'subcontractor'], true)) {
+            $groupBy = 'hub';
+        }
+
+        $rows = $this->fetchEnrichedQuality($request, 2000)
+            ->filter(fn ($row) => $row->scope_type === 'route')
+            ->sortByDesc('period_end')
+            ->groupBy('scope_id')
+            ->map(fn ($items) => $items->first())
+            ->values();
+
+        $grouped = $rows->groupBy(function ($row) use ($groupBy) {
+            return $groupBy === 'hub'
+                ? (string) ($row->hub_id ?? 'unknown')
+                : (string) ($row->subcontractor_id ?? 'unknown');
+        })->map(function ($items, $key) use ($groupBy, $threshold) {
+            $count = $items->count();
+            $underThreshold = $items->filter(fn ($row) => (float) $row->service_quality_score < $threshold);
+            $avgScore = $count > 0
+                ? round((float) $items->avg(fn ($row) => (float) $row->service_quality_score), 2)
+                : 0.0;
+            $worst = $items->sortBy('service_quality_score')->first();
+
+            $label = $key;
+            if ($groupBy === 'hub' && $key !== 'unknown') {
+                $label = (string) (DB::table('hubs')->where('id', $key)->value('code') ?? $key);
+            }
+            if ($groupBy === 'subcontractor' && $key !== 'unknown') {
+                $label = (string) (DB::table('subcontractors')->where('id', $key)->value('legal_name') ?? $key);
+            }
+
+            return [
+                'group_type' => $groupBy,
+                'group_id' => $key,
+                'group_label' => $label,
+                'routes_count' => $count,
+                'routes_under_threshold' => $underThreshold->count(),
+                'under_threshold_ratio' => $count > 0 ? round(($underThreshold->count() / $count) * 100, 2) : 0.0,
+                'avg_score' => $avgScore,
+                'worst_route_id' => $worst->scope_id ?? null,
+                'worst_route_label' => $worst->scope_label ?? $worst->scope_id ?? null,
+                'worst_route_score' => $worst->service_quality_score ?? null,
+            ];
+        })->sortByDesc('under_threshold_ratio')->values();
+
+        return response()->json([
+            'data' => $grouped,
+            'meta' => [
+                'threshold' => $threshold,
+                'group_by' => $groupBy,
+            ],
+        ]);
+    }
+
     public function exportCsv(Request $request): Response|JsonResponse
     {
         /** @var User $actor */

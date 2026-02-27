@@ -129,6 +129,98 @@ class QualityByRouteHttpTest extends TestCase
         $response->assertJsonPath('data.0.scope_id', $routeAId);
     }
 
+    public function test_risk_summary_returns_grouped_rows_for_hub_and_subcontractor(): void
+    {
+        $hubId = (string) DB::table('routes')->value('hub_id');
+        $subcontractorId = (string) DB::table('routes')->value('subcontractor_id');
+        $routeId = (string) DB::table('routes')->value('id');
+        $this->assertNotEmpty($hubId);
+        $this->assertNotEmpty($subcontractorId);
+        $this->assertNotEmpty($routeId);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'route',
+            'scope_id' => $routeId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 100,
+            'delivered_completed' => 88,
+            'failed_count' => 0,
+            'absent_count' => 0,
+            'retry_count' => 0,
+            'pickups_completed' => 2,
+            'service_quality_score' => 90.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $byHub = $this->getJson('/api/v1/kpis/quality/risk-summary?group_by=hub&hub_id=' . $hubId . '&period_start=2026-02-01&period_end=2026-02-28');
+        $byHub->assertOk();
+        $byHub->assertJsonPath('meta.group_by', 'hub');
+        $this->assertNotEmpty($byHub->json('data'));
+        $byHub->assertJsonStructure([
+            'data',
+            'meta' => ['threshold', 'group_by'],
+        ]);
+
+        $bySubcontractor = $this->getJson('/api/v1/kpis/quality/risk-summary?group_by=subcontractor&subcontractor_id=' . $subcontractorId);
+        $bySubcontractor->assertOk();
+        $bySubcontractor->assertJsonPath('meta.group_by', 'subcontractor');
+    }
+
+    public function test_risk_summary_defaults_invalid_group_by_to_hub(): void
+    {
+        $routeId = (string) DB::table('routes')->value('id');
+        $this->assertNotEmpty($routeId);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'route',
+            'scope_id' => $routeId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 10,
+            'delivered_completed' => 9,
+            'failed_count' => 0,
+            'absent_count' => 0,
+            'retry_count' => 0,
+            'pickups_completed' => 0,
+            'service_quality_score' => 90.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/kpis/quality/risk-summary?group_by=invalid');
+        $response->assertOk();
+        $response->assertJsonPath('meta.group_by', 'hub');
+    }
+
+    public function test_risk_summary_requires_dashboard_quality_permission(): void
+    {
+        /** @var \App\Models\User|null $user */
+        $user = \App\Models\User::query()->where('email', 'admin@eco.local')->first();
+        $this->assertNotNull($user);
+
+        $driverRoleId = DB::table('roles')->where('code', 'driver')->value('id');
+        $this->assertNotNull($driverRoleId);
+        DB::table('user_roles')->where('user_id', $user->id)->delete();
+        DB::table('user_roles')->insert([
+            'user_id' => $user->id,
+            'role_id' => $driverRoleId,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+        $response = $this->getJson('/api/v1/kpis/quality/risk-summary');
+        $response->assertForbidden();
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */
