@@ -168,6 +168,32 @@ export type SettlementDetail = {
   }>;
 };
 
+export type SettlementRecalculatePreview = {
+  settlement: {
+    id: string;
+    subcontractor_id: string;
+    period_start: string;
+    period_end: string;
+    status: 'draft' | 'approved' | 'exported' | 'paid';
+    currency: string;
+  };
+  totals: {
+    gross_amount_cents: number;
+    advances_amount_cents: number;
+    adjustments_amount_cents: number;
+    net_amount_cents: number;
+  };
+  manual_adjustments: Array<{
+    id: string;
+    line_type: string;
+    source_ref?: string | null;
+    line_total_cents: number;
+    status: 'payable' | 'excluded';
+    exclusion_reason?: string | null;
+  }>;
+  lines_count: number;
+};
+
 export type SettlementAdjustment = {
   id: string;
   settlement_id: string;
@@ -192,6 +218,20 @@ export type LoginResponse = {
   message: string;
   token?: string;
   token_type?: 'Bearer';
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    status: string;
+  };
+};
+
+export type CurrentUserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  roles: Array<{ id: string; code: string; name: string }>;
 };
 
 export type AuditLogEntry = {
