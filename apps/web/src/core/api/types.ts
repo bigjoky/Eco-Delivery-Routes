@@ -218,6 +218,20 @@ export type LoginResponse = {
   message: string;
   token?: string;
   token_type?: 'Bearer';
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    status: string;
+  };
+};
+
+export type CurrentUserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  roles: Array<{ id: string; code: string; name: string }>;
 };
 
 export type AuditLogEntry = {

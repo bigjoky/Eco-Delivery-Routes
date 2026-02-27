@@ -3,6 +3,18 @@ export const mockApi = {
     return { message: 'Login mock OK', token: 'mock-token' };
   },
 
+  async getCurrentUser() {
+    return {
+      id: 'u-1',
+      name: 'Admin Demo',
+      email: 'admin@eco.local',
+      status: 'active',
+      roles: [
+        { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
+      ],
+    };
+  },
+
   async getUsers() {
     return [
       { id: 'u-1', name: 'Admin Demo', email: 'admin@eco.local', status: 'active' },

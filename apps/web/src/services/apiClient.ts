@@ -1,6 +1,7 @@
 import {
   AuditLogEntry,
   AdvanceSummary,
+  CurrentUserProfile,
   IncidentCatalogItem,
   IncidentSummary,
   LoginResponse,
@@ -70,7 +71,28 @@ export const apiClient = {
 
     const data = (await response.json()) as LoginResponse;
     sessionStore.setToken(data.token ?? null);
+    try {
+      await this.getCurrentUser();
+    } catch {
+      // Non-blocking; role context can be refreshed later.
+    }
     return data;
+  },
+
+  async getCurrentUser(): Promise<CurrentUserProfile> {
+    if (USE_MOCK) {
+      const profile = await mockApi.getCurrentUser() as CurrentUserProfile;
+      sessionStore.setRoles(profile.roles.map((role) => role.code));
+      return profile;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const data = await response.json();
+    const profile = data.data as CurrentUserProfile;
+    sessionStore.setRoles((profile.roles ?? []).map((role) => role.code));
+    return profile;
   },
 
   async getUsers(): Promise<UserSummary[]> {

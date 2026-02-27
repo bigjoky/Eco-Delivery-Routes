@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
 export function SettlementDetailPage() {
@@ -16,6 +17,9 @@ export function SettlementDetailPage() {
   const [amountCents, setAmountCents] = useState('0');
   const [reason, setReason] = useState('');
   const [preview, setPreview] = useState<SettlementRecalculatePreview | null>(null);
+  const [newAdjustmentAmount, setNewAdjustmentAmount] = useState('0');
+  const [newAdjustmentReason, setNewAdjustmentReason] = useState('');
+  const [roles, setRoles] = useState<string[]>(sessionStore.getRoles());
 
   const reload = async () => {
     if (!settlementId) return;
@@ -26,6 +30,10 @@ export function SettlementDetailPage() {
     setDetail(detailData);
     setAdjustments(adjustmentData);
   };
+
+  useEffect(() => {
+    apiClient.getCurrentUser().finally(() => setRoles(sessionStore.getRoles()));
+  }, []);
 
   useEffect(() => {
     reload();
@@ -46,6 +54,43 @@ export function SettlementDetailPage() {
     setPreview(null);
   };
 
+  const onCreateAdjustment = async () => {
+    if (!settlementId) return;
+    await apiClient.createSettlementAdjustment(settlementId, {
+      amount_cents: Number(newAdjustmentAmount || '0'),
+      reason: newAdjustmentReason,
+    });
+    setNewAdjustmentAmount('0');
+    setNewAdjustmentReason('');
+    await reload();
+  };
+
+  const onApproveAdjustment = async (adjustmentId: string) => {
+    if (!settlementId) return;
+    await apiClient.approveSettlementAdjustment(settlementId, adjustmentId);
+    await reload();
+  };
+
+  const onRejectAdjustment = async (adjustmentId: string) => {
+    if (!settlementId) return;
+    const rejectReason = window.prompt('Motivo del rechazo', 'Rechazado por validacion de contabilidad');
+    if (!rejectReason) return;
+    await apiClient.rejectSettlementAdjustment(settlementId, adjustmentId, rejectReason);
+    await reload();
+  };
+
+  const onExportCsv = async () => {
+    if (!settlementId) return;
+    await apiClient.exportSettlementCsv(settlementId);
+    await reload();
+  };
+
+  const onExportPdf = async () => {
+    if (!settlementId) return;
+    await apiClient.exportSettlementPdf(settlementId);
+    await reload();
+  };
+
   if (!detail) {
     return (
       <section className="page-grid">
@@ -53,6 +98,14 @@ export function SettlementDetailPage() {
       </section>
     );
   }
+
+  const settlementStatus = detail.settlement.status;
+  const isDraft = settlementStatus === 'draft';
+  const canManageAdjustments = roles.includes('accountant') || roles.includes('super_admin');
+  const canApproveAdjustments = roles.includes('operations_manager') || roles.includes('super_admin');
+  const canRecalculate = roles.includes('accountant') || roles.includes('super_admin');
+  const canExport = roles.includes('accountant') || roles.includes('super_admin');
+  const canExportByStatus = settlementStatus === 'approved' || settlementStatus === 'exported';
 
   return (
     <section className="page-grid two">
@@ -62,6 +115,9 @@ export function SettlementDetailPage() {
           <CardDescription>{detail.settlement.period_start} - {detail.settlement.period_end}</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="helper">
+            Roles activos: {roles.length > 0 ? roles.join(', ') : 'sin roles cargados'}
+          </div>
           <div className="kpi-grid">
             <div className="kpi-item"><div className="kpi-label">Estado</div><div className="kpi-value"><Badge variant="outline">{detail.settlement.status}</Badge></div></div>
             <div className="kpi-item"><div className="kpi-label">Bruto</div><div className="kpi-value">{(detail.settlement.gross_amount_cents / 100).toFixed(2)} EUR</div></div>
@@ -97,16 +153,37 @@ export function SettlementDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle>Previsualizar recálculo</CardTitle>
-          <CardDescription>Añade ajuste manual temporal y previsualiza antes de recalcular.</CardDescription>
+          <CardDescription>Workflow draft: ajustes, previsualización, recálculo y exportes.</CardDescription>
         </CardHeader>
         <CardContent className="page-grid">
+          <div className="kpi-grid">
+            <div className="kpi-item"><div className="kpi-label">Recalcular</div><div className="kpi-value">{canRecalculate && isDraft ? 'Habilitado' : 'Bloqueado'}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Gestionar ajustes</div><div className="kpi-value">{canManageAdjustments && isDraft ? 'Habilitado' : 'Bloqueado'}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Aprobar/Rechazar</div><div className="kpi-value">{canApproveAdjustments && isDraft ? 'Habilitado' : 'Bloqueado'}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Exportar</div><div className="kpi-value">{canExport && canExportByStatus ? 'Habilitado' : 'Bloqueado'}</div></div>
+          </div>
+
+          <div className="form-row">
+            <Input value={newAdjustmentAmount} onChange={(e) => setNewAdjustmentAmount(e.target.value)} placeholder="Nuevo ajuste (centimos)" />
+            <Input value={newAdjustmentReason} onChange={(e) => setNewAdjustmentReason(e.target.value)} placeholder="Motivo nuevo ajuste" />
+          </div>
+          <Button
+            type="button"
+            onClick={onCreateAdjustment}
+            disabled={!canManageAdjustments || !isDraft || newAdjustmentReason.trim().length === 0}
+          >
+            Crear ajuste
+          </Button>
+
           <div className="form-row">
             <Input value={amountCents} onChange={(e) => setAmountCents(e.target.value)} placeholder="Monto ajuste (centimos)" />
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo ajuste temporal" />
           </div>
           <div className="inline-actions">
-            <Button type="button" variant="outline" onClick={onPreview}>Previsualizar</Button>
-            <Button type="button" onClick={onRecalculate}>Recalcular</Button>
+            <Button type="button" variant="outline" onClick={onPreview} disabled={!canRecalculate || !isDraft}>Previsualizar</Button>
+            <Button type="button" onClick={onRecalculate} disabled={!canRecalculate || !isDraft}>Recalcular</Button>
+            <Button type="button" variant="outline" onClick={onExportCsv} disabled={!canExport || !canExportByStatus}>Exportar CSV</Button>
+            <Button type="button" variant="outline" onClick={onExportPdf} disabled={!canExport || !canExportByStatus}>Exportar PDF</Button>
           </div>
 
           {preview && (
@@ -125,6 +202,7 @@ export function SettlementDetailPage() {
                   <TableHead>Motivo</TableHead>
                   <TableHead>Monto</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -133,6 +211,26 @@ export function SettlementDetailPage() {
                     <TableCell>{item.reason}</TableCell>
                     <TableCell>{(item.amount_cents / 100).toFixed(2)} EUR</TableCell>
                     <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="inline-actions">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onApproveAdjustment(item.id)}
+                          disabled={!canApproveAdjustments || !isDraft || item.status !== 'pending'}
+                        >
+                          Aprobar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onRejectAdjustment(item.id)}
+                          disabled={!canApproveAdjustments || !isDraft || item.status !== 'pending'}
+                        >
+                          Rechazar
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
