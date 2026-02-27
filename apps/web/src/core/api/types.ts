@@ -76,6 +76,22 @@ export type DriverRouteMeResponse = {
   stops: RouteStopSummary[];
 };
 
+export type TrackingEventSummary = {
+  id: string;
+  trackable_type: 'shipment' | 'pickup';
+  trackable_id: string;
+  event_code: string;
+  scan_code: string;
+  occurred_at: string;
+};
+
+export type PodSummary = {
+  id: string;
+  evidenceable_type: 'shipment' | 'pickup';
+  evidenceable_id: string;
+  signature_name: string;
+};
+
 export type QualitySnapshot = {
   id: string;
   scope_type: 'driver' | 'subcontractor' | 'route';

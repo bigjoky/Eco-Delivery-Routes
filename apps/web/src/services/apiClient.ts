@@ -27,6 +27,8 @@ import {
   TariffSummary,
   UserSummary,
   DriverRouteMeResponse,
+  PodSummary,
+  TrackingEventSummary,
 } from '../core/api/types';
 import { sessionStore } from '../core/auth/sessionStore';
 import { mockApi } from '../mocks/mockApi';
@@ -267,6 +269,51 @@ export const apiClient = {
     return json.data ?? { route: null, stops: [] };
   },
 
+  async registerScan(payload: {
+    trackable_type: 'shipment' | 'pickup';
+    trackable_id: string;
+    event_code?: string;
+    scan_code: string;
+    occurred_at?: string;
+  }): Promise<TrackingEventSummary> {
+    const body = {
+      trackable_type: payload.trackable_type,
+      trackable_id: payload.trackable_id,
+      event_code: payload.event_code ?? 'SCAN',
+      scan_code: payload.scan_code,
+      occurred_at: payload.occurred_at ?? new Date().toISOString(),
+    };
+    if (USE_MOCK) return mockApi.registerScan(body) as Promise<TrackingEventSummary>;
+    const response = await fetch(`${API_BASE_URL}/tracking-events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const json = await response.json();
+    return json.data as TrackingEventSummary;
+  },
+
+  async registerPod(payload: {
+    evidenceable_type: 'shipment' | 'pickup';
+    evidenceable_id: string;
+    signature_name: string;
+  }): Promise<PodSummary> {
+    if (USE_MOCK) return mockApi.registerPod(payload) as Promise<PodSummary>;
+    const response = await fetch(`${API_BASE_URL}/pods`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    return json.data as PodSummary;
+  },
+
   async getQualitySnapshots(filters: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
     scopeId?: string;
@@ -293,6 +340,7 @@ export const apiClient = {
   async getQualityTopRoutesUnderThreshold(filters: {
     threshold?: number;
     limit?: number;
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -302,6 +350,7 @@ export const apiClient = {
     const params = new URLSearchParams();
     if (filters.threshold !== undefined) params.set('threshold', String(filters.threshold));
     if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
     if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.periodStart) params.set('period_start', filters.periodStart);
@@ -320,6 +369,7 @@ export const apiClient = {
   async getQualityRiskSummary(filters: {
     threshold?: number;
     groupBy?: 'hub' | 'subcontractor';
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -329,6 +379,7 @@ export const apiClient = {
     const params = new URLSearchParams();
     if (filters.threshold !== undefined) params.set('threshold', String(filters.threshold));
     if (filters.groupBy) params.set('group_by', filters.groupBy);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
     if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.periodStart) params.set('period_start', filters.periodStart);
@@ -346,6 +397,7 @@ export const apiClient = {
 
   async exportQualityCsv(filters: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -354,6 +406,7 @@ export const apiClient = {
     if (USE_MOCK) return mockApi.exportQualityCsv(filters) as Promise<void>;
     const params = new URLSearchParams();
     if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
     if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.periodStart) params.set('period_start', filters.periodStart);
@@ -376,6 +429,7 @@ export const apiClient = {
 
   async exportQualityPdf(filters: {
     threshold?: number;
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -385,6 +439,7 @@ export const apiClient = {
     const params = new URLSearchParams();
     params.set('scope_type', 'route');
     if (filters.threshold !== undefined) params.set('threshold', String(filters.threshold));
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
     if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.periodStart) params.set('period_start', filters.periodStart);

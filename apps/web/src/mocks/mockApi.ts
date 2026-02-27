@@ -1,3 +1,6 @@
+let trackingSeq = 1;
+let podSeq = 1;
+
 export const mockApi = {
   async login(_: { email: string; password: string }) {
     return { message: 'Login mock OK', token: 'mock-token' };
@@ -166,6 +169,26 @@ export const mockApi = {
     };
   },
 
+  async registerScan(payload: {
+    trackable_type: 'shipment' | 'pickup';
+    trackable_id: string;
+    event_code: string;
+    scan_code: string;
+    occurred_at: string;
+  }) {
+    const id = `te-${trackingSeq++}`;
+    return { id, ...payload };
+  },
+
+  async registerPod(payload: {
+    evidenceable_type: 'shipment' | 'pickup';
+    evidenceable_id: string;
+    signature_name: string;
+  }) {
+    const id = `pod-${podSeq++}`;
+    return { id, ...payload };
+  },
+
   async getQualitySnapshots(filters: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
     scopeId?: string;
@@ -207,12 +230,14 @@ export const mockApi = {
     if (filters.scopeType) {
       return rows
         .filter((row) => row.scope_type === filters.scopeType)
+        .filter((row) => (filters.scopeId ? row.scope_id === filters.scopeId : true))
         .filter((row) => (filters.hubId ? row.hub_id === filters.hubId : true))
         .filter((row) => (filters.subcontractorId ? row.subcontractor_id === filters.subcontractorId : true))
         .filter((row) => (filters.periodStart ? row.period_start >= filters.periodStart : true))
         .filter((row) => (filters.periodEnd ? row.period_end <= filters.periodEnd : true));
     }
     return rows
+      .filter((row) => (filters.scopeId ? row.scope_id === filters.scopeId : true))
       .filter((row) => (filters.hubId ? row.hub_id === filters.hubId : true))
       .filter((row) => (filters.subcontractorId ? row.subcontractor_id === filters.subcontractorId : true))
       .filter((row) => (filters.periodStart ? row.period_start >= filters.periodStart : true))
@@ -222,6 +247,7 @@ export const mockApi = {
   async getQualityTopRoutesUnderThreshold(filters: {
     threshold?: number;
     limit?: number;
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -231,6 +257,7 @@ export const mockApi = {
     const limit = filters.limit ?? 10;
     const rows = await this.getQualitySnapshots({
       scopeType: 'route',
+      scopeId: filters.scopeId,
       hubId: filters.hubId,
       subcontractorId: filters.subcontractorId,
       periodStart: filters.periodStart,
@@ -253,6 +280,7 @@ export const mockApi = {
   async getQualityRiskSummary(filters: {
     threshold?: number;
     groupBy?: 'hub' | 'subcontractor';
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -262,6 +290,7 @@ export const mockApi = {
     const groupBy = filters.groupBy ?? 'hub';
     const rows = await this.getQualitySnapshots({
       scopeType: 'route',
+      scopeId: filters.scopeId,
       hubId: filters.hubId,
       subcontractorId: filters.subcontractorId,
       periodStart: filters.periodStart,
@@ -304,6 +333,7 @@ export const mockApi = {
 
   async exportQualityCsv(_: {
     scopeType?: 'driver' | 'subcontractor' | 'route';
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
@@ -314,6 +344,7 @@ export const mockApi = {
 
   async exportQualityPdf(_: {
     threshold?: number;
+    scopeId?: string;
     hubId?: string;
     subcontractorId?: string;
     periodStart?: string;
