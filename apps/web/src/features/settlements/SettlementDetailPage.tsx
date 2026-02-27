@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview } from '../../core/api/types';
+import { AuditLogEntry, SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
@@ -20,6 +20,9 @@ export function SettlementDetailPage() {
   const [newAdjustmentAmount, setNewAdjustmentAmount] = useState('0');
   const [newAdjustmentReason, setNewAdjustmentReason] = useState('');
   const [roles, setRoles] = useState<string[]>(sessionStore.getRoles());
+  const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
+  const [auditEventFilter, setAuditEventFilter] = useState('');
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const reload = async () => {
     if (!settlementId) return;
@@ -31,6 +34,18 @@ export function SettlementDetailPage() {
     setAdjustments(adjustmentData);
   };
 
+  const loadAudit = async () => {
+    if (!settlementId) return;
+    const response = await apiClient.getAuditLogs({
+      resource: 'settlement',
+      id: settlementId,
+      event: auditEventFilter.trim() || undefined,
+      page: 1,
+      perPage: 10,
+    });
+    setAuditRows(response.data);
+  };
+
   useEffect(() => {
     apiClient.getCurrentUser().finally(() => setRoles(sessionStore.getRoles()));
   }, []);
@@ -38,6 +53,10 @@ export function SettlementDetailPage() {
   useEffect(() => {
     reload();
   }, [settlementId]);
+
+  useEffect(() => {
+    loadAudit();
+  }, [settlementId, auditEventFilter]);
 
   const onPreview = async () => {
     if (!settlementId) return;
@@ -60,15 +79,19 @@ export function SettlementDetailPage() {
       amount_cents: Number(newAdjustmentAmount || '0'),
       reason: newAdjustmentReason,
     });
+    setFeedback('Ajuste creado');
     setNewAdjustmentAmount('0');
     setNewAdjustmentReason('');
     await reload();
+    await loadAudit();
   };
 
   const onApproveAdjustment = async (adjustmentId: string) => {
     if (!settlementId) return;
     await apiClient.approveSettlementAdjustment(settlementId, adjustmentId);
+    setFeedback(`Ajuste ${adjustmentId} aprobado`);
     await reload();
+    await loadAudit();
   };
 
   const onRejectAdjustment = async (adjustmentId: string) => {
@@ -76,19 +99,44 @@ export function SettlementDetailPage() {
     const rejectReason = window.prompt('Motivo del rechazo', 'Rechazado por validacion de contabilidad');
     if (!rejectReason) return;
     await apiClient.rejectSettlementAdjustment(settlementId, adjustmentId, rejectReason);
+    setFeedback(`Ajuste ${adjustmentId} rechazado`);
     await reload();
+    await loadAudit();
   };
 
   const onExportCsv = async () => {
     if (!settlementId) return;
     await apiClient.exportSettlementCsv(settlementId);
-    await reload();
+    setFeedback('Export CSV lanzado');
+    await loadAudit();
   };
 
   const onExportPdf = async () => {
     if (!settlementId) return;
     await apiClient.exportSettlementPdf(settlementId);
+    setFeedback('Export PDF lanzado');
+    await loadAudit();
+  };
+
+  const onExcludeLine = async (lineId: string) => {
+    if (!settlementId) return;
+    const reason = window.prompt('Motivo de exclusion', 'Excluido por conciliacion manual');
+    if (!reason || reason.trim().length === 0) return;
+    await apiClient.reconcileSettlementLine(settlementId, lineId, {
+      status: 'excluded',
+      exclusion_reason: reason.trim(),
+    });
+    setFeedback(`Linea ${lineId} excluida`);
     await reload();
+    await loadAudit();
+  };
+
+  const onRestoreLine = async (lineId: string) => {
+    if (!settlementId) return;
+    await apiClient.reconcileSettlementLine(settlementId, lineId, { status: 'payable' });
+    setFeedback(`Linea ${lineId} marcada pagable`);
+    await reload();
+    await loadAudit();
   };
 
   if (!detail) {
@@ -105,6 +153,7 @@ export function SettlementDetailPage() {
   const canApproveAdjustments = roles.includes('operations_manager') || roles.includes('super_admin');
   const canRecalculate = roles.includes('accountant') || roles.includes('super_admin');
   const canExport = roles.includes('accountant') || roles.includes('super_admin');
+  const canReconcileLines = roles.includes('accountant') || roles.includes('super_admin');
   const canExportByStatus = settlementStatus === 'approved' || settlementStatus === 'exported';
 
   return (
@@ -118,6 +167,7 @@ export function SettlementDetailPage() {
           <div className="helper">
             Roles activos: {roles.length > 0 ? roles.join(', ') : 'sin roles cargados'}
           </div>
+          {feedback && <div className="helper">{feedback}</div>}
           <div className="kpi-grid">
             <div className="kpi-item"><div className="kpi-label">Estado</div><div className="kpi-value"><Badge variant="outline">{detail.settlement.status}</Badge></div></div>
             <div className="kpi-item"><div className="kpi-label">Bruto</div><div className="kpi-value">{(detail.settlement.gross_amount_cents / 100).toFixed(2)} EUR</div></div>
@@ -133,6 +183,7 @@ export function SettlementDetailPage() {
                   <TableHead>Referencia</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Total</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -142,6 +193,26 @@ export function SettlementDetailPage() {
                     <TableCell>{line.source_ref ?? '-'}</TableCell>
                     <TableCell><Badge variant={line.status === 'payable' ? 'success' : 'warning'}>{line.status}</Badge></TableCell>
                     <TableCell>{(line.line_total_cents / 100).toFixed(2)} EUR</TableCell>
+                    <TableCell>
+                      <div className="inline-actions">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onExcludeLine(line.id)}
+                          disabled={!canReconcileLines || !isDraft || line.line_type === 'advance_deduction' || line.status === 'excluded'}
+                        >
+                          Excluir
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onRestoreLine(line.id)}
+                          disabled={!canReconcileLines || !isDraft || line.line_type === 'advance_deduction' || line.status === 'payable'}
+                        >
+                          Reincluir
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -230,6 +301,52 @@ export function SettlementDetailPage() {
                           Rechazar
                         </Button>
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Timeline auditoria</CardTitle>
+          <CardDescription>Eventos de liquidacion y ajustes del periodo.</CardDescription>
+        </CardHeader>
+        <CardContent className="page-grid">
+          <div className="form-row">
+            <Input
+              value={auditEventFilter}
+              onChange={(e) => setAuditEventFilter(e.target.value)}
+              placeholder="Filtrar por evento (ej: settlement.adjustment.approved)"
+            />
+            <Button type="button" variant="outline" onClick={loadAudit}>Refrescar</Button>
+          </div>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Evento</TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>Detalle</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {auditRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4}>Sin eventos para este filtro.</TableCell>
+                  </TableRow>
+                )}
+                {auditRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
+                    <TableCell>{row.event}</TableCell>
+                    <TableCell>{row.actor_name ?? row.actor_user_id ?? 'sistema'}</TableCell>
+                    <TableCell>
+                      {row.metadata ? JSON.stringify(row.metadata) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}

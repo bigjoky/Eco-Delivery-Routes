@@ -524,6 +524,88 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function reconcileLine(Request $request, string $id, string $lineId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $settlement = DB::table('settlements')->where('id', $id)->first();
+        if (!$settlement) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Settlement not found.'],
+            ], 404);
+        }
+
+        if ($settlement->status !== 'draft') {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Only draft settlements can be reconciled.'],
+            ], 422);
+        }
+
+        $line = DB::table('settlement_lines')
+            ->where('id', $lineId)
+            ->where('settlement_id', $id)
+            ->first();
+        if (!$line) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Settlement line not found.'],
+            ], 404);
+        }
+
+        if ($line->line_type === 'advance_deduction') {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Advance deductions cannot be manually reconciled.'],
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'status' => ['required', 'in:payable,excluded'],
+            'exclusion_reason' => ['nullable', 'string', 'max:80', 'required_if:status,excluded'],
+        ]);
+
+        $status = (string) $payload['status'];
+        $exclusionReason = $status === 'excluded' ? (string) ($payload['exclusion_reason'] ?? '') : null;
+
+        DB::transaction(function () use ($id, $lineId, $status, $exclusionReason, $actor): void {
+            DB::table('settlement_lines')
+                ->where('id', $lineId)
+                ->where('settlement_id', $id)
+                ->update([
+                    'status' => $status,
+                    'exclusion_reason' => $exclusionReason,
+                    'updated_at' => now(),
+                ]);
+
+            $this->recomputeSettlementTotals($id);
+
+            DB::table('audit_logs')->insert([
+                'actor_user_id' => $actor->id,
+                'event' => 'settlement.line.reconciled',
+                'metadata' => json_encode([
+                    'settlement_id' => $id,
+                    'line_id' => $lineId,
+                    'status' => $status,
+                    'exclusion_reason' => $exclusionReason,
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'data' => [
+                'line' => DB::table('settlement_lines')->where('id', $lineId)->first(),
+                'settlement' => DB::table('settlements')->where('id', $id)->first(),
+            ],
+            'message' => 'Settlement line reconciled.',
+        ]);
+    }
+
     public function exportCsv(Request $request, string $id): Response|JsonResponse
     {
         /** @var User $actor */

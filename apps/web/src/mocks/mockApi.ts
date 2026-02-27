@@ -425,6 +425,18 @@ export const mockApi = {
     return;
   },
 
+  async reconcileSettlementLine(
+    _: string,
+    __: string,
+    ___: { status: 'payable' | 'excluded'; exclusion_reason?: string | null }
+  ) {
+    return;
+  },
+
+  async exportSettlementCsv(_: string) {
+    return;
+  },
+
   async exportSettlementPdf(_: string) {
     return;
   },

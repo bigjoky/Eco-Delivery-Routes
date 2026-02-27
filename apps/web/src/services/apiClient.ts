@@ -649,6 +649,23 @@ export const apiClient = {
     });
   },
 
+  async reconcileSettlementLine(
+    settlementId: string,
+    lineId: string,
+    payload: { status: 'payable' | 'excluded'; exclusion_reason?: string | null }
+  ): Promise<void> {
+    if (USE_MOCK) return mockApi.reconcileSettlementLine(settlementId, lineId, payload) as Promise<void>;
+
+    await fetch(`${API_BASE_URL}/settlements/${settlementId}/lines/${lineId}/reconcile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+
   async getSubcontractors(filters: { q?: string; limit?: number } = {}): Promise<SubcontractorSummary[]> {
     if (USE_MOCK) return mockApi.getSubcontractors(filters) as Promise<SubcontractorSummary[]>;
 

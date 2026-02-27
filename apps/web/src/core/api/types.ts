@@ -161,6 +161,7 @@ export type SettlementDetail = {
   lines: Array<{
     id: string;
     line_type: string;
+    source_id?: string | null;
     source_ref?: string | null;
     status: 'payable' | 'excluded';
     line_total_cents: number;

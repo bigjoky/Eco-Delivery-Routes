@@ -484,6 +484,35 @@ paths:
         '404': { description: Liquidacion no encontrada }
         '422': { description: Solo liquidaciones draft pueden recalcularse }
 
+  /settlements/{id}/lines/{lineId}/reconcile:
+    patch:
+      tags: [Settlements]
+      summary: Conciliar manualmente una linea de liquidacion draft (payable/excluded)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: lineId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [payable, excluded] }
+                exclusion_reason: { type: string, maxLength: 80 }
+      responses:
+        '200': { description: Linea conciliada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Liquidacion o linea no encontrada }
+        '422': { description: Solo en draft y con reglas de conciliacion validas }
+
   /settlements/{id}/preview-recalculate:
     post:
       tags: [Settlements]
