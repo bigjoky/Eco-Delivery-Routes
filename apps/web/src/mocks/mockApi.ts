@@ -71,17 +71,22 @@ export const mockApi = {
     ];
   },
 
-  async getShipments() {
-    return [
+  async getShipments(filters: { status?: string } = {}) {
+    const rows = [
       { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo' },
       { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro' },
     ];
+    if (!filters.status) return rows;
+    return rows.filter((row) => row.status === filters.status);
   },
 
-  async getRoutes() {
-    return [
+  async getRoutes(filters: { status?: string } = {}) {
+    const rows = [
       { id: 'r-1', code: 'R-AGP-20260227', route_date: '2026-02-27', status: 'in_progress', stops_count: 28 },
+      { id: 'r-2', code: 'R-AGP-20260228', route_date: '2026-02-28', status: 'planned', stops_count: 24 },
     ];
+    if (!filters.status) return rows;
+    return rows.filter((row) => row.status === filters.status);
   },
 
   async getQualitySnapshots(filters: {
@@ -371,6 +376,16 @@ export const mockApi = {
     ];
   },
 
+  async getSettlementReconciliationReasons() {
+    return [
+      { id: 'sr-1', code: 'NO_POD', name: 'Sin POD valido', is_active: true },
+      { id: 'sr-2', code: 'RETRY_NOT_PAYABLE', name: 'Reintento no pagable', is_active: true },
+      { id: 'sr-3', code: 'ABSENCE_NOT_PAYABLE', name: 'Ausencia no pagable', is_active: true },
+      { id: 'sr-4', code: 'INCIDENT_REVIEW', name: 'Incidencia en revision contable', is_active: true },
+      { id: 'sr-5', code: 'MANUAL_AUDIT', name: 'Ajuste manual de auditoria', is_active: true },
+    ];
+  },
+
   async createSettlementAdjustment(_: string, __: { amount_cents: number; reason: string }) {
     return { id: 'sa-new' };
   },
@@ -428,9 +443,22 @@ export const mockApi = {
   async reconcileSettlementLine(
     _: string,
     __: string,
-    ___: { status: 'payable' | 'excluded'; exclusion_reason?: string | null }
+    ___: { status: 'payable' | 'excluded'; exclusion_code?: string | null }
   ) {
     return;
+  },
+
+  async reconcileSettlementLinesBulk(
+    _: string,
+    __: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      line_ids?: string[];
+    }
+  ) {
+    return { affected_count: 1 };
   },
 
   async exportSettlementCsv(_: string) {

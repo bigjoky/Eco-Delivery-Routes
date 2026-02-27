@@ -208,6 +208,13 @@ export type SettlementAdjustment = {
   approved_by_user_id?: string | null;
 };
 
+export type SettlementReconciliationReason = {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+};
+
 export type SubcontractorSummary = {
   id: string;
   legal_name: string;

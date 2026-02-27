@@ -4,9 +4,11 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { AuditLogEntry, SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview } from '../../core/api/types';
+import { AuditLogEntry, SettlementAdjustment, SettlementDetail, SettlementRecalculatePreview, SettlementReconciliationReason } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
+import { hasValidCatalogReason, normalizeBulkReconcileFilters } from './reconciliation';
 import { apiClient } from '../../services/apiClient';
 
 export function SettlementDetailPage() {
@@ -23,6 +25,11 @@ export function SettlementDetailPage() {
   const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
   const [auditEventFilter, setAuditEventFilter] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [reconciliationReasons, setReconciliationReasons] = useState<SettlementReconciliationReason[]>([]);
+  const [selectedExclusionCode, setSelectedExclusionCode] = useState('');
+  const [bulkLineType, setBulkLineType] = useState<'all' | 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment'>('all');
+  const [bulkCurrentStatus, setBulkCurrentStatus] = useState<'all' | 'payable' | 'excluded'>('payable');
+  const [bulkTargetStatus, setBulkTargetStatus] = useState<'payable' | 'excluded'>('excluded');
 
   const reload = async () => {
     if (!settlementId) return;
@@ -48,6 +55,12 @@ export function SettlementDetailPage() {
 
   useEffect(() => {
     apiClient.getCurrentUser().finally(() => setRoles(sessionStore.getRoles()));
+    apiClient.getSettlementReconciliationReasons().then((rows) => {
+      setReconciliationReasons(rows);
+      if (rows.length > 0) {
+        setSelectedExclusionCode(rows[0].code);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -120,11 +133,13 @@ export function SettlementDetailPage() {
 
   const onExcludeLine = async (lineId: string) => {
     if (!settlementId) return;
-    const reason = window.prompt('Motivo de exclusion', 'Excluido por conciliacion manual');
-    if (!reason || reason.trim().length === 0) return;
+    if (!selectedExclusionCode) {
+      setFeedback('Selecciona un motivo de exclusion del catalogo.');
+      return;
+    }
     await apiClient.reconcileSettlementLine(settlementId, lineId, {
       status: 'excluded',
-      exclusion_reason: reason.trim(),
+      exclusion_code: selectedExclusionCode,
     });
     setFeedback(`Linea ${lineId} excluida`);
     await reload();
@@ -135,6 +150,27 @@ export function SettlementDetailPage() {
     if (!settlementId) return;
     await apiClient.reconcileSettlementLine(settlementId, lineId, { status: 'payable' });
     setFeedback(`Linea ${lineId} marcada pagable`);
+    await reload();
+    await loadAudit();
+  };
+
+  const onBulkReconcile = async () => {
+    if (!settlementId) return;
+    if (!hasValidCatalogReason(bulkTargetStatus, selectedExclusionCode)) {
+      setFeedback('Selecciona un motivo de exclusion para la conciliacion masiva.');
+      return;
+    }
+    const normalized = normalizeBulkReconcileFilters({
+      lineType: bulkLineType,
+      currentStatus: bulkCurrentStatus,
+    });
+    const result = await apiClient.reconcileSettlementLinesBulk(settlementId, {
+      status: bulkTargetStatus,
+      exclusion_code: bulkTargetStatus === 'excluded' ? selectedExclusionCode : undefined,
+      line_type: normalized.line_type,
+      current_status: normalized.current_status,
+    });
+    setFeedback(`Conciliacion masiva aplicada: ${result.affected_count} lineas.`);
     await reload();
     await loadAudit();
   };
@@ -173,6 +209,41 @@ export function SettlementDetailPage() {
             <div className="kpi-item"><div className="kpi-label">Bruto</div><div className="kpi-value">{(detail.settlement.gross_amount_cents / 100).toFixed(2)} EUR</div></div>
             <div className="kpi-item"><div className="kpi-label">Anticipos</div><div className="kpi-value">{(detail.settlement.advances_amount_cents / 100).toFixed(2)} EUR</div></div>
             <div className="kpi-item"><div className="kpi-label">Neto</div><div className="kpi-value">{(detail.settlement.net_amount_cents / 100).toFixed(2)} EUR</div></div>
+          </div>
+
+          <div className="form-row">
+            <Select value={selectedExclusionCode} onChange={(e) => setSelectedExclusionCode(e.target.value)}>
+              <option value="">Motivo de exclusion...</option>
+              {reconciliationReasons.map((reasonItem) => (
+                <option key={reasonItem.id} value={reasonItem.code}>
+                  {reasonItem.code} - {reasonItem.name}
+                </option>
+              ))}
+            </Select>
+            <Select value={bulkLineType} onChange={(e) => setBulkLineType(e.target.value as typeof bulkLineType)}>
+              <option value="all">Tipo linea (todas)</option>
+              <option value="shipment_delivery">shipment_delivery</option>
+              <option value="pickup_normal">pickup_normal</option>
+              <option value="pickup_return">pickup_return</option>
+              <option value="manual_adjustment">manual_adjustment</option>
+            </Select>
+            <Select value={bulkCurrentStatus} onChange={(e) => setBulkCurrentStatus(e.target.value as typeof bulkCurrentStatus)}>
+              <option value="all">Estado actual (todos)</option>
+              <option value="payable">payable</option>
+              <option value="excluded">excluded</option>
+            </Select>
+            <Select value={bulkTargetStatus} onChange={(e) => setBulkTargetStatus(e.target.value as typeof bulkTargetStatus)}>
+              <option value="excluded">Objetivo: excluded</option>
+              <option value="payable">Objetivo: payable</option>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onBulkReconcile}
+              disabled={!canReconcileLines || !isDraft}
+            >
+              Conciliar en lote
+            </Button>
           </div>
 
           <TableWrapper>

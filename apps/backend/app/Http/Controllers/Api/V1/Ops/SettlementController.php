@@ -80,6 +80,26 @@ class SettlementController extends Controller
         ]);
     }
 
+    public function reconciliationReasons(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.read')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $rows = DB::table('settlement_exclusion_reasons')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
+        return response()->json([
+            'data' => $rows,
+        ]);
+    }
+
     public function show(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
@@ -565,19 +585,28 @@ class SettlementController extends Controller
 
         $payload = $request->validate([
             'status' => ['required', 'in:payable,excluded'],
-            'exclusion_reason' => ['nullable', 'string', 'max:80', 'required_if:status,excluded'],
+            'exclusion_code' => ['nullable', 'string', 'max:40', 'required_if:status,excluded'],
         ]);
 
         $status = (string) $payload['status'];
-        $exclusionReason = $status === 'excluded' ? (string) ($payload['exclusion_reason'] ?? '') : null;
+        $exclusionCode = $status === 'excluded' ? (string) ($payload['exclusion_code'] ?? '') : null;
+        $exclusionReason = $this->resolveExclusionReasonLabel($status, $exclusionCode);
+        if ($status === 'excluded' && $exclusionReason === null) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid exclusion code.'],
+            ], 422);
+        }
 
-        DB::transaction(function () use ($id, $lineId, $status, $exclusionReason, $actor): void {
+        DB::transaction(function () use ($id, $lineId, $status, $exclusionReason, $exclusionCode, $actor): void {
             DB::table('settlement_lines')
                 ->where('id', $lineId)
                 ->where('settlement_id', $id)
                 ->update([
                     'status' => $status,
                     'exclusion_reason' => $exclusionReason,
+                    'metadata' => $status === 'excluded'
+                        ? json_encode(['exclusion_code' => $exclusionCode, 'exclusion_reason' => $exclusionReason])
+                        : null,
                     'updated_at' => now(),
                 ]);
 
@@ -590,6 +619,7 @@ class SettlementController extends Controller
                     'settlement_id' => $id,
                     'line_id' => $lineId,
                     'status' => $status,
+                    'exclusion_code' => $exclusionCode,
                     'exclusion_reason' => $exclusionReason,
                 ]),
                 'created_at' => now(),
@@ -603,6 +633,114 @@ class SettlementController extends Controller
                 'settlement' => DB::table('settlements')->where('id', $id)->first(),
             ],
             'message' => 'Settlement line reconciled.',
+        ]);
+    }
+
+    public function reconcileLinesBulk(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('settlements.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $settlement = DB::table('settlements')->where('id', $id)->first();
+        if (!$settlement) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Settlement not found.'],
+            ], 404);
+        }
+        if ($settlement->status !== 'draft') {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Only draft settlements can be reconciled.'],
+            ], 422);
+        }
+
+        $payload = $request->validate([
+            'status' => ['required', 'in:payable,excluded'],
+            'exclusion_code' => ['nullable', 'string', 'max:40', 'required_if:status,excluded'],
+            'line_type' => ['nullable', 'in:shipment_delivery,pickup_normal,pickup_return,manual_adjustment'],
+            'current_status' => ['nullable', 'in:payable,excluded'],
+            'line_ids' => ['nullable', 'array', 'max:500'],
+            'line_ids.*' => ['uuid'],
+        ]);
+
+        $status = (string) $payload['status'];
+        $exclusionCode = $status === 'excluded' ? (string) ($payload['exclusion_code'] ?? '') : null;
+        $exclusionReason = $this->resolveExclusionReasonLabel($status, $exclusionCode);
+        if ($status === 'excluded' && $exclusionReason === null) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid exclusion code.'],
+            ], 422);
+        }
+
+        $lineIds = $payload['line_ids'] ?? [];
+        $query = DB::table('settlement_lines')
+            ->where('settlement_id', $id)
+            ->where('line_type', '!=', 'advance_deduction');
+
+        if (!empty($lineIds)) {
+            $query->whereIn('id', $lineIds);
+        }
+        if (isset($payload['line_type'])) {
+            $query->where('line_type', $payload['line_type']);
+        }
+        if (isset($payload['current_status'])) {
+            $query->where('status', $payload['current_status']);
+        }
+
+        $targetIds = $query->pluck('id')->all();
+        if (empty($targetIds)) {
+            return response()->json([
+                'data' => [
+                    'affected_count' => 0,
+                    'settlement' => DB::table('settlements')->where('id', $id)->first(),
+                ],
+                'message' => 'No settlement lines matched the bulk reconciliation filters.',
+            ]);
+        }
+
+        DB::transaction(function () use ($id, $targetIds, $status, $exclusionReason, $exclusionCode, $payload, $actor): void {
+            DB::table('settlement_lines')
+                ->whereIn('id', $targetIds)
+                ->update([
+                    'status' => $status,
+                    'exclusion_reason' => $exclusionReason,
+                    'metadata' => $status === 'excluded'
+                        ? json_encode(['exclusion_code' => $exclusionCode, 'exclusion_reason' => $exclusionReason, 'bulk' => true])
+                        : null,
+                    'updated_at' => now(),
+                ]);
+
+            $this->recomputeSettlementTotals($id);
+
+            DB::table('audit_logs')->insert([
+                'actor_user_id' => $actor->id,
+                'event' => 'settlement.lines.bulk_reconciled',
+                'metadata' => json_encode([
+                    'settlement_id' => $id,
+                    'affected_count' => count($targetIds),
+                    'status' => $status,
+                    'exclusion_code' => $exclusionCode,
+                    'filters' => [
+                        'line_type' => $payload['line_type'] ?? null,
+                        'current_status' => $payload['current_status'] ?? null,
+                        'line_ids_count' => count($payload['line_ids'] ?? []),
+                    ],
+                ]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'data' => [
+                'affected_count' => count($targetIds),
+                'settlement' => DB::table('settlements')->where('id', $id)->first(),
+            ],
+            'message' => 'Settlement lines reconciled in bulk.',
         ]);
     }
 
@@ -960,6 +1098,27 @@ class SettlementController extends Controller
             'net_amount_cents' => $net,
             'updated_at' => now(),
         ]);
+    }
+
+    private function resolveExclusionReasonLabel(string $status, ?string $code): ?string
+    {
+        if ($status !== 'excluded') {
+            return null;
+        }
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        $row = DB::table('settlement_exclusion_reasons')
+            ->where('code', $code)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return (string) $row->name;
     }
 
     /**

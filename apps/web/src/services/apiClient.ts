@@ -15,6 +15,7 @@ import {
   SettlementAdjustment,
   SettlementSummary,
   SettlementPreview,
+  SettlementReconciliationReason,
   SettlementRecalculatePreview,
   SubcontractorSummary,
   ShipmentSummary,
@@ -173,11 +174,17 @@ export const apiClient = {
     return parseData<RoleSummary>(response);
   },
 
-  async getShipments(filters: { page?: number; perPage?: number; sort?: string; dir?: 'asc' | 'desc' } = {}): Promise<PaginatedResult<ShipmentSummary>> {
+  async getShipments(filters: {
+    page?: number;
+    perPage?: number;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+    status?: string;
+  } = {}): Promise<PaginatedResult<ShipmentSummary>> {
     const page = filters.page ?? 1;
     const perPage = filters.perPage ?? 10;
     if (USE_MOCK) {
-      return paginateLocal(await mockApi.getShipments(), page, perPage);
+      return paginateLocal(await mockApi.getShipments(filters), page, perPage);
     }
 
     const params = new URLSearchParams();
@@ -185,15 +192,19 @@ export const apiClient = {
     params.set('per_page', String(perPage));
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
+    if (filters.status) params.set('status', filters.status);
     const response = await fetch(`${API_BASE_URL}/shipments?${params.toString()}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parsePaginatedData<ShipmentSummary>(response);
   },
 
-  async getRoutes(): Promise<RouteSummary[]> {
-    if (USE_MOCK) return mockApi.getRoutes();
-    const response = await fetch(`${API_BASE_URL}/routes`, {
+  async getRoutes(filters: { status?: string } = {}): Promise<RouteSummary[]> {
+    if (USE_MOCK) return mockApi.getRoutes(filters);
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/routes${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<RouteSummary>(response);
@@ -592,6 +603,15 @@ export const apiClient = {
     return parseData<SettlementAdjustment>(response);
   },
 
+  async getSettlementReconciliationReasons(): Promise<SettlementReconciliationReason[]> {
+    if (USE_MOCK) return mockApi.getSettlementReconciliationReasons() as Promise<SettlementReconciliationReason[]>;
+
+    const response = await fetch(`${API_BASE_URL}/settlements/reconciliation-reasons`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parseData<SettlementReconciliationReason>(response);
+  },
+
   async createSettlementAdjustment(
     settlementId: string,
     payload: { amount_cents: number; reason: string }
@@ -652,7 +672,7 @@ export const apiClient = {
   async reconcileSettlementLine(
     settlementId: string,
     lineId: string,
-    payload: { status: 'payable' | 'excluded'; exclusion_reason?: string | null }
+    payload: { status: 'payable' | 'excluded'; exclusion_code?: string | null }
   ): Promise<void> {
     if (USE_MOCK) return mockApi.reconcileSettlementLine(settlementId, lineId, payload) as Promise<void>;
 
@@ -664,6 +684,30 @@ export const apiClient = {
       },
       body: JSON.stringify(payload),
     });
+  },
+
+  async reconcileSettlementLinesBulk(
+    settlementId: string,
+    payload: {
+      status: 'payable' | 'excluded';
+      exclusion_code?: string | null;
+      line_type?: 'shipment_delivery' | 'pickup_normal' | 'pickup_return' | 'manual_adjustment';
+      current_status?: 'payable' | 'excluded';
+      line_ids?: string[];
+    }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.reconcileSettlementLinesBulk(settlementId, payload) as Promise<{ affected_count: number }>;
+
+    const response = await fetch(`${API_BASE_URL}/settlements/${settlementId}/lines/reconcile-bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return { affected_count: data.data?.affected_count ?? 0 };
   },
 
   async getSubcontractors(filters: { q?: string; limit?: number } = {}): Promise<SubcontractorSummary[]> {
