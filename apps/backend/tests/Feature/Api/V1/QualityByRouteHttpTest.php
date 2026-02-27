@@ -202,6 +202,75 @@ class QualityByRouteHttpTest extends TestCase
         $response->assertJsonPath('meta.group_by', 'hub');
     }
 
+    public function test_quality_endpoints_support_scope_id_filter_for_route_views(): void
+    {
+        $routeId = (string) DB::table('routes')->value('id');
+        $this->assertNotEmpty($routeId);
+
+        $otherRouteId = (string) Str::uuid();
+        $baseRoute = DB::table('routes')->first();
+        $this->assertNotNull($baseRoute);
+        DB::table('routes')->insert([
+            'id' => $otherRouteId,
+            'hub_id' => $baseRoute->hub_id,
+            'driver_id' => $baseRoute->driver_id,
+            'subcontractor_id' => $baseRoute->subcontractor_id,
+            'code' => 'R-OTHER',
+            'route_date' => now()->toDateString(),
+            'status' => 'in_progress',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'route',
+            'scope_id' => $routeId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 120,
+            'delivered_completed' => 110,
+            'failed_count' => 0,
+            'absent_count' => 0,
+            'retry_count' => 0,
+            'pickups_completed' => 2,
+            'service_quality_score' => 93.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'route',
+            'scope_id' => $otherRouteId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 100,
+            'delivered_completed' => 70,
+            'failed_count' => 0,
+            'absent_count' => 0,
+            'retry_count' => 0,
+            'pickups_completed' => 0,
+            'service_quality_score' => 70.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $top = $this->getJson('/api/v1/kpis/quality/top-routes-under-threshold?threshold=95&scope_id=' . $routeId);
+        $top->assertOk();
+        $top->assertJsonPath('meta.count', 1);
+        $top->assertJsonPath('data.0.scope_id', $routeId);
+
+        $risk = $this->getJson('/api/v1/kpis/quality/risk-summary?group_by=hub&scope_id=' . $routeId);
+        $risk->assertOk();
+        $risk->assertJsonPath('data.0.routes_count', 1);
+    }
+
     public function test_risk_summary_requires_dashboard_quality_permission(): void
     {
         /** @var \App\Models\User|null $user */

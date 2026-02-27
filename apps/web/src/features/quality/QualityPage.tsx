@@ -5,18 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { QualityRiskSummaryRow, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityRiskSummaryRow, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { severityFromScore, severityLabel } from './risk';
 
 export function QualityPage() {
   const [items, setItems] = useState<QualitySnapshot[]>([]);
   const [scopeType, setScopeType] = useState<'all' | 'driver' | 'route' | 'subcontractor'>('all');
+  const [scopeId, setScopeId] = useState('');
   const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
+  const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [threshold, setThreshold] = useState('95');
   const [underThresholdRoutes, setUnderThresholdRoutes] = useState<QualitySnapshot[]>([]);
   const [riskGroupBy, setRiskGroupBy] = useState<'hub' | 'subcontractor'>('hub');
@@ -24,45 +26,49 @@ export function QualityPage() {
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
+    apiClient.getHubs({ onlyActive: true }).then(setHubs);
   }, []);
 
   useEffect(() => {
     apiClient
       .getQualitySnapshots({
         scopeType: scopeType === 'all' ? undefined : scopeType,
+        scopeId: scopeId || undefined,
         hubId: hubId || undefined,
         subcontractorId: subcontractorId || undefined,
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
       .then(setItems);
-  }, [scopeType, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     apiClient
       .getQualityTopRoutesUnderThreshold({
         threshold: Number(threshold),
         limit: 10,
+        scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
         subcontractorId: subcontractorId || undefined,
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setUnderThresholdRoutes(result.data));
-  }, [threshold, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [threshold, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     apiClient
       .getQualityRiskSummary({
         threshold: Number(threshold),
         groupBy: riskGroupBy,
+        scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
         subcontractorId: subcontractorId || undefined,
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setRiskSummary(result.data));
-  }, [threshold, riskGroupBy, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [threshold, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
@@ -97,7 +103,17 @@ export function QualityPage() {
               <option value="route">Solo ruta</option>
               <option value="subcontractor">Solo subcontrata</option>
             </Select>
-            <Input value={hubId} onChange={(e) => setHubId(e.target.value)} placeholder="Filtrar hub_id (UUID)" />
+            <Input
+              value={scopeId}
+              onChange={(e) => setScopeId(e.target.value)}
+              placeholder={scopeType === 'route' ? 'Filtrar route_id (scope_id)' : 'Filtrar scope_id'}
+            />
+            <Select value={hubId} onChange={(e) => setHubId(e.target.value)}>
+              <option value="">Todos los hubs</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code}</option>
+              ))}
+            </Select>
             <Select value={subcontractorId} onChange={(e) => setSubcontractorId(e.target.value)}>
               <option value="">Todas las subcontratas</option>
               {subcontractors.map((subcontractor) => (
@@ -115,6 +131,7 @@ export function QualityPage() {
               onClick={() =>
                 apiClient.exportQualityCsv({
                   scopeType: scopeType === 'all' ? undefined : scopeType,
+                  scopeId: scopeId || undefined,
                   hubId: hubId || undefined,
                   subcontractorId: subcontractorId || undefined,
                   periodStart: periodStart || undefined,
@@ -130,6 +147,7 @@ export function QualityPage() {
               onClick={() =>
                 apiClient.exportQualityPdf({
                   threshold: Number(threshold),
+                  scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
                   hubId: hubId || undefined,
                   subcontractorId: subcontractorId || undefined,
                   periodStart: periodStart || undefined,

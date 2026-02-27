@@ -1030,6 +1030,9 @@ paths:
           name: limit
           schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
         - in: query
+          name: scope_id
+          schema: { type: string, format: uuid, description: "Filtro opcional de route_id (scope route)" }
+        - in: query
           name: period_start
           schema: { type: string, format: date }
         - in: query
@@ -1056,6 +1059,9 @@ paths:
           name: group_by
           schema: { type: string, enum: [hub, subcontractor], default: hub }
         - in: query
+          name: scope_id
+          schema: { type: string, format: uuid, description: "Filtro opcional de route_id (scope route)" }
+        - in: query
           name: period_start
           schema: { type: string, format: date }
         - in: query
@@ -1079,6 +1085,9 @@ paths:
           name: scope_type
           schema: { type: string, enum: [driver, subcontractor, route] }
         - in: query
+          name: scope_id
+          schema: { type: string, format: uuid }
+        - in: query
           name: period_start
           schema: { type: string, format: date }
         - in: query
@@ -1101,6 +1110,9 @@ paths:
         - in: query
           name: scope_type
           schema: { type: string, enum: [route], default: route }
+        - in: query
+          name: scope_id
+          schema: { type: string, format: uuid }
         - in: query
           name: threshold
           schema: { type: number, default: 95 }
