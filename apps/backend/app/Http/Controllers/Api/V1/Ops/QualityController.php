@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -136,43 +137,155 @@ class QualityController extends Controller
             ], 404);
         }
 
-        $rows = $this->fetchEnrichedQuality($request, 2000)
-            ->filter(fn ($row) => $row->scope_type === 'route' && (string) $row->scope_id === $routeId)
-            ->sortByDesc('period_end')
-            ->values();
+        return response()->json([
+            'data' => $this->buildBreakdownPayload(
+                rows: $this->scopeRows($request, 'route', $routeId),
+                scopeKey: 'route',
+                scopeId: $routeId,
+                scopeLabel: $route->code,
+                hubId: $route->hub_id,
+                subcontractorId: $route->subcontractor_id,
+                granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+            ),
+        ]);
+    }
 
-        $latest = $rows->first();
-        $assigned = (int) $rows->sum(fn ($row) => (int) ($row->assigned_with_attempt ?? 0));
-        $delivered = (int) $rows->sum(fn ($row) => (int) ($row->delivered_completed ?? 0));
-        $pickups = (int) $rows->sum(fn ($row) => (int) ($row->pickups_completed ?? 0));
-        $failed = (int) $rows->sum(fn ($row) => (int) ($row->failed_count ?? 0));
-        $absent = (int) $rows->sum(fn ($row) => (int) ($row->absent_count ?? 0));
-        $retry = (int) $rows->sum(fn ($row) => (int) ($row->retry_count ?? 0));
-        $completed = $delivered + $pickups;
-        $score = $assigned > 0 ? round(($completed / $assigned) * 100, 2) : 0.0;
+    public function routeBreakdownExportCsv(Request $request, string $routeId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $routeId)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_ROUTE_NOT_FOUND',
+                    'message' => 'Route not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'route', $routeId),
+            scopeKey: 'route',
+            scopeId: $routeId,
+            scopeLabel: $route->code,
+            hubId: $route->hub_id,
+            subcontractorId: $route->subcontractor_id,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $csvRows = [
+            'scope_type,scope_id,scope_label,granularity,period_key,period_start,period_end,assigned_with_attempt,delivered_completed,pickups_completed,failed_count,absent_count,retry_count,completed_total,completion_ratio',
+        ];
+        foreach ($payload['periods'] as $period) {
+            $csvRows[] = implode(',', [
+                $this->csv((string) $payload['scope_type']),
+                $this->csv((string) $payload['scope_id']),
+                $this->csv((string) ($payload['scope_label'] ?? '')),
+                $this->csv((string) $payload['granularity']),
+                $this->csv((string) ($period['period_key'] ?? '')),
+                $this->csv((string) ($period['period_start'] ?? '')),
+                $this->csv((string) ($period['period_end'] ?? '')),
+                (string) ($period['components']['assigned_with_attempt'] ?? 0),
+                (string) ($period['components']['delivered_completed'] ?? 0),
+                (string) ($period['components']['pickups_completed'] ?? 0),
+                (string) ($period['components']['failed_count'] ?? 0),
+                (string) ($period['components']['absent_count'] ?? 0),
+                (string) ($period['components']['retry_count'] ?? 0),
+                (string) ($period['components']['completed_total'] ?? 0),
+                (string) ($period['components']['completion_ratio'] ?? 0),
+            ]);
+        }
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="quality_route_breakdown.csv"',
+        ]);
+    }
+
+    public function routeBreakdownExportPdf(Request $request, string $routeId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $routeId)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_ROUTE_NOT_FOUND',
+                    'message' => 'Route not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'route', $routeId),
+            scopeKey: 'route',
+            scopeId: $routeId,
+            scopeLabel: $route->code,
+            hubId: $route->hub_id,
+            subcontractorId: $route->subcontractor_id,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $lines = [
+            'Eco Delivery Routes - Route Breakdown',
+            sprintf('Route: %s', (string) ($payload['scope_label'] ?? $payload['scope_id'])),
+            sprintf('Granularity: %s', (string) $payload['granularity']),
+            sprintf('Quality score: %.2f%%', (float) $payload['service_quality_score']),
+            sprintf('Assigned: %d | Completed: %d', (int) $payload['components']['assigned_with_attempt'], (int) $payload['components']['completed_total']),
+        ];
+        foreach ($payload['periods'] as $period) {
+            $lines[] = sprintf(
+                '%s | %.2f%% | completed %d/%d',
+                (string) ($period['period_key'] ?? ''),
+                (float) ($period['components']['completion_ratio'] ?? 0),
+                (int) ($period['components']['completed_total'] ?? 0),
+                (int) ($period['components']['assigned_with_attempt'] ?? 0)
+            );
+        }
+
+        return response($this->buildSimplePdf($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="quality_route_breakdown.pdf"',
+        ]);
+    }
+
+    public function driverBreakdown(Request $request, string $driverId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboardQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $driver = DB::table('drivers')->where('id', $driverId)->first();
+        if (!$driver) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_DRIVER_NOT_FOUND',
+                    'message' => 'Driver not found.',
+                ],
+            ], 404);
+        }
 
         return response()->json([
-            'data' => [
-                'route_id' => $routeId,
-                'route_code' => $route->code,
-                'hub_id' => $route->hub_id,
-                'subcontractor_id' => $route->subcontractor_id,
-                'latest_snapshot_id' => $latest->id ?? null,
-                'latest_period_start' => $latest->period_start ?? null,
-                'latest_period_end' => $latest->period_end ?? null,
-                'snapshots_count' => $rows->count(),
-                'service_quality_score' => $score,
-                'components' => [
-                    'assigned_with_attempt' => $assigned,
-                    'delivered_completed' => $delivered,
-                    'pickups_completed' => $pickups,
-                    'failed_count' => $failed,
-                    'absent_count' => $absent,
-                    'retry_count' => $retry,
-                    'completed_total' => $completed,
-                    'completion_ratio' => $score,
-                ],
-            ],
+            'data' => $this->buildBreakdownPayload(
+                rows: $this->scopeRows($request, 'driver', $driverId),
+                scopeKey: 'driver',
+                scopeId: $driverId,
+                scopeLabel: $driver->code ?? $driver->name ?? $driverId,
+                hubId: $driver->home_hub_id ?? null,
+                subcontractorId: $driver->subcontractor_id ?? null,
+                granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+            ),
         ]);
     }
 
@@ -450,6 +563,103 @@ class QualityController extends Controller
         }
 
         return $enriched;
+    }
+
+    private function scopeRows(Request $request, string $scopeType, string $scopeId)
+    {
+        return $this->fetchEnrichedQuality($request, 3000)
+            ->filter(fn ($row) => (string) $row->scope_type === $scopeType && (string) $row->scope_id === $scopeId)
+            ->sortByDesc('period_end')
+            ->values();
+    }
+
+    private function normalizeBreakdownGranularity(string $granularity): string
+    {
+        return in_array($granularity, ['week', 'month'], true) ? $granularity : 'month';
+    }
+
+    private function buildBreakdownPayload(
+        $rows,
+        string $scopeKey,
+        string $scopeId,
+        ?string $scopeLabel,
+        ?string $hubId,
+        ?string $subcontractorId,
+        string $granularity
+    ): array {
+        $latest = $rows->first();
+        $assigned = (int) $rows->sum(fn ($row) => (int) ($row->assigned_with_attempt ?? 0));
+        $delivered = (int) $rows->sum(fn ($row) => (int) ($row->delivered_completed ?? 0));
+        $pickups = (int) $rows->sum(fn ($row) => (int) ($row->pickups_completed ?? 0));
+        $failed = (int) $rows->sum(fn ($row) => (int) ($row->failed_count ?? 0));
+        $absent = (int) $rows->sum(fn ($row) => (int) ($row->absent_count ?? 0));
+        $retry = (int) $rows->sum(fn ($row) => (int) ($row->retry_count ?? 0));
+        $completed = $delivered + $pickups;
+        $score = $assigned > 0 ? round(($completed / $assigned) * 100, 2) : 0.0;
+
+        $periods = $rows->groupBy(function ($row) use ($granularity) {
+            $end = Carbon::parse((string) $row->period_end);
+            if ($granularity === 'week') {
+                return $end->format('o-\WW');
+            }
+
+            return $end->format('Y-m');
+        })->map(function ($items, $periodKey) {
+            $start = (string) $items->min('period_start');
+            $end = (string) $items->max('period_end');
+            $periodAssigned = (int) $items->sum(fn ($row) => (int) ($row->assigned_with_attempt ?? 0));
+            $periodDelivered = (int) $items->sum(fn ($row) => (int) ($row->delivered_completed ?? 0));
+            $periodPickups = (int) $items->sum(fn ($row) => (int) ($row->pickups_completed ?? 0));
+            $periodFailed = (int) $items->sum(fn ($row) => (int) ($row->failed_count ?? 0));
+            $periodAbsent = (int) $items->sum(fn ($row) => (int) ($row->absent_count ?? 0));
+            $periodRetry = (int) $items->sum(fn ($row) => (int) ($row->retry_count ?? 0));
+            $periodCompleted = $periodDelivered + $periodPickups;
+            $periodScore = $periodAssigned > 0 ? round(($periodCompleted / $periodAssigned) * 100, 2) : 0.0;
+
+            return [
+                'period_key' => (string) $periodKey,
+                'period_start' => $start,
+                'period_end' => $end,
+                'service_quality_score' => $periodScore,
+                'components' => [
+                    'assigned_with_attempt' => $periodAssigned,
+                    'delivered_completed' => $periodDelivered,
+                    'pickups_completed' => $periodPickups,
+                    'failed_count' => $periodFailed,
+                    'absent_count' => $periodAbsent,
+                    'retry_count' => $periodRetry,
+                    'completed_total' => $periodCompleted,
+                    'completion_ratio' => $periodScore,
+                ],
+            ];
+        })->sortBy('period_start')->values();
+
+        return [
+            'scope_type' => $scopeKey,
+            'scope_id' => $scopeId,
+            'scope_label' => $scopeLabel,
+            $scopeKey . '_id' => $scopeId,
+            $scopeKey . '_code' => $scopeLabel,
+            'hub_id' => $hubId,
+            'subcontractor_id' => $subcontractorId,
+            'granularity' => $granularity,
+            'latest_snapshot_id' => $latest->id ?? null,
+            'latest_period_start' => $latest->period_start ?? null,
+            'latest_period_end' => $latest->period_end ?? null,
+            'snapshots_count' => $rows->count(),
+            'service_quality_score' => $score,
+            'components' => [
+                'assigned_with_attempt' => $assigned,
+                'delivered_completed' => $delivered,
+                'pickups_completed' => $pickups,
+                'failed_count' => $failed,
+                'absent_count' => $absent,
+                'retry_count' => $retry,
+                'completed_total' => $completed,
+                'completion_ratio' => $score,
+            ],
+            'periods' => $periods,
+        ];
     }
 
     private function csv(string $value): string

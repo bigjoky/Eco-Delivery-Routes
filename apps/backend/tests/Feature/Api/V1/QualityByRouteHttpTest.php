@@ -296,9 +296,10 @@ class QualityByRouteHttpTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $response = $this->getJson('/api/v1/kpis/quality/routes/' . $routeId . '/breakdown?period_start=2026-02-01&period_end=2026-02-28');
+        $response = $this->getJson('/api/v1/kpis/quality/routes/' . $routeId . '/breakdown?period_start=2026-02-01&period_end=2026-02-28&granularity=week');
         $response->assertOk();
         $response->assertJsonPath('data.route_id', $routeId);
+        $response->assertJsonPath('data.granularity', 'week');
         $response->assertJsonPath('data.components.assigned_with_attempt', 100);
         $response->assertJsonPath('data.components.delivered_completed', 80);
         $response->assertJsonPath('data.components.pickups_completed', 5);
@@ -307,6 +308,48 @@ class QualityByRouteHttpTest extends TestCase
         $response->assertJsonPath('data.components.retry_count', 3);
         $response->assertJsonPath('data.components.completed_total', 85);
         $response->assertJsonPath('data.components.completion_ratio', 85);
+        $this->assertNotEmpty($response->json('data.periods'));
+
+        $csv = $this->get('/api/v1/kpis/quality/routes/' . $routeId . '/breakdown/export.csv?granularity=week');
+        $csv->assertOk();
+        $csv->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $pdf = $this->get('/api/v1/kpis/quality/routes/' . $routeId . '/breakdown/export.pdf?granularity=month');
+        $pdf->assertOk();
+        $pdf->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_driver_breakdown_returns_aggregate_for_driver_scope(): void
+    {
+        $driverId = (string) DB::table('drivers')->value('id');
+        $this->assertNotEmpty($driverId);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'driver',
+            'scope_id' => $driverId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 75,
+            'delivered_completed' => 66,
+            'failed_count' => 4,
+            'absent_count' => 2,
+            'retry_count' => 1,
+            'pickups_completed' => 3,
+            'service_quality_score' => 92.0,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/kpis/quality/drivers/' . $driverId . '/breakdown?granularity=month');
+        $response->assertOk();
+        $response->assertJsonPath('data.driver_id', $driverId);
+        $response->assertJsonPath('data.scope_type', 'driver');
+        $response->assertJsonPath('data.components.assigned_with_attempt', 75);
+        $response->assertJsonPath('data.components.completed_total', 69);
     }
 
     public function test_risk_summary_requires_dashboard_quality_permission(): void
