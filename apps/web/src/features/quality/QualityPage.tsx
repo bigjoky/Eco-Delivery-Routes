@@ -26,6 +26,7 @@ export function QualityPage() {
   const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
+  const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -82,9 +83,10 @@ export function QualityPage() {
       .getQualityRouteBreakdown(selectedRouteId, {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
+        granularity: breakdownGranularity,
       })
       .then(setRouteBreakdown);
-  }, [selectedRouteId, periodStart, periodEnd]);
+  }, [selectedRouteId, periodStart, periodEnd, breakdownGranularity]);
 
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
@@ -141,6 +143,10 @@ export function QualityPage() {
             <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Umbral (ej: 95)" />
           </div>
           <div className="inline-actions">
+            <Select value={breakdownGranularity} onChange={(e) => setBreakdownGranularity(e.target.value as 'week' | 'month')}>
+              <option value="month">Desglose mensual</option>
+              <option value="week">Desglose semanal</option>
+            </Select>
             <Button
               type="button"
               variant="outline"
@@ -228,6 +234,52 @@ export function QualityPage() {
                 <span>Ruta: {routeBreakdown.route_code ?? routeBreakdown.route_id}</span>
                 <span>Snapshots: {routeBreakdown.snapshots_count}</span>
                 <Link to={`/routes/${routeBreakdown.route_id}`}>Abrir ruta</Link>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualityRouteBreakdownCsv(routeBreakdown.route_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar CSV desglose
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualityRouteBreakdownPdf(routeBreakdown.route_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar PDF desglose
+                </Button>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {routeBreakdown.periods.map((period) => (
+                  <div key={period.period_key}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{period.period_key}</span>
+                      <span>{period.components.completion_ratio}%</span>
+                    </div>
+                    <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8 }}>
+                      <div
+                        style={{
+                          width: `${Math.min(100, Math.max(0, period.components.completion_ratio))}%`,
+                          height: '100%',
+                          borderRadius: 6,
+                          background: period.components.completion_ratio >= 95 ? '#22c55e' : '#f59e0b',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
               <TableWrapper>
                 <Table>

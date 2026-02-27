@@ -20,7 +20,9 @@ public protocol APIClientProtocol {
         notes: String
     ) async throws
     func qualitySnapshots(scopeType: String?) async throws -> [QualitySnapshot]
-    func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?) async throws -> QualityRouteBreakdown
+    func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown
+    func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
+    func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
 }
 
 public final class APIClient: APIClientProtocol {
@@ -235,9 +237,9 @@ public final class APIClient: APIClientProtocol {
         return try JSONDecoder().decode(DataEnvelope<QualitySnapshot>.self, from: data).data
     }
 
-    public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?) async throws -> QualityRouteBreakdown {
+    public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
         guard let baseURL else {
-            return try await mock.qualityRouteBreakdown(routeId: routeId, periodStart: periodStart, periodEnd: periodEnd)
+            return try await mock.qualityRouteBreakdown(routeId: routeId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
         }
 
         let url = withQueryItems(
@@ -245,11 +247,46 @@ public final class APIClient: APIClientProtocol {
             queryItems: [
                 URLQueryItem(name: "period_start", value: periodStart),
                 URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
             ]
         )
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataObjectEnvelope<QualityRouteBreakdown>.self, from: data).data
+    }
+
+    public func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        guard let baseURL else {
+            return try await mock.exportQualityRouteBreakdownCsv(routeId: routeId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/routes/\(routeId)/breakdown/export.csv"),
+            queryItems: [
+                URLQueryItem(name: "period_start", value: periodStart),
+                URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
+    }
+
+    public func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        guard let baseURL else {
+            return try await mock.exportQualityRouteBreakdownPdf(routeId: routeId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/routes/\(routeId)/breakdown/export.pdf"),
+            queryItems: [
+                URLQueryItem(name: "period_start", value: periodStart),
+                URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {

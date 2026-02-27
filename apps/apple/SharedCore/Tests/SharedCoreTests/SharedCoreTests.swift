@@ -87,10 +87,30 @@ final class SharedCoreTests: XCTestCase {
     func test_quality_route_breakdown_decodes_component_payload() throws {
         let payload = """
         {
+          "scope_type": "route",
+          "scope_id": "route-1",
+          "scope_label": "R-AGP-01",
           "route_id": "route-1",
           "route_code": "R-AGP-01",
+          "granularity": "month",
           "snapshots_count": 1,
           "service_quality_score": 93.5,
+          "periods": [{
+            "period_key": "2026-02",
+            "period_start": "2026-02-01",
+            "period_end": "2026-02-28",
+            "service_quality_score": 93.0,
+            "components": {
+              "assigned_with_attempt": 100,
+              "delivered_completed": 88,
+              "pickups_completed": 5,
+              "failed_count": 4,
+              "absent_count": 2,
+              "retry_count": 1,
+              "completed_total": 93,
+              "completion_ratio": 93.0
+            }
+          }],
           "components": {
             "assigned_with_attempt": 100,
             "delivered_completed": 88,
@@ -106,13 +126,16 @@ final class SharedCoreTests: XCTestCase {
 
         let decoded = try JSONDecoder().decode(QualityRouteBreakdown.self, from: payload)
         XCTAssertEqual(decoded.routeId, "route-1")
+        XCTAssertEqual(decoded.scopeType, "route")
+        XCTAssertEqual(decoded.granularity, "month")
+        XCTAssertEqual(decoded.periods.count, 1)
         XCTAssertEqual(decoded.components.completedTotal, 93)
         XCTAssertEqual(decoded.components.failedCount, 4)
     }
 
     func test_api_client_returns_mock_route_breakdown_when_base_url_is_nil() async throws {
         let client = APIClient(baseURL: nil)
-        let breakdown = try await client.qualityRouteBreakdown(routeId: "r-1", periodStart: nil, periodEnd: nil)
+        let breakdown = try await client.qualityRouteBreakdown(routeId: "r-1", periodStart: nil, periodEnd: nil, granularity: "month")
         XCTAssertEqual(breakdown.routeId, "r-1")
         XCTAssertGreaterThan(breakdown.components.assignedWithAttempt, 0)
     }

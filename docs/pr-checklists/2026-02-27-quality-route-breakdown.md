@@ -2,6 +2,8 @@
 
 ## Scope
 - Backend: endpoint `GET /api/v1/kpis/quality/routes/{routeId}/breakdown`.
+- Backend: endpoint `GET /api/v1/kpis/quality/drivers/{driverId}/breakdown`.
+- Backend: exportes `GET /api/v1/kpis/quality/routes/{routeId}/breakdown/export.csv|pdf`.
 - Web: drill-down desde `Calidad` a desglose por ruta con componentes KPI.
 - Apple macOS: panel de calidad con detalle auditable de ruta seleccionada.
 - Apple tvOS: dashboard solo lectura con desglose de ruta en riesgo.
@@ -23,14 +25,16 @@
 8. tvOS/macOS: fallback mock visible si API no responde.
 
 ## QA Contract/API
-- [ ] OpenAPI incluye `/kpis/quality/routes/{routeId}/breakdown`.
-- [ ] OpenAPI documenta query params `period_start` y `period_end`.
-- [ ] Tests backend pasan: `QualityByRouteHttpTest`, `OpsEndpointsTest`.
+- [x] OpenAPI incluye `/kpis/quality/routes/{routeId}/breakdown`.
+- [x] OpenAPI incluye exportes `/kpis/quality/routes/{routeId}/breakdown/export.csv|pdf`.
+- [x] OpenAPI incluye `/kpis/quality/drivers/{driverId}/breakdown`.
+- [x] OpenAPI documenta query params `period_start`, `period_end`, `granularity`.
+- [x] Tests backend pasan: `QualityByRouteHttpTest`, `OpsEndpointsTest`.
 
 ## Build/Test Evidence
-- [ ] Backend: `./vendor/bin/phpunit --filter QualityByRouteHttpTest`
-- [ ] Backend: `./vendor/bin/phpunit --filter OpsEndpointsTest`
-- [ ] Web: `npm test -- --run`
-- [ ] Web: `npm run build`
-- [ ] Apple SharedCore: `swift test`
-
+- [x] Backend: `./vendor/bin/phpunit --filter QualityByRouteHttpTest`
+- [x] Backend: `./vendor/bin/phpunit --filter OpsEndpointsTest`
+- [x] Web: `npm test -- --run`
+- [x] Web: `npm run build`
+- [x] Apple SharedCore: `swift test`
+- [x] Android: `./gradlew :app:assembleDebug`
