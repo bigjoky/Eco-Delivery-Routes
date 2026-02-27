@@ -362,6 +362,7 @@ export const mockApi = {
   async getQualityRouteBreakdown(routeId: string, filters: {
     periodStart?: string;
     periodEnd?: string;
+    granularity?: 'week' | 'month';
   } = {}) {
     const rows = await this.getQualitySnapshots({
       scopeType: 'route',
@@ -394,17 +395,141 @@ export const mockApi = {
     const completed = delivered + pickups;
     const ratio = assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
     const latest = rows[0];
+    const granularity = filters.granularity ?? 'month';
+
+    const periodGroups = rows.reduce((acc, row) => {
+      const key = granularity === 'week'
+        ? `${row.period_end.slice(0, 4)}-W${String(Math.ceil(Number(row.period_end.slice(8, 10)) / 7)).padStart(2, '0')}`
+        : row.period_end.slice(0, 7);
+      const current = acc.get(key) ?? [];
+      current.push(row);
+      acc.set(key, current);
+      return acc;
+    }, new Map<string, typeof rows>());
+
+    const periods = Array.from(periodGroups.entries()).map(([periodKey, periodRows]) => {
+      const periodAssigned = periodRows.reduce((acc, row) => acc + row.assigned_with_attempt, 0);
+      const periodDelivered = periodRows.reduce((acc, row) => acc + row.delivered_completed, 0);
+      const periodPickups = periodRows.reduce((acc, row) => acc + row.pickups_completed, 0);
+      const periodFailed = periodRows.reduce((acc, row) => acc + (row.failed_count ?? 0), 0);
+      const periodAbsent = periodRows.reduce((acc, row) => acc + (row.absent_count ?? 0), 0);
+      const periodRetry = periodRows.reduce((acc, row) => acc + (row.retry_count ?? 0), 0);
+      const periodCompleted = periodDelivered + periodPickups;
+      const periodRatio = periodAssigned > 0 ? Number(((periodCompleted / periodAssigned) * 100).toFixed(2)) : 0;
+      return {
+        period_key: periodKey,
+        period_start: periodRows[periodRows.length - 1]?.period_start ?? '',
+        period_end: periodRows[0]?.period_end ?? '',
+        service_quality_score: periodRatio,
+        components: {
+          assigned_with_attempt: periodAssigned,
+          delivered_completed: periodDelivered,
+          pickups_completed: periodPickups,
+          failed_count: periodFailed,
+          absent_count: periodAbsent,
+          retry_count: periodRetry,
+          completed_total: periodCompleted,
+          completion_ratio: periodRatio,
+        },
+      };
+    });
 
     return {
+      scope_type: 'route',
+      scope_id: routeId,
+      scope_label: latest?.scope_label ?? routeId,
       route_id: routeId,
       route_code: latest?.scope_label ?? routeId,
       hub_id: latest?.hub_id ?? null,
       subcontractor_id: latest?.subcontractor_id ?? null,
+      granularity,
       latest_snapshot_id: latest?.id ?? null,
       latest_period_start: latest?.period_start ?? null,
       latest_period_end: latest?.period_end ?? null,
       snapshots_count: rows.length,
       service_quality_score: ratio,
+      periods,
+      components: {
+        assigned_with_attempt: assigned,
+        delivered_completed: delivered,
+        pickups_completed: pickups,
+        failed_count: failed,
+        absent_count: absent,
+        retry_count: retry,
+        completed_total: completed,
+        completion_ratio: ratio,
+      },
+    };
+  },
+
+  async exportQualityRouteBreakdownCsv(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
+  },
+
+  async exportQualityRouteBreakdownPdf(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
+  },
+
+  async getQualityDriverBreakdown(driverId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}) {
+    const rows = await this.getQualitySnapshots({
+      scopeType: 'driver',
+      scopeId: driverId,
+      periodStart: filters.periodStart,
+      periodEnd: filters.periodEnd,
+    }) as Array<{
+      id: string;
+      scope_id: string;
+      scope_label?: string;
+      hub_id?: string;
+      subcontractor_id?: string;
+      period_start: string;
+      period_end: string;
+      assigned_with_attempt: number;
+      delivered_completed: number;
+      pickups_completed: number;
+      failed_count?: number;
+      absent_count?: number;
+      retry_count?: number;
+    }>;
+
+    const assigned = rows.reduce((acc, row) => acc + row.assigned_with_attempt, 0);
+    const delivered = rows.reduce((acc, row) => acc + row.delivered_completed, 0);
+    const pickups = rows.reduce((acc, row) => acc + row.pickups_completed, 0);
+    const failed = rows.reduce((acc, row) => acc + (row.failed_count ?? 0), 0);
+    const absent = rows.reduce((acc, row) => acc + (row.absent_count ?? 0), 0);
+    const retry = rows.reduce((acc, row) => acc + (row.retry_count ?? 0), 0);
+    const completed = delivered + pickups;
+    const ratio = assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
+    const granularity = filters.granularity ?? 'month';
+    const latest = rows[0];
+
+    return {
+      scope_type: 'driver',
+      scope_id: driverId,
+      scope_label: latest?.scope_label ?? driverId,
+      driver_id: driverId,
+      driver_code: latest?.scope_label ?? driverId,
+      hub_id: latest?.hub_id ?? null,
+      subcontractor_id: latest?.subcontractor_id ?? null,
+      granularity,
+      latest_snapshot_id: latest?.id ?? null,
+      latest_period_start: latest?.period_start ?? null,
+      latest_period_end: latest?.period_end ?? null,
+      snapshots_count: rows.length,
+      service_quality_score: ratio,
+      periods: [],
       components: {
         assigned_with_attempt: assigned,
         delivered_completed: delivered,

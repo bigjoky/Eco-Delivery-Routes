@@ -40,6 +40,7 @@ struct ContentView: View {
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var selectedQualityRouteId: String?
     @State private var selectedRouteBreakdown: QualityRouteBreakdown?
+    @State private var breakdownGranularity: String = "month"
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -206,11 +207,44 @@ struct ContentView: View {
                             Text("Snapshots: \(breakdown.snapshotsCount)")
                                 .foregroundStyle(.secondary)
                                 .font(.caption)
+                            Picker("Granularidad", selection: $breakdownGranularity) {
+                                Text("Mensual").tag("month")
+                                Text("Semanal").tag("week")
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: breakdownGranularity) { _, _ in
+                                guard let selectedQualityRouteId else { return }
+                                Task { await loadRouteBreakdown(routeId: selectedQualityRouteId) }
+                            }
                             Text("Asignados: \(breakdown.components.assignedWithAttempt)")
                             Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
                             Text("Fallidas: \(breakdown.components.failedCount) · Ausencias: \(breakdown.components.absentCount) · Reintentos: \(breakdown.components.retryCount)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Exportar CSV") {
+                                    guard let selectedQualityRouteId else { return }
+                                    Task {
+                                        try? await apiClient.exportQualityRouteBreakdownCsv(
+                                            routeId: selectedQualityRouteId,
+                                            periodStart: nil,
+                                            periodEnd: nil,
+                                            granularity: breakdownGranularity
+                                        )
+                                    }
+                                }
+                                Button("Exportar PDF") {
+                                    guard let selectedQualityRouteId else { return }
+                                    Task {
+                                        try? await apiClient.exportQualityRouteBreakdownPdf(
+                                            routeId: selectedQualityRouteId,
+                                            periodStart: nil,
+                                            periodEnd: nil,
+                                            granularity: breakdownGranularity
+                                        )
+                                    }
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
@@ -325,7 +359,8 @@ struct ContentView: View {
         selectedRouteBreakdown = try? await apiClient.qualityRouteBreakdown(
             routeId: routeId,
             periodStart: nil,
-            periodEnd: nil
+            periodEnd: nil,
+            granularity: breakdownGranularity
         )
     }
 

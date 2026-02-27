@@ -180,6 +180,24 @@ export type QualityRouteBreakdown = {
   };
 };
 
+export type QualityDriverBreakdown = {
+  scope_type: 'driver';
+  scope_id: string;
+  scope_label?: string | null;
+  driver_id: string;
+  driver_code?: string | null;
+  hub_id?: string | null;
+  subcontractor_id?: string | null;
+  granularity: 'week' | 'month';
+  latest_snapshot_id?: string | null;
+  latest_period_start?: string | null;
+  latest_period_end?: string | null;
+  snapshots_count: number;
+  service_quality_score: number;
+  periods: QualityRouteBreakdown['periods'];
+  components: QualityRouteBreakdown['components'];
+};
+
 export type IncidentSummary = {
   id: string;
   incidentable_type: 'shipment' | 'pickup';

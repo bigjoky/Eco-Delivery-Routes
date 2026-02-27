@@ -9,6 +9,7 @@ import {
   PaginatedResult,
   QualitySnapshot,
   QualityRiskSummaryResult,
+  QualityDriverBreakdown,
   QualityRouteBreakdown,
   QualityTopRoutesResult,
   RoleSummary,
@@ -464,17 +465,89 @@ export const apiClient = {
   async getQualityRouteBreakdown(routeId: string, filters: {
     periodStart?: string;
     periodEnd?: string;
+    granularity?: 'week' | 'month';
   } = {}): Promise<QualityRouteBreakdown> {
     if (USE_MOCK) return mockApi.getQualityRouteBreakdown(routeId, filters) as Promise<QualityRouteBreakdown>;
     const params = new URLSearchParams();
     if (filters.periodStart) params.set('period_start', filters.periodStart);
     if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/kpis/quality/routes/${routeId}/breakdown${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     const json = await response.json();
     return json.data as QualityRouteBreakdown;
+  },
+
+  async exportQualityRouteBreakdownCsv(routeId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityRouteBreakdownCsv(routeId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/routes/${routeId}/breakdown/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_route_${routeId}_breakdown.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportQualityRouteBreakdownPdf(routeId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityRouteBreakdownPdf(routeId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/routes/${routeId}/breakdown/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_route_${routeId}_breakdown.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async getQualityDriverBreakdown(driverId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<QualityDriverBreakdown> {
+    if (USE_MOCK) return mockApi.getQualityDriverBreakdown(driverId, filters) as Promise<QualityDriverBreakdown>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityDriverBreakdown;
   },
 
   async getIncidents(): Promise<IncidentSummary[]> {

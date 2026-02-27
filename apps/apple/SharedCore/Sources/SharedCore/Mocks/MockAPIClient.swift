@@ -258,18 +258,40 @@ public final class MockAPIClient {
         return rows.filter { $0.scopeType == scopeType }
     }
 
-    public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?) async throws -> QualityRouteBreakdown {
+    public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
         _ = (periodStart, periodEnd)
         return QualityRouteBreakdown(
+            scopeType: "route",
+            scopeId: routeId,
+            scopeLabel: "R-AGP-20260227",
             routeId: routeId,
             routeCode: "R-AGP-20260227",
             hubId: "00000000-0000-0000-0000-000000000001",
             subcontractorId: "sub-1",
+            granularity: granularity ?? "month",
             latestSnapshotId: "q-2",
             latestPeriodStart: "2026-02-01",
             latestPeriodEnd: "2026-02-28",
             snapshotsCount: 1,
             serviceQualityScore: 94.5,
+            periods: [
+                .init(
+                    periodKey: "2026-02",
+                    periodStart: "2026-02-01",
+                    periodEnd: "2026-02-28",
+                    serviceQualityScore: 94.17,
+                    components: .init(
+                        assignedWithAttempt: 120,
+                        deliveredCompleted: 110,
+                        pickupsCompleted: 3,
+                        failedCount: 4,
+                        absentCount: 2,
+                        retryCount: 1,
+                        completedTotal: 113,
+                        completionRatio: 94.17
+                    )
+                ),
+            ],
             components: .init(
                 assignedWithAttempt: 120,
                 deliveredCompleted: 110,
@@ -281,5 +303,13 @@ public final class MockAPIClient {
                 completionRatio: 94.17
             )
         )
+    }
+
+    public func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        _ = (routeId, periodStart, periodEnd, granularity)
+    }
+
+    public func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        _ = (routeId, periodStart, periodEnd, granularity)
     }
 }
