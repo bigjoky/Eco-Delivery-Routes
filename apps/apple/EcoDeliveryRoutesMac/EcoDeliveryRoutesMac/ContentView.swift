@@ -44,6 +44,9 @@ struct ContentView: View {
     @State private var selectedSubcontractorId: String?
     @State private var selectedSubcontractorBreakdown: QualitySubcontractorBreakdown?
     @State private var breakdownGranularity: String = "month"
+    @State private var qualityPeriodStart: String = ""
+    @State private var qualityPeriodEnd: String = ""
+    @State private var qualityAlertThresholdText: String = "95"
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -54,6 +57,10 @@ struct ContentView: View {
 
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
+    }
+
+    private var qualityAlertThreshold: Double {
+        Double(qualityAlertThresholdText) ?? 95
     }
 
     var body: some View {
@@ -178,6 +185,33 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
+                        TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
+                        TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
+                    }
+
+                    let routeAlerts = routeQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
+                    let subcontractorAlerts = subcontractorQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
+                    if !routeAlerts.isEmpty || !subcontractorAlerts.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Alertas KPI < \(qualityAlertThreshold, specifier: "%.2f")%")
+                                .font(.headline)
+                            ForEach(routeAlerts.prefix(5)) { snapshot in
+                                Text("Ruta \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                    .foregroundStyle(.red)
+                            }
+                            ForEach(subcontractorAlerts.prefix(5)) { snapshot in
+                                Text("Subcontrata \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
                     List(routeQuality) { snapshot in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -259,8 +293,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualityRouteBreakdownCsv(
                                             routeId: selectedQualityRouteId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -270,8 +304,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualityRouteBreakdownPdf(
                                             routeId: selectedQualityRouteId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -309,8 +343,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualitySubcontractorBreakdownCsv(
                                             subcontractorId: selectedSubcontractorId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -320,8 +354,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualitySubcontractorBreakdownPdf(
                                             subcontractorId: selectedSubcontractorId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -394,17 +428,10 @@ struct ContentView: View {
                     }
                     .frame(minHeight: 260)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Conciliacion por motivo")
-                            .font(.headline)
-                        Text("Widget de conciliacion disponible en siguiente iteracion del target macOS.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
-                    .padding()
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    WarehouseReconciliationWidget()
+                        .frame(minHeight: 280)
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
             .navigationTitle("Liquidaciones")
@@ -454,8 +481,8 @@ struct ContentView: View {
     private func loadRouteBreakdown(routeId: String) async {
         selectedRouteBreakdown = try? await apiClient.qualityRouteBreakdown(
             routeId: routeId,
-            periodStart: nil,
-            periodEnd: nil,
+            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
             granularity: breakdownGranularity
         )
     }
@@ -463,8 +490,8 @@ struct ContentView: View {
     private func loadSubcontractorBreakdown(subcontractorId: String) async {
         selectedSubcontractorBreakdown = try? await apiClient.qualitySubcontractorBreakdown(
             subcontractorId: subcontractorId,
-            periodStart: nil,
-            periodEnd: nil,
+            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
             granularity: breakdownGranularity
         )
     }

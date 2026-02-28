@@ -139,4 +139,62 @@ final class SharedCoreTests: XCTestCase {
         XCTAssertEqual(breakdown.routeId, "r-1")
         XCTAssertGreaterThan(breakdown.components.assignedWithAttempt, 0)
     }
+
+    func test_quality_subcontractor_breakdown_decodes_component_payload() throws {
+        let payload = """
+        {
+          "scope_type": "subcontractor",
+          "scope_id": "sub-1",
+          "scope_label": "Rapid Last Mile",
+          "subcontractor_id": "sub-1",
+          "subcontractor_code": "Rapid Last Mile",
+          "granularity": "month",
+          "snapshots_count": 1,
+          "service_quality_score": 95.4,
+          "periods": [{
+            "period_key": "2026-02",
+            "period_start": "2026-02-01",
+            "period_end": "2026-02-28",
+            "service_quality_score": 95.4,
+            "components": {
+              "assigned_with_attempt": 260,
+              "delivered_completed": 240,
+              "pickups_completed": 8,
+              "failed_count": 7,
+              "absent_count": 3,
+              "retry_count": 2,
+              "completed_total": 248,
+              "completion_ratio": 95.4
+            }
+          }],
+          "components": {
+            "assigned_with_attempt": 260,
+            "delivered_completed": 240,
+            "pickups_completed": 8,
+            "failed_count": 7,
+            "absent_count": 3,
+            "retry_count": 2,
+            "completed_total": 248,
+            "completion_ratio": 95.4
+          }
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(QualitySubcontractorBreakdown.self, from: payload)
+        XCTAssertEqual(decoded.scopeType, "subcontractor")
+        XCTAssertEqual(decoded.subcontractorId, "sub-1")
+        XCTAssertEqual(decoded.components.completedTotal, 248)
+    }
+
+    func test_api_client_returns_mock_subcontractor_breakdown_when_base_url_is_nil() async throws {
+        let client = APIClient(baseURL: nil)
+        let breakdown = try await client.qualitySubcontractorBreakdown(
+            subcontractorId: "sub-1",
+            periodStart: nil,
+            periodEnd: nil,
+            granularity: "month"
+        )
+        XCTAssertEqual(breakdown.subcontractorId, "sub-1")
+        XCTAssertGreaterThan(breakdown.components.assignedWithAttempt, 0)
+    }
 }

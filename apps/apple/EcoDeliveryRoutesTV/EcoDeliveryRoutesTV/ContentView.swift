@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var routeBreakdown: TVRouteBreakdown?
     @State private var driverBreakdown: TVDriverBreakdown?
     @State private var subcontractorBreakdown: TVSubcontractorBreakdown?
+    @State private var qualityThreshold: Double = 95
     @State private var lastRefreshText: String = "Sin refresco"
     @State private var statusText: String = "Conectando..."
 
@@ -130,6 +131,23 @@ struct ContentView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Alertas KPI < \(qualityThreshold, specifier: "%.2f")%")
+                    .font(.headline)
+                ForEach(routeQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                    Text("Ruta \(item.routeCode) en alerta: \(item.score, specifier: "%.2f")%")
+                        .foregroundStyle(.red)
+                }
+                ForEach(driverQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                    Text("Conductor \(item.driverCode) en alerta: \(item.score, specifier: "%.2f")%")
+                        .foregroundStyle(.red)
+                }
+                ForEach(subcontractorQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                    Text("Subcontrata \(item.subcontractorCode) en alerta: \(item.score, specifier: "%.2f")%")
+                        .foregroundStyle(.red)
+                }
+            }
+
             Text(lastRefreshText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -157,6 +175,7 @@ struct ContentView: View {
         routeBreakdown = payload.routeBreakdown
         driverBreakdown = payload.driverBreakdown
         subcontractorBreakdown = payload.subcontractorBreakdown
+        qualityThreshold = payload.threshold
         statusText = payload.status
 
         let formatter = DateFormatter()
@@ -189,6 +208,7 @@ struct TVSnapshot {
     let routeBreakdown: TVRouteBreakdown?
     let driverBreakdown: TVDriverBreakdown?
     let subcontractorBreakdown: TVSubcontractorBreakdown?
+    let threshold: Double
     let status: String
 }
 
@@ -273,6 +293,7 @@ final class TVMonitorService {
             routeBreakdown: apiSnapshot.routeBreakdown,
             driverBreakdown: apiSnapshot.driverBreakdown,
             subcontractorBreakdown: apiSnapshot.subcontractorBreakdown,
+            threshold: apiSnapshot.threshold,
             status: apiSnapshot.status
         )
     }
@@ -284,8 +305,10 @@ final class TVMonitorService {
         routeBreakdown: TVRouteBreakdown?,
         driverBreakdown: TVDriverBreakdown?,
         subcontractorBreakdown: TVSubcontractorBreakdown?,
+        threshold: Double,
         status: String
     ) {
+        let threshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
         guard
             let rawBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"],
             !rawBaseURL.isEmpty
@@ -297,6 +320,7 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
+                threshold,
                 "Monitor activo (solo lectura/mock)"
             )
         }
@@ -314,6 +338,7 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
+                threshold,
                 "Monitor activo (URL invalida, fallback mock)"
             )
         }
@@ -347,6 +372,7 @@ final class TVMonitorService {
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
+                    threshold,
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
@@ -393,6 +419,7 @@ final class TVMonitorService {
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
+                    threshold,
                     "Monitor API sin datos, fallback mock"
                 )
             }
@@ -414,7 +441,7 @@ final class TVMonitorService {
                 token: token,
                 subcontractorId: worstSubcontractor?.subcontractorId
             )
-            return (mappedRoutes, mappedDrivers, mappedSubcontractors, routeBreakdown, driverBreakdown, subcontractorBreakdown, "Monitor activo (API real)")
+            return (mappedRoutes, mappedDrivers, mappedSubcontractors, routeBreakdown, driverBreakdown, subcontractorBreakdown, threshold, "Monitor activo (API real)")
         } catch {
             return (
                 mockRouteQuality(),
@@ -423,6 +450,7 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
+                threshold,
                 "Monitor fallback (error conexion API)"
             )
         }

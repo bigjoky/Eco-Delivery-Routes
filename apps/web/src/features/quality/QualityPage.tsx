@@ -32,6 +32,7 @@ export function QualityPage() {
   const [driverBreakdown, setDriverBreakdown] = useState<QualityDriverBreakdown | null>(null);
   const [subcontractorBreakdown, setSubcontractorBreakdown] = useState<QualitySubcontractorBreakdown | null>(null);
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
+  const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -54,7 +55,7 @@ export function QualityPage() {
   useEffect(() => {
     apiClient
       .getQualityTopRoutesUnderThreshold({
-        threshold: Number(threshold),
+        threshold: thresholdNumber,
         limit: 10,
         scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
@@ -63,12 +64,12 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setUnderThresholdRoutes(result.data));
-  }, [threshold, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [thresholdNumber, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     apiClient
       .getQualityRiskSummary({
-        threshold: Number(threshold),
+        threshold: thresholdNumber,
         groupBy: riskGroupBy,
         scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
@@ -77,7 +78,7 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setRiskSummary(result.data));
-  }, [threshold, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [thresholdNumber, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     if (!selectedRouteId) {
@@ -134,6 +135,8 @@ export function QualityPage() {
     const completionDelta = routeBreakdown.components.completed_total - driverBreakdown.components.completed_total;
     return { scoreDelta, completionDelta };
   }, [routeBreakdown, driverBreakdown]);
+
+  const alerts = useMemo(() => items.filter((item) => item.service_quality_score < thresholdNumber), [items, thresholdNumber]);
 
   function applyQuickRange(days: 7 | 30) {
     const end = new Date();
@@ -227,7 +230,7 @@ export function QualityPage() {
               variant="outline"
               onClick={() =>
                 apiClient.exportQualityPdf({
-                  threshold: Number(threshold),
+                  threshold: thresholdNumber,
                   scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
                   hubId: hubId || undefined,
                   subcontractorId: subcontractorId || undefined,
@@ -239,6 +242,36 @@ export function QualityPage() {
               Exportar PDF rutas
             </Button>
           </div>
+
+          {alerts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Alertas KPI &lt; {thresholdNumber}%</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TableWrapper>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Scope</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Periodo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {alerts.slice(0, 20).map((item) => (
+                        <TableRow key={`alert-${item.id}`}>
+                          <TableCell>{item.scope_type} {item.scope_label ?? item.scope_id}</TableCell>
+                          <TableCell><Badge variant="destructive">{item.service_quality_score}%</Badge></TableCell>
+                          <TableCell>{item.period_start} - {item.period_end}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+              </CardContent>
+            </Card>
+          )}
 
           <TableWrapper>
             <Table>
