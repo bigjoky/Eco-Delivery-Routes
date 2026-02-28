@@ -22,6 +22,10 @@ public protocol APIClientProtocol {
     func qualitySnapshots(scopeType: String?) async throws -> [QualitySnapshot]
     func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown
     func qualitySubcontractorBreakdown(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualitySubcontractorBreakdown
+    func qualityThreshold() async throws -> QualityThresholdConfig
+    func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig
+    func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings
+    func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry]
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
@@ -342,6 +346,58 @@ public final class APIClient: APIClientProtocol {
         )
         let request = authorizedRequest(url: url, method: "GET")
         _ = try await execute(request)
+    }
+
+    public func qualityThreshold() async throws -> QualityThresholdConfig {
+        guard let baseURL else { return try await mock.qualityThreshold() }
+
+        let request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold"), method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdConfig>.self, from: data).data
+    }
+
+    public func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig {
+        guard let baseURL else {
+            return try await mock.updateQualityThreshold(threshold: threshold, scopeType: scopeType, scopeId: scopeId)
+        }
+
+        var request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold"), method: "PUT")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var payload: [String: Any] = ["threshold": threshold]
+        if let scopeType {
+            payload["scope_type"] = scopeType
+        }
+        if let scopeId {
+            payload["scope_id"] = scopeId
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdConfig>.self, from: data).data
+    }
+
+    public func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings {
+        guard let baseURL else { return try await mock.qualityThresholdAlertSettings() }
+
+        let request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold/alert-settings"), method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdAlertSettings>.self, from: data).data
+    }
+
+    public func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry] {
+        guard let baseURL else { return try await mock.qualityThresholdHistory(dateFrom: dateFrom, dateTo: dateTo) }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/threshold/history"),
+            queryItems: [
+                URLQueryItem(name: "date_from", value: dateFrom),
+                URLQueryItem(name: "date_to", value: dateTo),
+                URLQueryItem(name: "page", value: "1"),
+                URLQueryItem(name: "per_page", value: "100"),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(PaginatedResponse<QualityThresholdHistoryEntry>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {

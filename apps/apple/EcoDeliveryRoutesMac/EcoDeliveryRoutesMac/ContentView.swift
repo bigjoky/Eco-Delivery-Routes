@@ -47,6 +47,16 @@ struct ContentView: View {
     @State private var qualityPeriodStart: String = ""
     @State private var qualityPeriodEnd: String = ""
     @State private var qualityAlertThresholdText: String = "95"
+    @State private var qualityThresholdSource: String = "default"
+    @State private var qualityThresholdScopeType: String = "user"
+    @State private var qualityThresholdScopeId: String = ""
+    @State private var qualityThresholdBeforeValue: Double?
+    @State private var qualityThresholdAfterValue: Double?
+    @State private var qualityThresholdLargeDeltaCount: Int = 0
+    @State private var qualityThresholdAlertWindowHours: Int = 24
+    @State private var qualityThresholdDeltaTrigger: Double = 5
+    @State private var canManageQualityThreshold: Bool = false
+    @State private var qualityThresholdMessage: String = ""
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -90,7 +100,7 @@ struct ContentView: View {
     }
 
     private var operationsTab: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(routeStops) { stop in
                 VStack(alignment: .leading) {
                     Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
@@ -102,8 +112,10 @@ struct ContentView: View {
                     selectedStopId = stop.id
                 }
             }
-            .navigationTitle("Manifiesto")
-        } detail: {
+            .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
+
+            Divider()
+
             VStack(alignment: .leading, spacing: 12) {
                 Text("Recepcion / Scan masivo")
                     .font(.title3)
@@ -135,7 +147,9 @@ struct ContentView: View {
                 Spacer()
             }
             .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .navigationTitle("Manifiesto")
     }
 
     private var advancesTab: some View {
@@ -189,6 +203,60 @@ struct ContentView: View {
                         TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
                         TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
                         TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
+                        Picker("Scope", selection: $qualityThresholdScopeType) {
+                            Text("Usuario").tag("user")
+                            Text("Rol").tag("role")
+                            Text("Global").tag("global")
+                        }
+                        .pickerStyle(.segmented)
+                        if qualityThresholdScopeType != "global" {
+                            TextField(
+                                qualityThresholdScopeType == "role"
+                                    ? "Scope ID (code rol, ej: driver)"
+                                    : "Scope ID usuario (vacío = usuario actual)",
+                                text: $qualityThresholdScopeId
+                            )
+                        }
+                        HStack(spacing: 8) {
+                            Text("Fuente umbral: \(qualityThresholdSource)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if !qualityThresholdScopeId.isEmpty {
+                                Text("· Scope: \(qualityThresholdScopeId)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Button("Guardar umbral") {
+                                Task { await saveQualityThreshold() }
+                            }
+                            .disabled(!canManageQualityThreshold)
+                        }
+                        if !qualityThresholdMessage.isEmpty {
+                            Text(qualityThresholdMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let before = qualityThresholdBeforeValue, let after = qualityThresholdAfterValue {
+                            HStack(spacing: 8) {
+                                Text(String(format: "%.2f%% → %.2f%%", before, after))
+                                    .font(.caption)
+                                Text(thresholdTrendLabel(before: before, after: after))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(thresholdTrendColor(before: before, after: after).opacity(0.18))
+                                    .foregroundStyle(thresholdTrendColor(before: before, after: after))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        HStack(spacing: 8) {
+                            Text("Alertas delta (ultimas \(qualityThresholdAlertWindowHours)h): \(qualityThresholdLargeDeltaCount)")
+                                .font(.caption)
+                                .foregroundStyle(qualityThresholdLargeDeltaCount > 0 ? .red : .secondary)
+                            Text("Trigger: ±\(qualityThresholdDeltaTrigger, specifier: "%.2f")")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     let routeAlerts = routeQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
@@ -445,6 +513,8 @@ struct ContentView: View {
 
     private func refreshAll() async {
         apiClient.setAuthToken(authSession.token?.token)
+        await loadQualityThreshold()
+        await loadQualityThresholdAlerts()
         await loadRoute()
         await loadRouteQuality()
         await loadAdvances()
@@ -476,6 +546,67 @@ struct ContentView: View {
         if let selectedSubcontractorId {
             await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
         }
+    }
+
+    private func loadQualityThreshold() async {
+        guard let config = try? await apiClient.qualityThreshold() else { return }
+        qualityAlertThresholdText = String(format: "%.2f", config.threshold)
+        qualityThresholdBeforeValue = config.threshold
+        qualityThresholdAfterValue = config.threshold
+        qualityThresholdSource = config.sourceType
+        qualityThresholdScopeType = config.sourceType == "default" ? "user" : config.sourceType
+        qualityThresholdScopeId = config.sourceId ?? ""
+        canManageQualityThreshold = config.canManage ?? false
+    }
+
+    private func saveQualityThreshold() async {
+        guard let threshold = Double(qualityAlertThresholdText) else {
+            qualityThresholdMessage = "Umbral invalido"
+            return
+        }
+
+        do {
+            let beforeValue = Double(qualityAlertThresholdText)
+            let scopeType = qualityThresholdScopeType
+            let scopeId = scopeType == "global"
+                ? nil
+                : (qualityThresholdScopeId.isEmpty ? nil : qualityThresholdScopeId)
+            let updated = try await apiClient.updateQualityThreshold(
+                threshold: threshold,
+                scopeType: scopeType,
+                scopeId: scopeId
+            )
+            qualityAlertThresholdText = String(format: "%.2f", updated.threshold)
+            qualityThresholdBeforeValue = beforeValue
+            qualityThresholdAfterValue = updated.threshold
+            qualityThresholdSource = updated.sourceType
+            qualityThresholdScopeId = updated.sourceId ?? qualityThresholdScopeId
+            canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
+            qualityThresholdMessage = "Umbral guardado"
+            await loadQualityThresholdAlerts()
+        } catch {
+            qualityThresholdMessage = "No se pudo guardar el umbral"
+        }
+    }
+
+    private func loadQualityThresholdAlerts() async {
+        let dateFormatter = DateFormatter()
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let settings = try? await apiClient.qualityThresholdAlertSettings()
+        let windowHours = settings?.windowHours ?? 24
+        qualityThresholdAlertWindowHours = windowHours
+        qualityThresholdDeltaTrigger = settings?.largeDeltaThreshold ?? 5
+
+        let now = Date()
+        let fromDate = Calendar(identifier: .gregorian).date(byAdding: .hour, value: -windowHours, to: now) ?? now
+        let dateFrom = dateFormatter.string(from: fromDate)
+        let dateTo = dateFormatter.string(from: now)
+
+        let history = (try? await apiClient.qualityThresholdHistory(dateFrom: dateFrom, dateTo: dateTo)) ?? []
+        qualityThresholdLargeDeltaCount = history.filter { $0.event == "quality.threshold.alert.large_delta" }.count
     }
 
     private func loadRouteBreakdown(routeId: String) async {
@@ -529,6 +660,18 @@ struct ContentView: View {
         formatter.numberStyle = .currency
         formatter.currencyCode = currency
         return formatter.string(from: NSNumber(value: amount)) ?? "\(amount) \(currency)"
+    }
+
+    private func thresholdTrendLabel(before: Double, after: Double) -> String {
+        if after > before { return "SUBE" }
+        if after < before { return "BAJA" }
+        return "IGUAL"
+    }
+
+    private func thresholdTrendColor(before: Double, after: Double) -> Color {
+        if after > before { return .green }
+        if after < before { return .orange }
+        return .secondary
     }
 }
 

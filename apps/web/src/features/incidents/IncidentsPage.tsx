@@ -23,8 +23,18 @@ export function IncidentsPage() {
   const [catalogCode, setCatalogCode] = useState('');
   const [category, setCategory] = useState<'failed' | 'absent' | 'retry' | 'general'>('absent');
   const [notes, setNotes] = useState('');
+  const [resolvedFilter, setResolvedFilter] = useState<'open' | 'resolved' | ''>('open');
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
 
-  const reload = () => apiClient.getIncidents().then(setItems);
+  const reload = () => apiClient.getIncidents({
+    resolved: resolvedFilter || undefined,
+    page,
+    perPage: 20,
+  }).then((result) => {
+    setItems(result.data);
+    setLastPage(result.meta.last_page || 1);
+  });
 
   useEffect(() => {
     reload();
@@ -35,7 +45,7 @@ export function IncidentsPage() {
         setCategory(entries[0].category);
       }
     });
-  }, []);
+  }, [resolvedFilter, page]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
@@ -52,6 +62,12 @@ export function IncidentsPage() {
       notes,
     });
     setNotes('');
+    setPage(1);
+    await reload();
+  };
+
+  const onResolve = async (id: string) => {
+    await apiClient.resolveIncident(id, 'Resuelta desde panel web');
     await reload();
   };
 
@@ -95,6 +111,15 @@ export function IncidentsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Incidencias recientes</CardTitle>
+          <CardDescription>
+            <div className="form-row">
+              <Select value={resolvedFilter} onChange={(e) => { setResolvedFilter(e.target.value as 'open' | 'resolved' | ''); setPage(1); }}>
+                <option value="">todas</option>
+                <option value="open">abiertas</option>
+                <option value="resolved">resueltas</option>
+              </Select>
+            </div>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <TableWrapper>
@@ -105,6 +130,8 @@ export function IncidentsPage() {
                   <TableHead>Referencia</TableHead>
                   <TableHead>Catalogo</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Accion</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -114,11 +141,28 @@ export function IncidentsPage() {
                     <TableCell>{item.incidentable_id}</TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
                     <TableCell><Badge variant={categoryVariant(item.category)}>{item.category}</Badge></TableCell>
+                    <TableCell>{item.resolved_at ? 'resuelta' : 'abierta'}</TableCell>
+                    <TableCell>
+                      {item.resolved_at ? (
+                        <span>-</span>
+                      ) : (
+                        <Button type="button" onClick={() => onResolve(item.id)}>Resolver</Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="form-row">
+            <Button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+              Anterior
+            </Button>
+            <span>Pagina {page} de {lastPage}</span>
+            <Button type="button" onClick={() => setPage((value) => Math.min(lastPage, value + 1))} disabled={page >= lastPage}>
+              Siguiente
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </section>

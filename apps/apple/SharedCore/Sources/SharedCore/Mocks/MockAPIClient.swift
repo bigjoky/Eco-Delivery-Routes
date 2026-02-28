@@ -1,6 +1,19 @@
 import Foundation
 
 public final class MockAPIClient {
+    private var mockQualityThreshold = QualityThresholdConfig(
+        threshold: 95,
+        sourceType: "default",
+        sourceId: nil,
+        canManage: true
+    )
+    private var mockQualityThresholdAlertSettings = QualityThresholdAlertSettings(
+        largeDeltaThreshold: 5,
+        windowHours: 24,
+        canManage: true,
+        sourceType: "default"
+    )
+
     private var mockAdvances: [AdvanceSummary] = [
         AdvanceSummary(
             id: "adv-1",
@@ -256,6 +269,49 @@ public final class MockAPIClient {
         ]
         guard let scopeType, !scopeType.isEmpty else { return rows }
         return rows.filter { $0.scopeType == scopeType }
+    }
+
+    public func qualityThreshold() async throws -> QualityThresholdConfig {
+        mockQualityThreshold
+    }
+
+    public func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig {
+        let resolvedScopeType = scopeType ?? "user"
+        mockQualityThreshold = QualityThresholdConfig(
+            threshold: threshold,
+            sourceType: resolvedScopeType,
+            sourceId: scopeId,
+            canManage: true
+        )
+        return mockQualityThreshold
+    }
+
+    public func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings {
+        mockQualityThresholdAlertSettings
+    }
+
+    public func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry] {
+        _ = (dateFrom, dateTo)
+        return [
+            QualityThresholdHistoryEntry(
+                id: 301,
+                event: "quality.threshold.updated",
+                actorUserId: "u-1",
+                actorName: "Admin Demo",
+                createdAt: "2026-02-28T09:00:00Z",
+                scopeType: "role",
+                scopeId: "driver"
+            ),
+            QualityThresholdHistoryEntry(
+                id: 302,
+                event: "quality.threshold.alert.large_delta",
+                actorUserId: "u-1",
+                actorName: "Admin Demo",
+                createdAt: "2026-02-28T10:45:00Z",
+                scopeType: "role",
+                scopeId: "driver"
+            ),
+        ]
     }
 
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {

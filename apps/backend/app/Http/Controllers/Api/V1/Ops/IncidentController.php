@@ -53,14 +53,42 @@ class IncidentController extends Controller
 
         $query = DB::table('incidents')->orderByDesc('created_at');
 
-        foreach (['incidentable_type', 'category', 'catalog_code'] as $field) {
+        foreach (['incidentable_type', 'incidentable_id', 'category', 'catalog_code'] as $field) {
             $value = $request->query($field);
             if (is_string($value) && $value !== '') {
                 $query->where($field, $value);
             }
         }
 
-        return response()->json(['data' => $query->limit(100)->get()]);
+        $resolved = $request->query('resolved');
+        if (is_string($resolved) && $resolved !== '') {
+            if (in_array(strtolower($resolved), ['1', 'true', 'resolved'], true)) {
+                $query->whereNotNull('resolved_at');
+            }
+            if (in_array(strtolower($resolved), ['0', 'false', 'open'], true)) {
+                $query->whereNull('resolved_at');
+            }
+        }
+
+        $perPage = (int) $request->query('per_page', 20);
+        $perPage = max(1, min($perPage, 100));
+        $page = (int) $request->query('page', 1);
+        $page = max(1, $page);
+
+        $total = (clone $query)->count();
+        $items = $query
+            ->forPage($page, $perPage)
+            ->get();
+
+        return response()->json([
+            'data' => $items,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => (int) ceil($total / $perPage),
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -140,6 +168,7 @@ class IncidentController extends Controller
 
     public function resolve(Request $request, string $id): JsonResponse
     {
+        $start = microtime(true);
         /** @var User $actor */
         $actor = $request->user();
         if (!$actor->hasPermission('incidents.write')) {
@@ -161,6 +190,12 @@ class IncidentController extends Controller
             'notes' => $payload['notes'] ?? DB::raw('notes'),
             'resolved_at' => now(),
             'updated_at' => now(),
+        ]);
+
+        Log::info('ops.incident.resolved', [
+            'actor_user_id' => $actor->id,
+            'incident_id' => $id,
+            'latency_ms' => (int) round((microtime(true) - $start) * 1000),
         ]);
 
         return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);

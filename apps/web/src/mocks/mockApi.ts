@@ -1,5 +1,17 @@
 let trackingSeq = 1;
 let podSeq = 1;
+let incidentSeq = 2;
+let mockIncidents = [
+  {
+    id: 'i-1',
+    incidentable_type: 'shipment' as const,
+    incidentable_id: '00000000-0000-0000-0000-000000000101',
+    catalog_code: 'ABSENT_HOME',
+    category: 'absent' as const,
+    notes: 'Cliente no localizado',
+    resolved_at: null as string | null,
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -26,7 +38,7 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -53,13 +65,137 @@ export const mockApi = {
         metadata: { settlement_id: 'st-1', adjustment_id: 'sa-1' },
         created_at: '2026-02-27T10:05:00Z',
       },
+      {
+        id: 3,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'quality.threshold.updated',
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 95 },
+          after: { threshold: 96.5 },
+        },
+        created_at: '2026-02-28T09:00:00Z',
+      },
     ];
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    return;
+  },
+
+  async getQualityThresholdHistory(_: {
+    event?: string;
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    perPage?: number;
+  }) {
+    const rows = [
+      {
+        id: 301,
+        event: 'quality.threshold.updated',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-28T09:00:00Z',
+        scope_type: 'role' as const,
+        scope_id: 'driver',
+        before_threshold: 95,
+        after_threshold: 96.5,
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 95 },
+          after: { threshold: 96.5 },
+        },
+      },
+      {
+        id: 302,
+        event: 'quality.threshold.updated',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-27T12:10:00Z',
+        scope_type: 'global' as const,
+        scope_id: null,
+        before_threshold: 94,
+        after_threshold: 95,
+        metadata: {
+          scope_type: 'global',
+          scope_id: null,
+          before: { threshold: 94 },
+          after: { threshold: 95 },
+        },
+      },
+      {
+        id: 303,
+        event: 'quality.threshold.alert.large_delta',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-28T10:45:00Z',
+        scope_type: 'role' as const,
+        scope_id: 'driver',
+        before_threshold: 96.5,
+        after_threshold: 90.5,
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 96.5 },
+          after: { threshold: 90.5 },
+          delta: 6,
+          window_hours: 24,
+          threshold_delta_trigger: 5,
+        },
+      },
+    ];
+    if (_.event) {
+      return rows.filter((row) => row.event === _.event);
+    }
+    return rows;
+  },
+
+  async getQualityThresholdAlertSettings() {
+    return {
+      large_delta_threshold: 5,
+      window_hours: 24,
+      can_manage: true,
+      source_type: 'default' as const,
+    };
+  },
+
+  async setQualityThresholdAlertSettings(payload: {
+    largeDeltaThreshold: number;
+    windowHours: number;
+  }) {
+    return {
+      large_delta_threshold: payload.largeDeltaThreshold,
+      window_hours: payload.windowHours,
+      can_manage: true,
+      source_type: 'configured' as const,
+    };
+  },
+
+  async exportQualityThresholdHistoryCsv(_: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    return;
+  },
+
+  async exportQualityThresholdHistoryPdf(_: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
     dateFrom?: string;
     dateTo?: string;
   }) {
@@ -675,18 +811,23 @@ export const mockApi = {
     return;
   },
 
-  async getIncidents() {
-    return [
-      {
-        id: 'i-1',
-        incidentable_type: 'shipment',
-        incidentable_id: 'SHP-AGP-0001',
-        catalog_code: 'ABSENT_HOME',
-        category: 'absent',
-        notes: 'Cliente no localizado',
-        resolved_at: null,
-      },
-    ];
+  async getIncidents(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    incidentableId?: string;
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+    catalogCode?: string;
+    resolved?: 'open' | 'resolved';
+  } = {}) {
+    return mockIncidents
+      .filter((item) => (filters.incidentableType ? item.incidentable_type === filters.incidentableType : true))
+      .filter((item) => (filters.incidentableId ? item.incidentable_id === filters.incidentableId : true))
+      .filter((item) => (filters.category ? item.category === filters.category : true))
+      .filter((item) => (filters.catalogCode ? item.catalog_code === filters.catalogCode : true))
+      .filter((item) => {
+        if (!filters.resolved) return true;
+        if (filters.resolved === 'open') return item.resolved_at === null;
+        return item.resolved_at !== null;
+      });
   },
 
   async createIncident(payload: {
@@ -696,11 +837,36 @@ export const mockApi = {
     category: 'failed' | 'absent' | 'retry' | 'general';
     notes?: string;
   }) {
-    return {
-      id: 'i-new',
+    const item = {
+      id: `i-${incidentSeq++}`,
       ...payload,
       resolved_at: null,
     };
+    mockIncidents = [item, ...mockIncidents];
+    return item;
+  },
+
+  async resolveIncident(id: string, notes?: string) {
+    const now = new Date().toISOString();
+    const target = mockIncidents.find((item) => item.id === id);
+    if (!target) {
+      return {
+        id,
+        incidentable_type: 'shipment' as const,
+        incidentable_id: '00000000-0000-0000-0000-000000000000',
+        catalog_code: 'UNKNOWN',
+        category: 'general' as const,
+        notes: notes ?? null,
+        resolved_at: now,
+      };
+    }
+    const resolved = {
+      ...target,
+      notes: notes ?? target.notes,
+      resolved_at: now,
+    };
+    mockIncidents = mockIncidents.map((item) => (item.id === id ? resolved : item));
+    return resolved;
   },
 
   async getIncidentCatalog() {

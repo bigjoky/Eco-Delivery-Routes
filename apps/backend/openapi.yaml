@@ -54,7 +54,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
@@ -84,7 +84,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
@@ -950,6 +950,18 @@ paths:
         - in: query
           name: catalog_code
           schema: { type: string }
+        - in: query
+          name: incidentable_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: resolved
+          schema: { type: string, enum: [open, resolved, "0", "1"] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
         '200': { description: OK }
     post:
@@ -1359,6 +1371,174 @@ paths:
               $ref: '#/components/schemas/RecalculateQualityRequest'
       responses:
         '201': { description: Creado }
+
+  /kpis/quality/threshold:
+    get:
+      tags: [Quality]
+      summary: Obtener umbral KPI resuelto (usuario > rol > global > default)
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Quality]
+      summary: Configurar umbral KPI por alcance (global, role, user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [threshold]
+              properties:
+                threshold: { type: number, minimum: 0, maximum: 100, default: 95 }
+                scope_type: { type: string, enum: [global, role, user], default: user }
+                scope_id: { type: string, description: "role code o user id (segun scope_type)" }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Error validación }
+
+  /kpis/quality/threshold/alert-settings:
+    get:
+      tags: [Quality]
+      summary: Obtener configuración de alerta por delta grande en umbral KPI
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Quality]
+      summary: Configurar delta y ventana para alertas de cambios bruscos de umbral
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [large_delta_threshold, window_hours]
+              properties:
+                large_delta_threshold: { type: number, minimum: 0, maximum: 100, default: 5 }
+                window_hours: { type: integer, minimum: 1, maximum: 168, default: 24 }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Error validación }
+
+  /kpis/quality/threshold/history:
+    get:
+      tags: [Quality]
+      summary: Historial dedicado de cambios de umbral KPI
+      parameters:
+        - in: query
+          name: event
+          schema: { type: string, description: "Filtro por evento exacto (ej: quality.threshold.alert.large_delta)" }
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string, description: "role code o user id" }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: per_page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /kpis/quality/threshold/history/alerts/summary:
+    get:
+      tags: [Quality]
+      summary: Resumen agregado de alertas de cambios bruscos de umbral
+      parameters:
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /kpis/quality/threshold/history/alerts/top-scopes:
+    get:
+      tags: [Quality]
+      summary: Top scopes con mayor número de alertas de cambios bruscos de umbral
+      parameters:
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user, route, subcontractor] }
+        - in: query
+          name: scope_id
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /kpis/quality/threshold/history/export.csv:
+    get:
+      tags: [Quality]
+      summary: Exportar historial de cambios de umbral KPI a CSV
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string, description: "role code o user id" }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /kpis/quality/threshold/history/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar historial de cambios de umbral KPI a PDF
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string, description: "role code o user id" }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 components:
   securitySchemes:

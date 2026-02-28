@@ -136,6 +136,50 @@ export type QualityRiskSummaryResult = {
   };
 };
 
+export type QualityThresholdConfig = {
+  threshold: number;
+  source_type: 'default' | 'global' | 'role' | 'user';
+  source_id?: string | null;
+  can_manage?: boolean;
+};
+
+export type QualityThresholdAlertSettings = {
+  large_delta_threshold: number;
+  window_hours: number;
+  can_manage?: boolean;
+  source_type?: 'default' | 'configured';
+};
+
+export type QualityThresholdHistoryEntry = {
+  id: number;
+  event: string;
+  actor_user_id?: string | null;
+  actor_name?: string | null;
+  created_at: string;
+  scope_type: 'global' | 'role' | 'user';
+  scope_id?: string | null;
+  before_threshold?: number | null;
+  after_threshold?: number | null;
+  metadata?: Record<string, unknown> | string | null;
+};
+
+export type QualityThresholdAlertSummary = {
+  event: string;
+  count: number;
+  last_event_at?: string | null;
+  window_hours: number;
+  large_delta_threshold: number;
+  date_from: string;
+  date_to: string;
+};
+
+export type QualityThresholdAlertTopScope = {
+  scope_type: string;
+  scope_id?: string | null;
+  scope_label?: string | null;
+  alerts_count: number;
+};
+
 export type QualityRouteBreakdown = {
   scope_type: 'route';
   scope_id: string;
@@ -416,6 +460,6 @@ export type AuditLogEntry = {
   actor_name?: string | null;
   actor_roles?: string | null;
   event: string;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | string | null;
   created_at: string;
 };

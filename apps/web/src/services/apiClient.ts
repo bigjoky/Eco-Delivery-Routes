@@ -12,6 +12,11 @@ import {
   QualityDriverBreakdown,
   QualityRouteBreakdown,
   QualitySubcontractorBreakdown,
+  QualityThresholdConfig,
+  QualityThresholdAlertSettings,
+  QualityThresholdAlertSummary,
+  QualityThresholdAlertTopScope,
+  QualityThresholdHistoryEntry,
   QualityTopRoutesResult,
   RoleSummary,
   RouteStopSummary,
@@ -116,7 +121,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -146,7 +151,7 @@ export const apiClient = {
   },
 
   async exportAuditLogsCsv(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -687,12 +692,275 @@ export const apiClient = {
     window.URL.revokeObjectURL(url);
   },
 
-  async getIncidents(): Promise<IncidentSummary[]> {
-    if (USE_MOCK) return mockApi.getIncidents();
-    const response = await fetch(`${API_BASE_URL}/incidents`, {
+  async getQualityThreshold(): Promise<QualityThresholdConfig> {
+    if (USE_MOCK) {
+      return { threshold: 95, source_type: 'default', source_id: null, can_manage: true };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
-    return parseData<IncidentSummary>(response);
+    const json = await response.json();
+    return json.data as QualityThresholdConfig;
+  },
+
+  async setQualityThreshold(payload: {
+    threshold: number;
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+  }): Promise<QualityThresholdConfig> {
+    if (USE_MOCK) {
+      return {
+        threshold: payload.threshold,
+        source_type: payload.scopeType ?? 'user',
+        source_id: payload.scopeId ?? null,
+        can_manage: true,
+      };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        threshold: payload.threshold,
+        scope_type: payload.scopeType,
+        scope_id: payload.scopeId,
+      }),
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdConfig;
+  },
+
+  async getQualityThresholdAlertSettings(): Promise<QualityThresholdAlertSettings> {
+    if (USE_MOCK) {
+      return { large_delta_threshold: 5, window_hours: 24, can_manage: true, source_type: 'default' };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/alert-settings`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSettings;
+  },
+
+  async setQualityThresholdAlertSettings(payload: {
+    largeDeltaThreshold: number;
+    windowHours: number;
+  }): Promise<QualityThresholdAlertSettings> {
+    if (USE_MOCK) {
+      return {
+        large_delta_threshold: payload.largeDeltaThreshold,
+        window_hours: payload.windowHours,
+        can_manage: true,
+        source_type: 'configured',
+      };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/alert-settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        large_delta_threshold: payload.largeDeltaThreshold,
+        window_hours: payload.windowHours,
+      }),
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSettings;
+  },
+
+  async getQualityThresholdHistory(filters: {
+    event?: string;
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    perPage?: number;
+  } = {}): Promise<PaginatedResult<QualityThresholdHistoryEntry>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 20;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getQualityThresholdHistory(filters), page, perPage);
+    }
+
+    const params = new URLSearchParams();
+    if (filters.event) params.set('event', filters.event);
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history?${params.toString()}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parsePaginatedData<QualityThresholdHistoryEntry>(response);
+  },
+
+  async getQualityThresholdAlertSummary(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<QualityThresholdAlertSummary> {
+    if (USE_MOCK) {
+      const history = await mockApi.getQualityThresholdHistory({ event: 'quality.threshold.alert.large_delta' });
+      return {
+        event: 'quality.threshold.alert.large_delta',
+        count: history.filter((row) => row.event === 'quality.threshold.alert.large_delta').length,
+        last_event_at: history.find((row) => row.event === 'quality.threshold.alert.large_delta')?.created_at ?? null,
+        window_hours: 24,
+        large_delta_threshold: 5,
+        date_from: '2026-02-27',
+        date_to: '2026-02-28',
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/alerts/summary${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSummary;
+  },
+
+  async getQualityThresholdAlertTopScopes(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  } = {}): Promise<QualityThresholdAlertTopScope[]> {
+    if (USE_MOCK) {
+      const history = await mockApi.getQualityThresholdHistory({ event: 'quality.threshold.alert.large_delta' });
+      const grouped = new Map<string, QualityThresholdAlertTopScope>();
+      for (const row of history) {
+        const key = `${row.scope_type ?? 'unknown'}|${row.scope_id ?? ''}`;
+        const current = grouped.get(key);
+        if (current) {
+          current.alerts_count += 1;
+        } else {
+          grouped.set(key, {
+            scope_type: row.scope_type ?? 'unknown',
+            scope_id: row.scope_id ?? null,
+            scope_label: row.scope_id ?? null,
+            alerts_count: 1,
+          });
+        }
+      }
+      return Array.from(grouped.values()).sort((a, b) => b.alerts_count - a.alerts_count).slice(0, filters.limit ?? 10);
+    }
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (typeof filters.limit === 'number') params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/alerts/top-scopes${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return (json.data ?? []) as QualityThresholdAlertTopScope[];
+  },
+
+  async exportQualityThresholdHistoryCsv(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityThresholdHistoryCsv(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'quality_threshold_history.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportQualityThresholdHistoryPdf(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityThresholdHistoryPdf(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'quality_threshold_history.pdf';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async getIncidents(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    incidentableId?: string;
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+    catalogCode?: string;
+    resolved?: 'open' | 'resolved';
+    page?: number;
+    perPage?: number;
+  } = {}): Promise<PaginatedResult<IncidentSummary>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 20;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getIncidents(filters), page, perPage);
+    }
+    const params = new URLSearchParams();
+    if (filters.incidentableType) params.set('incidentable_type', filters.incidentableType);
+    if (filters.incidentableId) params.set('incidentable_id', filters.incidentableId);
+    if (filters.category) params.set('category', filters.category);
+    if (filters.catalogCode) params.set('catalog_code', filters.catalogCode);
+    if (filters.resolved) params.set('resolved', filters.resolved);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+    const response = await fetch(`${API_BASE_URL}/incidents?${params.toString()}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parsePaginatedData<IncidentSummary>(response);
   },
 
   async createIncident(payload: {
@@ -713,6 +981,20 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
 
+    const data = await response.json();
+    return data.data as IncidentSummary;
+  },
+
+  async resolveIncident(id: string, notes?: string): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.resolveIncident(id, notes) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}/resolve`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ notes }),
+    });
     const data = await response.json();
     return data.data as IncidentSummary;
   },

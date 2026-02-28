@@ -75,6 +75,53 @@ class AuditLogsHttpTest extends TestCase
         $csv->assertHeader('content-type', 'text/csv; charset=UTF-8');
     }
 
+    public function test_can_filter_quality_threshold_audit_by_resource_and_scope_id(): void
+    {
+        $userId = (string) DB::table('users')->value('id');
+        $otherUserId = (string) (DB::table('users')->where('id', '!=', $userId)->value('id') ?? (string) Str::uuid());
+
+        DB::table('audit_logs')->insert([
+            'actor_user_id' => $userId,
+            'event' => 'quality.threshold.updated',
+            'metadata' => json_encode([
+                'scope_type' => 'user',
+                'scope_id' => $userId,
+                'after' => ['threshold' => 96.5],
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('audit_logs')->insert([
+            'actor_user_id' => $userId,
+            'event' => 'quality.threshold.updated',
+            'metadata' => json_encode([
+                'scope_type' => 'user',
+                'scope_id' => $otherUserId,
+                'after' => ['threshold' => 92.0],
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $allThreshold = $this->getJson('/api/v1/audit-logs?resource=quality_threshold');
+        $allThreshold->assertOk();
+        $events = collect((array) $allThreshold->json('data'))->pluck('event')->unique()->all();
+        $this->assertContains('quality.threshold.updated', $events);
+
+        $filtered = $this->getJson('/api/v1/audit-logs?resource=quality_threshold&id=' . $userId);
+        $filtered->assertOk();
+        $rows = collect((array) $filtered->json('data'));
+        $this->assertTrue($rows->count() >= 1);
+        $matches = $rows->filter(function (array $row) use ($userId): bool {
+            $metadata = $row['metadata'] ?? null;
+            if (is_string($metadata)) {
+                $metadata = json_decode($metadata, true);
+            }
+            return (string) ($metadata['scope_id'] ?? '') === $userId;
+        });
+        $this->assertTrue($matches->count() >= 1);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

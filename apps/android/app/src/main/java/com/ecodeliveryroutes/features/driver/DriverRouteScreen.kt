@@ -167,7 +167,7 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}) {
                     incidentableType = target.entityType,
                     incidentableId = target.entityId,
                     catalogCode = incidentCode.value,
-                    category = "absent",
+                    category = incidentCategoryForCode(incidentCode.value),
                     notes = incidentNotes.value
                 )
                 if (ok) {
@@ -180,5 +180,15 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}) {
         }) { Text("Registrar Incidencia") }
 
         if (message.value.isNotBlank()) Text(message.value)
+    }
+}
+
+private fun incidentCategoryForCode(code: String): String {
+    val normalized = code.trim().uppercase()
+    return when {
+        normalized.startsWith("ABSENT") -> "absent"
+        normalized.startsWith("RETRY") -> "retry"
+        normalized.startsWith("FAILED") -> "failed"
+        else -> "general"
     }
 }
