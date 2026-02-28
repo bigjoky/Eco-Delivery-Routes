@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
+import { AuditLogEntry, HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -39,6 +39,7 @@ export function QualityPage() {
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [thresholdSaveMessage, setThresholdSaveMessage] = useState('');
+  const [thresholdAuditRows, setThresholdAuditRows] = useState<AuditLogEntry[]>([]);
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
@@ -51,6 +52,10 @@ export function QualityPage() {
       setCanManageThreshold(Boolean(config.can_manage));
       setThresholdSource(config.source_type);
     });
+    apiClient
+      .getAuditLogs({ resource: 'quality_threshold', page: 1, perPage: 20 })
+      .then((response) => setThresholdAuditRows(response.data))
+      .catch(() => setThresholdAuditRows([]));
   }, []);
 
   useEffect(() => {
@@ -166,6 +171,18 @@ export function QualityPage() {
     setPeriodEnd('');
   }
 
+  function parseAuditMetadata(metadata: AuditLogEntry['metadata']): Record<string, unknown> {
+    if (!metadata) return {};
+    if (typeof metadata === 'string') {
+      try {
+        return JSON.parse(metadata) as Record<string, unknown>;
+      } catch {
+        return {};
+      }
+    }
+    return metadata as Record<string, unknown>;
+  }
+
   const thresholdScopeIdRequired = thresholdScopeType === 'role';
   const disableThresholdSave =
     !canManageThreshold ||
@@ -258,6 +275,10 @@ export function QualityPage() {
                     setThreshold(String(config.threshold));
                     setThresholdSource(config.source_type);
                     setThresholdSaveMessage(`Umbral guardado (${config.source_type}${config.source_id ? `:${config.source_id}` : ''})`);
+                    return apiClient.getAuditLogs({ resource: 'quality_threshold', page: 1, perPage: 20 });
+                  })
+                  .then((response) => {
+                    if (response) setThresholdAuditRows(response.data);
                   })
                   .catch(() => setThresholdSaveMessage('No se pudo guardar el umbral'))
               }
@@ -339,6 +360,46 @@ export function QualityPage() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Historial umbrales KPI</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Cambio</TableHead>
+                      <TableHead>Actor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {thresholdAuditRows.map((row) => {
+                      const metadata = parseAuditMetadata(row.metadata);
+                      const beforeThreshold = (metadata.before as { threshold?: number } | undefined)?.threshold;
+                      const afterThreshold = (metadata.after as { threshold?: number } | undefined)?.threshold;
+                      const scopeType = String((metadata.scope_type as string | undefined) ?? '-');
+                      const scopeId = String((metadata.scope_id as string | undefined) ?? '-');
+
+                      return (
+                        <TableRow key={`threshold-audit-${row.id}`}>
+                          <TableCell>{row.created_at}</TableCell>
+                          <TableCell>{scopeType} · {scopeId}</TableCell>
+                          <TableCell>
+                            {beforeThreshold !== undefined ? `${beforeThreshold}%` : '-'} → {afterThreshold !== undefined ? `${afterThreshold}%` : '-'}
+                          </TableCell>
+                          <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableWrapper>
+            </CardContent>
+          </Card>
 
           <TableWrapper>
             <Table>

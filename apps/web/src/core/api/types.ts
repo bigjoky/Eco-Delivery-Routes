@@ -423,6 +423,6 @@ export type AuditLogEntry = {
   actor_name?: string | null;
   actor_roles?: string | null;
   event: string;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | string | null;
   created_at: string;
 };

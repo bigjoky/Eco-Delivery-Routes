@@ -48,6 +48,8 @@ struct ContentView: View {
     @State private var qualityPeriodEnd: String = ""
     @State private var qualityAlertThresholdText: String = "95"
     @State private var qualityThresholdSource: String = "default"
+    @State private var qualityThresholdScopeType: String = "user"
+    @State private var qualityThresholdScopeId: String = ""
     @State private var canManageQualityThreshold: Bool = false
     @State private var qualityThresholdMessage: String = ""
     @State private var advances: [AdvanceSummary] = []
@@ -196,10 +198,29 @@ struct ContentView: View {
                         TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
                         TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
                         TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
+                        Picker("Scope", selection: $qualityThresholdScopeType) {
+                            Text("Usuario").tag("user")
+                            Text("Rol").tag("role")
+                            Text("Global").tag("global")
+                        }
+                        .pickerStyle(.segmented)
+                        if qualityThresholdScopeType != "global" {
+                            TextField(
+                                qualityThresholdScopeType == "role"
+                                    ? "Scope ID (code rol, ej: driver)"
+                                    : "Scope ID usuario (vacío = usuario actual)",
+                                text: $qualityThresholdScopeId
+                            )
+                        }
                         HStack(spacing: 8) {
                             Text("Fuente umbral: \(qualityThresholdSource)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if !qualityThresholdScopeId.isEmpty {
+                                Text("· Scope: \(qualityThresholdScopeId)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             Button("Guardar umbral") {
                                 Task { await saveQualityThreshold() }
                             }
@@ -504,6 +525,8 @@ struct ContentView: View {
         guard let config = try? await apiClient.qualityThreshold() else { return }
         qualityAlertThresholdText = String(format: "%.2f", config.threshold)
         qualityThresholdSource = config.sourceType
+        qualityThresholdScopeType = config.sourceType == "default" ? "user" : config.sourceType
+        qualityThresholdScopeId = config.sourceId ?? ""
         canManageQualityThreshold = config.canManage ?? false
     }
 
@@ -514,13 +537,18 @@ struct ContentView: View {
         }
 
         do {
+            let scopeType = qualityThresholdScopeType
+            let scopeId = scopeType == "global"
+                ? nil
+                : (qualityThresholdScopeId.isEmpty ? nil : qualityThresholdScopeId)
             let updated = try await apiClient.updateQualityThreshold(
                 threshold: threshold,
-                scopeType: "user",
-                scopeId: nil
+                scopeType: scopeType,
+                scopeId: scopeId
             )
             qualityAlertThresholdText = String(format: "%.2f", updated.threshold)
             qualityThresholdSource = updated.sourceType
+            qualityThresholdScopeId = updated.sourceId ?? qualityThresholdScopeId
             canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
             qualityThresholdMessage = "Umbral guardado"
         } catch {

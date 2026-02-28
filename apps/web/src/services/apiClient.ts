@@ -117,7 +117,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -147,7 +147,7 @@ export const apiClient = {
   },
 
   async exportAuditLogsCsv(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;

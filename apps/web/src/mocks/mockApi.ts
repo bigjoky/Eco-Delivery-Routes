@@ -38,7 +38,7 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -65,11 +65,25 @@ export const mockApi = {
         metadata: { settlement_id: 'st-1', adjustment_id: 'sa-1' },
         created_at: '2026-02-27T10:05:00Z',
       },
+      {
+        id: 3,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'quality.threshold.updated',
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 95 },
+          after: { threshold: 96.5 },
+        },
+        created_at: '2026-02-28T09:00:00Z',
+      },
     ];
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
     id?: string;
     event?: string;
     dateFrom?: string;

@@ -54,7 +54,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
@@ -84,7 +84,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
