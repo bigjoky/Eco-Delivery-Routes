@@ -1394,6 +1394,32 @@ paths:
         '200': { description: OK }
         '404': { description: Ruta no encontrada }
 
+  /routes/{id}/manifest/export.csv:
+    get:
+      tags: [Routes]
+      summary: Exportar manifiesto de ruta en CSV
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: CSV export }
+        '404': { description: Ruta no encontrada }
+
+  /routes/{id}/manifest/export.pdf:
+    get:
+      tags: [Routes]
+      summary: Exportar manifiesto de ruta en PDF
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: PDF export }
+        '404': { description: Ruta no encontrada }
+
   /routes/{id}/stops/{stopId}:
     patch:
       tags: [Routes]
@@ -2140,6 +2166,7 @@ components:
         pickup_id: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [planned, in_progress, completed] }
         planned_at: { type: string, format: date-time, nullable: true }
+        undo_of_stop_id: { type: string, format: uuid, nullable: true }
     UpdateRouteStopRequest:
       type: object
       properties:

@@ -556,6 +556,7 @@ export const apiClient = {
     pickup_id?: string | null;
     status?: 'planned' | 'in_progress' | 'completed';
     planned_at?: string | null;
+    undo_of_stop_id?: string | null;
   }): Promise<RouteStopSummary> {
     if (USE_MOCK) return mockApi.createRouteStop(routeId, payload) as Promise<RouteStopSummary>;
     const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops`, {
@@ -629,6 +630,42 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot fetch route manifest');
     return json.data as RouteManifest;
+  },
+
+  async exportRouteManifestCsv(routeId: string): Promise<void> {
+    if (USE_MOCK) return;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/manifest/export.csv`);
+    if (!response.ok) {
+      const json = await response.json().catch(() => null);
+      throw new Error(json?.error?.message ?? 'Cannot export route manifest CSV');
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `route_manifest_${routeId}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportRouteManifestPdf(routeId: string): Promise<void> {
+    if (USE_MOCK) return;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/manifest/export.pdf`);
+    if (!response.ok) {
+      const json = await response.json().catch(() => null);
+      throw new Error(json?.error?.message ?? 'Cannot export route manifest PDF');
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `route_manifest_${routeId}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
