@@ -1158,10 +1158,72 @@ paths:
           name: period_end
           schema: { type: string, format: date }
         - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
           name: granularity
           schema: { type: string, enum: [week, month], default: month }
       responses:
         '200': { description: OK }
+        '404': { description: Conductor no encontrado }
+
+  /kpis/quality/drivers/{driverId}/breakdown/export.csv:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por conductor a CSV
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: CSV export }
+        '404': { description: Conductor no encontrado }
+
+  /kpis/quality/drivers/{driverId}/breakdown/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por conductor a PDF
+      parameters:
+        - in: path
+          name: driverId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: PDF export }
         '404': { description: Conductor no encontrado }
 
   /kpis/quality/export.csv:

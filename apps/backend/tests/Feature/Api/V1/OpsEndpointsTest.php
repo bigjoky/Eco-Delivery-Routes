@@ -61,6 +61,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('kpis/quality/routes/{routeId}/breakdown/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/routes/{routeId}/breakdown/export.pdf'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown/export.csv'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown/export.pdf'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.pdf'", $contents);
     }
@@ -123,6 +125,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/kpis/quality/routes/{routeId}/breakdown/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/routes/{routeId}/breakdown/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
+import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
 
 export function QualityPage() {
@@ -25,7 +26,9 @@ export function QualityPage() {
   const [riskGroupBy, setRiskGroupBy] = useState<'hub' | 'subcontractor'>('hub');
   const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [selectedDriverId, setSelectedDriverId] = useState('');
   const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
+  const [driverBreakdown, setDriverBreakdown] = useState<QualityDriverBreakdown | null>(null);
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
 
   useEffect(() => {
@@ -88,10 +91,47 @@ export function QualityPage() {
       .then(setRouteBreakdown);
   }, [selectedRouteId, periodStart, periodEnd, breakdownGranularity]);
 
+  useEffect(() => {
+    if (!selectedDriverId) {
+      setDriverBreakdown(null);
+      return;
+    }
+    apiClient
+      .getQualityDriverBreakdown(selectedDriverId, {
+        periodStart: periodStart || undefined,
+        periodEnd: periodEnd || undefined,
+        granularity: breakdownGranularity,
+        hubId: hubId || undefined,
+        subcontractorId: subcontractorId || undefined,
+      })
+      .then(setDriverBreakdown);
+  }, [selectedDriverId, periodStart, periodEnd, breakdownGranularity, hubId, subcontractorId]);
+
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
     return items.reduce((acc, item) => acc + item.service_quality_score, 0) / items.length;
   }, [items]);
+
+  const comparisonDelta = useMemo(() => {
+    if (!routeBreakdown || !driverBreakdown) return null;
+    const scoreDelta = Number((routeBreakdown.service_quality_score - driverBreakdown.service_quality_score).toFixed(2));
+    const completionDelta = routeBreakdown.components.completed_total - driverBreakdown.components.completed_total;
+    return { scoreDelta, completionDelta };
+  }, [routeBreakdown, driverBreakdown]);
+
+  function applyQuickRange(days: 7 | 30) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days + 1);
+    const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
+    setPeriodStart(toIsoDate(start));
+    setPeriodEnd(toIsoDate(end));
+  }
+
+  function clearRange() {
+    setPeriodStart('');
+    setPeriodEnd('');
+  }
 
   return (
     <section className="page-grid">
@@ -143,6 +183,9 @@ export function QualityPage() {
             <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Umbral (ej: 95)" />
           </div>
           <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={() => applyQuickRange(7)}>Ultimos 7 dias</Button>
+            <Button type="button" variant="outline" onClick={() => applyQuickRange(30)}>Ultimos 30 dias</Button>
+            <Button type="button" variant="outline" onClick={clearRange}>Limpiar rango</Button>
             <Select value={breakdownGranularity} onChange={(e) => setBreakdownGranularity(e.target.value as 'week' | 'month')}>
               <option value="month">Desglose mensual</option>
               <option value="week">Desglose semanal</option>
@@ -214,6 +257,14 @@ export function QualityPage() {
                         >
                           Ver detalle ruta
                         </Button>
+                      ) : item.scope_type === 'driver' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSelectedDriverId(item.scope_id)}
+                        >
+                          Ver detalle conductor
+                        </Button>
                       ) : (
                         '-'
                       )}
@@ -271,10 +322,10 @@ export function QualityPage() {
                     <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8 }}>
                       <div
                         style={{
-                          width: `${Math.min(100, Math.max(0, period.components.completion_ratio))}%`,
+                          width: `${normalizeChartWidth(period.components.completion_ratio)}%`,
                           height: '100%',
                           borderRadius: 6,
-                          background: period.components.completion_ratio >= 95 ? '#22c55e' : '#f59e0b',
+                          background: chartColorByRatio(period.components.completion_ratio),
                         }}
                       />
                     </div>
@@ -302,6 +353,89 @@ export function QualityPage() {
                 </Table>
               </TableWrapper>
             </>
+          )}
+
+          {driverBreakdown && (
+            <>
+              <h3>Detalle KPI por conductor</h3>
+              <div className="inline-actions">
+                <Badge variant={driverBreakdown.service_quality_score >= 95 ? 'success' : 'warning'}>
+                  {driverBreakdown.service_quality_score}%
+                </Badge>
+                <span>Conductor: {driverBreakdown.driver_code ?? driverBreakdown.driver_id}</span>
+                <span>Snapshots: {driverBreakdown.snapshots_count}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualityDriverBreakdownCsv(driverBreakdown.driver_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
+                    })
+                  }
+                >
+                  Exportar CSV conductor
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualityDriverBreakdownPdf(driverBreakdown.driver_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
+                    })
+                  }
+                >
+                  Exportar PDF conductor
+                </Button>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {driverBreakdown.periods.map((period) => (
+                  <div key={`driver-${period.period_key}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{period.period_key}</span>
+                      <span>{period.components.completion_ratio}%</span>
+                    </div>
+                    <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8 }}>
+                      <div
+                        style={{
+                          width: `${normalizeChartWidth(period.components.completion_ratio)}%`,
+                          height: '100%',
+                          borderRadius: 6,
+                          background: chartColorByRatio(period.components.completion_ratio),
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {comparisonDelta && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparativa Ruta vs Conductor</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="kpi-grid">
+                  <div className="kpi-item">
+                    <div className="kpi-label">Delta score</div>
+                    <div className="kpi-value">{comparisonDelta.scoreDelta}%</div>
+                  </div>
+                  <div className="kpi-item">
+                    <div className="kpi-label">Delta completados</div>
+                    <div className="kpi-value">{comparisonDelta.completionDelta}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <h3>Rutas bajo umbral</h3>

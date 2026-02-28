@@ -79,6 +79,8 @@ Route::prefix('v1')->group(function () {
         Route::get('kpis/quality/routes/{routeId}/breakdown/export.csv', [QualityController::class, 'routeBreakdownExportCsv']);
         Route::get('kpis/quality/routes/{routeId}/breakdown/export.pdf', [QualityController::class, 'routeBreakdownExportPdf']);
         Route::get('kpis/quality/drivers/{driverId}/breakdown', [QualityController::class, 'driverBreakdown']);
+        Route::get('kpis/quality/drivers/{driverId}/breakdown/export.csv', [QualityController::class, 'driverBreakdownExportCsv']);
+        Route::get('kpis/quality/drivers/{driverId}/breakdown/export.pdf', [QualityController::class, 'driverBreakdownExportPdf']);
         Route::get('kpis/quality/export.csv', [QualityController::class, 'exportCsv']);
         Route::get('kpis/quality/export.pdf', [QualityController::class, 'exportPdf']);
         Route::post('kpis/quality/recalculate', [QualityController::class, 'recalculate']);
