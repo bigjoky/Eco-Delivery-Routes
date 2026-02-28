@@ -289,6 +289,7 @@ export function RouteDetailPage() {
         shipment_id: lastDeletedStop.shipment_id ?? null,
         pickup_id: lastDeletedStop.pickup_id ?? null,
         status: lastDeletedStop.status as 'planned' | 'in_progress' | 'completed',
+        undo_of_stop_id: lastDeletedStop.id,
       });
       const merged = [...stops, recreated];
       const targetIndex = Math.max(0, Math.min(merged.length - 1, lastDeletedStop.sequence - 1));
@@ -304,6 +305,26 @@ export function RouteDetailPage() {
       setError(exception instanceof Error ? exception.message : 'No se pudo deshacer la eliminacion');
     } finally {
       setUndoDeleting(false);
+    }
+  };
+
+  const exportManifestCsv = async () => {
+    if (!id) return;
+    setError('');
+    try {
+      await apiClient.exportRouteManifestCsv(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo exportar el manifiesto CSV');
+    }
+  };
+
+  const exportManifestPdf = async () => {
+    if (!id) return;
+    setError('');
+    try {
+      await apiClient.exportRouteManifestPdf(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo exportar el manifiesto PDF');
     }
   };
 
@@ -375,6 +396,12 @@ export function RouteDetailPage() {
                 {' | '}Pickups {manifest?.totals.pickups ?? 0} | Completed {manifest?.totals.completed ?? 0}
               </span>
             )}
+            <Button type="button" variant="outline" disabled={!id} onClick={() => void exportManifestCsv()}>
+              Export CSV
+            </Button>
+            <Button type="button" variant="outline" disabled={!id} onClick={() => void exportManifestPdf()}>
+              Export PDF
+            </Button>
           </div>
           <div className="inline-actions">
             <strong>Bulk add:</strong>

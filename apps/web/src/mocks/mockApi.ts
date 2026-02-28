@@ -720,6 +720,7 @@ export const mockApi = {
     shipment_id?: string | null;
     pickup_id?: string | null;
     status?: 'planned' | 'in_progress' | 'completed';
+    undo_of_stop_id?: string | null;
   }) {
     const stop = {
       id: `st-${routeStopSeq++}`,

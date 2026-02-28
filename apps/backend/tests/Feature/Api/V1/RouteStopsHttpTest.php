@@ -346,6 +346,28 @@ class RouteStopsHttpTest extends TestCase
         $manifest->assertJsonPath('data.totals.stops', 2);
         $manifest->assertJsonPath('data.totals.deliveries', 1);
         $manifest->assertJsonPath('data.totals.pickups', 1);
+
+        $csv = $this->get("/api/v1/routes/{$routeId}/manifest/export.csv");
+        $csv->assertOk();
+        $this->assertStringContainsString('text/csv', (string) $csv->headers->get('content-type'));
+
+        $pdf = $this->get("/api/v1/routes/{$routeId}/manifest/export.pdf");
+        $pdf->assertOk();
+        $this->assertStringContainsString('application/pdf', (string) $pdf->headers->get('content-type'));
+
+        $events = DB::table('audit_logs')
+            ->orderByDesc('created_at')
+            ->get(['event', 'metadata'])
+            ->filter(function (object $row) use ($routeId): bool {
+                $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+                return ($metadata['resource_type'] ?? null) === 'route'
+                    && ($metadata['resource_id'] ?? null) === $routeId;
+            })
+            ->pluck('event')
+            ->all();
+        $this->assertContains('route.stops.bulk_added', $events);
+        $this->assertContains('route.manifest.exported.csv', $events);
+        $this->assertContains('route.manifest.exported.pdf', $events);
     }
 
     private function createUserWithRole(string $roleCode): User

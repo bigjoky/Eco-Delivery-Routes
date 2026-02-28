@@ -65,6 +65,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('routes/{id}/stops/{stopId}', [RouteController::class, 'updateStop']);
         Route::delete('routes/{id}/stops/{stopId}', [RouteController::class, 'deleteStop']);
         Route::get('routes/{id}/manifest', [RouteController::class, 'manifest']);
+        Route::get('routes/{id}/manifest/export.csv', [RouteController::class, 'manifestExportCsv']);
+        Route::get('routes/{id}/manifest/export.pdf', [RouteController::class, 'manifestExportPdf']);
 
         Route::get('pickups', [PickupController::class, 'index']);
         Route::post('pickups', [PickupController::class, 'store']);
