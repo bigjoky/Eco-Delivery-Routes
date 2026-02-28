@@ -99,6 +99,46 @@ class MalagaStagingSeeder extends Seeder
         $driverRutaSurId = (string) DB::table('drivers')->where('code', 'DRV-AGP-201')->value('id');
         $driverCostaId = (string) DB::table('drivers')->where('code', 'DRV-AGP-202')->value('id');
 
+        $vehicles = [
+            [
+                'code' => 'VEH-AGP-201',
+                'plate_number' => '2010-MAL',
+                'vehicle_type' => 'van',
+                'capacity_kg' => 1200,
+                'status' => 'active',
+                'subcontractor_id' => $rutaSurId,
+                'home_hub_id' => $hubCentroId,
+                'assigned_driver_id' => $driverRutaSurId,
+            ],
+            [
+                'code' => 'VEH-AGP-202',
+                'plate_number' => '2020-MAL',
+                'vehicle_type' => 'van',
+                'capacity_kg' => 1250,
+                'status' => 'active',
+                'subcontractor_id' => $costaCourierId,
+                'home_hub_id' => $hubOesteId,
+                'assigned_driver_id' => $driverCostaId,
+            ],
+        ];
+        foreach ($vehicles as $vehicle) {
+            DB::table('vehicles')->updateOrInsert(
+                ['code' => $vehicle['code']],
+                [
+                    'id' => (string) (DB::table('vehicles')->where('code', $vehicle['code'])->value('id') ?? Str::uuid()),
+                    'plate_number' => $vehicle['plate_number'],
+                    'vehicle_type' => $vehicle['vehicle_type'],
+                    'capacity_kg' => $vehicle['capacity_kg'],
+                    'status' => $vehicle['status'],
+                    'subcontractor_id' => $vehicle['subcontractor_id'],
+                    'home_hub_id' => $vehicle['home_hub_id'],
+                    'assigned_driver_id' => $vehicle['assigned_driver_id'],
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+
         $routes = [
             ['code' => 'R-AGP-CENTRO-' . now()->format('Ymd'), 'hub_id' => $hubCentroId, 'driver_id' => $driverRutaSurId, 'subcontractor_id' => $rutaSurId],
             ['code' => 'R-AGP-OESTE-' . now()->format('Ymd'), 'hub_id' => $hubOesteId, 'driver_id' => $driverCostaId, 'subcontractor_id' => $costaCourierId],

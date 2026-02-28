@@ -453,6 +453,33 @@ export type SubcontractorSummary = {
   legal_name: string;
   tax_id?: string | null;
   status: string;
+  payment_terms?: string | null;
+};
+
+export type DriverSummary = {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  employment_type: string;
+  user_id?: string | null;
+  subcontractor_id?: string | null;
+  subcontractor_name?: string | null;
+  home_hub_id?: string | null;
+};
+
+export type VehicleSummary = {
+  id: string;
+  code: string;
+  plate_number?: string | null;
+  vehicle_type: string;
+  capacity_kg?: number | null;
+  status: string;
+  subcontractor_id?: string | null;
+  subcontractor_name?: string | null;
+  home_hub_id?: string | null;
+  assigned_driver_id?: string | null;
+  assigned_driver_code?: string | null;
 };
 
 export type LoginResponse = {
