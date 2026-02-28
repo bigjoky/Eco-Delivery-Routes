@@ -802,11 +802,18 @@ class QualityController extends Controller
             })
             ->first();
 
+        $before = $existing ? [
+            'threshold' => round((float) $existing->threshold, 2),
+            'scope_type' => (string) $existing->scope_type,
+            'scope_id' => $existing->scope_id !== null ? (string) $existing->scope_id : null,
+        ] : null;
+
+        $newThreshold = round((float) $payload['threshold'], 2);
         if ($existing) {
             DB::table('quality_threshold_settings')
                 ->where('id', $existing->id)
                 ->update([
-                    'threshold' => round((float) $payload['threshold'], 2),
+                    'threshold' => $newThreshold,
                     'updated_by_user_id' => $actor->id,
                     'updated_at' => now(),
                 ]);
@@ -815,18 +822,39 @@ class QualityController extends Controller
                 'id' => (string) Str::uuid(),
                 'scope_type' => $scopeType,
                 'scope_id' => $scopeId,
-                'threshold' => round((float) $payload['threshold'], 2),
+                'threshold' => $newThreshold,
                 'updated_by_user_id' => $actor->id,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
         }
 
-        return response()->json([
-            'data' => [
-                'threshold' => round((float) $payload['threshold'], 2),
+        $after = [
+            'threshold' => $newThreshold,
+            'scope_type' => $scopeType,
+            'scope_id' => $scopeId,
+        ];
+        DB::table('audit_logs')->insert([
+            'actor_user_id' => $actor->id,
+            'event' => 'quality.threshold.updated',
+            'metadata' => json_encode([
                 'scope_type' => $scopeType,
                 'scope_id' => $scopeId,
+                'before' => $before,
+                'after' => $after,
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'threshold' => $newThreshold,
+                'source_type' => $scopeType,
+                'source_id' => $scopeId,
+                'scope_type' => $scopeType,
+                'scope_id' => $scopeId,
+                'can_manage' => true,
                 'updated_by_user_id' => (string) $actor->id,
             ],
             'message' => 'Quality threshold updated.',

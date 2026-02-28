@@ -361,11 +361,14 @@ public final class APIClient: APIClientProtocol {
 
         var request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold"), method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "threshold": threshold,
-            "scope_type": scopeType as Any,
-            "scope_id": scopeId as Any,
-        ])
+        var payload: [String: Any] = ["threshold": threshold]
+        if let scopeType {
+            payload["scope_type"] = scopeType
+        }
+        if let scopeId {
+            payload["scope_id"] = scopeId
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         let data = try await execute(request)
         return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdConfig>.self, from: data).data
     }

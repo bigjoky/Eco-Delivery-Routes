@@ -38,18 +38,32 @@ class QualityThresholdHttpTest extends TestCase
             'scope_id' => 'super_admin',
         ]);
         $setRole->assertOk();
+        $setRole->assertJsonPath('data.source_type', 'role');
+        $setRole->assertJsonPath('data.source_id', 'super_admin');
 
         $setUser = $this->putJson('/api/v1/kpis/quality/threshold', [
             'threshold' => 97.3,
             'scope_type' => 'user',
         ]);
         $setUser->assertOk();
+        $setUser->assertJsonPath('data.source_type', 'user');
+        $setUser->assertJsonPath('data.source_id', (string) $admin->id);
 
         $resolved = $this->getJson('/api/v1/kpis/quality/threshold');
         $resolved->assertOk();
         $resolved->assertJsonPath('data.threshold', 97.3);
         $resolved->assertJsonPath('data.source_type', 'user');
         $resolved->assertJsonPath('data.source_id', (string) $admin->id);
+
+        $auditRow = DB::table('audit_logs')
+            ->where('event', 'quality.threshold.updated')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($auditRow);
+        $metadata = json_decode((string) $auditRow->metadata, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('user', $metadata['scope_type']);
+        $this->assertSame((string) $admin->id, $metadata['scope_id']);
+        $this->assertSame(97.3, (float) $metadata['after']['threshold']);
     }
 
     public function test_driver_cannot_update_threshold(): void

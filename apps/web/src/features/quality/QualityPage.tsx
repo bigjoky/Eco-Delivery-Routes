@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -34,11 +34,18 @@ export function QualityPage() {
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
   const [canManageThreshold, setCanManageThreshold] = useState(false);
   const [thresholdSource, setThresholdSource] = useState<'default' | 'global' | 'role' | 'user'>('default');
+  const [thresholdScopeType, setThresholdScopeType] = useState<'global' | 'role' | 'user'>('user');
+  const [thresholdScopeId, setThresholdScopeId] = useState('');
+  const [roles, setRoles] = useState<RoleSummary[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [thresholdSaveMessage, setThresholdSaveMessage] = useState('');
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
     apiClient.getHubs({ onlyActive: true }).then(setHubs);
+    apiClient.getRoles().then(setRoles).catch(() => setRoles([]));
+    apiClient.getUsers().then(setUsers).catch(() => setUsers([]));
     apiClient.getQualityThreshold().then((config) => {
       setThreshold(String(config.threshold));
       setCanManageThreshold(Boolean(config.can_manage));
@@ -159,6 +166,14 @@ export function QualityPage() {
     setPeriodEnd('');
   }
 
+  const thresholdScopeIdRequired = thresholdScopeType === 'role';
+  const disableThresholdSave =
+    !canManageThreshold ||
+    !Number.isFinite(Number(threshold)) ||
+    Number(threshold) < 0 ||
+    Number(threshold) > 100 ||
+    (thresholdScopeIdRequired && !thresholdScopeId);
+
   return (
     <section className="page-grid">
       <Card>
@@ -207,22 +222,50 @@ export function QualityPage() {
             <Input value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} placeholder="Desde periodo (YYYY-MM-DD)" />
             <Input value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} placeholder="Hasta periodo (YYYY-MM-DD)" />
             <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Umbral (ej: 95)" />
+            <Select value={thresholdScopeType} onChange={(e) => setThresholdScopeType(e.target.value as 'global' | 'role' | 'user')}>
+              <option value="user">Scope usuario</option>
+              <option value="role">Scope rol</option>
+              <option value="global">Scope global</option>
+            </Select>
+            {thresholdScopeType === 'role' && (
+              <Select value={thresholdScopeId} onChange={(e) => setThresholdScopeId(e.target.value)}>
+                <option value="">Selecciona rol</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.code}>{role.code}</option>
+                ))}
+              </Select>
+            )}
+            {thresholdScopeType === 'user' && (
+              <Select value={thresholdScopeId} onChange={(e) => setThresholdScopeId(e.target.value)}>
+                <option value="">Usuario actual</option>
+                {users.slice(0, 100).map((user) => (
+                  <option key={user.id} value={user.id}>{user.name} · {user.email}</option>
+                ))}
+              </Select>
+            )}
             <Button
               type="button"
               variant="outline"
-              disabled={!canManageThreshold}
+              disabled={disableThresholdSave}
               onClick={() =>
                 apiClient
-                  .setQualityThreshold({ threshold: thresholdNumber, scopeType: 'user' })
+                  .setQualityThreshold({
+                    threshold: thresholdNumber,
+                    scopeType: thresholdScopeType,
+                    scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                  })
                   .then((config) => {
                     setThreshold(String(config.threshold));
                     setThresholdSource(config.source_type);
+                    setThresholdSaveMessage(`Umbral guardado (${config.source_type}${config.source_id ? `:${config.source_id}` : ''})`);
                   })
+                  .catch(() => setThresholdSaveMessage('No se pudo guardar el umbral'))
               }
             >
               Guardar umbral
             </Button>
           </div>
+          {thresholdSaveMessage && <p>{thresholdSaveMessage}</p>}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => applyQuickRange(7)}>Ultimos 7 dias</Button>
             <Button type="button" variant="outline" onClick={() => applyQuickRange(30)}>Ultimos 30 dias</Button>

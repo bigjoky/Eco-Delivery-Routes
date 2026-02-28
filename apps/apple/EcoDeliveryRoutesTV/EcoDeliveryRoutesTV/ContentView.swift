@@ -308,7 +308,7 @@ final class TVMonitorService {
         threshold: Double,
         status: String
     ) {
-        let threshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
+        let fallbackThreshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
         guard
             let rawBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"],
             !rawBaseURL.isEmpty
@@ -320,7 +320,7 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
-                threshold,
+                fallbackThreshold,
                 "Monitor activo (solo lectura/mock)"
             )
         }
@@ -338,7 +338,7 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
-                threshold,
+                fallbackThreshold,
                 "Monitor activo (URL invalida, fallback mock)"
             )
         }
@@ -372,7 +372,7 @@ final class TVMonitorService {
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
-                    threshold,
+                    fallbackThreshold,
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
@@ -419,7 +419,7 @@ final class TVMonitorService {
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
-                    threshold,
+                    fallbackThreshold,
                     "Monitor API sin datos, fallback mock"
                 )
             }
@@ -441,6 +441,11 @@ final class TVMonitorService {
                 token: token,
                 subcontractorId: worstSubcontractor?.subcontractorId
             )
+            let threshold = await fetchThresholdFromAPI(
+                normalizedBaseURL: normalizedBaseURL,
+                token: token,
+                fallbackThreshold: fallbackThreshold
+            )
             return (mappedRoutes, mappedDrivers, mappedSubcontractors, routeBreakdown, driverBreakdown, subcontractorBreakdown, threshold, "Monitor activo (API real)")
         } catch {
             return (
@@ -450,9 +455,31 @@ final class TVMonitorService {
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
-                threshold,
+                fallbackThreshold,
                 "Monitor fallback (error conexion API)"
             )
+        }
+    }
+
+    private func fetchThresholdFromAPI(normalizedBaseURL: String, token: String?, fallbackThreshold: Double) async -> Double {
+        guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold") else {
+            return fallbackThreshold
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return fallbackThreshold
+            }
+            let decoded = try JSONDecoder().decode(QualityThresholdEnvelope.self, from: data)
+            return decoded.data.threshold
+        } catch {
+            return fallbackThreshold
         }
     }
 
@@ -701,4 +728,12 @@ private struct SubcontractorBreakdownPayload: Decodable {
         case serviceQualityScore = "service_quality_score"
         case components
     }
+}
+
+private struct QualityThresholdEnvelope: Decodable {
+    let data: QualityThresholdPayload
+}
+
+private struct QualityThresholdPayload: Decodable {
+    let threshold: Double
 }
