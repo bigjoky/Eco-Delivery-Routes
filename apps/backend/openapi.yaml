@@ -161,6 +161,53 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
 
+  /roles:
+    get:
+      tags: [Roles]
+      summary: Listar roles
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /roles/{id}:
+    get:
+      tags: [Roles]
+      summary: Detalle de rol con permisos
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /roles/{id}/permissions:
+    put:
+      tags: [Roles]
+      summary: Asignar permisos a rol
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permission_ids]
+              properties:
+                permission_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
   /driver/me/route:
     get:
       tags: [Driver]
@@ -188,7 +235,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
@@ -218,7 +265,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
         - in: query
           name: id
           schema: { type: string, format: uuid }

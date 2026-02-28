@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -25,6 +26,7 @@ export function RolesPage() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Codigo</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -32,6 +34,7 @@ export function RolesPage() {
                   <TableRow key={role.id}>
                     <TableCell>{role.name}</TableCell>
                     <TableCell><Badge variant="outline">{role.code}</Badge></TableCell>
+                    <TableCell><Link to={`/roles/${role.id}`} className="btn btn-outline">Detalle</Link></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -18,6 +18,21 @@ const mockRoles = [
   { id: 'r-2', code: 'operations_manager', name: 'Operations Manager' },
   { id: 'r-3', code: 'driver', name: 'Driver' },
 ];
+const mockPermissions = [
+  { id: 'p-1', code: 'users.read', name: 'USERS.READ' },
+  { id: 'p-2', code: 'users.create', name: 'USERS.CREATE' },
+  { id: 'p-3', code: 'users.update', name: 'USERS.UPDATE' },
+  { id: 'p-4', code: 'roles.read', name: 'ROLES.READ' },
+  { id: 'p-5', code: 'roles.assign', name: 'ROLES.ASSIGN' },
+  { id: 'p-6', code: 'routes.read', name: 'ROUTES.READ' },
+  { id: 'p-7', code: 'shipments.read', name: 'SHIPMENTS.READ' },
+  { id: 'p-8', code: 'tracking.write', name: 'TRACKING.WRITE' },
+];
+let mockRolePermissions: Record<string, string[]> = {
+  'r-1': ['p-1', 'p-2', 'p-3', 'p-4', 'p-5', 'p-6', 'p-7', 'p-8'],
+  'r-2': ['p-1', 'p-4', 'p-6', 'p-7'],
+  'r-3': ['p-6', 'p-7', 'p-8'],
+};
 let mockUsers: Array<{
   id: string;
   name: string;
@@ -175,7 +190,7 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -234,6 +249,21 @@ export const mockApi = {
         metadata: { user_id: 'u-2', role_ids: ['r-2'] },
         created_at: '2026-02-28T10:05:00Z',
       },
+      {
+        id: 6,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'role.permissions.assigned',
+        metadata: {
+          role_id: 'r-2',
+          before_permission_ids: ['p-1', 'p-4'],
+          after_permission_ids: ['p-1', 'p-4', 'p-6', 'p-7'],
+          added_permission_ids: ['p-6', 'p-7'],
+          removed_permission_ids: [],
+        },
+        created_at: '2026-02-28T10:20:00Z',
+      },
     ];
     let filtered = rows;
     if (_.resource === 'user') {
@@ -245,6 +275,15 @@ export const mockApi = {
         });
       }
     }
+    if (_.resource === 'role') {
+      filtered = filtered.filter((row) => row.event.startsWith('role.'));
+      if (_.id) {
+        filtered = filtered.filter((row) => {
+          const metadata = row.metadata as { role_id?: string };
+          return metadata.role_id === _.id;
+        });
+      }
+    }
     if (_.event) {
       filtered = filtered.filter((row) => row.event.startsWith(_.event ?? ''));
     }
@@ -252,7 +291,7 @@ export const mockApi = {
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -373,6 +412,36 @@ export const mockApi = {
 
   async getRoles() {
     return mockRoles;
+  },
+
+  async getRoleById(roleId: string) {
+    const role = mockRoles.find((row) => row.id === roleId);
+    if (!role) {
+      throw new Error('Role not found');
+    }
+
+    return {
+      id: role.id,
+      code: role.code,
+      name: role.name,
+      permissions: (mockRolePermissions[role.id] ?? [])
+        .map((permissionId) => mockPermissions.find((permission) => permission.id === permissionId))
+        .filter((permission): permission is (typeof mockPermissions)[number] => !!permission),
+      available_permissions: mockPermissions,
+      users_count: mockUsers.filter((user) => user.role_ids.includes(role.id)).length,
+    };
+  },
+
+  async updateRolePermissions(roleId: string, permissionIds: string[]) {
+    const role = mockRoles.find((row) => row.id === roleId);
+    if (!role) {
+      throw new Error('Role not found');
+    }
+    mockRolePermissions = {
+      ...mockRolePermissions,
+      [roleId]: permissionIds,
+    };
+    return this.getRoleById(roleId);
   },
 
   async getHubs(_: { onlyActive?: boolean } = {}) {
