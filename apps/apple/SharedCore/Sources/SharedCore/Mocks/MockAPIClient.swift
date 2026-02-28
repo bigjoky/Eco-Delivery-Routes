@@ -1,6 +1,13 @@
 import Foundation
 
 public final class MockAPIClient {
+    private var mockQualityThreshold = QualityThresholdConfig(
+        threshold: 95,
+        sourceType: "default",
+        sourceId: nil,
+        canManage: true
+    )
+
     private var mockAdvances: [AdvanceSummary] = [
         AdvanceSummary(
             id: "adv-1",
@@ -256,6 +263,21 @@ public final class MockAPIClient {
         ]
         guard let scopeType, !scopeType.isEmpty else { return rows }
         return rows.filter { $0.scopeType == scopeType }
+    }
+
+    public func qualityThreshold() async throws -> QualityThresholdConfig {
+        mockQualityThreshold
+    }
+
+    public func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig {
+        let resolvedScopeType = scopeType ?? "user"
+        mockQualityThreshold = QualityThresholdConfig(
+            threshold: threshold,
+            sourceType: resolvedScopeType,
+            sourceId: scopeId,
+            canManage: true
+        )
+        return mockQualityThreshold
     }
 
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {

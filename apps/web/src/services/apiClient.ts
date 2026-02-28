@@ -12,6 +12,7 @@ import {
   QualityDriverBreakdown,
   QualityRouteBreakdown,
   QualitySubcontractorBreakdown,
+  QualityThresholdConfig,
   QualityTopRoutesResult,
   RoleSummary,
   RouteStopSummary,
@@ -685,6 +686,46 @@ export const apiClient = {
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  async getQualityThreshold(): Promise<QualityThresholdConfig> {
+    if (USE_MOCK) {
+      return { threshold: 95, source_type: 'default', source_id: null, can_manage: true };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdConfig;
+  },
+
+  async setQualityThreshold(payload: {
+    threshold: number;
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+  }): Promise<QualityThresholdConfig> {
+    if (USE_MOCK) {
+      return {
+        threshold: payload.threshold,
+        source_type: payload.scopeType ?? 'user',
+        source_id: payload.scopeId ?? null,
+        can_manage: true,
+      };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        threshold: payload.threshold,
+        scope_type: payload.scopeType,
+        scope_id: payload.scopeId,
+      }),
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdConfig;
   },
 
   async getIncidents(): Promise<IncidentSummary[]> {

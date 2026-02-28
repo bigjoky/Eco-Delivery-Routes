@@ -735,6 +735,104 @@ class QualityController extends Controller
         ], 201);
     }
 
+    public function threshold(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $resolved = $this->resolveQualityThreshold($actor);
+
+        return response()->json([
+            'data' => [
+                'threshold' => $resolved['threshold'],
+                'source_type' => $resolved['source_type'],
+                'source_id' => $resolved['source_id'],
+                'can_manage' => $actor->hasPermission('quality.recalculate'),
+            ],
+        ]);
+    }
+
+    public function upsertThreshold(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.recalculate')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'threshold' => ['required', 'numeric', 'min:0', 'max:100'],
+            'scope_type' => ['nullable', 'in:global,role,user'],
+            'scope_id' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $scopeType = (string) ($payload['scope_type'] ?? 'user');
+        $scopeId = isset($payload['scope_id']) ? (string) $payload['scope_id'] : null;
+
+        if ($scopeType === 'global') {
+            $scopeId = null;
+        }
+        if ($scopeType === 'user' && ($scopeId === null || $scopeId === '')) {
+            $scopeId = (string) $actor->id;
+        }
+        if ($scopeType === 'role') {
+            if ($scopeId === null || $scopeId === '' || !DB::table('roles')->where('code', $scopeId)->exists()) {
+                return response()->json([
+                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid role scope_id.'],
+                ], 422);
+            }
+        }
+        if ($scopeType === 'user' && ($scopeId === null || $scopeId === '')) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid user scope_id.'],
+            ], 422);
+        }
+
+        $existing = DB::table('quality_threshold_settings')
+            ->where('scope_type', $scopeType)
+            ->where(function ($query) use ($scopeId): void {
+                if ($scopeId === null) {
+                    $query->whereNull('scope_id');
+                } else {
+                    $query->where('scope_id', $scopeId);
+                }
+            })
+            ->first();
+
+        if ($existing) {
+            DB::table('quality_threshold_settings')
+                ->where('id', $existing->id)
+                ->update([
+                    'threshold' => round((float) $payload['threshold'], 2),
+                    'updated_by_user_id' => $actor->id,
+                    'updated_at' => now(),
+                ]);
+        } else {
+            DB::table('quality_threshold_settings')->insert([
+                'id' => (string) Str::uuid(),
+                'scope_type' => $scopeType,
+                'scope_id' => $scopeId,
+                'threshold' => round((float) $payload['threshold'], 2),
+                'updated_by_user_id' => $actor->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json([
+            'data' => [
+                'threshold' => round((float) $payload['threshold'], 2),
+                'scope_type' => $scopeType,
+                'scope_id' => $scopeId,
+                'updated_by_user_id' => (string) $actor->id,
+            ],
+            'message' => 'Quality threshold updated.',
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([
@@ -750,6 +848,67 @@ class QualityController extends Controller
     private function canReadDashboardQuality(User $actor): bool
     {
         return $actor->hasPermission('quality.read.dashboard') || $actor->hasPermission('quality.read');
+    }
+
+    /**
+     * @return array{threshold:float,source_type:string,source_id:?string}
+     */
+    private function resolveQualityThreshold(User $actor): array
+    {
+        $default = 95.0;
+
+        $userSetting = DB::table('quality_threshold_settings')
+            ->where('scope_type', 'user')
+            ->where('scope_id', (string) $actor->id)
+            ->orderByDesc('updated_at')
+            ->first();
+        if ($userSetting) {
+            return [
+                'threshold' => round((float) $userSetting->threshold, 2),
+                'source_type' => 'user',
+                'source_id' => (string) $userSetting->scope_id,
+            ];
+        }
+
+        $roleCodes = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', (string) $actor->id)
+            ->pluck('roles.code')
+            ->map(fn ($value) => (string) $value)
+            ->all();
+        if (!empty($roleCodes)) {
+            $roleSetting = DB::table('quality_threshold_settings')
+                ->where('scope_type', 'role')
+                ->whereIn('scope_id', $roleCodes)
+                ->orderByDesc('updated_at')
+                ->first();
+            if ($roleSetting) {
+                return [
+                    'threshold' => round((float) $roleSetting->threshold, 2),
+                    'source_type' => 'role',
+                    'source_id' => (string) $roleSetting->scope_id,
+                ];
+            }
+        }
+
+        $globalSetting = DB::table('quality_threshold_settings')
+            ->where('scope_type', 'global')
+            ->whereNull('scope_id')
+            ->orderByDesc('updated_at')
+            ->first();
+        if ($globalSetting) {
+            return [
+                'threshold' => round((float) $globalSetting->threshold, 2),
+                'source_type' => 'global',
+                'source_id' => null,
+            ];
+        }
+
+        return [
+            'threshold' => $default,
+            'source_type' => 'default',
+            'source_id' => null,
+        ];
     }
 
     private function fetchEnrichedQuality(Request $request, int $limit)

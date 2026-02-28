@@ -136,6 +136,13 @@ export type QualityRiskSummaryResult = {
   };
 };
 
+export type QualityThresholdConfig = {
+  threshold: number;
+  source_type: 'default' | 'global' | 'role' | 'user';
+  source_id?: string | null;
+  can_manage?: boolean;
+};
+
 export type QualityRouteBreakdown = {
   scope_type: 'route';
   scope_id: string;

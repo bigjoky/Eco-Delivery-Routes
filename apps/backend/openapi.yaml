@@ -1360,6 +1360,32 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /kpis/quality/threshold:
+    get:
+      tags: [Quality]
+      summary: Obtener umbral KPI resuelto (usuario > rol > global > default)
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Quality]
+      summary: Configurar umbral KPI por alcance (global, role, user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [threshold]
+              properties:
+                threshold: { type: number, minimum: 0, maximum: 100, default: 95 }
+                scope_type: { type: string, enum: [global, role, user], default: user }
+                scope_id: { type: string, description: "role code o user id (segun scope_type)" }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Error validación }
+
 components:
   securitySchemes:
     bearerAuth:

@@ -87,6 +87,8 @@ Route::prefix('v1')->group(function () {
         Route::get('kpis/quality/export.csv', [QualityController::class, 'exportCsv']);
         Route::get('kpis/quality/export.pdf', [QualityController::class, 'exportPdf']);
         Route::post('kpis/quality/recalculate', [QualityController::class, 'recalculate']);
+        Route::get('kpis/quality/threshold', [QualityController::class, 'threshold']);
+        Route::put('kpis/quality/threshold', [QualityController::class, 'upsertThreshold']);
         Route::get('subcontractors', [SubcontractorController::class, 'index']);
         Route::get('settlements', [SettlementController::class, 'index']);
         Route::get('settlements/reconciliation-reasons', [SettlementController::class, 'reconciliationReasons']);

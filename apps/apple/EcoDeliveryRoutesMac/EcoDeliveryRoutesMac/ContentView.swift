@@ -90,7 +90,7 @@ struct ContentView: View {
     }
 
     private var operationsTab: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(routeStops) { stop in
                 VStack(alignment: .leading) {
                     Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
@@ -102,8 +102,10 @@ struct ContentView: View {
                     selectedStopId = stop.id
                 }
             }
-            .navigationTitle("Manifiesto")
-        } detail: {
+            .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
+
+            Divider()
+
             VStack(alignment: .leading, spacing: 12) {
                 Text("Recepcion / Scan masivo")
                     .font(.title3)
@@ -135,7 +137,9 @@ struct ContentView: View {
                 Spacer()
             }
             .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .navigationTitle("Manifiesto")
     }
 
     private var advancesTab: some View {

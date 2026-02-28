@@ -32,11 +32,18 @@ export function QualityPage() {
   const [driverBreakdown, setDriverBreakdown] = useState<QualityDriverBreakdown | null>(null);
   const [subcontractorBreakdown, setSubcontractorBreakdown] = useState<QualitySubcontractorBreakdown | null>(null);
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
+  const [canManageThreshold, setCanManageThreshold] = useState(false);
+  const [thresholdSource, setThresholdSource] = useState<'default' | 'global' | 'role' | 'user'>('default');
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
     apiClient.getHubs({ onlyActive: true }).then(setHubs);
+    apiClient.getQualityThreshold().then((config) => {
+      setThreshold(String(config.threshold));
+      setCanManageThreshold(Boolean(config.can_manage));
+      setThresholdSource(config.source_type);
+    });
   }, []);
 
   useEffect(() => {
@@ -200,6 +207,21 @@ export function QualityPage() {
             <Input value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} placeholder="Desde periodo (YYYY-MM-DD)" />
             <Input value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} placeholder="Hasta periodo (YYYY-MM-DD)" />
             <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Umbral (ej: 95)" />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canManageThreshold}
+              onClick={() =>
+                apiClient
+                  .setQualityThreshold({ threshold: thresholdNumber, scopeType: 'user' })
+                  .then((config) => {
+                    setThreshold(String(config.threshold));
+                    setThresholdSource(config.source_type);
+                  })
+              }
+            >
+              Guardar umbral
+            </Button>
           </div>
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => applyQuickRange(7)}>Ultimos 7 dias</Button>
@@ -241,6 +263,8 @@ export function QualityPage() {
             >
               Exportar PDF rutas
             </Button>
+            <Badge variant="secondary">Umbral fuente: {thresholdSource}</Badge>
+            <Badge variant={alerts.length > 0 ? 'warning' : 'success'}>Alertas activas: {alerts.length}</Badge>
           </div>
 
           {alerts.length > 0 && (

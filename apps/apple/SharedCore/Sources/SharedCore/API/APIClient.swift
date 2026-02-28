@@ -22,6 +22,8 @@ public protocol APIClientProtocol {
     func qualitySnapshots(scopeType: String?) async throws -> [QualitySnapshot]
     func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown
     func qualitySubcontractorBreakdown(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualitySubcontractorBreakdown
+    func qualityThreshold() async throws -> QualityThresholdConfig
+    func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
@@ -342,6 +344,30 @@ public final class APIClient: APIClientProtocol {
         )
         let request = authorizedRequest(url: url, method: "GET")
         _ = try await execute(request)
+    }
+
+    public func qualityThreshold() async throws -> QualityThresholdConfig {
+        guard let baseURL else { return try await mock.qualityThreshold() }
+
+        let request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold"), method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdConfig>.self, from: data).data
+    }
+
+    public func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig {
+        guard let baseURL else {
+            return try await mock.updateQualityThreshold(threshold: threshold, scopeType: scopeType, scopeId: scopeId)
+        }
+
+        var request = authorizedRequest(url: baseURL.appending(path: "kpis/quality/threshold"), method: "PUT")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "threshold": threshold,
+            "scope_type": scopeType as Any,
+            "scope_id": scopeId as Any,
+        ])
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualityThresholdConfig>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {
