@@ -281,6 +281,7 @@ class RouteController extends Controller
             'planned_at' => ['nullable', 'date'],
         ]);
         $this->assertStopPayloadConsistency($payload);
+        $this->assertUniqueStopSequence($id, (int) $payload['sequence']);
 
         $stopId = (string) Str::uuid();
         DB::table('route_stops')->insert([
@@ -330,6 +331,9 @@ class RouteController extends Controller
             'planned_at' => ['nullable', 'date'],
             'completed_at' => ['nullable', 'date'],
         ]);
+        if (array_key_exists('sequence', $payload) && $payload['sequence'] !== null) {
+            $this->assertUniqueStopSequence($id, (int) $payload['sequence'], $stopId);
+        }
 
         if ($payload !== []) {
             DB::table('route_stops')
@@ -412,6 +416,23 @@ class RouteController extends Controller
         if (empty($payload['pickup_id']) || !empty($payload['shipment_id'])) {
             throw ValidationException::withMessages([
                 'pickup_id' => ['Pickup stop requires pickup_id and must not include shipment_id.'],
+            ]);
+        }
+    }
+
+    private function assertUniqueStopSequence(string $routeId, int $sequence, ?string $ignoreStopId = null): void
+    {
+        $query = DB::table('route_stops')
+            ->where('route_id', $routeId)
+            ->where('sequence', $sequence);
+
+        if ($ignoreStopId) {
+            $query->where('id', '!=', $ignoreStopId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'sequence' => ['Sequence already exists for this route.'],
             ]);
         }
     }

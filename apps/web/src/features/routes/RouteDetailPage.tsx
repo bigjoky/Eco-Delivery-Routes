@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DriverSummary, RouteStopSummary, RouteSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { DriverSummary, PickupSummary, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 export function RouteDetailPage() {
@@ -13,6 +13,8 @@ export function RouteDetailPage() {
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [shipments, setShipments] = useState<ShipmentSummary[]>([]);
+  const [pickups, setPickups] = useState<PickupSummary[]>([]);
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [subcontractorId, setSubcontractorId] = useState('');
   const [driverId, setDriverId] = useState('');
@@ -21,7 +23,8 @@ export function RouteDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [stopType, setStopType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
-  const [stopEntityId, setStopEntityId] = useState('');
+  const [selectedShipmentId, setSelectedShipmentId] = useState('');
+  const [selectedPickupId, setSelectedPickupId] = useState('');
   const [stopSequence, setStopSequence] = useState(1);
   const [savingStop, setSavingStop] = useState(false);
 
@@ -30,6 +33,8 @@ export function RouteDetailPage() {
     setError('');
     apiClient.getRouteStops(id).then(setStops).catch(() => setStops([]));
     apiClient.getSubcontractors({ limit: 100 }).then(setSubcontractors).catch(() => setSubcontractors([]));
+    apiClient.getShipments({ status: 'created', perPage: 100, page: 1 }).then((result) => setShipments(result.data)).catch(() => setShipments([]));
+    apiClient.getPickups({ status: 'planned', limit: 100 }).then(setPickups).catch(() => setPickups([]));
     apiClient
       .getDrivers({ status: 'active', limit: 100 })
       .then(setDrivers)
@@ -103,8 +108,9 @@ export function RouteDetailPage() {
   };
 
   const createStop = async () => {
+    const stopEntityId = stopType === 'DELIVERY' ? selectedShipmentId : selectedPickupId;
     if (!id || !stopEntityId) {
-      setError('Debes indicar el ID de envio/recogida para la parada.');
+      setError(`Debes seleccionar ${stopType === 'DELIVERY' ? 'un envio' : 'una recogida'} para la parada.`);
       return;
     }
     setSavingStop(true);
@@ -118,7 +124,8 @@ export function RouteDetailPage() {
         status: 'planned',
       });
       setStops((current) => [...current, created].sort((a, b) => a.sequence - b.sequence));
-      setStopEntityId('');
+      setSelectedShipmentId('');
+      setSelectedPickupId('');
       setStopSequence((value) => value + 1);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo crear la parada');
@@ -226,12 +233,25 @@ export function RouteDetailPage() {
               onChange={(event) => setStopSequence(Number(event.target.value) || 1)}
             />
             <label htmlFor="stop-entity-id">{stopType === 'DELIVERY' ? 'Shipment ID' : 'Pickup ID'}</label>
-            <input
-              id="stop-entity-id"
-              value={stopEntityId}
-              onChange={(event) => setStopEntityId(event.target.value)}
-              placeholder={stopType === 'DELIVERY' ? 'uuid shipment' : 'uuid pickup'}
-            />
+            {stopType === 'DELIVERY' ? (
+              <select id="stop-entity-id" value={selectedShipmentId} onChange={(event) => setSelectedShipmentId(event.target.value)}>
+                <option value="">Selecciona envio</option>
+                {shipments.map((shipment) => (
+                  <option key={shipment.id} value={shipment.id}>
+                    {shipment.reference} ({shipment.status})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select id="stop-entity-id" value={selectedPickupId} onChange={(event) => setSelectedPickupId(event.target.value)}>
+                <option value="">Selecciona recogida</option>
+                {pickups.map((pickup) => (
+                  <option key={pickup.id} value={pickup.id}>
+                    {pickup.reference} ({pickup.pickup_type})
+                  </option>
+                ))}
+              </select>
+            )}
             <Button type="button" onClick={createStop} disabled={savingStop}>
               {savingStop ? 'Creando...' : 'Agregar parada'}
             </Button>
