@@ -97,6 +97,14 @@ export const mockApi = {
     return rows;
   },
 
+  async getUserById(id: string) {
+    const user = (await this.getUsers()).find((row) => row.id === id);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return user;
+  },
+
   async createUser(payload: {
     name: string;
     email: string;
@@ -167,7 +175,7 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -175,7 +183,7 @@ export const mockApi = {
     page?: number;
     perPage?: number;
   }) {
-    return [
+    const rows = [
       {
         id: 1,
         actor_user_id: 'u-1',
@@ -208,11 +216,43 @@ export const mockApi = {
         },
         created_at: '2026-02-28T09:00:00Z',
       },
+      {
+        id: 4,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'user.updated',
+        metadata: { user_id: 'u-2', before: { status: 'pending' }, after: { status: 'active' } },
+        created_at: '2026-02-28T10:00:00Z',
+      },
+      {
+        id: 5,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'user.roles.assigned',
+        metadata: { user_id: 'u-2', role_ids: ['r-2'] },
+        created_at: '2026-02-28T10:05:00Z',
+      },
     ];
+    let filtered = rows;
+    if (_.resource === 'user') {
+      filtered = filtered.filter((row) => row.event.startsWith('user.'));
+      if (_.id) {
+        filtered = filtered.filter((row) => {
+          const metadata = row.metadata as { user_id?: string };
+          return metadata.user_id === _.id;
+        });
+      }
+    }
+    if (_.event) {
+      filtered = filtered.filter((row) => row.event.startsWith(_.event ?? ''));
+    }
+    return filtered;
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
     id?: string;
     event?: string;
     dateFrom?: string;

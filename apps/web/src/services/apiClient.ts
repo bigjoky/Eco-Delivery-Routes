@@ -43,6 +43,59 @@ import { mockApi } from '../mocks/mockApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const USE_MOCK = !API_BASE_URL;
+let refreshPromise: Promise<string | null> | null = null;
+
+function buildAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const token = sessionStore.getToken();
+  return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+}
+
+async function refreshAuthToken(): Promise<string | null> {
+  if (USE_MOCK) return sessionStore.getToken();
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const token = sessionStore.getToken();
+    if (!token) return null;
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+    });
+    if (!response.ok) return null;
+    const json = await response.json();
+    const refreshed = typeof json?.token === 'string' ? json.token : null;
+    if (refreshed) {
+      sessionStore.setToken(refreshed);
+      return refreshed;
+    }
+    return null;
+  })();
+
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function authorizedFetch(input: string, init: RequestInit = {}, canRetry = true): Promise<Response> {
+  const response = await fetch(input, {
+    ...init,
+    headers: buildAuthHeaders((init.headers ?? {}) as Record<string, string>),
+  });
+  if (response.status !== 401 || !canRetry) {
+    return response;
+  }
+  const refreshed = await refreshAuthToken();
+  if (!refreshed) {
+    sessionStore.setToken(null);
+    sessionStore.setRoles([]);
+    return response;
+  }
+  return fetch(input, {
+    ...init,
+    headers: buildAuthHeaders((init.headers ?? {}) as Record<string, string>),
+  });
+}
 
 async function parseData<T>(response: Response): Promise<T[]> {
   const data = await response.json();
@@ -107,9 +160,8 @@ export const apiClient = {
     }
 
     try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
+      await authorizedFetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
-        headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
       });
     } finally {
       sessionStore.setToken(null);
@@ -124,9 +176,10 @@ export const apiClient = {
       return profile;
     }
 
-    const response = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/auth/me`);
+    if (!response.ok) {
+      throw new Error('Session expired');
+    }
     const data = await response.json();
     const profile = data.data as CurrentUserProfile;
     sessionStore.setRoles((profile.roles ?? []).map((role) => role.code));
@@ -153,10 +206,18 @@ export const apiClient = {
     params.set('per_page', String(perPage));
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
-    const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/users?${params.toString()}`);
     return parsePaginatedData<UserSummary>(response);
+  },
+
+  async getUserById(id: string): Promise<UserSummary> {
+    if (USE_MOCK) return mockApi.getUserById(id) as Promise<UserSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${id}`);
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot load user');
+    }
+    return json.data as UserSummary;
   },
 
   async createUser(payload: {
@@ -168,11 +229,10 @@ export const apiClient = {
   }): Promise<UserSummary> {
     if (USE_MOCK) return mockApi.createUser(payload) as Promise<UserSummary>;
 
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    const response = await authorizedFetch(`${API_BASE_URL}/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
       },
       body: JSON.stringify({
         name: payload.name,
@@ -196,11 +256,10 @@ export const apiClient = {
     password?: string;
   }): Promise<UserSummary> {
     if (USE_MOCK) return mockApi.updateUser(id, payload) as Promise<UserSummary>;
-    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
       },
       body: JSON.stringify(payload),
     });
@@ -213,11 +272,10 @@ export const apiClient = {
 
   async assignUserRoles(userId: string, roleIds: string[]): Promise<void> {
     if (USE_MOCK) return mockApi.assignUserRoles(userId, roleIds) as Promise<void>;
-    const response = await fetch(`${API_BASE_URL}/users/${userId}/roles`, {
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${userId}/roles`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
       },
       body: JSON.stringify({ role_ids: roleIds }),
     });
@@ -228,7 +286,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -251,14 +309,12 @@ export const apiClient = {
     params.set('page', String(page));
     params.set('per_page', String(perPage));
 
-    const response = await fetch(`${API_BASE_URL}/audit-logs?${params.toString()}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/audit-logs?${params.toString()}`);
     return parsePaginatedData<AuditLogEntry>(response);
   },
 
   async exportAuditLogsCsv(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -274,9 +330,7 @@ export const apiClient = {
     if (filters.dateTo) params.set('date_to', filters.dateTo);
 
     const suffix = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetch(`${API_BASE_URL}/audit-logs/export.csv${suffix}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/audit-logs/export.csv${suffix}`);
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -291,9 +345,7 @@ export const apiClient = {
 
   async getRoles(): Promise<RoleSummary[]> {
     if (USE_MOCK) return mockApi.getRoles();
-    const response = await fetch(`${API_BASE_URL}/roles`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/roles`);
     return parseData<RoleSummary>(response);
   },
 
@@ -328,9 +380,7 @@ export const apiClient = {
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
     if (filters.status) params.set('status', filters.status);
-    const response = await fetch(`${API_BASE_URL}/shipments?${params.toString()}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments?${params.toString()}`);
     return parsePaginatedData<ShipmentSummary>(response);
   },
 
@@ -357,9 +407,7 @@ export const apiClient = {
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
     const suffix = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetch(`${API_BASE_URL}/routes${suffix}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/routes${suffix}`);
     return parsePaginatedData<RouteSummary>(response);
   },
 

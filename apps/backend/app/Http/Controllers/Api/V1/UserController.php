@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Users\AssignRolesRequest;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,10 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function __construct(private readonly ListUsersAction $listUsersAction)
+    public function __construct(
+        private readonly ListUsersAction $listUsersAction,
+        private readonly AuditLogWriter $auditLogWriter
+    )
     {
     }
 
@@ -62,6 +66,11 @@ class UserController extends Controller
             $user->roles()->sync($roles);
         }
         $user->load('roles:id,code,name');
+        $this->auditLogWriter->write($actor->id, 'user.created', [
+            'user_id' => $user->id,
+            'status' => $user->status,
+            'role_ids' => $user->roles->pluck('id')->all(),
+        ]);
 
         return response()->json([
             'data' => [
@@ -136,8 +145,14 @@ class UserController extends Controller
             return $this->forbidden();
         }
 
+        $before = $user->only(['name', 'email', 'status']);
         $user->fill($request->validated())->save();
         $user->load('roles:id,code,name');
+        $this->auditLogWriter->write($actor->id, 'user.updated', [
+            'user_id' => $user->id,
+            'before' => $before,
+            'after' => $user->only(['name', 'email', 'status']),
+        ]);
 
         return response()->json([
             'data' => [
@@ -180,6 +195,10 @@ class UserController extends Controller
             ->all();
 
         $user->roles()->sync($validatedIds);
+        $this->auditLogWriter->write($actor->id, 'user.roles.assigned', [
+            'user_id' => $user->id,
+            'role_ids' => $validatedIds,
+        ]);
 
         return response()->json([
             'data' => [

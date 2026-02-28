@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -158,7 +159,10 @@ export function UsersPage() {
                     <TableCell>{(user.roles ?? []).map((role) => role.code).join(', ') || '-'}</TableCell>
                     <TableCell>{user.last_login_at ?? '-'}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" onClick={() => onOpenEdit(user)}>Editar</Button>
+                      <div className="inline-actions">
+                        <Button type="button" variant="outline" onClick={() => onOpenEdit(user)}>Editar</Button>
+                        <Link to={`/users/${user.id}`} className="btn btn-outline">Detalle</Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

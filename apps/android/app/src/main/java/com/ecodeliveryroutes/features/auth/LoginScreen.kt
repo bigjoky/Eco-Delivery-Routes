@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ecodeliveryroutes.core.network.ApiProvider
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onSuccess: () -> Unit) {
+    val context = LocalContext.current
     val email = remember { mutableStateOf("admin@eco.local") }
     val password = remember { mutableStateOf("password123") }
     val message = remember { mutableStateOf("") }
@@ -41,6 +43,7 @@ fun LoginScreen(onSuccess: () -> Unit) {
             scope.launch {
                 val token = ApiProvider.client.login(email.value, password.value)
                 SessionStore.updateToken(token)
+                SessionStore.persist(context)
                 message.value = if (SessionStore.isAuthenticated()) "Sesión activa" else "Error de autenticación"
                 if (SessionStore.isAuthenticated()) onSuccess()
             }

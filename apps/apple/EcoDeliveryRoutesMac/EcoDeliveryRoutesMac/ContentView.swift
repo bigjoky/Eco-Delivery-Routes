@@ -65,6 +65,9 @@ struct ContentView: View {
     @State private var scanCode: String = ""
     @State private var operationalMessage: String = "Recepcion lista"
     @State private var advancesMessage: String = ""
+    @State private var email: String = "admin@eco.local"
+    @State private var password: String = "password123"
+    @State private var loginMessage: String = "No autenticado"
 
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
@@ -75,29 +78,62 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(Section.allCases, selection: $selectedSection) { section in
-                Label(section.rawValue, systemImage: section.systemImage)
-                    .tag(section)
-            }
-            .navigationTitle("Eco Delivery")
-        } detail: {
-            switch selectedSection ?? .operations {
-            case .operations:
-                operationsTab
-            case .quality:
-                qualityTab
-            case .advances:
-                advancesTab
-            case .tariffs:
-                tariffsTab
-            case .settlements:
-                settlementsTab
+        Group {
+            if authSession.token == nil {
+                loginView
+            } else {
+                NavigationSplitView {
+                    List(Section.allCases, selection: $selectedSection) { section in
+                        Label(section.rawValue, systemImage: section.systemImage)
+                            .tag(section)
+                    }
+                    .navigationTitle("Eco Delivery")
+                } detail: {
+                    switch selectedSection ?? .operations {
+                    case .operations:
+                        operationsTab
+                    case .quality:
+                        qualityTab
+                    case .advances:
+                        advancesTab
+                    case .tariffs:
+                        tariffsTab
+                    case .settlements:
+                        settlementsTab
+                    }
+                }
+                .toolbar {
+                    Button("Cerrar sesion") {
+                        Task { await logout() }
+                    }
+                }
             }
         }
         .task {
             await refreshAll()
         }
+    }
+
+    private var loginView: some View {
+        VStack(spacing: 12) {
+            Text("Warehouse / Traffic Login")
+                .font(.headline)
+            TextField("Email", text: $email)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(maxWidth: 320)
+            SecureField("Password", text: $password)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .frame(maxWidth: 320)
+            Button("Entrar") {
+                Task { await login() }
+            }
+            .disabled(email.isEmpty || password.isEmpty)
+            Text(loginMessage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
 
     private var operationsTab: some View {
@@ -525,6 +561,7 @@ struct ContentView: View {
 
     private func refreshAll() async {
         apiClient.setAuthToken(authSession.token?.token)
+        guard authSession.token != nil else { return }
         await loadQualityThreshold()
         await loadQualityThresholdAlerts()
         await loadRoute()
@@ -685,6 +722,25 @@ struct ContentView: View {
         if after > before { return .green }
         if after < before { return .orange }
         return .secondary
+    }
+
+    private func login() async {
+        do {
+            let token = try await apiClient.login(email: email, password: password)
+            authSession.updateToken(token)
+            apiClient.setAuthToken(token.token)
+            loginMessage = "Sesion activa"
+            await refreshAll()
+        } catch {
+            loginMessage = "Error de login"
+        }
+    }
+
+    private func logout() async {
+        await apiClient.logout()
+        authSession.updateToken(nil)
+        apiClient.setAuthToken(nil)
+        loginMessage = "No autenticado"
     }
 }
 

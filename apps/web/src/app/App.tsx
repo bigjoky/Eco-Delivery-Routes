@@ -15,6 +15,7 @@ import { SettlementPreviewPage } from '../features/settlements/SettlementPreview
 import { ShipmentsPage } from '../features/shipments/ShipmentsPage';
 import { TariffsPage } from '../features/tariffs/TariffsPage';
 import { UsersPage } from '../features/users/UsersPage';
+import { UserDetailPage } from '../features/users/UserDetailPage';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(sessionStore.isAuthenticated());
@@ -40,6 +41,7 @@ export function App() {
         <Route path="/settlements/preview" element={isAuthenticated ? <SettlementPreviewPage /> : <Navigate to="/" replace />} />
         <Route path="/quality" element={isAuthenticated ? <QualityPage /> : <Navigate to="/" replace />} />
         <Route path="/users" element={isAuthenticated ? <UsersPage /> : <Navigate to="/" replace />} />
+        <Route path="/users/:id" element={isAuthenticated ? <UserDetailPage /> : <Navigate to="/" replace />} />
         <Route path="/roles" element={isAuthenticated ? <RolesPage /> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/shipments' : '/'} replace />} />
       </Routes>

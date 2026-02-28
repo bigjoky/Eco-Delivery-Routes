@@ -184,12 +184,15 @@ struct ContentView: View {
 
                 Section("Sesion") {
                     Button("Cerrar sesion") {
-                        authSession.updateToken(nil)
-                        apiClient.setAuthToken(nil)
-                        routeStops = []
-                        selectedStopId = nil
-                        routeQuality = []
-                        loginMessage = "No autenticado"
+                        Task {
+                            await apiClient.logout()
+                            authSession.updateToken(nil)
+                            apiClient.setAuthToken(nil)
+                            routeStops = []
+                            selectedStopId = nil
+                            routeQuality = []
+                            loginMessage = "No autenticado"
+                        }
                     }
                 }
             }

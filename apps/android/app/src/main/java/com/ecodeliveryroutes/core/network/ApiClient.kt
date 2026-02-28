@@ -32,6 +32,17 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrDefault("mock-token")
     }
 
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext
+        runCatching {
+            val connection = (URL("$baseUrl/auth/logout").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                SessionStore.token?.let { setRequestProperty("Authorization", "Bearer $it") }
+            }
+            connection.inputStream.bufferedReader().use { it.readText() }
+        }
+    }
+
     suspend fun myRouteStops(routeDate: String? = null, status: String? = null): List<RouteStop> = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext mockRouteStops()
 
@@ -182,22 +193,62 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
     }
 
     private fun authedGet(url: String): String {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            SessionStore.token?.let { setRequestProperty("Authorization", "Bearer $it") }
-        }
-        return connection.inputStream.bufferedReader().use { it.readText() }
+        return executeWithRefresh("GET", url, null)
     }
 
     private fun authedPost(url: String, payload: JSONObject): String {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            setRequestProperty("Content-Type", "application/json")
-            SessionStore.token?.let { setRequestProperty("Authorization", "Bearer $it") }
-            doOutput = true
+        return executeWithRefresh("POST", url, payload)
+    }
+
+    private fun executeWithRefresh(method: String, url: String, payload: JSONObject?): String {
+        var response = execute(method, url, payload)
+        if (response.statusCode == 401 && refreshToken()) {
+            response = execute(method, url, payload)
         }
-        connection.outputStream.use { it.write(payload.toString().toByteArray()) }
-        return connection.inputStream.bufferedReader().use { it.readText() }
+        if (response.statusCode in 200..299) {
+            return response.body
+        }
+        throw IllegalStateException("HTTP ${response.statusCode}")
+    }
+
+    private fun execute(method: String, url: String, payload: JSONObject?): HttpResult {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            SessionStore.token?.let { setRequestProperty("Authorization", "Bearer $it") }
+            if (payload != null) {
+                setRequestProperty("Content-Type", "application/json")
+                doOutput = true
+            }
+        }
+        if (payload != null) {
+            connection.outputStream.use { it.write(payload.toString().toByteArray()) }
+        }
+        val statusCode = connection.responseCode
+        val stream = if (statusCode in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+        return HttpResult(statusCode = statusCode, body = body)
+    }
+
+    private fun refreshToken(): Boolean {
+        val token = SessionStore.token ?: return false
+        val baseUrl = baseUrl ?: return false
+        val connection = (URL("$baseUrl/auth/refresh").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Authorization", "Bearer $token")
+        }
+        val code = connection.responseCode
+        if (code !in 200..299) {
+            SessionStore.updateToken(null)
+            return false
+        }
+        val body = connection.inputStream.bufferedReader().use { it.readText() }
+        val refreshed = JSONObject(body).optString("token")
+        if (refreshed.isBlank()) {
+            SessionStore.updateToken(null)
+            return false
+        }
+        SessionStore.updateToken(refreshed)
+        return true
     }
 
     private fun mockRouteStops(): List<RouteStop> = listOf(
@@ -251,6 +302,11 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         )
     }
 }
+
+private data class HttpResult(
+    val statusCode: Int,
+    val body: String
+)
 
 internal fun parseRouteStops(stops: JSONArray): List<RouteStop> =
     (0 until stops.length()).map { index ->
