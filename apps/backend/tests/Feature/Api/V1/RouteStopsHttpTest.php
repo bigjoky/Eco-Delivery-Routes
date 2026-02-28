@@ -156,6 +156,75 @@ class RouteStopsHttpTest extends TestCase
         $forbidden->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
+    public function test_cannot_create_or_update_stop_with_duplicate_sequence(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-DUP',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-DUP-A',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-DUP-B',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $stopA = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentA,
+        ]);
+        $stopA->assertStatus(201);
+
+        $duplicateCreate = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentB,
+        ]);
+        $duplicateCreate->assertStatus(422);
+        $duplicateCreate->assertJsonValidationErrors(['sequence']);
+
+        $stopB = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 2,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentB,
+        ]);
+        $stopB->assertStatus(201);
+
+        $duplicateUpdate = $this->patchJson("/api/v1/routes/{$routeId}/stops/" . $stopB->json('data.id'), [
+            'sequence' => 1,
+        ]);
+        $duplicateUpdate->assertStatus(422);
+        $duplicateUpdate->assertJsonValidationErrors(['sequence']);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

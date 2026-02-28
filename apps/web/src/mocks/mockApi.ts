@@ -630,6 +630,21 @@ export const mockApi = {
     return rows.filter((row) => row.status === filters.status);
   },
 
+  async getPickups(filters: { status?: string; limit?: number } = {}) {
+    let rows = [
+      { id: '00000000-0000-0000-0000-000000000201', reference: 'PCK-AGP-0001', pickup_type: 'NORMAL', status: 'planned', requester_name: 'Cliente Pickup 1' },
+      { id: '00000000-0000-0000-0000-000000000202', reference: 'PCK-AGP-0002', pickup_type: 'RETURN', status: 'planned', requester_name: 'Cliente Pickup 2' },
+      { id: '00000000-0000-0000-0000-000000000203', reference: 'PCK-AGP-0003', pickup_type: 'NORMAL', status: 'completed', requester_name: 'Cliente Pickup 3' },
+    ];
+    if (filters.status) {
+      rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.limit) {
+      rows = rows.slice(0, Math.max(1, filters.limit));
+    }
+    return rows;
+  },
+
   async getRoutes(filters: {
     status?: string;
     dateFrom?: string;

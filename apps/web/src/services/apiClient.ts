@@ -35,6 +35,7 @@ import {
   DriverSummary,
   VehicleSummary,
   ShipmentSummary,
+  PickupSummary,
   TariffSummary,
   UserSummary,
   DriverRouteMeResponse,
@@ -459,6 +460,20 @@ export const apiClient = {
     if (filters.status) params.set('status', filters.status);
     const response = await authorizedFetch(`${API_BASE_URL}/shipments?${params.toString()}`);
     return parsePaginatedData<ShipmentSummary>(response);
+  },
+
+  async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {
+    if (USE_MOCK) return mockApi.getPickups(filters) as Promise<PickupSummary[]>;
+    const response = await authorizedFetch(`${API_BASE_URL}/pickups`);
+    const rows = await parseData<PickupSummary>(response);
+    let filtered = rows;
+    if (filters.status) {
+      filtered = filtered.filter((row) => row.status === filters.status);
+    }
+    if (filters.limit) {
+      filtered = filtered.slice(0, Math.max(1, filters.limit));
+    }
+    return filtered;
   },
 
   async getRoutes(filters: {

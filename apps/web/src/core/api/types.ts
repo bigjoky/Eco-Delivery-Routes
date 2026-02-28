@@ -51,6 +51,14 @@ export type ShipmentSummary = {
   consignee_name?: string | null;
 };
 
+export type PickupSummary = {
+  id: string;
+  reference: string;
+  pickup_type: 'NORMAL' | 'RETURN';
+  status: string;
+  requester_name?: string | null;
+};
+
 export type RouteSummary = {
   id: string;
   code: string;
