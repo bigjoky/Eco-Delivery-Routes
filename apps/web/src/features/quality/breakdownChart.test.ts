@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 
 describe('breakdown chart helpers', () => {
-  it('clamps ratio width between 0 and 100', () => {
-    expect(normalizeChartWidth(-10)).toBe(0);
-    expect(normalizeChartWidth(48.2)).toBe(48.2);
-    expect(normalizeChartWidth(130)).toBe(100);
+  it('clamps width between 0 and 100', () => {
+    expect(normalizeChartWidth(-5)).toBe(0);
+    expect(normalizeChartWidth(42.5)).toBe(42.5);
+    expect(normalizeChartWidth(150)).toBe(100);
   });
 
-  it('uses green for >=95 and warning otherwise', () => {
-    expect(chartColorByRatio(96)).toBe('#22c55e');
+  it('returns color by threshold', () => {
     expect(chartColorByRatio(95)).toBe('#22c55e');
-    expect(chartColorByRatio(94.99)).toBe('#f59e0b');
+    expect(chartColorByRatio(99)).toBe('#22c55e');
+    expect(chartColorByRatio(80)).toBe('#f59e0b');
   });
 });

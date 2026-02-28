@@ -18,6 +18,7 @@ vendor/
 **/vendor/
 apps/backend/.phpunit.result.cache
 apps/backend/storage/logs/*.log
+apps/backend/storage/
 apps/backend/database/*.sqlite
 
 # Android

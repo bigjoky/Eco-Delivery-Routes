@@ -11,6 +11,7 @@ import {
   QualityRiskSummaryResult,
   QualityDriverBreakdown,
   QualityRouteBreakdown,
+  QualitySubcontractorBreakdown,
   QualityTopRoutesResult,
   RoleSummary,
   RouteStopSummary,
@@ -536,12 +537,16 @@ export const apiClient = {
     periodStart?: string;
     periodEnd?: string;
     granularity?: 'week' | 'month';
+    hubId?: string;
+    subcontractorId?: string;
   } = {}): Promise<QualityDriverBreakdown> {
     if (USE_MOCK) return mockApi.getQualityDriverBreakdown(driverId, filters) as Promise<QualityDriverBreakdown>;
     const params = new URLSearchParams();
     if (filters.periodStart) params.set('period_start', filters.periodStart);
     if (filters.periodEnd) params.set('period_end', filters.periodEnd);
     if (filters.granularity) params.set('granularity', filters.granularity);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
@@ -554,12 +559,16 @@ export const apiClient = {
     periodStart?: string;
     periodEnd?: string;
     granularity?: 'week' | 'month';
+    hubId?: string;
+    subcontractorId?: string;
   } = {}): Promise<void> {
     if (USE_MOCK) return mockApi.exportQualityDriverBreakdownCsv(driverId, filters) as Promise<void>;
     const params = new URLSearchParams();
     if (filters.periodStart) params.set('period_start', filters.periodStart);
     if (filters.periodEnd) params.set('period_end', filters.periodEnd);
     if (filters.granularity) params.set('granularity', filters.granularity);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown/export.csv${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
@@ -580,12 +589,16 @@ export const apiClient = {
     periodStart?: string;
     periodEnd?: string;
     granularity?: 'week' | 'month';
+    hubId?: string;
+    subcontractorId?: string;
   } = {}): Promise<void> {
     if (USE_MOCK) return mockApi.exportQualityDriverBreakdownPdf(driverId, filters) as Promise<void>;
     const params = new URLSearchParams();
     if (filters.periodStart) params.set('period_start', filters.periodStart);
     if (filters.periodEnd) params.set('period_end', filters.periodEnd);
     if (filters.granularity) params.set('granularity', filters.granularity);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/kpis/quality/drivers/${driverId}/breakdown/export.pdf${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
@@ -596,6 +609,78 @@ export const apiClient = {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `quality_driver_${driverId}_breakdown.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async getQualitySubcontractorBreakdown(subcontractorId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<QualitySubcontractorBreakdown> {
+    if (USE_MOCK) {
+      return mockApi.getQualitySubcontractorBreakdown(subcontractorId, filters) as Promise<QualitySubcontractorBreakdown>;
+    }
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/subcontractors/${subcontractorId}/breakdown${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualitySubcontractorBreakdown;
+  },
+
+  async exportQualitySubcontractorBreakdownCsv(subcontractorId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualitySubcontractorBreakdownCsv(subcontractorId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/subcontractors/${subcontractorId}/breakdown/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_subcontractor_${subcontractorId}_breakdown.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportQualitySubcontractorBreakdownPdf(subcontractorId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualitySubcontractorBreakdownPdf(subcontractorId, filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.periodStart) params.set('period_start', filters.periodStart);
+    if (filters.periodEnd) params.set('period_end', filters.periodEnd);
+    if (filters.granularity) params.set('granularity', filters.granularity);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/subcontractors/${subcontractorId}/breakdown/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `quality_subcontractor_${subcontractorId}_breakdown.pdf`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();

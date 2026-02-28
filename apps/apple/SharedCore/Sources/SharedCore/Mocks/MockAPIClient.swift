@@ -312,4 +312,57 @@ public final class MockAPIClient {
     public func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
         _ = (routeId, periodStart, periodEnd, granularity)
     }
+
+    public func qualitySubcontractorBreakdown(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualitySubcontractorBreakdown {
+        _ = (periodStart, periodEnd)
+        return QualitySubcontractorBreakdown(
+            scopeType: "subcontractor",
+            scopeId: subcontractorId,
+            scopeLabel: "Rapid Last Mile",
+            subcontractorId: subcontractorId,
+            subcontractorCode: "Rapid Last Mile",
+            granularity: granularity ?? "month",
+            latestSnapshotId: "q-sub-1",
+            latestPeriodStart: "2026-02-01",
+            latestPeriodEnd: "2026-02-28",
+            snapshotsCount: 1,
+            serviceQualityScore: 95.42,
+            periods: [
+                .init(
+                    periodKey: "2026-02",
+                    periodStart: "2026-02-01",
+                    periodEnd: "2026-02-28",
+                    serviceQualityScore: 95.42,
+                    components: .init(
+                        assignedWithAttempt: 260,
+                        deliveredCompleted: 240,
+                        pickupsCompleted: 8,
+                        failedCount: 7,
+                        absentCount: 3,
+                        retryCount: 2,
+                        completedTotal: 248,
+                        completionRatio: 95.42
+                    )
+                )
+            ],
+            components: .init(
+                assignedWithAttempt: 260,
+                deliveredCompleted: 240,
+                pickupsCompleted: 8,
+                failedCount: 7,
+                absentCount: 3,
+                retryCount: 2,
+                completedTotal: 248,
+                completionRatio: 95.42
+            )
+        )
+    }
+
+    public func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        _ = (subcontractorId, periodStart, periodEnd, granularity)
+    }
+
+    public func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        _ = (subcontractorId, periodStart, periodEnd, granularity)
+    }
 }

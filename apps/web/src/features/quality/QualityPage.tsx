@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -26,10 +26,13 @@ export function QualityPage() {
   const [riskGroupBy, setRiskGroupBy] = useState<'hub' | 'subcontractor'>('hub');
   const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
-  const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedSubcontractorBreakdownId, setSelectedSubcontractorBreakdownId] = useState('');
+  const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
   const [driverBreakdown, setDriverBreakdown] = useState<QualityDriverBreakdown | null>(null);
+  const [subcontractorBreakdown, setSubcontractorBreakdown] = useState<QualitySubcontractorBreakdown | null>(null);
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
+  const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -52,7 +55,7 @@ export function QualityPage() {
   useEffect(() => {
     apiClient
       .getQualityTopRoutesUnderThreshold({
-        threshold: Number(threshold),
+        threshold: thresholdNumber,
         limit: 10,
         scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
@@ -61,12 +64,12 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setUnderThresholdRoutes(result.data));
-  }, [threshold, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [thresholdNumber, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     apiClient
       .getQualityRiskSummary({
-        threshold: Number(threshold),
+        threshold: thresholdNumber,
         groupBy: riskGroupBy,
         scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
         hubId: hubId || undefined,
@@ -75,7 +78,7 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
       })
       .then((result) => setRiskSummary(result.data));
-  }, [threshold, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
+  }, [thresholdNumber, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
     if (!selectedRouteId) {
@@ -101,14 +104,53 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
         granularity: breakdownGranularity,
+        hubId: hubId || undefined,
+        subcontractorId: subcontractorId || undefined,
       })
       .then(setDriverBreakdown);
-  }, [selectedDriverId, periodStart, periodEnd, breakdownGranularity]);
+  }, [selectedDriverId, periodStart, periodEnd, breakdownGranularity, hubId, subcontractorId]);
+
+  useEffect(() => {
+    if (!selectedSubcontractorBreakdownId) {
+      setSubcontractorBreakdown(null);
+      return;
+    }
+    apiClient
+      .getQualitySubcontractorBreakdown(selectedSubcontractorBreakdownId, {
+        periodStart: periodStart || undefined,
+        periodEnd: periodEnd || undefined,
+        granularity: breakdownGranularity,
+      })
+      .then(setSubcontractorBreakdown);
+  }, [selectedSubcontractorBreakdownId, periodStart, periodEnd, breakdownGranularity]);
 
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
     return items.reduce((acc, item) => acc + item.service_quality_score, 0) / items.length;
   }, [items]);
+
+  const comparisonDelta = useMemo(() => {
+    if (!routeBreakdown || !driverBreakdown) return null;
+    const scoreDelta = Number((routeBreakdown.service_quality_score - driverBreakdown.service_quality_score).toFixed(2));
+    const completionDelta = routeBreakdown.components.completed_total - driverBreakdown.components.completed_total;
+    return { scoreDelta, completionDelta };
+  }, [routeBreakdown, driverBreakdown]);
+
+  const alerts = useMemo(() => items.filter((item) => item.service_quality_score < thresholdNumber), [items, thresholdNumber]);
+
+  function applyQuickRange(days: 7 | 30) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days + 1);
+    const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
+    setPeriodStart(toIsoDate(start));
+    setPeriodEnd(toIsoDate(end));
+  }
+
+  function clearRange() {
+    setPeriodStart('');
+    setPeriodEnd('');
+  }
 
   return (
     <section className="page-grid">
@@ -160,6 +202,9 @@ export function QualityPage() {
             <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder="Umbral (ej: 95)" />
           </div>
           <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={() => applyQuickRange(7)}>Ultimos 7 dias</Button>
+            <Button type="button" variant="outline" onClick={() => applyQuickRange(30)}>Ultimos 30 dias</Button>
+            <Button type="button" variant="outline" onClick={clearRange}>Limpiar rango</Button>
             <Select value={breakdownGranularity} onChange={(e) => setBreakdownGranularity(e.target.value as 'week' | 'month')}>
               <option value="month">Desglose mensual</option>
               <option value="week">Desglose semanal</option>
@@ -185,7 +230,7 @@ export function QualityPage() {
               variant="outline"
               onClick={() =>
                 apiClient.exportQualityPdf({
-                  threshold: Number(threshold),
+                  threshold: thresholdNumber,
                   scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
                   hubId: hubId || undefined,
                   subcontractorId: subcontractorId || undefined,
@@ -197,6 +242,36 @@ export function QualityPage() {
               Exportar PDF rutas
             </Button>
           </div>
+
+          {alerts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Alertas KPI &lt; {thresholdNumber}%</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TableWrapper>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Scope</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Periodo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {alerts.slice(0, 20).map((item) => (
+                        <TableRow key={`alert-${item.id}`}>
+                          <TableCell>{item.scope_type} {item.scope_label ?? item.scope_id}</TableCell>
+                          <TableCell><Badge variant="destructive">{item.service_quality_score}%</Badge></TableCell>
+                          <TableCell>{item.period_start} - {item.period_end}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+              </CardContent>
+            </Card>
+          )}
 
           <TableWrapper>
             <Table>
@@ -238,6 +313,14 @@ export function QualityPage() {
                           onClick={() => setSelectedDriverId(item.scope_id)}
                         >
                           Ver detalle conductor
+                        </Button>
+                      ) : item.scope_type === 'subcontractor' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSelectedSubcontractorBreakdownId(item.scope_id)}
+                        >
+                          Ver detalle subcontrata
                         </Button>
                       ) : (
                         '-'
@@ -346,6 +429,8 @@ export function QualityPage() {
                       periodStart: periodStart || undefined,
                       periodEnd: periodEnd || undefined,
                       granularity: breakdownGranularity,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
                     })
                   }
                 >
@@ -359,6 +444,8 @@ export function QualityPage() {
                       periodStart: periodStart || undefined,
                       periodEnd: periodEnd || undefined,
                       granularity: breakdownGranularity,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
                     })
                   }
                 >
@@ -385,27 +472,86 @@ export function QualityPage() {
                   </div>
                 ))}
               </div>
-              <TableWrapper>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Componente</TableHead>
-                      <TableHead>Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow><TableCell>Asignados con intento</TableCell><TableCell>{driverBreakdown.components.assigned_with_attempt}</TableCell></TableRow>
-                    <TableRow><TableCell>Entregas completadas</TableCell><TableCell>{driverBreakdown.components.delivered_completed}</TableCell></TableRow>
-                    <TableRow><TableCell>Recogidas completadas</TableCell><TableCell>{driverBreakdown.components.pickups_completed}</TableCell></TableRow>
-                    <TableRow><TableCell>Total completados</TableCell><TableCell>{driverBreakdown.components.completed_total}</TableCell></TableRow>
-                    <TableRow><TableCell>Fallidas</TableCell><TableCell>{driverBreakdown.components.failed_count}</TableCell></TableRow>
-                    <TableRow><TableCell>Ausencias</TableCell><TableCell>{driverBreakdown.components.absent_count}</TableCell></TableRow>
-                    <TableRow><TableCell>Reintentos</TableCell><TableCell>{driverBreakdown.components.retry_count}</TableCell></TableRow>
-                    <TableRow><TableCell>Ratio completitud</TableCell><TableCell>{driverBreakdown.components.completion_ratio}%</TableCell></TableRow>
-                  </TableBody>
-                </Table>
-              </TableWrapper>
             </>
+          )}
+
+          {subcontractorBreakdown && (
+            <>
+              <h3>Detalle KPI por subcontrata</h3>
+              <div className="inline-actions">
+                <Badge variant={subcontractorBreakdown.service_quality_score >= 95 ? 'success' : 'warning'}>
+                  {subcontractorBreakdown.service_quality_score}%
+                </Badge>
+                <span>Subcontrata: {subcontractorBreakdown.subcontractor_code ?? subcontractorBreakdown.subcontractor_id}</span>
+                <span>Snapshots: {subcontractorBreakdown.snapshots_count}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualitySubcontractorBreakdownCsv(subcontractorBreakdown.subcontractor_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar CSV subcontrata
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualitySubcontractorBreakdownPdf(subcontractorBreakdown.subcontractor_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar PDF subcontrata
+                </Button>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {subcontractorBreakdown.periods.map((period) => (
+                  <div key={`subcontractor-${period.period_key}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{period.period_key}</span>
+                      <span>{period.components.completion_ratio}%</span>
+                    </div>
+                    <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8 }}>
+                      <div
+                        style={{
+                          width: `${normalizeChartWidth(period.components.completion_ratio)}%`,
+                          height: '100%',
+                          borderRadius: 6,
+                          background: chartColorByRatio(period.components.completion_ratio),
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {comparisonDelta && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comparativa Ruta vs Conductor</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="kpi-grid">
+                  <div className="kpi-item">
+                    <div className="kpi-label">Delta score</div>
+                    <div className="kpi-value">{comparisonDelta.scoreDelta}%</div>
+                  </div>
+                  <div className="kpi-item">
+                    <div className="kpi-label">Delta completados</div>
+                    <div className="kpi-value">{comparisonDelta.completionDelta}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <h3>Rutas bajo umbral</h3>

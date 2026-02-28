@@ -1,6 +1,9 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
+import com.ecodeliveryroutes.core.model.QualityBreakdown
+import com.ecodeliveryroutes.core.model.QualityBreakdownComponents
+import com.ecodeliveryroutes.core.model.QualityBreakdownPeriod
 import com.ecodeliveryroutes.core.model.QualitySnapshot
 import com.ecodeliveryroutes.core.model.RouteStop
 import com.ecodeliveryroutes.core.session.SessionStore
@@ -136,6 +139,48 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrDefault(mockQualityRouteSnapshots())
     }
 
+    suspend fun qualityRouteBreakdown(routeId: String, granularity: String = "month"): QualityBreakdown = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext mockQualityRouteBreakdown(routeId, granularity)
+
+        runCatching {
+            val payload = authedGet("$baseUrl/kpis/quality/routes/$routeId/breakdown?granularity=$granularity")
+            val data = JSONObject(payload).optJSONObject("data") ?: return@runCatching mockQualityRouteBreakdown(routeId, granularity)
+            val components = data.optJSONObject("components") ?: JSONObject()
+            val periodsJson = data.optJSONArray("periods") ?: JSONArray()
+
+            val periods = (0 until periodsJson.length()).map { index ->
+                val item = periodsJson.getJSONObject(index)
+                val periodComponents = item.optJSONObject("components") ?: JSONObject()
+                QualityBreakdownPeriod(
+                    periodKey = item.optString("period_key"),
+                    periodStart = item.optString("period_start"),
+                    periodEnd = item.optString("period_end"),
+                    completionRatio = periodComponents.optDouble("completion_ratio"),
+                    completedTotal = periodComponents.optInt("completed_total"),
+                    assignedWithAttempt = periodComponents.optInt("assigned_with_attempt")
+                )
+            }
+
+            QualityBreakdown(
+                scopeId = data.optString("scope_id").ifBlank { routeId },
+                scopeLabel = data.optString("scope_label").ifBlank { routeId },
+                granularity = data.optString("granularity").ifBlank { granularity },
+                serviceQualityScore = data.optDouble("service_quality_score"),
+                components = QualityBreakdownComponents(
+                    assignedWithAttempt = components.optInt("assigned_with_attempt"),
+                    deliveredCompleted = components.optInt("delivered_completed"),
+                    pickupsCompleted = components.optInt("pickups_completed"),
+                    failedCount = components.optInt("failed_count"),
+                    absentCount = components.optInt("absent_count"),
+                    retryCount = components.optInt("retry_count"),
+                    completedTotal = components.optInt("completed_total"),
+                    completionRatio = components.optDouble("completion_ratio")
+                ),
+                periods = periods
+            )
+        }.getOrDefault(mockQualityRouteBreakdown(routeId, granularity))
+    }
+
     private fun authedGet(url: String): String {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
@@ -174,6 +219,37 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
             pickupsCompleted = 3
         )
     )
+
+    private fun mockQualityRouteBreakdown(routeId: String, granularity: String): QualityBreakdown {
+        val components = QualityBreakdownComponents(
+            assignedWithAttempt = 120,
+            deliveredCompleted = 112,
+            pickupsCompleted = 3,
+            failedCount = 2,
+            absentCount = 1,
+            retryCount = 2,
+            completedTotal = 115,
+            completionRatio = 95.83
+        )
+
+        return QualityBreakdown(
+            scopeId = routeId,
+            scopeLabel = "R-AGP-20260227",
+            granularity = granularity,
+            serviceQualityScore = 95.83,
+            components = components,
+            periods = listOf(
+                QualityBreakdownPeriod(
+                    periodKey = if (granularity == "week") "2026-W08" else "2026-02",
+                    periodStart = "2026-02-01",
+                    periodEnd = "2026-02-28",
+                    completionRatio = components.completionRatio,
+                    completedTotal = components.completedTotal,
+                    assignedWithAttempt = components.assignedWithAttempt
+                )
+            )
+        )
+    }
 }
 
 internal fun parseRouteStops(stops: JSONArray): List<RouteStop> =

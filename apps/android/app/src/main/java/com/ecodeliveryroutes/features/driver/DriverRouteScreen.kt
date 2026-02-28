@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
-fun DriverRouteScreen() {
+fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}) {
     val stops = remember { mutableStateOf<List<RouteStop>>(emptyList()) }
     val selectedStopId = remember { mutableStateOf<String?>(null) }
     val routeDateFilter = remember { mutableStateOf(LocalDate.now().toString()) }
@@ -67,6 +67,9 @@ fun DriverRouteScreen() {
             Text(
                 "Periodo ${snapshot.periodStart} - ${snapshot.periodEnd} | completados ${snapshot.deliveredCompleted + snapshot.pickupsCompleted}/${snapshot.assignedWithAttempt}"
             )
+            Button(onClick = { onOpenRouteQuality(snapshot.scopeId) }) {
+                Text("Ver detalle KPI ruta")
+            }
         }
         Button(onClick = {
             scope.launch {

@@ -40,7 +40,13 @@ struct ContentView: View {
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var selectedQualityRouteId: String?
     @State private var selectedRouteBreakdown: QualityRouteBreakdown?
+    @State private var subcontractorQuality: [QualitySnapshot] = []
+    @State private var selectedSubcontractorId: String?
+    @State private var selectedSubcontractorBreakdown: QualitySubcontractorBreakdown?
     @State private var breakdownGranularity: String = "month"
+    @State private var qualityPeriodStart: String = ""
+    @State private var qualityPeriodEnd: String = ""
+    @State private var qualityAlertThresholdText: String = "95"
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -51,6 +57,10 @@ struct ContentView: View {
 
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
+    }
+
+    private var qualityAlertThreshold: Double {
+        Double(qualityAlertThresholdText) ?? 95
     }
 
     var body: some View {
@@ -175,6 +185,33 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
+                        TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
+                        TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
+                    }
+
+                    let routeAlerts = routeQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
+                    let subcontractorAlerts = subcontractorQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
+                    if !routeAlerts.isEmpty || !subcontractorAlerts.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Alertas KPI < \(qualityAlertThreshold, specifier: "%.2f")%")
+                                .font(.headline)
+                            ForEach(routeAlerts.prefix(5)) { snapshot in
+                                Text("Ruta \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                    .foregroundStyle(.red)
+                            }
+                            ForEach(subcontractorAlerts.prefix(5)) { snapshot in
+                                Text("Subcontrata \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
                     List(routeQuality) { snapshot in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -199,6 +236,30 @@ struct ContentView: View {
                     }
                     .frame(minHeight: 260)
 
+                    List(subcontractorQuality) { snapshot in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(snapshot.scopeLabel ?? snapshot.scopeId)
+                                    .font(.headline)
+                                Spacer()
+                                Button("Detalle subcontrata") {
+                                    selectedSubcontractorId = snapshot.scopeId
+                                    Task { await loadSubcontractorBreakdown(subcontractorId: snapshot.scopeId) }
+                                }
+                            }
+                            Text("Score: \(snapshot.serviceQualityScore, specifier: "%.2f")%")
+                                .font(.subheadline)
+                            Text("Periodo: \(snapshot.periodStart) - \(snapshot.periodEnd)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(minHeight: 220)
+
                     if let breakdown = selectedRouteBreakdown {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Desglose ruta \(breakdown.routeCode ?? breakdown.routeId)")
@@ -214,7 +275,12 @@ struct ContentView: View {
                             .pickerStyle(.segmented)
                             .onChange(of: breakdownGranularity) { _, _ in
                                 guard let selectedQualityRouteId else { return }
-                                Task { await loadRouteBreakdown(routeId: selectedQualityRouteId) }
+                                Task {
+                                    await loadRouteBreakdown(routeId: selectedQualityRouteId)
+                                    if let selectedSubcontractorId {
+                                        await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
+                                    }
+                                }
                             }
                             Text("Asignados: \(breakdown.components.assignedWithAttempt)")
                             Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
@@ -227,8 +293,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualityRouteBreakdownCsv(
                                             routeId: selectedQualityRouteId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -238,8 +304,8 @@ struct ContentView: View {
                                     Task {
                                         try? await apiClient.exportQualityRouteBreakdownPdf(
                                             routeId: selectedQualityRouteId,
-                                            periodStart: nil,
-                                            periodEnd: nil,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
                                             granularity: breakdownGranularity
                                         )
                                     }
@@ -257,9 +323,59 @@ struct ContentView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal)
                     }
+
+                    if let breakdown = selectedSubcontractorBreakdown {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Desglose subcontrata \(breakdown.subcontractorCode ?? breakdown.subcontractorId)")
+                                .font(.headline)
+                            Text("Score agregado: \(breakdown.serviceQualityScore, specifier: "%.2f")%")
+                            Text("Snapshots: \(breakdown.snapshotsCount)")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                            Text("Asignados: \(breakdown.components.assignedWithAttempt)")
+                            Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
+                            Text("Fallidas: \(breakdown.components.failedCount) · Ausencias: \(breakdown.components.absentCount) · Reintentos: \(breakdown.components.retryCount)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack {
+                                Button("Exportar CSV subcontrata") {
+                                    guard let selectedSubcontractorId else { return }
+                                    Task {
+                                        try? await apiClient.exportQualitySubcontractorBreakdownCsv(
+                                            subcontractorId: selectedSubcontractorId,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
+                                            granularity: breakdownGranularity
+                                        )
+                                    }
+                                }
+                                Button("Exportar PDF subcontrata") {
+                                    guard let selectedSubcontractorId else { return }
+                                    Task {
+                                        try? await apiClient.exportQualitySubcontractorBreakdownPdf(
+                                            subcontractorId: selectedSubcontractorId,
+                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
+                                            granularity: breakdownGranularity
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Text(selectedSubcontractorId == nil ? "Selecciona una subcontrata para ver el desglose KPI." : "Sin desglose disponible para esta subcontrata.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                    }
                 }
             }
-            .navigationTitle("Calidad por ruta")
+            .navigationTitle("Calidad")
             .toolbar {
                 Button("Recargar") {
                     Task { await loadRouteQuality() }
@@ -347,19 +463,35 @@ struct ContentView: View {
 
     private func loadRouteQuality() async {
         routeQuality = (try? await apiClient.qualitySnapshots(scopeType: "route")) ?? []
+        subcontractorQuality = (try? await apiClient.qualitySnapshots(scopeType: "subcontractor")) ?? []
         if selectedQualityRouteId == nil {
             selectedQualityRouteId = routeQuality.first?.scopeId
         }
         if let selectedQualityRouteId {
             await loadRouteBreakdown(routeId: selectedQualityRouteId)
         }
+        if selectedSubcontractorId == nil {
+            selectedSubcontractorId = subcontractorQuality.first?.scopeId
+        }
+        if let selectedSubcontractorId {
+            await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
+        }
     }
 
     private func loadRouteBreakdown(routeId: String) async {
         selectedRouteBreakdown = try? await apiClient.qualityRouteBreakdown(
             routeId: routeId,
-            periodStart: nil,
-            periodEnd: nil,
+            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
+            granularity: breakdownGranularity
+        )
+    }
+
+    private func loadSubcontractorBreakdown(subcontractorId: String) async {
+        selectedSubcontractorBreakdown = try? await apiClient.qualitySubcontractorBreakdown(
+            subcontractorId: subcontractorId,
+            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
+            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
             granularity: breakdownGranularity
         )
     }
