@@ -23,6 +23,8 @@ export function RouteDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [stopType, setStopType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [shipmentQuery, setShipmentQuery] = useState('');
+  const [pickupQuery, setPickupQuery] = useState('');
   const [selectedShipmentId, setSelectedShipmentId] = useState('');
   const [selectedPickupId, setSelectedPickupId] = useState('');
   const [stopSequence, setStopSequence] = useState(1);
@@ -69,6 +71,16 @@ export function RouteDetailPage() {
   const filteredVehicles = subcontractorId
     ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === subcontractorId)
     : vehicles;
+  const filteredShipments = shipments.filter((item) => {
+    if (!shipmentQuery) return true;
+    const query = shipmentQuery.toLowerCase();
+    return item.reference.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
+  });
+  const filteredPickups = pickups.filter((item) => {
+    if (!pickupQuery) return true;
+    const query = pickupQuery.toLowerCase();
+    return item.reference.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
+  });
 
   const saveVehicleAssignment = async () => {
     if (!id) return;
@@ -234,23 +246,39 @@ export function RouteDetailPage() {
             />
             <label htmlFor="stop-entity-id">{stopType === 'DELIVERY' ? 'Shipment ID' : 'Pickup ID'}</label>
             {stopType === 'DELIVERY' ? (
-              <select id="stop-entity-id" value={selectedShipmentId} onChange={(event) => setSelectedShipmentId(event.target.value)}>
-                <option value="">Selecciona envio</option>
-                {shipments.map((shipment) => (
-                  <option key={shipment.id} value={shipment.id}>
-                    {shipment.reference} ({shipment.status})
-                  </option>
-                ))}
-              </select>
+              <>
+                <input
+                  id="stop-entity-search"
+                  value={shipmentQuery}
+                  onChange={(event) => setShipmentQuery(event.target.value)}
+                  placeholder="Buscar envio por referencia o ID"
+                />
+                <select id="stop-entity-id" value={selectedShipmentId} onChange={(event) => setSelectedShipmentId(event.target.value)}>
+                  <option value="">Selecciona envio</option>
+                  {filteredShipments.map((shipment) => (
+                    <option key={shipment.id} value={shipment.id}>
+                      {shipment.reference} ({shipment.status})
+                    </option>
+                  ))}
+                </select>
+              </>
             ) : (
-              <select id="stop-entity-id" value={selectedPickupId} onChange={(event) => setSelectedPickupId(event.target.value)}>
-                <option value="">Selecciona recogida</option>
-                {pickups.map((pickup) => (
-                  <option key={pickup.id} value={pickup.id}>
-                    {pickup.reference} ({pickup.pickup_type})
-                  </option>
-                ))}
-              </select>
+              <>
+                <input
+                  id="stop-entity-search"
+                  value={pickupQuery}
+                  onChange={(event) => setPickupQuery(event.target.value)}
+                  placeholder="Buscar recogida por referencia o ID"
+                />
+                <select id="stop-entity-id" value={selectedPickupId} onChange={(event) => setSelectedPickupId(event.target.value)}>
+                  <option value="">Selecciona recogida</option>
+                  {filteredPickups.map((pickup) => (
+                    <option key={pickup.id} value={pickup.id}>
+                      {pickup.reference} ({pickup.pickup_type})
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
             <Button type="button" onClick={createStop} disabled={savingStop}>
               {savingStop ? 'Creando...' : 'Agregar parada'}
