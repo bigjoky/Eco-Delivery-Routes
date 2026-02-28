@@ -8,8 +8,10 @@ struct ContentView: View {
     @State private var roles: [TVRole] = []
     @State private var routeQuality: [TVRouteQuality] = []
     @State private var driverQuality: [TVDriverQuality] = []
+    @State private var subcontractorQuality: [TVSubcontractorQuality] = []
     @State private var routeBreakdown: TVRouteBreakdown?
     @State private var driverBreakdown: TVDriverBreakdown?
+    @State private var subcontractorBreakdown: TVSubcontractorBreakdown?
     @State private var lastRefreshText: String = "Sin refresco"
     @State private var statusText: String = "Conectando..."
 
@@ -44,6 +46,12 @@ struct ContentView: View {
                     Text("Conductores KPI")
                         .font(.headline)
                     Text("\(driverQuality.count)")
+                        .font(.title)
+                }
+                VStack(alignment: .leading) {
+                    Text("Subcontratas KPI")
+                        .font(.headline)
+                    Text("\(subcontractorQuality.count)")
                         .font(.title)
                 }
             }
@@ -103,6 +111,25 @@ struct ContentView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Calidad por subcontrata")
+                    .font(.headline)
+                ForEach(subcontractorQuality.prefix(6)) { item in
+                    Text("\(item.subcontractorCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
+                }
+            }
+
+            if let subcontractorBreakdown {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Desglose subcontrata en riesgo")
+                        .font(.headline)
+                    Text("\(subcontractorBreakdown.subcontractorCode) · \(subcontractorBreakdown.score, specifier: "%.2f")%")
+                    Text("Asignados: \(subcontractorBreakdown.assigned) · Completados: \(subcontractorBreakdown.completed)")
+                    Text("Fallidas: \(subcontractorBreakdown.failed) · Ausencias: \(subcontractorBreakdown.absent) · Reintentos: \(subcontractorBreakdown.retry)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Text(lastRefreshText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -126,8 +153,10 @@ struct ContentView: View {
         roles = payload.roles
         routeQuality = payload.routeQuality
         driverQuality = payload.driverQuality
+        subcontractorQuality = payload.subcontractorQuality
         routeBreakdown = payload.routeBreakdown
         driverBreakdown = payload.driverBreakdown
+        subcontractorBreakdown = payload.subcontractorBreakdown
         statusText = payload.status
 
         let formatter = DateFormatter()
@@ -156,8 +185,10 @@ struct TVSnapshot {
     let roles: [TVRole]
     let routeQuality: [TVRouteQuality]
     let driverQuality: [TVDriverQuality]
+    let subcontractorQuality: [TVSubcontractorQuality]
     let routeBreakdown: TVRouteBreakdown?
     let driverBreakdown: TVDriverBreakdown?
+    let subcontractorBreakdown: TVSubcontractorBreakdown?
     let status: String
 }
 
@@ -174,6 +205,15 @@ struct TVDriverQuality: Identifiable {
     let id: String
     let driverId: String
     let driverCode: String
+    let score: Double
+    let assigned: Int
+    let completed: Int
+}
+
+struct TVSubcontractorQuality: Identifiable {
+    let id: String
+    let subcontractorId: String
+    let subcontractorCode: String
     let score: Double
     let assigned: Int
     let completed: Int
@@ -201,6 +241,17 @@ struct TVDriverBreakdown {
     let retry: Int
 }
 
+struct TVSubcontractorBreakdown {
+    let subcontractorId: String
+    let subcontractorCode: String
+    let score: Double
+    let assigned: Int
+    let completed: Int
+    let failed: Int
+    let absent: Int
+    let retry: Int
+}
+
 final class TVMonitorService {
     func snapshot() async -> TVSnapshot {
         let apiSnapshot = await fetchQualityFromAPI()
@@ -218,8 +269,10 @@ final class TVMonitorService {
             ],
             routeQuality: apiSnapshot.routeQuality,
             driverQuality: apiSnapshot.driverQuality,
+            subcontractorQuality: apiSnapshot.subcontractorQuality,
             routeBreakdown: apiSnapshot.routeBreakdown,
             driverBreakdown: apiSnapshot.driverBreakdown,
+            subcontractorBreakdown: apiSnapshot.subcontractorBreakdown,
             status: apiSnapshot.status
         )
     }
@@ -227,8 +280,10 @@ final class TVMonitorService {
     private func fetchQualityFromAPI() async -> (
         routeQuality: [TVRouteQuality],
         driverQuality: [TVDriverQuality],
+        subcontractorQuality: [TVSubcontractorQuality],
         routeBreakdown: TVRouteBreakdown?,
         driverBreakdown: TVDriverBreakdown?,
+        subcontractorBreakdown: TVSubcontractorBreakdown?,
         status: String
     ) {
         guard
@@ -238,8 +293,10 @@ final class TVMonitorService {
             return (
                 mockRouteQuality(),
                 mockDriverQuality(),
+                mockSubcontractorQuality(),
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
+                mockSubcontractorBreakdown(),
                 "Monitor activo (solo lectura/mock)"
             )
         }
@@ -247,13 +304,16 @@ final class TVMonitorService {
         let normalizedBaseURL = rawBaseURL.hasSuffix("/v1") ? rawBaseURL : "\(rawBaseURL)/v1"
         guard
             let routeURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=route"),
-            let driverURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=driver")
+            let driverURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=driver"),
+            let subcontractorURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=subcontractor")
         else {
             return (
                 mockRouteQuality(),
                 mockDriverQuality(),
+                mockSubcontractorQuality(),
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
+                mockSubcontractorBreakdown(),
                 "Monitor activo (URL invalida, fallback mock)"
             )
         }
@@ -262,30 +322,38 @@ final class TVMonitorService {
         routeRequest.httpMethod = "GET"
         var driverRequest = URLRequest(url: driverURL)
         driverRequest.httpMethod = "GET"
+        var subcontractorRequest = URLRequest(url: subcontractorURL)
+        subcontractorRequest.httpMethod = "GET"
         let token = ProcessInfo.processInfo.environment["API_TOKEN"]
         if let token, !token.isEmpty {
             routeRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             driverRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            subcontractorRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         do {
             let (routeData, routeResponse) = try await URLSession.shared.data(for: routeRequest)
             let (driverData, driverResponse) = try await URLSession.shared.data(for: driverRequest)
+            let (subcontractorData, subcontractorResponse) = try await URLSession.shared.data(for: subcontractorRequest)
             guard
                 let routeHTTP = routeResponse as? HTTPURLResponse, (200...299).contains(routeHTTP.statusCode),
-                let driverHTTP = driverResponse as? HTTPURLResponse, (200...299).contains(driverHTTP.statusCode)
+                let driverHTTP = driverResponse as? HTTPURLResponse, (200...299).contains(driverHTTP.statusCode),
+                let subcontractorHTTP = subcontractorResponse as? HTTPURLResponse, (200...299).contains(subcontractorHTTP.statusCode)
             else {
                 return (
                     mockRouteQuality(),
                     mockDriverQuality(),
+                    mockSubcontractorQuality(),
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
+                    mockSubcontractorBreakdown(),
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
 
             let routeDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: routeData)
             let driverDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: driverData)
+            let subcontractorDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: subcontractorData)
             let mappedRoutes = routeDecoded.data.map {
                 TVRouteQuality(
                     id: $0.id,
@@ -306,13 +374,25 @@ final class TVMonitorService {
                     completed: $0.deliveredCompleted + $0.pickupsCompleted
                 )
             }
+            let mappedSubcontractors = subcontractorDecoded.data.map {
+                TVSubcontractorQuality(
+                    id: $0.id,
+                    subcontractorId: $0.scopeId,
+                    subcontractorCode: $0.scopeLabel ?? $0.scopeId,
+                    score: $0.serviceQualityScore,
+                    assigned: $0.assignedWithAttempt,
+                    completed: $0.deliveredCompleted + $0.pickupsCompleted
+                )
+            }
 
-            if mappedRoutes.isEmpty && mappedDrivers.isEmpty {
+            if mappedRoutes.isEmpty && mappedDrivers.isEmpty && mappedSubcontractors.isEmpty {
                 return (
                     mockRouteQuality(),
                     mockDriverQuality(),
+                    mockSubcontractorQuality(),
                     mockRouteBreakdown(),
                     mockDriverBreakdown(),
+                    mockSubcontractorBreakdown(),
                     "Monitor API sin datos, fallback mock"
                 )
             }
@@ -328,13 +408,21 @@ final class TVMonitorService {
                 token: token,
                 driverId: worstDriver?.driverId
             )
-            return (mappedRoutes, mappedDrivers, routeBreakdown, driverBreakdown, "Monitor activo (API real)")
+            let worstSubcontractor = mappedSubcontractors.min(by: { $0.score < $1.score })
+            let subcontractorBreakdown = await fetchSubcontractorBreakdownFromAPI(
+                normalizedBaseURL: normalizedBaseURL,
+                token: token,
+                subcontractorId: worstSubcontractor?.subcontractorId
+            )
+            return (mappedRoutes, mappedDrivers, mappedSubcontractors, routeBreakdown, driverBreakdown, subcontractorBreakdown, "Monitor activo (API real)")
         } catch {
             return (
                 mockRouteQuality(),
                 mockDriverQuality(),
+                mockSubcontractorQuality(),
                 mockRouteBreakdown(),
                 mockDriverBreakdown(),
+                mockSubcontractorBreakdown(),
                 "Monitor fallback (error conexion API)"
             )
         }
@@ -383,6 +471,13 @@ final class TVMonitorService {
         [
             TVDriverQuality(id: "dq-1", driverId: "d-1", driverCode: "DRV-AGP-001", score: 96.0, assigned: 160, completed: 154),
             TVDriverQuality(id: "dq-2", driverId: "d-2", driverCode: "DRV-AGP-002", score: 93.5, assigned: 140, completed: 131),
+        ]
+    }
+
+    private func mockSubcontractorQuality() -> [TVSubcontractorQuality] {
+        [
+            TVSubcontractorQuality(id: "sq-1", subcontractorId: "sub-1", subcontractorCode: "Rapid Last Mile", score: 95.8, assigned: 320, completed: 306),
+            TVSubcontractorQuality(id: "sq-2", subcontractorId: "sub-2", subcontractorCode: "ThermoParcel", score: 93.4, assigned: 280, completed: 261),
         ]
     }
 
@@ -439,6 +534,49 @@ final class TVMonitorService {
             failed: 5,
             absent: 3,
             retry: 1
+        )
+    }
+
+    private func fetchSubcontractorBreakdownFromAPI(normalizedBaseURL: String, token: String?, subcontractorId: String?) async -> TVSubcontractorBreakdown? {
+        guard let subcontractorId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/subcontractors/\(subcontractorId)/breakdown") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return nil
+            }
+            let decoded = try JSONDecoder().decode(SubcontractorBreakdownEnvelope.self, from: data)
+            return TVSubcontractorBreakdown(
+                subcontractorId: decoded.data.subcontractorId,
+                subcontractorCode: decoded.data.subcontractorCode ?? decoded.data.subcontractorId,
+                score: decoded.data.serviceQualityScore,
+                assigned: decoded.data.components.assignedWithAttempt,
+                completed: decoded.data.components.completedTotal,
+                failed: decoded.data.components.failedCount,
+                absent: decoded.data.components.absentCount,
+                retry: decoded.data.components.retryCount
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    private func mockSubcontractorBreakdown() -> TVSubcontractorBreakdown {
+        TVSubcontractorBreakdown(
+            subcontractorId: "sub-2",
+            subcontractorCode: "ThermoParcel",
+            score: 93.4,
+            assigned: 280,
+            completed: 261,
+            failed: 10,
+            absent: 6,
+            retry: 3
         )
     }
 }
@@ -514,6 +652,24 @@ private struct DriverBreakdownPayload: Decodable {
     enum CodingKeys: String, CodingKey {
         case driverId = "driver_id"
         case driverCode = "driver_code"
+        case serviceQualityScore = "service_quality_score"
+        case components
+    }
+}
+
+private struct SubcontractorBreakdownEnvelope: Decodable {
+    let data: SubcontractorBreakdownPayload
+}
+
+private struct SubcontractorBreakdownPayload: Decodable {
+    let subcontractorId: String
+    let subcontractorCode: String?
+    let serviceQualityScore: Double
+    let components: RouteBreakdownComponentsPayload
+
+    enum CodingKeys: String, CodingKey {
+        case subcontractorId = "subcontractor_id"
+        case subcontractorCode = "subcontractor_code"
         case serviceQualityScore = "service_quality_score"
         case components
     }

@@ -21,8 +21,11 @@ public protocol APIClientProtocol {
     ) async throws
     func qualitySnapshots(scopeType: String?) async throws -> [QualitySnapshot]
     func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown
+    func qualitySubcontractorBreakdown(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualitySubcontractorBreakdown
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
+    func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
+    func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
 }
 
 public final class APIClient: APIClientProtocol {
@@ -279,6 +282,58 @@ public final class APIClient: APIClientProtocol {
 
         let url = withQueryItems(
             baseURL.appending(path: "kpis/quality/routes/\(routeId)/breakdown/export.pdf"),
+            queryItems: [
+                URLQueryItem(name: "period_start", value: periodStart),
+                URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
+    }
+
+    public func qualitySubcontractorBreakdown(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualitySubcontractorBreakdown {
+        guard let baseURL else {
+            return try await mock.qualitySubcontractorBreakdown(subcontractorId: subcontractorId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/subcontractors/\(subcontractorId)/breakdown"),
+            queryItems: [
+                URLQueryItem(name: "period_start", value: periodStart),
+                URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<QualitySubcontractorBreakdown>.self, from: data).data
+    }
+
+    public func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        guard let baseURL else {
+            return try await mock.exportQualitySubcontractorBreakdownCsv(subcontractorId: subcontractorId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/subcontractors/\(subcontractorId)/breakdown/export.csv"),
+            queryItems: [
+                URLQueryItem(name: "period_start", value: periodStart),
+                URLQueryItem(name: "period_end", value: periodEnd),
+                URLQueryItem(name: "granularity", value: granularity),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
+    }
+
+    public func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
+        guard let baseURL else {
+            return try await mock.exportQualitySubcontractorBreakdownPdf(subcontractorId: subcontractorId, periodStart: periodStart, periodEnd: periodEnd, granularity: granularity)
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/subcontractors/\(subcontractorId)/breakdown/export.pdf"),
             queryItems: [
                 URLQueryItem(name: "period_start", value: periodStart),
                 URLQueryItem(name: "period_end", value: periodEnd),
