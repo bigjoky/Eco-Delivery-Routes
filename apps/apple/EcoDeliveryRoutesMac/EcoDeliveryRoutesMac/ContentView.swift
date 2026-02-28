@@ -50,6 +50,8 @@ struct ContentView: View {
     @State private var qualityThresholdSource: String = "default"
     @State private var qualityThresholdScopeType: String = "user"
     @State private var qualityThresholdScopeId: String = ""
+    @State private var qualityThresholdBeforeValue: Double?
+    @State private var qualityThresholdAfterValue: Double?
     @State private var canManageQualityThreshold: Bool = false
     @State private var qualityThresholdMessage: String = ""
     @State private var advances: [AdvanceSummary] = []
@@ -230,6 +232,19 @@ struct ContentView: View {
                             Text(qualityThresholdMessage)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                        if let before = qualityThresholdBeforeValue, let after = qualityThresholdAfterValue {
+                            HStack(spacing: 8) {
+                                Text(String(format: "%.2f%% → %.2f%%", before, after))
+                                    .font(.caption)
+                                Text(thresholdTrendLabel(before: before, after: after))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(thresholdTrendColor(before: before, after: after).opacity(0.18))
+                                    .foregroundStyle(thresholdTrendColor(before: before, after: after))
+                                    .clipShape(Capsule())
+                            }
                         }
                     }
 
@@ -524,6 +539,8 @@ struct ContentView: View {
     private func loadQualityThreshold() async {
         guard let config = try? await apiClient.qualityThreshold() else { return }
         qualityAlertThresholdText = String(format: "%.2f", config.threshold)
+        qualityThresholdBeforeValue = config.threshold
+        qualityThresholdAfterValue = config.threshold
         qualityThresholdSource = config.sourceType
         qualityThresholdScopeType = config.sourceType == "default" ? "user" : config.sourceType
         qualityThresholdScopeId = config.sourceId ?? ""
@@ -537,6 +554,7 @@ struct ContentView: View {
         }
 
         do {
+            let beforeValue = Double(qualityAlertThresholdText)
             let scopeType = qualityThresholdScopeType
             let scopeId = scopeType == "global"
                 ? nil
@@ -547,6 +565,8 @@ struct ContentView: View {
                 scopeId: scopeId
             )
             qualityAlertThresholdText = String(format: "%.2f", updated.threshold)
+            qualityThresholdBeforeValue = beforeValue
+            qualityThresholdAfterValue = updated.threshold
             qualityThresholdSource = updated.sourceType
             qualityThresholdScopeId = updated.sourceId ?? qualityThresholdScopeId
             canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
@@ -607,6 +627,18 @@ struct ContentView: View {
         formatter.numberStyle = .currency
         formatter.currencyCode = currency
         return formatter.string(from: NSNumber(value: amount)) ?? "\(amount) \(currency)"
+    }
+
+    private func thresholdTrendLabel(before: Double, after: Double) -> String {
+        if after > before { return "SUBE" }
+        if after < before { return "BAJA" }
+        return "IGUAL"
+    }
+
+    private func thresholdTrendColor(before: Double, after: Double) -> Color {
+        if after > before { return .green }
+        if after < before { return .orange }
+        return .secondary
     }
 }
 

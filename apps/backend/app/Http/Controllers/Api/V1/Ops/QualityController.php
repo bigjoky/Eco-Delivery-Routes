@@ -861,6 +861,89 @@ class QualityController extends Controller
         ]);
     }
 
+    public function thresholdHistory(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $perPage = max(1, min((int) $request->query('per_page', 20), 100));
+        $page = max(1, (int) $request->query('page', 1));
+        $query = $this->buildThresholdHistoryQuery($request);
+        $total = (clone $query)->count();
+        $rows = $query
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get()
+            ->map(function ($row) {
+                $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+                $before = is_array($metadata['before'] ?? null) ? $metadata['before'] : [];
+                $after = is_array($metadata['after'] ?? null) ? $metadata['after'] : [];
+
+                return [
+                    'id' => (int) $row->id,
+                    'event' => (string) $row->event,
+                    'actor_user_id' => $row->actor_user_id !== null ? (string) $row->actor_user_id : null,
+                    'actor_name' => $row->actor_name !== null ? (string) $row->actor_name : null,
+                    'created_at' => (string) $row->created_at,
+                    'scope_type' => (string) ($metadata['scope_type'] ?? ''),
+                    'scope_id' => isset($metadata['scope_id']) ? (string) $metadata['scope_id'] : null,
+                    'before_threshold' => isset($before['threshold']) ? (float) $before['threshold'] : null,
+                    'after_threshold' => isset($after['threshold']) ? (float) $after['threshold'] : null,
+                    'metadata' => $metadata,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $perPage > 0 ? (int) ceil($total / $perPage) : 0,
+            ],
+        ]);
+    }
+
+    public function thresholdHistoryExportCsv(Request $request): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $rows = $this->buildThresholdHistoryQuery($request)->limit(2000)->get();
+        $csvRows = [
+            'id,created_at,event,actor_user_id,actor_name,scope_type,scope_id,before_threshold,after_threshold',
+        ];
+
+        foreach ($rows as $row) {
+            $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+            $before = is_array($metadata['before'] ?? null) ? $metadata['before'] : [];
+            $after = is_array($metadata['after'] ?? null) ? $metadata['after'] : [];
+            $csvRows[] = implode(',', [
+                (string) $row->id,
+                $this->csv((string) $row->created_at),
+                $this->csv((string) $row->event),
+                $this->csv((string) ($row->actor_user_id ?? '')),
+                $this->csv((string) ($row->actor_name ?? '')),
+                $this->csv((string) ($metadata['scope_type'] ?? '')),
+                $this->csv((string) ($metadata['scope_id'] ?? '')),
+                isset($before['threshold']) ? (string) ((float) $before['threshold']) : '',
+                isset($after['threshold']) ? (string) ((float) $after['threshold']) : '',
+            ]);
+        }
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="quality_threshold_history.csv"',
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([
@@ -937,6 +1020,30 @@ class QualityController extends Controller
             'source_type' => 'default',
             'source_id' => null,
         ];
+    }
+
+    private function buildThresholdHistoryQuery(Request $request)
+    {
+        $query = DB::table('audit_logs')
+            ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_user_id')
+            ->select('audit_logs.*', 'users.name as actor_name')
+            ->where('audit_logs.event', 'like', 'quality.threshold.%')
+            ->orderByDesc('audit_logs.created_at');
+
+        if ($request->filled('scope_type')) {
+            $query->whereRaw("json_extract(audit_logs.metadata, '$.scope_type') = ?", [(string) $request->query('scope_type')]);
+        }
+        if ($request->filled('scope_id')) {
+            $query->whereRaw("json_extract(audit_logs.metadata, '$.scope_id') = ?", [(string) $request->query('scope_id')]);
+        }
+        if ($request->filled('date_from')) {
+            $query->whereDate('audit_logs.created_at', '>=', (string) $request->query('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('audit_logs.created_at', '<=', (string) $request->query('date_to'));
+        }
+
+        return $query;
     }
 
     private function fetchEnrichedQuality(Request $request, int $limit)

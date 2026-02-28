@@ -143,6 +143,19 @@ export type QualityThresholdConfig = {
   can_manage?: boolean;
 };
 
+export type QualityThresholdHistoryEntry = {
+  id: number;
+  event: string;
+  actor_user_id?: string | null;
+  actor_name?: string | null;
+  created_at: string;
+  scope_type: 'global' | 'role' | 'user';
+  scope_id?: string | null;
+  before_threshold?: number | null;
+  after_threshold?: number | null;
+  metadata?: Record<string, unknown> | string | null;
+};
+
 export type QualityRouteBreakdown = {
   scope_type: 'route';
   scope_id: string;

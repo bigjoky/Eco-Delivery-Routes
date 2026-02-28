@@ -13,6 +13,7 @@ import {
   QualityRouteBreakdown,
   QualitySubcontractorBreakdown,
   QualityThresholdConfig,
+  QualityThresholdHistoryEntry,
   QualityTopRoutesResult,
   RoleSummary,
   RouteStopSummary,
@@ -726,6 +727,64 @@ export const apiClient = {
     });
     const json = await response.json();
     return json.data as QualityThresholdConfig;
+  },
+
+  async getQualityThresholdHistory(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    perPage?: number;
+  } = {}): Promise<PaginatedResult<QualityThresholdHistoryEntry>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 20;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getQualityThresholdHistory(filters), page, perPage);
+    }
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history?${params.toString()}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    return parsePaginatedData<QualityThresholdHistoryEntry>(response);
+  },
+
+  async exportQualityThresholdHistoryCsv(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityThresholdHistoryCsv(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/export.csv${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'quality_threshold_history.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   async getIncidents(filters: {

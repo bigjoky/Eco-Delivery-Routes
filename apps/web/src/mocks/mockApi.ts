@@ -92,6 +92,61 @@ export const mockApi = {
     return;
   },
 
+  async getQualityThresholdHistory(_: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    perPage?: number;
+  }) {
+    return [
+      {
+        id: 301,
+        event: 'quality.threshold.updated',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-28T09:00:00Z',
+        scope_type: 'role' as const,
+        scope_id: 'driver',
+        before_threshold: 95,
+        after_threshold: 96.5,
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 95 },
+          after: { threshold: 96.5 },
+        },
+      },
+      {
+        id: 302,
+        event: 'quality.threshold.updated',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-27T12:10:00Z',
+        scope_type: 'global' as const,
+        scope_id: null,
+        before_threshold: 94,
+        after_threshold: 95,
+        metadata: {
+          scope_type: 'global',
+          scope_id: null,
+          before: { threshold: 94 },
+          after: { threshold: 95 },
+        },
+      },
+    ];
+  },
+
+  async exportQualityThresholdHistoryCsv(_: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    return;
+  },
+
   async getRoles() {
     return [
       { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
