@@ -13,6 +13,9 @@ struct ContentView: View {
     @State private var driverBreakdown: TVDriverBreakdown?
     @State private var subcontractorBreakdown: TVSubcontractorBreakdown?
     @State private var qualityThreshold: Double = 95
+    @State private var thresholdDeltaAlertCount: Int = 0
+    @State private var thresholdDeltaWindowHours: Int = 24
+    @State private var thresholdDeltaTrigger: Double = 5
     @State private var lastRefreshText: String = "Sin refresco"
     @State private var statusText: String = "Conectando..."
 
@@ -53,6 +56,12 @@ struct ContentView: View {
                     Text("Subcontratas KPI")
                         .font(.headline)
                     Text("\(subcontractorQuality.count)")
+                        .font(.title)
+                }
+                VStack(alignment: .leading) {
+                    Text("Alertas delta")
+                        .font(.headline)
+                    Text("\(thresholdDeltaAlertCount)")
                         .font(.title)
                 }
             }
@@ -146,6 +155,9 @@ struct ContentView: View {
                     Text("Subcontrata \(item.subcontractorCode) en alerta: \(item.score, specifier: "%.2f")%")
                         .foregroundStyle(.red)
                 }
+                Text("Cambios bruscos umbral: \(thresholdDeltaAlertCount) en \(thresholdDeltaWindowHours)h (trigger ±\(thresholdDeltaTrigger, specifier: "%.2f"))")
+                    .font(.caption)
+                    .foregroundStyle(thresholdDeltaAlertCount > 0 ? .red : .secondary)
             }
 
             Text(lastRefreshText)
@@ -176,6 +188,9 @@ struct ContentView: View {
         driverBreakdown = payload.driverBreakdown
         subcontractorBreakdown = payload.subcontractorBreakdown
         qualityThreshold = payload.threshold
+        thresholdDeltaAlertCount = payload.thresholdDeltaAlertCount
+        thresholdDeltaWindowHours = payload.thresholdDeltaWindowHours
+        thresholdDeltaTrigger = payload.thresholdDeltaTrigger
         statusText = payload.status
 
         let formatter = DateFormatter()
@@ -209,6 +224,9 @@ struct TVSnapshot {
     let driverBreakdown: TVDriverBreakdown?
     let subcontractorBreakdown: TVSubcontractorBreakdown?
     let threshold: Double
+    let thresholdDeltaAlertCount: Int
+    let thresholdDeltaWindowHours: Int
+    let thresholdDeltaTrigger: Double
     let status: String
 }
 
@@ -294,6 +312,9 @@ final class TVMonitorService {
             driverBreakdown: apiSnapshot.driverBreakdown,
             subcontractorBreakdown: apiSnapshot.subcontractorBreakdown,
             threshold: apiSnapshot.threshold,
+            thresholdDeltaAlertCount: apiSnapshot.thresholdDeltaAlertCount,
+            thresholdDeltaWindowHours: apiSnapshot.thresholdDeltaWindowHours,
+            thresholdDeltaTrigger: apiSnapshot.thresholdDeltaTrigger,
             status: apiSnapshot.status
         )
     }
@@ -306,6 +327,9 @@ final class TVMonitorService {
         driverBreakdown: TVDriverBreakdown?,
         subcontractorBreakdown: TVSubcontractorBreakdown?,
         threshold: Double,
+        thresholdDeltaAlertCount: Int,
+        thresholdDeltaWindowHours: Int,
+        thresholdDeltaTrigger: Double,
         status: String
     ) {
         let fallbackThreshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
@@ -321,6 +345,9 @@ final class TVMonitorService {
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
+                0,
+                24,
+                5,
                 "Monitor activo (solo lectura/mock)"
             )
         }
@@ -339,6 +366,9 @@ final class TVMonitorService {
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
+                0,
+                24,
+                5,
                 "Monitor activo (URL invalida, fallback mock)"
             )
         }
@@ -373,6 +403,9 @@ final class TVMonitorService {
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
                     fallbackThreshold,
+                    0,
+                    24,
+                    5,
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
@@ -420,6 +453,9 @@ final class TVMonitorService {
                     mockDriverBreakdown(),
                     mockSubcontractorBreakdown(),
                     fallbackThreshold,
+                    0,
+                    24,
+                    5,
                     "Monitor API sin datos, fallback mock"
                 )
             }
@@ -446,7 +482,23 @@ final class TVMonitorService {
                 token: token,
                 fallbackThreshold: fallbackThreshold
             )
-            return (mappedRoutes, mappedDrivers, mappedSubcontractors, routeBreakdown, driverBreakdown, subcontractorBreakdown, threshold, "Monitor activo (API real)")
+            let deltaAlert = await fetchThresholdDeltaAlertSummary(
+                normalizedBaseURL: normalizedBaseURL,
+                token: token
+            )
+            return (
+                mappedRoutes,
+                mappedDrivers,
+                mappedSubcontractors,
+                routeBreakdown,
+                driverBreakdown,
+                subcontractorBreakdown,
+                threshold,
+                deltaAlert.count,
+                deltaAlert.windowHours,
+                deltaAlert.deltaTrigger,
+                "Monitor activo (API real)"
+            )
         } catch {
             return (
                 mockRouteQuality(),
@@ -456,8 +508,62 @@ final class TVMonitorService {
                 mockDriverBreakdown(),
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
+                0,
+                24,
+                5,
                 "Monitor fallback (error conexion API)"
             )
+        }
+    }
+
+    private func fetchThresholdDeltaAlertSummary(normalizedBaseURL: String, token: String?) async -> (count: Int, windowHours: Int, deltaTrigger: Double) {
+        let defaultWindow = 24
+        let defaultTrigger = 5.0
+        guard let settingsURL = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/alert-settings") else {
+            return (0, defaultWindow, defaultTrigger)
+        }
+
+        var settingsRequest = URLRequest(url: settingsURL)
+        settingsRequest.httpMethod = "GET"
+        if let token, !token.isEmpty {
+            settingsRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (settingsData, settingsResponse) = try await URLSession.shared.data(for: settingsRequest)
+            guard let settingsHTTP = settingsResponse as? HTTPURLResponse, (200...299).contains(settingsHTTP.statusCode) else {
+                return (0, defaultWindow, defaultTrigger)
+            }
+            let settingsDecoded = try JSONDecoder().decode(QualityThresholdAlertSettingsEnvelope.self, from: settingsData)
+            let windowHours = settingsDecoded.data.windowHours
+            let deltaTrigger = settingsDecoded.data.largeDeltaThreshold
+
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd"
+            let now = Date()
+            let from = Calendar(identifier: .gregorian).date(byAdding: .hour, value: -windowHours, to: now) ?? now
+            let dateFrom = formatter.string(from: from)
+            let dateTo = formatter.string(from: now)
+            guard let historyURL = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history?date_from=\(dateFrom)&date_to=\(dateTo)&page=1&per_page=100") else {
+                return (0, windowHours, deltaTrigger)
+            }
+
+            var historyRequest = URLRequest(url: historyURL)
+            historyRequest.httpMethod = "GET"
+            if let token, !token.isEmpty {
+                historyRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            let (historyData, historyResponse) = try await URLSession.shared.data(for: historyRequest)
+            guard let historyHTTP = historyResponse as? HTTPURLResponse, (200...299).contains(historyHTTP.statusCode) else {
+                return (0, windowHours, deltaTrigger)
+            }
+            let historyDecoded = try JSONDecoder().decode(QualityThresholdHistoryEnvelope.self, from: historyData)
+            let count = historyDecoded.data.filter { $0.event == "quality.threshold.alert.large_delta" }.count
+            return (count, windowHours, deltaTrigger)
+        } catch {
+            return (0, defaultWindow, defaultTrigger)
         }
     }
 
@@ -736,4 +842,26 @@ private struct QualityThresholdEnvelope: Decodable {
 
 private struct QualityThresholdPayload: Decodable {
     let threshold: Double
+}
+
+private struct QualityThresholdAlertSettingsEnvelope: Decodable {
+    let data: QualityThresholdAlertSettingsPayload
+}
+
+private struct QualityThresholdAlertSettingsPayload: Decodable {
+    let largeDeltaThreshold: Double
+    let windowHours: Int
+
+    enum CodingKeys: String, CodingKey {
+        case largeDeltaThreshold = "large_delta_threshold"
+        case windowHours = "window_hours"
+    }
+}
+
+private struct QualityThresholdHistoryEnvelope: Decodable {
+    let data: [QualityThresholdHistoryPayload]
+}
+
+private struct QualityThresholdHistoryPayload: Decodable {
+    let event: String
 }

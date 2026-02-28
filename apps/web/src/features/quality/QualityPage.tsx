@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, QualityThresholdHistoryEntry, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, QualityThresholdAlertSummary, QualityThresholdHistoryEntry, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -39,7 +39,14 @@ export function QualityPage() {
   const [roles, setRoles] = useState<RoleSummary[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [thresholdSaveMessage, setThresholdSaveMessage] = useState('');
+  const [thresholdAlertDeltaText, setThresholdAlertDeltaText] = useState('5');
+  const [thresholdAlertWindowText, setThresholdAlertWindowText] = useState('24');
+  const [thresholdAlertSaveMessage, setThresholdAlertSaveMessage] = useState('');
   const [thresholdAuditRows, setThresholdAuditRows] = useState<QualityThresholdHistoryEntry[]>([]);
+  const [thresholdAlertSummary, setThresholdAlertSummary] = useState<QualityThresholdAlertSummary | null>(null);
+  const [thresholdAlertRows, setThresholdAlertRows] = useState<QualityThresholdHistoryEntry[]>([]);
+  const [thresholdAlertPage, setThresholdAlertPage] = useState(1);
+  const [thresholdAlertLastPage, setThresholdAlertLastPage] = useState(1);
   const [displayTimeZone, setDisplayTimeZone] = useState<string>(
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid'
   );
@@ -55,6 +62,13 @@ export function QualityPage() {
       setCanManageThreshold(Boolean(config.can_manage));
       setThresholdSource(config.source_type);
     });
+    apiClient.getQualityThresholdAlertSettings().then((config) => {
+      setThresholdAlertDeltaText(String(config.large_delta_threshold));
+      setThresholdAlertWindowText(String(config.window_hours));
+      if (typeof config.can_manage === 'boolean') {
+        setCanManageThreshold((current) => current && config.can_manage);
+      }
+    });
     apiClient
       .getQualityThresholdHistory({
         scopeType: thresholdScopeType,
@@ -64,7 +78,38 @@ export function QualityPage() {
       })
       .then((response) => setThresholdAuditRows(response.data))
       .catch(() => setThresholdAuditRows([]));
+    apiClient
+      .getQualityThresholdAlertSummary({
+        scopeType: thresholdScopeType,
+        scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+        dateFrom: periodStart || undefined,
+        dateTo: periodEnd || undefined,
+      })
+      .then(setThresholdAlertSummary)
+      .catch(() => setThresholdAlertSummary(null));
+    setThresholdAlertPage(1);
   }, [thresholdScopeType, thresholdScopeId]);
+
+  useEffect(() => {
+    apiClient
+      .getQualityThresholdHistory({
+        event: 'quality.threshold.alert.large_delta',
+        scopeType: thresholdScopeType,
+        scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+        dateFrom: periodStart || undefined,
+        dateTo: periodEnd || undefined,
+        page: thresholdAlertPage,
+        perPage: 10,
+      })
+      .then((response) => {
+        setThresholdAlertRows(response.data);
+        setThresholdAlertLastPage(Math.max(1, response.meta.last_page));
+      })
+      .catch(() => {
+        setThresholdAlertRows([]);
+        setThresholdAlertLastPage(1);
+      });
+  }, [thresholdScopeType, thresholdScopeId, periodStart, periodEnd, thresholdAlertPage]);
 
   useEffect(() => {
     apiClient
@@ -164,6 +209,7 @@ export function QualityPage() {
   }, [routeBreakdown, driverBreakdown]);
 
   const alerts = useMemo(() => items.filter((item) => item.service_quality_score < thresholdNumber), [items, thresholdNumber]);
+  const latestLargeDeltaAlert = thresholdAlertRows[0] ?? null;
 
   function applyQuickRange(days: 7 | 30) {
     const end = new Date();
@@ -198,6 +244,14 @@ export function QualityPage() {
     Number(threshold) < 0 ||
     Number(threshold) > 100 ||
     (thresholdScopeIdRequired && !thresholdScopeId);
+  const disableThresholdAlertSave =
+    !canManageThreshold ||
+    !Number.isFinite(Number(thresholdAlertDeltaText)) ||
+    Number(thresholdAlertDeltaText) < 0 ||
+    Number(thresholdAlertDeltaText) > 100 ||
+    !Number.isFinite(Number(thresholdAlertWindowText)) ||
+    Number(thresholdAlertWindowText) < 1 ||
+    Number(thresholdAlertWindowText) > 168;
 
   function thresholdDeltaBadge(beforeThreshold?: number | null, afterThreshold?: number | null) {
     if (beforeThreshold === null || beforeThreshold === undefined || afterThreshold === null || afterThreshold === undefined) {
@@ -316,13 +370,77 @@ export function QualityPage() {
                   .then((response) => {
                     if (response) setThresholdAuditRows(response.data);
                   })
+                  .then(() =>
+                    apiClient.getQualityThresholdAlertSummary({
+                      scopeType: thresholdScopeType,
+                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                    })
+                  )
+                  .then((summary) => {
+                    if (summary) setThresholdAlertSummary(summary);
+                    setThresholdAlertPage(1);
+                  })
                   .catch(() => setThresholdSaveMessage('No se pudo guardar el umbral'))
               }
             >
               Guardar umbral
             </Button>
+            <Input
+              value={thresholdAlertDeltaText}
+              onChange={(e) => setThresholdAlertDeltaText(e.target.value)}
+              placeholder="Delta alerta (ej: 5)"
+            />
+            <Input
+              value={thresholdAlertWindowText}
+              onChange={(e) => setThresholdAlertWindowText(e.target.value)}
+              placeholder="Ventana horas (ej: 24)"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disableThresholdAlertSave}
+              onClick={() =>
+                apiClient
+                  .setQualityThresholdAlertSettings({
+                    largeDeltaThreshold: Number(thresholdAlertDeltaText),
+                    windowHours: Number(thresholdAlertWindowText),
+                  })
+                  .then((config) => {
+                    setThresholdAlertDeltaText(String(config.large_delta_threshold));
+                    setThresholdAlertWindowText(String(config.window_hours));
+                    setThresholdAlertSaveMessage('Configuración de alerta guardada');
+                    return apiClient.getQualityThresholdHistory({
+                      scopeType: thresholdScopeType,
+                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      page: 1,
+                      perPage: 20,
+                    });
+                  })
+                  .then((response) => {
+                    if (response) setThresholdAuditRows(response.data);
+                  })
+                  .then(() =>
+                    apiClient.getQualityThresholdAlertSummary({
+                      scopeType: thresholdScopeType,
+                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                    })
+                  )
+                  .then((summary) => {
+                    if (summary) setThresholdAlertSummary(summary);
+                    setThresholdAlertPage(1);
+                  })
+                  .catch(() => setThresholdAlertSaveMessage('No se pudo guardar la configuración de alerta'))
+              }
+            >
+              Guardar alerta delta
+            </Button>
           </div>
           {thresholdSaveMessage && <p>{thresholdSaveMessage}</p>}
+          {thresholdAlertSaveMessage && <p>{thresholdAlertSaveMessage}</p>}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => applyQuickRange(7)}>Ultimos 7 dias</Button>
             <Button type="button" variant="outline" onClick={() => applyQuickRange(30)}>Ultimos 30 dias</Button>
@@ -427,6 +545,64 @@ export function QualityPage() {
                     </TableBody>
                   </Table>
                 </TableWrapper>
+              </CardContent>
+            </Card>
+          )}
+
+          {(thresholdAlertSummary?.count ?? 0) > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notificaciones internas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>
+                  Alertas por cambio brusco de umbral: <strong>{thresholdAlertSummary?.count ?? 0}</strong> (ventana: {thresholdAlertSummary?.window_hours ?? thresholdAlertWindowText}h)
+                </p>
+                {latestLargeDeltaAlert && (
+                  <p>
+                    Ultima alerta: {formatAuditTimestamp(latestLargeDeltaAlert.created_at)} por{' '}
+                    {latestLargeDeltaAlert.actor_name ?? latestLargeDeltaAlert.actor_user_id ?? 'sistema'}.
+                  </p>
+                )}
+                <TableWrapper>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Scope</TableHead>
+                        <TableHead>Actor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {thresholdAlertRows.map((row) => (
+                        <TableRow key={`delta-alert-${row.id}`}>
+                          <TableCell>{formatAuditTimestamp(row.created_at)}</TableCell>
+                          <TableCell>{row.scope_type} · {row.scope_id ?? '-'}</TableCell>
+                          <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+                <div className="inline-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={thresholdAlertPage <= 1}
+                    onClick={() => setThresholdAlertPage((current) => Math.max(1, current - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Badge variant="secondary">Pagina {thresholdAlertPage} / {thresholdAlertLastPage}</Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={thresholdAlertPage >= thresholdAlertLastPage}
+                    onClick={() => setThresholdAlertPage((current) => Math.min(thresholdAlertLastPage, current + 1))}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

@@ -13,6 +13,8 @@ import {
   QualityRouteBreakdown,
   QualitySubcontractorBreakdown,
   QualityThresholdConfig,
+  QualityThresholdAlertSettings,
+  QualityThresholdAlertSummary,
   QualityThresholdHistoryEntry,
   QualityTopRoutesResult,
   RoleSummary,
@@ -729,7 +731,46 @@ export const apiClient = {
     return json.data as QualityThresholdConfig;
   },
 
+  async getQualityThresholdAlertSettings(): Promise<QualityThresholdAlertSettings> {
+    if (USE_MOCK) {
+      return { large_delta_threshold: 5, window_hours: 24, can_manage: true, source_type: 'default' };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/alert-settings`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSettings;
+  },
+
+  async setQualityThresholdAlertSettings(payload: {
+    largeDeltaThreshold: number;
+    windowHours: number;
+  }): Promise<QualityThresholdAlertSettings> {
+    if (USE_MOCK) {
+      return {
+        large_delta_threshold: payload.largeDeltaThreshold,
+        window_hours: payload.windowHours,
+        can_manage: true,
+        source_type: 'configured',
+      };
+    }
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/alert-settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        large_delta_threshold: payload.largeDeltaThreshold,
+        window_hours: payload.windowHours,
+      }),
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSettings;
+  },
+
   async getQualityThresholdHistory(filters: {
+    event?: string;
     scopeType?: 'global' | 'role' | 'user';
     scopeId?: string;
     dateFrom?: string;
@@ -744,6 +785,7 @@ export const apiClient = {
     }
 
     const params = new URLSearchParams();
+    if (filters.event) params.set('event', filters.event);
     if (filters.scopeType) params.set('scope_type', filters.scopeType);
     if (filters.scopeId) params.set('scope_id', filters.scopeId);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
@@ -755,6 +797,39 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parsePaginatedData<QualityThresholdHistoryEntry>(response);
+  },
+
+  async getQualityThresholdAlertSummary(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<QualityThresholdAlertSummary> {
+    if (USE_MOCK) {
+      const history = await mockApi.getQualityThresholdHistory({ event: 'quality.threshold.alert.large_delta' });
+      return {
+        event: 'quality.threshold.alert.large_delta',
+        count: history.filter((row) => row.event === 'quality.threshold.alert.large_delta').length,
+        last_event_at: history.find((row) => row.event === 'quality.threshold.alert.large_delta')?.created_at ?? null,
+        window_hours: 24,
+        large_delta_threshold: 5,
+        date_from: '2026-02-27',
+        date_to: '2026-02-28',
+      };
+    }
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/alerts/summary${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return json.data as QualityThresholdAlertSummary;
   },
 
   async exportQualityThresholdHistoryCsv(filters: {

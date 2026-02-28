@@ -93,6 +93,7 @@ export const mockApi = {
   },
 
   async getQualityThresholdHistory(_: {
+    event?: string;
     scopeType?: 'global' | 'role' | 'user';
     scopeId?: string;
     dateFrom?: string;
@@ -100,7 +101,7 @@ export const mockApi = {
     page?: number;
     perPage?: number;
   }) {
-    return [
+    const rows = [
       {
         id: 301,
         event: 'quality.threshold.updated',
@@ -135,7 +136,52 @@ export const mockApi = {
           after: { threshold: 95 },
         },
       },
+      {
+        id: 303,
+        event: 'quality.threshold.alert.large_delta',
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        created_at: '2026-02-28T10:45:00Z',
+        scope_type: 'role' as const,
+        scope_id: 'driver',
+        before_threshold: 96.5,
+        after_threshold: 90.5,
+        metadata: {
+          scope_type: 'role',
+          scope_id: 'driver',
+          before: { threshold: 96.5 },
+          after: { threshold: 90.5 },
+          delta: 6,
+          window_hours: 24,
+          threshold_delta_trigger: 5,
+        },
+      },
     ];
+    if (_.event) {
+      return rows.filter((row) => row.event === _.event);
+    }
+    return rows;
+  },
+
+  async getQualityThresholdAlertSettings() {
+    return {
+      large_delta_threshold: 5,
+      window_hours: 24,
+      can_manage: true,
+      source_type: 'default' as const,
+    };
+  },
+
+  async setQualityThresholdAlertSettings(payload: {
+    largeDeltaThreshold: number;
+    windowHours: number;
+  }) {
+    return {
+      large_delta_threshold: payload.largeDeltaThreshold,
+      window_hours: payload.windowHours,
+      can_manage: true,
+      source_type: 'configured' as const,
+    };
   },
 
   async exportQualityThresholdHistoryCsv(_: {

@@ -755,6 +755,92 @@ class QualityController extends Controller
         ]);
     }
 
+    public function thresholdAlertSettings(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $config = $this->resolveThresholdAlertConfig();
+
+        return response()->json([
+            'data' => [
+                'large_delta_threshold' => $config['large_delta_threshold'],
+                'window_hours' => $config['window_hours'],
+                'can_manage' => $actor->hasPermission('quality.recalculate'),
+                'source_type' => $config['source_type'],
+            ],
+        ]);
+    }
+
+    public function upsertThresholdAlertSettings(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.recalculate')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'large_delta_threshold' => ['required', 'numeric', 'min:0', 'max:100'],
+            'window_hours' => ['required', 'integer', 'min:1', 'max:168'],
+        ]);
+
+        $existing = DB::table('quality_threshold_alert_settings')->first();
+        $before = $existing ? [
+            'large_delta_threshold' => (float) $existing->large_delta_threshold,
+            'window_hours' => (int) $existing->window_hours,
+        ] : null;
+
+        $newDelta = round((float) $payload['large_delta_threshold'], 2);
+        $newWindow = (int) $payload['window_hours'];
+        if ($existing) {
+            DB::table('quality_threshold_alert_settings')
+                ->where('id', $existing->id)
+                ->update([
+                    'large_delta_threshold' => $newDelta,
+                    'window_hours' => $newWindow,
+                    'updated_by_user_id' => $actor->id,
+                    'updated_at' => now(),
+                ]);
+        } else {
+            DB::table('quality_threshold_alert_settings')->insert([
+                'id' => (string) Str::uuid(),
+                'large_delta_threshold' => $newDelta,
+                'window_hours' => $newWindow,
+                'updated_by_user_id' => $actor->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('audit_logs')->insert([
+            'actor_user_id' => $actor->id,
+            'event' => 'quality.threshold.alert_settings.updated',
+            'metadata' => json_encode([
+                'before' => $before,
+                'after' => [
+                    'large_delta_threshold' => $newDelta,
+                    'window_hours' => $newWindow,
+                ],
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => [
+                'large_delta_threshold' => $newDelta,
+                'window_hours' => $newWindow,
+                'can_manage' => true,
+                'source_type' => 'configured',
+            ],
+            'message' => 'Threshold alert settings updated.',
+        ]);
+    }
+
     public function upsertThreshold(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -850,9 +936,10 @@ class QualityController extends Controller
         if ($existing && isset($before['threshold'])) {
             $previousThreshold = (float) $before['threshold'];
             $delta = round(abs($newThreshold - $previousThreshold), 2);
-            $windowHours = 24;
+            $alertConfig = $this->resolveThresholdAlertConfig();
+            $windowHours = $alertConfig['window_hours'];
             $isRecent = Carbon::parse((string) $existing->updated_at)->greaterThanOrEqualTo(now()->subHours($windowHours));
-            $alertThresholdDelta = 5.0;
+            $alertThresholdDelta = $alertConfig['large_delta_threshold'];
 
             if ($isRecent && $delta >= $alertThresholdDelta) {
                 DB::table('audit_logs')->insert([
@@ -930,6 +1017,39 @@ class QualityController extends Controller
                 'per_page' => $perPage,
                 'total' => $total,
                 'last_page' => $perPage > 0 ? (int) ceil($total / $perPage) : 0,
+            ],
+        ]);
+    }
+
+    public function thresholdHistoryAlertsSummary(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $config = $this->resolveThresholdAlertConfig();
+        $windowHours = $config['window_hours'];
+        $dateFrom = (string) $request->query('date_from', now()->subHours($windowHours)->toDateString());
+        $dateTo = (string) $request->query('date_to', now()->toDateString());
+
+        $query = $this->buildThresholdHistoryQuery($request, 'quality.threshold.alert.large_delta')
+            ->whereDate('audit_logs.created_at', '>=', $dateFrom)
+            ->whereDate('audit_logs.created_at', '<=', $dateTo);
+
+        $count = (clone $query)->count();
+        $latest = (clone $query)->first();
+
+        return response()->json([
+            'data' => [
+                'event' => 'quality.threshold.alert.large_delta',
+                'count' => $count,
+                'last_event_at' => $latest?->created_at,
+                'window_hours' => $windowHours,
+                'large_delta_threshold' => $config['large_delta_threshold'],
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
             ],
         ]);
     }
@@ -1086,13 +1206,44 @@ class QualityController extends Controller
         ];
     }
 
-    private function buildThresholdHistoryQuery(Request $request)
+    /**
+     * @return array{large_delta_threshold:float,window_hours:int,source_type:string}
+     */
+    private function resolveThresholdAlertConfig(): array
     {
+        $defaultDelta = 5.0;
+        $defaultWindowHours = 24;
+
+        $row = DB::table('quality_threshold_alert_settings')
+            ->orderByDesc('updated_at')
+            ->first();
+        if ($row) {
+            return [
+                'large_delta_threshold' => round((float) $row->large_delta_threshold, 2),
+                'window_hours' => max(1, (int) $row->window_hours),
+                'source_type' => 'configured',
+            ];
+        }
+
+        return [
+            'large_delta_threshold' => $defaultDelta,
+            'window_hours' => $defaultWindowHours,
+            'source_type' => 'default',
+        ];
+    }
+
+    private function buildThresholdHistoryQuery(Request $request, ?string $defaultEvent = null)
+    {
+        $eventFilter = (string) ($request->query('event') ?? $defaultEvent ?? '');
         $query = DB::table('audit_logs')
             ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_user_id')
             ->select('audit_logs.*', 'users.name as actor_name')
             ->where('audit_logs.event', 'like', 'quality.threshold.%')
             ->orderByDesc('audit_logs.created_at');
+
+        if ($eventFilter !== '') {
+            $query->where('audit_logs.event', $eventFilter);
+        }
 
         if ($request->filled('scope_type')) {
             $query->whereRaw("json_extract(audit_logs.metadata, '$.scope_type') = ?", [(string) $request->query('scope_type')]);

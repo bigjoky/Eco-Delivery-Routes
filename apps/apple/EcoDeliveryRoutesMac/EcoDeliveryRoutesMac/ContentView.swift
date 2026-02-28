@@ -52,6 +52,9 @@ struct ContentView: View {
     @State private var qualityThresholdScopeId: String = ""
     @State private var qualityThresholdBeforeValue: Double?
     @State private var qualityThresholdAfterValue: Double?
+    @State private var qualityThresholdLargeDeltaCount: Int = 0
+    @State private var qualityThresholdAlertWindowHours: Int = 24
+    @State private var qualityThresholdDeltaTrigger: Double = 5
     @State private var canManageQualityThreshold: Bool = false
     @State private var qualityThresholdMessage: String = ""
     @State private var advances: [AdvanceSummary] = []
@@ -245,6 +248,14 @@ struct ContentView: View {
                                     .foregroundStyle(thresholdTrendColor(before: before, after: after))
                                     .clipShape(Capsule())
                             }
+                        }
+                        HStack(spacing: 8) {
+                            Text("Alertas delta (ultimas \(qualityThresholdAlertWindowHours)h): \(qualityThresholdLargeDeltaCount)")
+                                .font(.caption)
+                                .foregroundStyle(qualityThresholdLargeDeltaCount > 0 ? .red : .secondary)
+                            Text("Trigger: ±\(qualityThresholdDeltaTrigger, specifier: "%.2f")")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -503,6 +514,7 @@ struct ContentView: View {
     private func refreshAll() async {
         apiClient.setAuthToken(authSession.token?.token)
         await loadQualityThreshold()
+        await loadQualityThresholdAlerts()
         await loadRoute()
         await loadRouteQuality()
         await loadAdvances()
@@ -571,9 +583,30 @@ struct ContentView: View {
             qualityThresholdScopeId = updated.sourceId ?? qualityThresholdScopeId
             canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
             qualityThresholdMessage = "Umbral guardado"
+            await loadQualityThresholdAlerts()
         } catch {
             qualityThresholdMessage = "No se pudo guardar el umbral"
         }
+    }
+
+    private func loadQualityThresholdAlerts() async {
+        let dateFormatter = DateFormatter()
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let settings = try? await apiClient.qualityThresholdAlertSettings()
+        let windowHours = settings?.windowHours ?? 24
+        qualityThresholdAlertWindowHours = windowHours
+        qualityThresholdDeltaTrigger = settings?.largeDeltaThreshold ?? 5
+
+        let now = Date()
+        let fromDate = Calendar(identifier: .gregorian).date(byAdding: .hour, value: -windowHours, to: now) ?? now
+        let dateFrom = dateFormatter.string(from: fromDate)
+        let dateTo = dateFormatter.string(from: now)
+
+        let history = (try? await apiClient.qualityThresholdHistory(dateFrom: dateFrom, dateTo: dateTo)) ?? []
+        qualityThresholdLargeDeltaCount = history.filter { $0.event == "quality.threshold.alert.large_delta" }.count
     }
 
     private func loadRouteBreakdown(routeId: String) async {

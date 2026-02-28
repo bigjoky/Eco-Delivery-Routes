@@ -70,7 +70,10 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('kpis/quality/export.pdf'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold'", $contents);
         $this->assertStringContainsString("Route::put('kpis/quality/threshold'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/threshold/alert-settings'", $contents);
+        $this->assertStringContainsString("Route::put('kpis/quality/threshold/alert-settings'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold/history'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/threshold/history/alerts/summary'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold/history/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold/history/export.pdf'", $contents);
     }
@@ -141,7 +144,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/kpis/quality/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/threshold/alert-settings:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold/history:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/threshold/history/alerts/summary:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold/history/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold/history/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

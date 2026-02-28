@@ -89,7 +89,10 @@ Route::prefix('v1')->group(function () {
         Route::post('kpis/quality/recalculate', [QualityController::class, 'recalculate']);
         Route::get('kpis/quality/threshold', [QualityController::class, 'threshold']);
         Route::put('kpis/quality/threshold', [QualityController::class, 'upsertThreshold']);
+        Route::get('kpis/quality/threshold/alert-settings', [QualityController::class, 'thresholdAlertSettings']);
+        Route::put('kpis/quality/threshold/alert-settings', [QualityController::class, 'upsertThresholdAlertSettings']);
         Route::get('kpis/quality/threshold/history', [QualityController::class, 'thresholdHistory']);
+        Route::get('kpis/quality/threshold/history/alerts/summary', [QualityController::class, 'thresholdHistoryAlertsSummary']);
         Route::get('kpis/quality/threshold/history/export.csv', [QualityController::class, 'thresholdHistoryExportCsv']);
         Route::get('kpis/quality/threshold/history/export.pdf', [QualityController::class, 'thresholdHistoryExportPdf']);
         Route::get('subcontractors', [SubcontractorController::class, 'index']);

@@ -7,6 +7,12 @@ public final class MockAPIClient {
         sourceId: nil,
         canManage: true
     )
+    private var mockQualityThresholdAlertSettings = QualityThresholdAlertSettings(
+        largeDeltaThreshold: 5,
+        windowHours: 24,
+        canManage: true,
+        sourceType: "default"
+    )
 
     private var mockAdvances: [AdvanceSummary] = [
         AdvanceSummary(
@@ -278,6 +284,34 @@ public final class MockAPIClient {
             canManage: true
         )
         return mockQualityThreshold
+    }
+
+    public func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings {
+        mockQualityThresholdAlertSettings
+    }
+
+    public func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry] {
+        _ = (dateFrom, dateTo)
+        return [
+            QualityThresholdHistoryEntry(
+                id: 301,
+                event: "quality.threshold.updated",
+                actorUserId: "u-1",
+                actorName: "Admin Demo",
+                createdAt: "2026-02-28T09:00:00Z",
+                scopeType: "role",
+                scopeId: "driver"
+            ),
+            QualityThresholdHistoryEntry(
+                id: 302,
+                event: "quality.threshold.alert.large_delta",
+                actorUserId: "u-1",
+                actorName: "Admin Demo",
+                createdAt: "2026-02-28T10:45:00Z",
+                scopeType: "role",
+                scopeId: "driver"
+            ),
+        ]
     }
 
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {

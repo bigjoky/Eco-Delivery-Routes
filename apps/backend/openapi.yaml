@@ -1398,11 +1398,39 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { description: Error validación }
 
+  /kpis/quality/threshold/alert-settings:
+    get:
+      tags: [Quality]
+      summary: Obtener configuración de alerta por delta grande en umbral KPI
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Quality]
+      summary: Configurar delta y ventana para alertas de cambios bruscos de umbral
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [large_delta_threshold, window_hours]
+              properties:
+                large_delta_threshold: { type: number, minimum: 0, maximum: 100, default: 5 }
+                window_hours: { type: integer, minimum: 1, maximum: 168, default: 24 }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Error validación }
+
   /kpis/quality/threshold/history:
     get:
       tags: [Quality]
       summary: Historial dedicado de cambios de umbral KPI
       parameters:
+        - in: query
+          name: event
+          schema: { type: string, description: "Filtro por evento exacto (ej: quality.threshold.alert.large_delta)" }
         - in: query
           name: scope_type
           schema: { type: string, enum: [global, role, user] }
@@ -1421,6 +1449,27 @@ paths:
         - in: query
           name: per_page
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /kpis/quality/threshold/history/alerts/summary:
+    get:
+      tags: [Quality]
+      summary: Resumen agregado de alertas de cambios bruscos de umbral
+      parameters:
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string }
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }

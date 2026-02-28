@@ -143,6 +143,13 @@ export type QualityThresholdConfig = {
   can_manage?: boolean;
 };
 
+export type QualityThresholdAlertSettings = {
+  large_delta_threshold: number;
+  window_hours: number;
+  can_manage?: boolean;
+  source_type?: 'default' | 'configured';
+};
+
 export type QualityThresholdHistoryEntry = {
   id: number;
   event: string;
@@ -154,6 +161,16 @@ export type QualityThresholdHistoryEntry = {
   before_threshold?: number | null;
   after_threshold?: number | null;
   metadata?: Record<string, unknown> | string | null;
+};
+
+export type QualityThresholdAlertSummary = {
+  event: string;
+  count: number;
+  last_event_at?: string | null;
+  window_hours: number;
+  large_delta_threshold: number;
+  date_from: string;
+  date_to: string;
 };
 
 export type QualityRouteBreakdown = {
