@@ -847,6 +847,32 @@ class QualityController extends Controller
             'updated_at' => now(),
         ]);
 
+        if ($existing && isset($before['threshold'])) {
+            $previousThreshold = (float) $before['threshold'];
+            $delta = round(abs($newThreshold - $previousThreshold), 2);
+            $windowHours = 24;
+            $isRecent = Carbon::parse((string) $existing->updated_at)->greaterThanOrEqualTo(now()->subHours($windowHours));
+            $alertThresholdDelta = 5.0;
+
+            if ($isRecent && $delta >= $alertThresholdDelta) {
+                DB::table('audit_logs')->insert([
+                    'actor_user_id' => $actor->id,
+                    'event' => 'quality.threshold.alert.large_delta',
+                    'metadata' => json_encode([
+                        'scope_type' => $scopeType,
+                        'scope_id' => $scopeId,
+                        'before' => $before,
+                        'after' => $after,
+                        'delta' => $delta,
+                        'window_hours' => $windowHours,
+                        'threshold_delta_trigger' => $alertThresholdDelta,
+                    ]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
         return response()->json([
             'data' => [
                 'threshold' => $newThreshold,
@@ -941,6 +967,44 @@ class QualityController extends Controller
         return response(implode("\n", $csvRows), 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="quality_threshold_history.csv"',
+        ]);
+    }
+
+    public function thresholdHistoryExportPdf(Request $request): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $rows = $this->buildThresholdHistoryQuery($request)->limit(120)->get();
+        $lines = [
+            'Eco Delivery Routes - Quality Threshold History',
+            sprintf('Rows exported: %d', $rows->count()),
+        ];
+        foreach ($rows as $row) {
+            $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+            $before = is_array($metadata['before'] ?? null) ? $metadata['before'] : [];
+            $after = is_array($metadata['after'] ?? null) ? $metadata['after'] : [];
+            $scopeType = (string) ($metadata['scope_type'] ?? '');
+            $scopeId = (string) ($metadata['scope_id'] ?? '');
+            $beforeThreshold = isset($before['threshold']) ? (string) ((float) $before['threshold']) : '-';
+            $afterThreshold = isset($after['threshold']) ? (string) ((float) $after['threshold']) : '-';
+            $lines[] = sprintf(
+                '%s | %s:%s | %s -> %s | %s',
+                (string) $row->created_at,
+                $scopeType,
+                $scopeId,
+                $beforeThreshold,
+                $afterThreshold,
+                (string) $row->event
+            );
+        }
+
+        return response($this->buildSimplePdf($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="quality_threshold_history.pdf"',
         ]);
     }
 

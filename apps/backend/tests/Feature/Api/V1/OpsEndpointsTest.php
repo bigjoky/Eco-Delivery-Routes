@@ -72,6 +72,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::put('kpis/quality/threshold'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold/history'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/threshold/history/export.csv'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/threshold/history/export.pdf'", $contents);
     }
 
     public function test_quality_controller_uses_recalculation_formula(): void
@@ -142,6 +143,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/kpis/quality/threshold:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold/history:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/threshold/history/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/threshold/history/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/subcontractors:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/finalize", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

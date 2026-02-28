@@ -147,6 +147,15 @@ export const mockApi = {
     return;
   },
 
+  async exportQualityThresholdHistoryPdf(_: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    return;
+  },
+
   async getRoles() {
     return [
       { id: 'r-1', code: 'super_admin', name: 'Super Admin' },

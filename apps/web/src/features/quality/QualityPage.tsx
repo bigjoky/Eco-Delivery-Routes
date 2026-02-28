@@ -40,6 +40,9 @@ export function QualityPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [thresholdSaveMessage, setThresholdSaveMessage] = useState('');
   const [thresholdAuditRows, setThresholdAuditRows] = useState<QualityThresholdHistoryEntry[]>([]);
+  const [displayTimeZone, setDisplayTimeZone] = useState<string>(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid'
+  );
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
@@ -209,6 +212,16 @@ export function QualityPage() {
     return <Badge variant="secondary">Igual</Badge>;
   }
 
+  function formatAuditTimestamp(raw: string): string {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return new Intl.DateTimeFormat('es-ES', {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+      timeZone: displayTimeZone,
+    }).format(date);
+  }
+
   return (
     <section className="page-grid">
       <Card>
@@ -352,6 +365,12 @@ export function QualityPage() {
             </Button>
             <Badge variant="secondary">Umbral fuente: {thresholdSource}</Badge>
             <Badge variant={alerts.length > 0 ? 'warning' : 'success'}>Alertas activas: {alerts.length}</Badge>
+            <Select value={displayTimeZone} onChange={(e) => setDisplayTimeZone(e.target.value)}>
+              <option value="Europe/Madrid">Europe/Madrid</option>
+              <option value="UTC">UTC</option>
+              <option value="Atlantic/Canary">Atlantic/Canary</option>
+              <option value="America/New_York">America/New_York</option>
+            </Select>
             <Button
               type="button"
               variant="outline"
@@ -365,6 +384,20 @@ export function QualityPage() {
               }
             >
               Exportar historial umbral CSV
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                apiClient.exportQualityThresholdHistoryPdf({
+                  scopeType: thresholdScopeType,
+                  scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                  dateFrom: periodStart || undefined,
+                  dateTo: periodEnd || undefined,
+                })
+              }
+            >
+              Exportar historial umbral PDF
             </Button>
           </div>
 
@@ -424,12 +457,16 @@ export function QualityPage() {
 
                       return (
                         <TableRow key={`threshold-audit-${row.id}`}>
-                          <TableCell>{row.created_at}</TableCell>
+                          <TableCell>{formatAuditTimestamp(row.created_at)}</TableCell>
                           <TableCell>{scopeType} · {scopeId}</TableCell>
                           <TableCell>
                             {beforeThreshold !== undefined ? `${beforeThreshold}%` : '-'} → {afterThreshold !== undefined ? `${afterThreshold}%` : '-'}
                           </TableCell>
-                          <TableCell>{thresholdDeltaBadge(beforeThreshold, afterThreshold)}</TableCell>
+                          <TableCell>
+                            {row.event === 'quality.threshold.alert.large_delta'
+                              ? <Badge variant="destructive">ALERTA</Badge>
+                              : thresholdDeltaBadge(beforeThreshold, afterThreshold)}
+                          </TableCell>
                           <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
                         </TableRow>
                       );

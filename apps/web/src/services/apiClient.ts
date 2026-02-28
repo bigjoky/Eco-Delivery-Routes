@@ -787,6 +787,36 @@ export const apiClient = {
     window.URL.revokeObjectURL(url);
   },
 
+  async exportQualityThresholdHistoryPdf(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportQualityThresholdHistoryPdf(filters) as Promise<void>;
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/export.pdf${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'quality_threshold_history.pdf';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   async getIncidents(filters: {
     incidentableType?: 'shipment' | 'pickup';
     incidentableId?: string;

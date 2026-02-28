@@ -1446,6 +1446,27 @@ paths:
         '200': { description: CSV export }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /kpis/quality/threshold/history/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar historial de cambios de umbral KPI a PDF
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user] }
+        - in: query
+          name: scope_id
+          schema: { type: string, description: "role code o user id" }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   securitySchemes:
     bearerAuth:

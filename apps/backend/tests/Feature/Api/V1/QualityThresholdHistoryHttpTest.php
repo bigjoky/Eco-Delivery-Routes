@@ -93,6 +93,57 @@ class QualityThresholdHistoryHttpTest extends TestCase
         $response->assertSee('96', false);
     }
 
+    public function test_history_pdf_export_works_for_accountant(): void
+    {
+        $accountant = $this->createUserWithRole('accountant');
+        DB::table('audit_logs')->insert([
+            'actor_user_id' => $accountant->id,
+            'event' => 'quality.threshold.updated',
+            'metadata' => json_encode([
+                'scope_type' => 'user',
+                'scope_id' => (string) $accountant->id,
+                'before' => ['threshold' => 94],
+                'after' => ['threshold' => 97],
+            ]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($accountant, 'sanctum');
+        $response = $this->get('/api/v1/kpis/quality/threshold/history/export.pdf?scope_type=user&scope_id=' . $accountant->id);
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_large_delta_update_creates_alert_event(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $this->putJson('/api/v1/kpis/quality/threshold', [
+            'threshold' => 95,
+            'scope_type' => 'role',
+            'scope_id' => 'driver',
+        ])->assertOk();
+
+        $this->putJson('/api/v1/kpis/quality/threshold', [
+            'threshold' => 89,
+            'scope_type' => 'role',
+            'scope_id' => 'driver',
+        ])->assertOk();
+
+        $alert = DB::table('audit_logs')
+            ->where('event', 'quality.threshold.alert.large_delta')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($alert);
+        $metadata = json_decode((string) $alert->metadata, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('role', $metadata['scope_type']);
+        $this->assertSame('driver', $metadata['scope_id']);
+        $this->assertSame(6.0, (float) $metadata['delta']);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([
