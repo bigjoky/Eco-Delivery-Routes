@@ -47,6 +47,9 @@ struct ContentView: View {
     @State private var qualityPeriodStart: String = ""
     @State private var qualityPeriodEnd: String = ""
     @State private var qualityAlertThresholdText: String = "95"
+    @State private var qualityThresholdSource: String = "default"
+    @State private var canManageQualityThreshold: Bool = false
+    @State private var qualityThresholdMessage: String = ""
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
@@ -193,6 +196,20 @@ struct ContentView: View {
                         TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
                         TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
                         TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
+                        HStack(spacing: 8) {
+                            Text("Fuente umbral: \(qualityThresholdSource)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("Guardar umbral") {
+                                Task { await saveQualityThreshold() }
+                            }
+                            .disabled(!canManageQualityThreshold)
+                        }
+                        if !qualityThresholdMessage.isEmpty {
+                            Text(qualityThresholdMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     let routeAlerts = routeQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
@@ -449,6 +466,7 @@ struct ContentView: View {
 
     private func refreshAll() async {
         apiClient.setAuthToken(authSession.token?.token)
+        await loadQualityThreshold()
         await loadRoute()
         await loadRouteQuality()
         await loadAdvances()
@@ -479,6 +497,34 @@ struct ContentView: View {
         }
         if let selectedSubcontractorId {
             await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
+        }
+    }
+
+    private func loadQualityThreshold() async {
+        guard let config = try? await apiClient.qualityThreshold() else { return }
+        qualityAlertThresholdText = String(format: "%.2f", config.threshold)
+        qualityThresholdSource = config.sourceType
+        canManageQualityThreshold = config.canManage ?? false
+    }
+
+    private func saveQualityThreshold() async {
+        guard let threshold = Double(qualityAlertThresholdText) else {
+            qualityThresholdMessage = "Umbral invalido"
+            return
+        }
+
+        do {
+            let updated = try await apiClient.updateQualityThreshold(
+                threshold: threshold,
+                scopeType: "user",
+                scopeId: nil
+            )
+            qualityAlertThresholdText = String(format: "%.2f", updated.threshold)
+            qualityThresholdSource = updated.sourceType
+            canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
+            qualityThresholdMessage = "Umbral guardado"
+        } catch {
+            qualityThresholdMessage = "No se pudo guardar el umbral"
         }
     }
 
