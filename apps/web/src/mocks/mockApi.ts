@@ -189,6 +189,31 @@ export const mockApi = {
     };
   },
 
+  async suspendUser(userId: string) {
+    const index = mockUsers.findIndex((item) => item.id === userId);
+    if (index < 0) {
+      throw new Error('User not found');
+    }
+    mockUsers[index] = { ...mockUsers[index], status: 'suspended' };
+    return this.getUserById(userId);
+  },
+
+  async reactivateUser(userId: string) {
+    const index = mockUsers.findIndex((item) => item.id === userId);
+    if (index < 0) {
+      throw new Error('User not found');
+    }
+    mockUsers[index] = { ...mockUsers[index], status: 'active' };
+    return this.getUserById(userId);
+  },
+
+  async resetUserPassword(userId: string, _password: string) {
+    const exists = mockUsers.some((item) => item.id === userId);
+    if (!exists) {
+      throw new Error('User not found');
+    }
+  },
+
   async getAuditLogs(_: {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;

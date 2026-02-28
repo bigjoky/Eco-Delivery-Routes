@@ -6,6 +6,7 @@ public protocol APIClientProtocol {
     func logout() async
     func myRoute(routeDate: String?, status: String?) async throws -> DriverRouteMePayload
     func myRouteStops() async throws -> [DriverStop]
+    func users(status: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<User>
     func advances(status: String?, period: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<AdvanceSummary>
     func approveAdvance(id: String) async throws -> AdvanceSummary
     func tariffs(serviceType: String?) async throws -> [TariffSummary]
@@ -119,6 +120,24 @@ public final class APIClient: APIClientProtocol {
             route: decoded.data.route,
             stops: normalizedStops
         )
+    }
+
+    public func users(status: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<User> {
+        guard let baseURL else { return try await mock.users(status: status, page: page, perPage: perPage) }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "users"),
+            queryItems: [
+                URLQueryItem(name: "status", value: status),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "per_page", value: String(perPage)),
+                URLQueryItem(name: "sort", value: "created_at"),
+                URLQueryItem(name: "dir", value: "desc"),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(PaginatedResponse<User>.self, from: data)
     }
 
     public func advances(status: String?, period: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<AdvanceSummary> {

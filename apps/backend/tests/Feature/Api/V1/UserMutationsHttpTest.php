@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 class UserMutationsHttpTest extends TestCase
@@ -116,6 +117,81 @@ class UserMutationsHttpTest extends TestCase
             'role_ids' => [],
         ]);
         $invalid->assertStatus(422)->assertJsonValidationErrors(['role_ids']);
+    }
+
+    public function test_super_admin_can_suspend_and_reactivate_user_and_audit_is_recorded(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $target = $this->createUserWithRole('driver');
+
+        $this->actingAs($admin, 'sanctum');
+        $suspend = $this->postJson("/api/v1/users/{$target->id}/suspend");
+        $suspend->assertOk()->assertJsonPath('data.status', 'suspended');
+
+        $reactivate = $this->postJson("/api/v1/users/{$target->id}/reactivate");
+        $reactivate->assertOk()->assertJsonPath('data.status', 'active');
+
+        $auditResponse = $this->getJson("/api/v1/audit-logs?resource=user&id={$target->id}");
+        $auditResponse->assertOk();
+        $events = collect($auditResponse->json('data'))->pluck('event')->all();
+        $this->assertContains('user.suspended', $events);
+        $this->assertContains('user.reactivated', $events);
+    }
+
+    public function test_user_cannot_suspend_self(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $response = $this->postJson("/api/v1/users/{$admin->id}/suspend");
+        $response
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'USER_SELF_SUSPEND_NOT_ALLOWED');
+    }
+
+    public function test_operations_manager_cannot_suspend_user_without_permission(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $target = $this->createUserWithRole('driver');
+        $this->actingAs($manager, 'sanctum');
+
+        $response = $this->postJson("/api/v1/users/{$target->id}/suspend");
+        $response->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
+    }
+
+    public function test_super_admin_can_reset_user_password_and_previous_tokens_are_invalidated(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $target = $this->createUserWithRole('driver');
+        $staleToken = $target->createToken('legacy-device')->plainTextToken;
+
+        $this->actingAs($admin, 'sanctum');
+        $response = $this->postJson("/api/v1/users/{$target->id}/reset-password", [
+            'password' => 'newPassword123',
+        ]);
+        $response->assertOk()->assertJsonPath('data.user_id', $target->id);
+
+        $target->refresh();
+        $this->assertTrue(Hash::check('newPassword123', (string) $target->password));
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $target->id,
+            'name' => 'legacy-device',
+        ]);
+
+        $tokenId = explode('|', $staleToken)[0] ?? '';
+        $this->assertFalse(PersonalAccessToken::query()->where('id', $tokenId)->exists());
+    }
+
+    public function test_reset_password_validates_payload(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $target = $this->createUserWithRole('driver');
+
+        $this->actingAs($admin, 'sanctum');
+        $response = $this->postJson("/api/v1/users/{$target->id}/reset-password", [
+            'password' => 'short',
+        ]);
+        $response->assertStatus(422)->assertJsonValidationErrors(['password']);
     }
 
     private function createUserWithRole(string $roleCode): User

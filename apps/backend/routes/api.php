@@ -38,6 +38,9 @@ Route::prefix('v1')->group(function () {
         Route::get('users/{id}', [UserController::class, 'show']);
         Route::patch('users/{id}', [UserController::class, 'update']);
         Route::post('users/{id}/roles', [UserController::class, 'assignRoles']);
+        Route::post('users/{id}/suspend', [UserController::class, 'suspend']);
+        Route::post('users/{id}/reactivate', [UserController::class, 'reactivate']);
+        Route::post('users/{id}/reset-password', [UserController::class, 'resetPassword']);
 
         Route::get('roles', [RoleController::class, 'index']);
         Route::get('roles/{id}', [RoleController::class, 'show']);

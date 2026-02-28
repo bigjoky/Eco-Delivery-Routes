@@ -295,6 +295,45 @@ export const apiClient = {
     }
   },
 
+  async suspendUser(userId: string): Promise<UserSummary> {
+    if (USE_MOCK) return mockApi.suspendUser(userId) as Promise<UserSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${userId}/suspend`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot suspend user');
+    }
+    return json.data as UserSummary;
+  },
+
+  async reactivateUser(userId: string): Promise<UserSummary> {
+    if (USE_MOCK) return mockApi.reactivateUser(userId) as Promise<UserSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${userId}/reactivate`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot reactivate user');
+    }
+    return json.data as UserSummary;
+  },
+
+  async resetUserPassword(userId: string, password: string): Promise<void> {
+    if (USE_MOCK) return mockApi.resetUserPassword(userId, password) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password }),
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(json?.error?.message ?? 'Cannot reset user password');
+    }
+  },
+
   async getAuditLogs(filters: {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;

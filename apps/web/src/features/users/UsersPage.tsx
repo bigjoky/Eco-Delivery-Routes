@@ -112,6 +112,30 @@ export function UsersPage() {
     setEditRoleIds((prev) => prev.filter((item) => item !== roleId));
   };
 
+  const onQuickSuspend = async (userId: string) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.suspendUser(userId);
+      setMessage('Usuario suspendido');
+      await loadUsers(meta.page);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'No se pudo suspender el usuario');
+    }
+  };
+
+  const onQuickReactivate = async (userId: string) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.reactivateUser(userId);
+      setMessage('Usuario reactivado');
+      await loadUsers(meta.page);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'No se pudo reactivar el usuario');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -161,6 +185,11 @@ export function UsersPage() {
                     <TableCell>
                       <div className="inline-actions">
                         <Button type="button" variant="outline" onClick={() => onOpenEdit(user)}>Editar</Button>
+                        {user.status !== 'suspended' ? (
+                          <Button type="button" variant="outline" onClick={() => onQuickSuspend(user.id)}>Suspender</Button>
+                        ) : (
+                          <Button type="button" variant="outline" onClick={() => onQuickReactivate(user.id)}>Reactivar</Button>
+                        )}
                         <Link to={`/users/${user.id}`} className="btn btn-outline">Detalle</Link>
                       </div>
                     </TableCell>
