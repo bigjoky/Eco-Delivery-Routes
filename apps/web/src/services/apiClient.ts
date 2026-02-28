@@ -496,6 +496,23 @@ export const apiClient = {
     return parseData<RouteStopSummary>(response);
   },
 
+  async updateRoute(id: string, payload: {
+    driver_id?: string | null;
+    subcontractor_id?: string | null;
+    vehicle_id?: string | null;
+    status?: string;
+  }): Promise<RouteSummary> {
+    if (USE_MOCK) return mockApi.updateRoute(id, payload) as Promise<RouteSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route');
+    return json.data as RouteSummary;
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
     if (USE_MOCK) return mockApi.getMyDriverRoute(filters);
     const params = new URLSearchParams();

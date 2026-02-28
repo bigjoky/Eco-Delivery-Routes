@@ -119,6 +119,47 @@ let mockVehicles: Array<{
     assigned_driver_id: 'drv-1',
   },
 ];
+let mockRoutes: Array<{
+  id: string;
+  code: string;
+  route_date: string;
+  status: string;
+  driver_id?: string | null;
+  subcontractor_id?: string | null;
+  vehicle_id?: string | null;
+  stops_count: number;
+}> = [
+  {
+    id: 'r-1',
+    code: 'R-AGP-20260227',
+    route_date: '2026-02-27',
+    status: 'in_progress',
+    driver_id: 'drv-1',
+    subcontractor_id: 'sc-1',
+    vehicle_id: 'veh-1',
+    stops_count: 28,
+  },
+  {
+    id: 'r-2',
+    code: 'R-AGP-20260228',
+    route_date: '2026-02-28',
+    status: 'planned',
+    driver_id: null,
+    subcontractor_id: null,
+    vehicle_id: null,
+    stops_count: 24,
+  },
+  {
+    id: 'r-3',
+    code: 'R-AGP-20260301',
+    route_date: '2026-03-01',
+    status: 'completed',
+    driver_id: null,
+    subcontractor_id: null,
+    vehicle_id: null,
+    stops_count: 31,
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -553,11 +594,15 @@ export const mockApi = {
     sort?: string;
     dir?: 'asc' | 'desc';
   } = {}) {
-    let rows = [
-      { id: 'r-1', code: 'R-AGP-20260227', route_date: '2026-02-27', status: 'in_progress', stops_count: 28 },
-      { id: 'r-2', code: 'R-AGP-20260228', route_date: '2026-02-28', status: 'planned', stops_count: 24 },
-      { id: 'r-3', code: 'R-AGP-20260301', route_date: '2026-03-01', status: 'completed', stops_count: 31 },
-    ];
+    let rows = mockRoutes.map((row) => {
+      const vehicle = row.vehicle_id ? mockVehicles.find((item) => item.id === row.vehicle_id) : null;
+      const driver = row.driver_id ? mockDrivers.find((item) => item.id === row.driver_id) : null;
+      return {
+        ...row,
+        driver_code: driver?.code ?? null,
+        vehicle_code: vehicle?.code ?? null,
+      };
+    });
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
     }
@@ -606,12 +651,10 @@ export const mockApi = {
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
-    const route = {
-      id: 'r-1',
-      code: 'R-AGP-20260227',
-      route_date: '2026-02-27',
-      status: 'in_progress',
-    };
+    const route = mockRoutes.find((row) => row.id === 'r-1');
+    if (!route) {
+      return { route: null, stops: [] };
+    }
     if (filters.routeDate && filters.routeDate !== route.route_date) {
       return { route: null, stops: [] };
     }
@@ -622,6 +665,34 @@ export const mockApi = {
       driver: { id: 'drv-1', code: 'DRV-AGP-001', name: 'Driver Demo' },
       route,
       stops: await this.getRouteStops(route.id),
+    };
+  },
+
+  async updateRoute(id: string, payload: {
+    driver_id?: string | null;
+    subcontractor_id?: string | null;
+    vehicle_id?: string | null;
+    status?: string;
+  }) {
+    const index = mockRoutes.findIndex((row) => row.id === id);
+    if (index < 0) {
+      throw new Error('Route not found');
+    }
+    const current = mockRoutes[index];
+    const next = {
+      ...current,
+      status: payload.status ?? current.status,
+      subcontractor_id: payload.subcontractor_id !== undefined ? payload.subcontractor_id : current.subcontractor_id,
+      driver_id: payload.driver_id !== undefined ? payload.driver_id : current.driver_id,
+      vehicle_id: payload.vehicle_id !== undefined ? payload.vehicle_id : current.vehicle_id,
+    };
+    mockRoutes[index] = next;
+    const vehicle = next.vehicle_id ? mockVehicles.find((item) => item.id === next.vehicle_id) : null;
+    const driver = next.driver_id ? mockDrivers.find((item) => item.id === next.driver_id) : null;
+    return {
+      ...next,
+      driver_code: driver?.code ?? null,
+      vehicle_code: vehicle?.code ?? null,
     };
   },
 

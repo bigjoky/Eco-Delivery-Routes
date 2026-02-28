@@ -56,6 +56,11 @@ export type RouteSummary = {
   code: string;
   route_date: string;
   status: string;
+  driver_id?: string | null;
+  driver_code?: string | null;
+  subcontractor_id?: string | null;
+  vehicle_id?: string | null;
+  vehicle_code?: string | null;
   stops_count?: number;
 };
 

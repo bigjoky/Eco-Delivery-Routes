@@ -1269,6 +1269,25 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /routes/{id}:
+    patch:
+      tags: [Routes]
+      summary: Actualizar asignaciones/estado de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteRequest'
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Ruta no encontrada }
+
   /routes/{id}/stops:
     get:
       tags: [Routes]
@@ -1981,6 +2000,14 @@ components:
         route_date: { type: string, format: date }
         driver_id: { type: string, format: uuid }
         subcontractor_id: { type: string, format: uuid }
+        vehicle_id: { type: string, format: uuid }
+    UpdateRouteRequest:
+      type: object
+      properties:
+        driver_id: { type: string, format: uuid, nullable: true }
+        subcontractor_id: { type: string, format: uuid, nullable: true }
+        vehicle_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, nullable: true }
     CreatePickupRequest:
       type: object
       required: [hub_id, reference, pickup_type]

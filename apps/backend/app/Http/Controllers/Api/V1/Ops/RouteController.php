@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class RouteController extends Controller
 {
@@ -68,8 +69,15 @@ class RouteController extends Controller
         $total = $totalQuery->count();
 
         $itemsQuery = DB::table('routes')
+            ->leftJoin('drivers', 'drivers.id', '=', 'routes.driver_id')
+            ->leftJoin('vehicles', 'vehicles.id', '=', 'routes.vehicle_id')
             ->leftJoin('route_stops', 'route_stops.route_id', '=', 'routes.id')
-            ->select('routes.*', DB::raw('count(route_stops.id) as stops_count'))
+            ->select(
+                'routes.*',
+                DB::raw('max(drivers.code) as driver_code'),
+                DB::raw('max(vehicles.code) as vehicle_code'),
+                DB::raw('count(route_stops.id) as stops_count')
+            )
             ->groupBy('routes.id');
         $applyFilters($itemsQuery);
 
@@ -102,9 +110,11 @@ class RouteController extends Controller
             'hub_id' => ['required', 'uuid'],
             'code' => ['required', 'string', 'max:60'],
             'route_date' => ['required', 'date'],
-            'driver_id' => ['nullable', 'uuid'],
-            'subcontractor_id' => ['nullable', 'uuid'],
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
+            'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
         ]);
+        $this->assertAssignmentConsistency($payload);
 
         $id = (string) Str::uuid();
         DB::table('routes')->insert([
@@ -114,12 +124,110 @@ class RouteController extends Controller
             'route_date' => $payload['route_date'],
             'driver_id' => $payload['driver_id'] ?? null,
             'subcontractor_id' => $payload['subcontractor_id'] ?? null,
+            'vehicle_id' => $payload['vehicle_id'] ?? null,
             'status' => 'planned',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        return response()->json(['data' => DB::table('routes')->where('id', $id)->first()], 201);
+        return response()->json(['data' => $this->fetchRouteWithAssignments($id)], 201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
+            'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
+            'status' => ['nullable', 'string', 'max:40'],
+        ]);
+        $merged = [
+            'driver_id' => array_key_exists('driver_id', $payload) ? $payload['driver_id'] : $route->driver_id,
+            'subcontractor_id' => array_key_exists('subcontractor_id', $payload) ? $payload['subcontractor_id'] : $route->subcontractor_id,
+            'vehicle_id' => array_key_exists('vehicle_id', $payload) ? $payload['vehicle_id'] : $route->vehicle_id,
+        ];
+        $this->assertAssignmentConsistency($merged);
+
+        if ($payload === []) {
+            return response()->json(['data' => $this->fetchRouteWithAssignments($id)]);
+        }
+
+        DB::table('routes')
+            ->where('id', $id)
+            ->update([
+                ...$payload,
+                'updated_at' => now(),
+            ]);
+
+        return response()->json(['data' => $this->fetchRouteWithAssignments($id)]);
+    }
+
+    private function fetchRouteWithAssignments(string $id): ?object
+    {
+        return DB::table('routes')
+            ->leftJoin('drivers', 'drivers.id', '=', 'routes.driver_id')
+            ->leftJoin('vehicles', 'vehicles.id', '=', 'routes.vehicle_id')
+            ->where('routes.id', $id)
+            ->select(
+                'routes.*',
+                DB::raw('drivers.code as driver_code'),
+                DB::raw('vehicles.code as vehicle_code')
+            )
+            ->first();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertAssignmentConsistency(array $payload): void
+    {
+        $driver = null;
+        $vehicle = null;
+        if (!empty($payload['driver_id'])) {
+            $driver = DB::table('drivers')
+                ->where('id', $payload['driver_id'])
+                ->first(['id', 'subcontractor_id']);
+        }
+        if (!empty($payload['vehicle_id'])) {
+            $vehicle = DB::table('vehicles')
+                ->where('id', $payload['vehicle_id'])
+                ->first(['id', 'subcontractor_id', 'assigned_driver_id']);
+        }
+
+        $subcontractorId = $payload['subcontractor_id'] ?? null;
+        if ($subcontractorId && $driver && $driver->subcontractor_id && $driver->subcontractor_id !== $subcontractorId) {
+            throw ValidationException::withMessages([
+                'driver_id' => ['Driver does not belong to selected subcontractor.'],
+            ]);
+        }
+        if ($subcontractorId && $vehicle && $vehicle->subcontractor_id && $vehicle->subcontractor_id !== $subcontractorId) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => ['Vehicle does not belong to selected subcontractor.'],
+            ]);
+        }
+        if ($driver && $vehicle && $driver->subcontractor_id && $vehicle->subcontractor_id && $driver->subcontractor_id !== $vehicle->subcontractor_id) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => ['Vehicle subcontractor must match driver subcontractor.'],
+            ]);
+        }
+        if ($driver && $vehicle && $vehicle->assigned_driver_id && $vehicle->assigned_driver_id !== $driver->id) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => ['Vehicle is assigned to a different driver.'],
+            ]);
+        }
     }
 
     public function stops(Request $request, string $id): JsonResponse

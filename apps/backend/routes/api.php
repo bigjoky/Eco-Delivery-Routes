@@ -57,6 +57,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::post('routes', [RouteController::class, 'store']);
+        Route::patch('routes/{id}', [RouteController::class, 'update']);
         Route::get('routes/{id}/stops', [RouteController::class, 'stops']);
 
         Route::get('pickups', [PickupController::class, 'index']);

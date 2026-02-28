@@ -48,6 +48,8 @@ export function RoutesPage() {
                   <TableHead>Codigo</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Conductor</TableHead>
+                  <TableHead>Vehiculo</TableHead>
                   <TableHead>Paradas</TableHead>
                 </TableRow>
               </TableHeader>
@@ -59,6 +61,8 @@ export function RoutesPage() {
                     </TableCell>
                     <TableCell>{item.route_date}</TableCell>
                     <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>
+                    <TableCell>{item.driver_code ?? '-'}</TableCell>
+                    <TableCell>{item.vehicle_code ?? '-'}</TableCell>
                     <TableCell>{item.stops_count ?? 0}</TableCell>
                   </TableRow>
                 ))}

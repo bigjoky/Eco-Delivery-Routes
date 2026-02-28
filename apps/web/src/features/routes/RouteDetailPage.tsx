@@ -1,22 +1,131 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { RouteStopSummary } from '../../core/api/types';
+import { DriverSummary, RouteStopSummary, RouteSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 export function RouteDetailPage() {
   const { id } = useParams();
   const [stops, setStops] = useState<RouteStopSummary[]>([]);
+  const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
+  const [drivers, setDrivers] = useState<DriverSummary[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [route, setRoute] = useState<RouteSummary | null>(null);
+  const [subcontractorId, setSubcontractorId] = useState('');
+  const [driverId, setDriverId] = useState('');
+  const [vehicleId, setVehicleId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!id) return;
-    apiClient.getRouteStops(id).then(setStops);
+    setError('');
+    apiClient.getRouteStops(id).then(setStops).catch(() => setStops([]));
+    apiClient.getSubcontractors({ limit: 100 }).then(setSubcontractors).catch(() => setSubcontractors([]));
+    apiClient
+      .getDrivers({ status: 'active', limit: 100 })
+      .then(setDrivers)
+      .catch(() => setDrivers([]));
+    apiClient
+      .getVehicles({ status: 'active', limit: 100 })
+      .then(setVehicles)
+      .catch(() => setVehicles([]));
+    apiClient
+      .getRoutes({ page: 1, perPage: 100, sort: 'route_date', dir: 'desc' })
+      .then((result) => {
+        const selected = result.data.find((item) => item.id === id) ?? null;
+        setRoute(selected);
+        setSubcontractorId(selected?.subcontractor_id ?? '');
+        setDriverId(selected?.driver_id ?? '');
+        setVehicleId(selected?.vehicle_id ?? '');
+      })
+      .catch(() => {
+        setRoute(null);
+        setSubcontractorId('');
+        setDriverId('');
+        setVehicleId('');
+      });
   }, [id]);
+
+  const filteredDrivers = subcontractorId
+    ? drivers.filter((item) => !item.subcontractor_id || item.subcontractor_id === subcontractorId)
+    : drivers;
+
+  const filteredVehicles = subcontractorId
+    ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === subcontractorId)
+    : vehicles;
+
+  const saveVehicleAssignment = async () => {
+    if (!id) return;
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await apiClient.updateRoute(id, {
+        subcontractor_id: subcontractorId || null,
+        driver_id: driverId || null,
+        vehicle_id: vehicleId || null,
+      });
+      setRoute(updated);
+      setSubcontractorId(updated.subcontractor_id ?? '');
+      setDriverId(updated.driver_id ?? '');
+      setVehicleId(updated.vehicle_id ?? '');
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la ruta');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <section className="page-grid">
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Asignaciones de Ruta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="inline-actions">
+            <label htmlFor="route-subcontractor">Subcontrata</label>
+            <select id="route-subcontractor" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
+              <option value="">Sin asignar</option>
+              {subcontractors.map((subcontractor) => (
+                <option key={subcontractor.id} value={subcontractor.id}>
+                  {subcontractor.legal_name}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="route-driver">Conductor</label>
+            <select id="route-driver" value={driverId} onChange={(event) => setDriverId(event.target.value)}>
+              <option value="">Sin asignar</option>
+              {filteredDrivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.code} - {driver.name}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="route-vehicle">Vehiculo</label>
+            <select id="route-vehicle" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>
+              <option value="">Sin asignar</option>
+              {filteredVehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.code} {vehicle.plate_number ? `(${vehicle.plate_number})` : ''}
+                </option>
+              ))}
+            </select>
+            <Button type="button" onClick={saveVehicleAssignment} disabled={saving}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+          <div className="helper">
+            Ruta: {route?.code ?? id}
+            {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
+            {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
+          </div>
+          {error ? <div className="helper">{error}</div> : null}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Paradas de Ruta</CardTitle>
