@@ -173,6 +173,13 @@ export type QualityThresholdAlertSummary = {
   date_to: string;
 };
 
+export type QualityThresholdAlertTopScope = {
+  scope_type: string;
+  scope_id?: string | null;
+  scope_label?: string | null;
+  alerts_count: number;
+};
+
 export type QualityRouteBreakdown = {
   scope_type: 'route';
   scope_id: string;

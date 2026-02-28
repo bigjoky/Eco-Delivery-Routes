@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, QualityThresholdAlertSummary, QualityThresholdHistoryEntry, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, QualityThresholdAlertSummary, QualityThresholdAlertTopScope, QualityThresholdHistoryEntry, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
 
 export function QualityPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<QualitySnapshot[]>([]);
   const [scopeType, setScopeType] = useState<'all' | 'driver' | 'route' | 'subcontractor'>('all');
   const [scopeId, setScopeId] = useState('');
@@ -45,12 +46,33 @@ export function QualityPage() {
   const [thresholdAuditRows, setThresholdAuditRows] = useState<QualityThresholdHistoryEntry[]>([]);
   const [thresholdAlertSummary, setThresholdAlertSummary] = useState<QualityThresholdAlertSummary | null>(null);
   const [thresholdAlertRows, setThresholdAlertRows] = useState<QualityThresholdHistoryEntry[]>([]);
-  const [thresholdAlertPage, setThresholdAlertPage] = useState(1);
+  const [thresholdAlertTopScopes, setThresholdAlertTopScopes] = useState<QualityThresholdAlertTopScope[]>([]);
+  const [alertScopeType, setAlertScopeType] = useState<'all' | 'global' | 'role' | 'user'>(() => {
+    const raw = searchParams.get('alert_scope_type');
+    return raw === 'global' || raw === 'role' || raw === 'user' ? raw : 'all';
+  });
+  const [alertScopeId, setAlertScopeId] = useState<string>(() => searchParams.get('alert_scope_id') ?? '');
+  const [thresholdAlertPage, setThresholdAlertPage] = useState<number>(() => {
+    const parsed = Number(searchParams.get('alert_page') ?? '1');
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  });
   const [thresholdAlertLastPage, setThresholdAlertLastPage] = useState(1);
   const [displayTimeZone, setDisplayTimeZone] = useState<string>(
     Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid'
   );
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
+
+  useEffect(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (alertScopeType === 'all') next.delete('alert_scope_type');
+      else next.set('alert_scope_type', alertScopeType);
+      if (alertScopeId) next.set('alert_scope_id', alertScopeId);
+      else next.delete('alert_scope_id');
+      next.set('alert_page', String(thresholdAlertPage));
+      return next;
+    }, { replace: true });
+  }, [alertScopeType, alertScopeId, thresholdAlertPage, setSearchParams]);
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -80,22 +102,31 @@ export function QualityPage() {
       .catch(() => setThresholdAuditRows([]));
     apiClient
       .getQualityThresholdAlertSummary({
-        scopeType: thresholdScopeType,
-        scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+        scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+        scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
         dateFrom: periodStart || undefined,
         dateTo: periodEnd || undefined,
       })
       .then(setThresholdAlertSummary)
       .catch(() => setThresholdAlertSummary(null));
-    setThresholdAlertPage(1);
-  }, [thresholdScopeType, thresholdScopeId]);
+    apiClient
+      .getQualityThresholdAlertTopScopes({
+        scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+        scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
+        dateFrom: periodStart || undefined,
+        dateTo: periodEnd || undefined,
+        limit: 5,
+      })
+      .then(setThresholdAlertTopScopes)
+      .catch(() => setThresholdAlertTopScopes([]));
+  }, [thresholdScopeType, thresholdScopeId, alertScopeType, alertScopeId, periodStart, periodEnd]);
 
   useEffect(() => {
     apiClient
       .getQualityThresholdHistory({
         event: 'quality.threshold.alert.large_delta',
-        scopeType: thresholdScopeType,
-        scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+        scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+        scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
         dateFrom: periodStart || undefined,
         dateTo: periodEnd || undefined,
         page: thresholdAlertPage,
@@ -109,7 +140,7 @@ export function QualityPage() {
         setThresholdAlertRows([]);
         setThresholdAlertLastPage(1);
       });
-  }, [thresholdScopeType, thresholdScopeId, periodStart, periodEnd, thresholdAlertPage]);
+  }, [alertScopeType, alertScopeId, periodStart, periodEnd, thresholdAlertPage]);
 
   useEffect(() => {
     apiClient
@@ -372,8 +403,8 @@ export function QualityPage() {
                   })
                   .then(() =>
                     apiClient.getQualityThresholdAlertSummary({
-                      scopeType: thresholdScopeType,
-                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+                      scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
                       dateFrom: periodStart || undefined,
                       dateTo: periodEnd || undefined,
                     })
@@ -381,6 +412,16 @@ export function QualityPage() {
                   .then((summary) => {
                     if (summary) setThresholdAlertSummary(summary);
                     setThresholdAlertPage(1);
+                    return apiClient.getQualityThresholdAlertTopScopes({
+                      scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+                      scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                      limit: 5,
+                    });
+                  })
+                  .then((rows) => {
+                    if (rows) setThresholdAlertTopScopes(rows);
                   })
                   .catch(() => setThresholdSaveMessage('No se pudo guardar el umbral'))
               }
@@ -423,8 +464,8 @@ export function QualityPage() {
                   })
                   .then(() =>
                     apiClient.getQualityThresholdAlertSummary({
-                      scopeType: thresholdScopeType,
-                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+                      scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
                       dateFrom: periodStart || undefined,
                       dateTo: periodEnd || undefined,
                     })
@@ -432,6 +473,16 @@ export function QualityPage() {
                   .then((summary) => {
                     if (summary) setThresholdAlertSummary(summary);
                     setThresholdAlertPage(1);
+                    return apiClient.getQualityThresholdAlertTopScopes({
+                      scopeType: alertScopeType === 'all' ? undefined : alertScopeType,
+                      scopeId: alertScopeType === 'all' || alertScopeType === 'global' ? undefined : (alertScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                      limit: 5,
+                    });
+                  })
+                  .then((rows) => {
+                    if (rows) setThresholdAlertTopScopes(rows);
                   })
                   .catch(() => setThresholdAlertSaveMessage('No se pudo guardar la configuración de alerta'))
               }
@@ -555,6 +606,40 @@ export function QualityPage() {
                 <CardTitle>Notificaciones internas</CardTitle>
               </CardHeader>
               <CardContent>
+                <div className="form-row">
+                  <Select
+                    value={alertScopeType}
+                    onChange={(e) => {
+                      setAlertScopeType(e.target.value as 'all' | 'global' | 'role' | 'user');
+                      setThresholdAlertPage(1);
+                    }}
+                  >
+                    <option value="all">Alertas todos scopes</option>
+                    <option value="global">Scope global</option>
+                    <option value="role">Scope rol</option>
+                    <option value="user">Scope usuario</option>
+                  </Select>
+                  <Input
+                    value={alertScopeId}
+                    onChange={(e) => {
+                      setAlertScopeId(e.target.value);
+                      setThresholdAlertPage(1);
+                    }}
+                    placeholder={alertScopeType === 'role' ? 'scope_id rol (ej: driver)' : 'scope_id (opcional)'}
+                    disabled={alertScopeType === 'all' || alertScopeType === 'global'}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setAlertScopeType('all');
+                      setAlertScopeId('');
+                      setThresholdAlertPage(1);
+                    }}
+                  >
+                    Limpiar filtro alertas
+                  </Button>
+                </div>
                 <p>
                   Alertas por cambio brusco de umbral: <strong>{thresholdAlertSummary?.count ?? 0}</strong> (ventana: {thresholdAlertSummary?.window_hours ?? thresholdAlertWindowText}h)
                 </p>
@@ -563,6 +648,26 @@ export function QualityPage() {
                     Ultima alerta: {formatAuditTimestamp(latestLargeDeltaAlert.created_at)} por{' '}
                     {latestLargeDeltaAlert.actor_name ?? latestLargeDeltaAlert.actor_user_id ?? 'sistema'}.
                   </p>
+                )}
+                {thresholdAlertTopScopes.length > 0 && (
+                  <TableWrapper>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Top scope</TableHead>
+                          <TableHead>Alertas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {thresholdAlertTopScopes.map((scope) => (
+                          <TableRow key={`top-scope-${scope.scope_type}-${scope.scope_id ?? 'null'}`}>
+                            <TableCell>{scope.scope_type} · {scope.scope_label ?? scope.scope_id ?? '-'}</TableCell>
+                            <TableCell>{scope.alerts_count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableWrapper>
                 )}
                 <TableWrapper>
                   <Table>

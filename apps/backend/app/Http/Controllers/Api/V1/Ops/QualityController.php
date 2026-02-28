@@ -1054,6 +1054,63 @@ class QualityController extends Controller
         ]);
     }
 
+    public function thresholdHistoryAlertsTopScopes(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $config = $this->resolveThresholdAlertConfig();
+        $windowHours = $config['window_hours'];
+        $dateFrom = (string) $request->query('date_from', now()->subHours($windowHours)->toDateString());
+        $dateTo = (string) $request->query('date_to', now()->toDateString());
+        $limit = max(1, min((int) $request->query('limit', 10), 100));
+
+        $query = $this->buildThresholdHistoryQuery($request, 'quality.threshold.alert.large_delta')
+            ->whereDate('audit_logs.created_at', '>=', $dateFrom)
+            ->whereDate('audit_logs.created_at', '<=', $dateTo);
+
+        $rows = $query->get()
+            ->map(function ($row) {
+                $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+                $scopeType = (string) ($metadata['scope_type'] ?? 'unknown');
+                $scopeId = isset($metadata['scope_id']) ? (string) $metadata['scope_id'] : null;
+                return [
+                    'scope_type' => $scopeType,
+                    'scope_id' => $scopeId,
+                ];
+            })
+            ->groupBy(fn (array $row) => ($row['scope_type'] ?? 'unknown') . '|' . (string) ($row['scope_id'] ?? ''))
+            ->map(function ($items) {
+                $first = $items->first();
+                $scopeType = (string) ($first['scope_type'] ?? 'unknown');
+                $scopeId = isset($first['scope_id']) ? (string) $first['scope_id'] : null;
+                return [
+                    'scope_type' => $scopeType,
+                    'scope_id' => $scopeId,
+                    'scope_label' => $this->resolveScopeLabel($scopeType, $scopeId),
+                    'alerts_count' => $items->count(),
+                ];
+            })
+            ->sortByDesc('alerts_count')
+            ->values()
+            ->take($limit)
+            ->values();
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'event' => 'quality.threshold.alert.large_delta',
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'limit' => $limit,
+                'window_hours' => $windowHours,
+            ],
+        ]);
+    }
+
     public function thresholdHistoryExportCsv(Request $request): Response|JsonResponse
     {
         /** @var User $actor */
@@ -1230,6 +1287,27 @@ class QualityController extends Controller
             'window_hours' => $defaultWindowHours,
             'source_type' => 'default',
         ];
+    }
+
+    private function resolveScopeLabel(string $scopeType, ?string $scopeId): ?string
+    {
+        if ($scopeType === 'role' && $scopeId !== null && $scopeId !== '') {
+            return DB::table('roles')->where('code', $scopeId)->value('name') ?? $scopeId;
+        }
+        if ($scopeType === 'user' && $scopeId !== null && $scopeId !== '') {
+            return DB::table('users')->where('id', $scopeId)->value('name') ?? $scopeId;
+        }
+        if ($scopeType === 'route' && $scopeId !== null && $scopeId !== '') {
+            return DB::table('routes')->where('id', $scopeId)->value('code') ?? $scopeId;
+        }
+        if ($scopeType === 'subcontractor' && $scopeId !== null && $scopeId !== '') {
+            return DB::table('subcontractors')->where('id', $scopeId)->value('legal_name') ?? $scopeId;
+        }
+        if ($scopeType === 'global') {
+            return 'Global';
+        }
+
+        return $scopeId;
     }
 
     private function buildThresholdHistoryQuery(Request $request, ?string $defaultEvent = null)

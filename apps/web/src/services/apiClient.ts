@@ -15,6 +15,7 @@ import {
   QualityThresholdConfig,
   QualityThresholdAlertSettings,
   QualityThresholdAlertSummary,
+  QualityThresholdAlertTopScope,
   QualityThresholdHistoryEntry,
   QualityTopRoutesResult,
   RoleSummary,
@@ -830,6 +831,48 @@ export const apiClient = {
     });
     const json = await response.json();
     return json.data as QualityThresholdAlertSummary;
+  },
+
+  async getQualityThresholdAlertTopScopes(filters: {
+    scopeType?: 'global' | 'role' | 'user';
+    scopeId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  } = {}): Promise<QualityThresholdAlertTopScope[]> {
+    if (USE_MOCK) {
+      const history = await mockApi.getQualityThresholdHistory({ event: 'quality.threshold.alert.large_delta' });
+      const grouped = new Map<string, QualityThresholdAlertTopScope>();
+      for (const row of history) {
+        const key = `${row.scope_type ?? 'unknown'}|${row.scope_id ?? ''}`;
+        const current = grouped.get(key);
+        if (current) {
+          current.alerts_count += 1;
+        } else {
+          grouped.set(key, {
+            scope_type: row.scope_type ?? 'unknown',
+            scope_id: row.scope_id ?? null,
+            scope_label: row.scope_id ?? null,
+            alerts_count: 1,
+          });
+        }
+      }
+      return Array.from(grouped.values()).sort((a, b) => b.alerts_count - a.alerts_count).slice(0, filters.limit ?? 10);
+    }
+
+    const params = new URLSearchParams();
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (typeof filters.limit === 'number') params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_BASE_URL}/kpis/quality/threshold/history/alerts/top-scopes${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    return (json.data ?? []) as QualityThresholdAlertTopScope[];
   },
 
   async exportQualityThresholdHistoryCsv(filters: {

@@ -1474,6 +1474,30 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /kpis/quality/threshold/history/alerts/top-scopes:
+    get:
+      tags: [Quality]
+      summary: Top scopes con mayor número de alertas de cambios bruscos de umbral
+      parameters:
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [global, role, user, route, subcontractor] }
+        - in: query
+          name: scope_id
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /kpis/quality/threshold/history/export.csv:
     get:
       tags: [Quality]
