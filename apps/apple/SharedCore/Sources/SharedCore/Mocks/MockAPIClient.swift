@@ -314,6 +314,14 @@ public final class MockAPIClient {
         ]
     }
 
+    public func qualityThresholdAlertTopScopes(dateFrom: String?, dateTo: String?, limit: Int?) async throws -> [QualityThresholdAlertTopScope] {
+        _ = (dateFrom, dateTo)
+        return Array([
+            QualityThresholdAlertTopScope(scopeType: "role", scopeId: "driver", scopeLabel: "Driver", alertsCount: 3),
+            QualityThresholdAlertTopScope(scopeType: "global", scopeId: nil, scopeLabel: "Global", alertsCount: 1),
+        ].prefix(max(1, min(limit ?? 5, 100))))
+    }
+
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
         _ = (periodStart, periodEnd)
         return QualityRouteBreakdown(

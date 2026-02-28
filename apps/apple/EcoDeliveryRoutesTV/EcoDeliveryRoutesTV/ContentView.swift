@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var subcontractorBreakdown: TVSubcontractorBreakdown?
     @State private var qualityThreshold: Double = 95
     @State private var thresholdDeltaAlertCount: Int = 0
+    @State private var thresholdDeltaTopScopes: [TVThresholdAlertTopScope] = []
     @State private var thresholdDeltaWindowHours: Int = 24
     @State private var thresholdDeltaTrigger: Double = 5
     @State private var lastRefreshText: String = "Sin refresco"
@@ -158,6 +159,13 @@ struct ContentView: View {
                 Text("Cambios bruscos umbral: \(thresholdDeltaAlertCount) en \(thresholdDeltaWindowHours)h (trigger ±\(thresholdDeltaTrigger, specifier: "%.2f"))")
                     .font(.caption)
                     .foregroundStyle(thresholdDeltaAlertCount > 0 ? .red : .secondary)
+                if !thresholdDeltaTopScopes.isEmpty {
+                    ForEach(thresholdDeltaTopScopes.prefix(5)) { scope in
+                        Text("Top: \(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-") (\(scope.alertsCount))")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             Text(lastRefreshText)
@@ -189,6 +197,7 @@ struct ContentView: View {
         subcontractorBreakdown = payload.subcontractorBreakdown
         qualityThreshold = payload.threshold
         thresholdDeltaAlertCount = payload.thresholdDeltaAlertCount
+        thresholdDeltaTopScopes = payload.thresholdDeltaTopScopes
         thresholdDeltaWindowHours = payload.thresholdDeltaWindowHours
         thresholdDeltaTrigger = payload.thresholdDeltaTrigger
         statusText = payload.status
@@ -225,9 +234,18 @@ struct TVSnapshot {
     let subcontractorBreakdown: TVSubcontractorBreakdown?
     let threshold: Double
     let thresholdDeltaAlertCount: Int
+    let thresholdDeltaTopScopes: [TVThresholdAlertTopScope]
     let thresholdDeltaWindowHours: Int
     let thresholdDeltaTrigger: Double
     let status: String
+}
+
+struct TVThresholdAlertTopScope: Identifiable {
+    var id: String { "\(scopeType)|\(scopeId ?? "")" }
+    let scopeType: String
+    let scopeId: String?
+    let scopeLabel: String?
+    let alertsCount: Int
 }
 
 struct TVRouteQuality: Identifiable {
@@ -313,6 +331,7 @@ final class TVMonitorService {
             subcontractorBreakdown: apiSnapshot.subcontractorBreakdown,
             threshold: apiSnapshot.threshold,
             thresholdDeltaAlertCount: apiSnapshot.thresholdDeltaAlertCount,
+            thresholdDeltaTopScopes: apiSnapshot.thresholdDeltaTopScopes,
             thresholdDeltaWindowHours: apiSnapshot.thresholdDeltaWindowHours,
             thresholdDeltaTrigger: apiSnapshot.thresholdDeltaTrigger,
             status: apiSnapshot.status
@@ -328,6 +347,7 @@ final class TVMonitorService {
         subcontractorBreakdown: TVSubcontractorBreakdown?,
         threshold: Double,
         thresholdDeltaAlertCount: Int,
+        thresholdDeltaTopScopes: [TVThresholdAlertTopScope],
         thresholdDeltaWindowHours: Int,
         thresholdDeltaTrigger: Double,
         status: String
@@ -346,6 +366,7 @@ final class TVMonitorService {
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
                 0,
+                [],
                 24,
                 5,
                 "Monitor activo (solo lectura/mock)"
@@ -367,6 +388,7 @@ final class TVMonitorService {
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
                 0,
+                [],
                 24,
                 5,
                 "Monitor activo (URL invalida, fallback mock)"
@@ -404,6 +426,7 @@ final class TVMonitorService {
                     mockSubcontractorBreakdown(),
                     fallbackThreshold,
                     0,
+                    [],
                     24,
                     5,
                     "Monitor fallback (error HTTP API calidad)"
@@ -454,6 +477,7 @@ final class TVMonitorService {
                     mockSubcontractorBreakdown(),
                     fallbackThreshold,
                     0,
+                    [],
                     24,
                     5,
                     "Monitor API sin datos, fallback mock"
@@ -486,6 +510,10 @@ final class TVMonitorService {
                 normalizedBaseURL: normalizedBaseURL,
                 token: token
             )
+            let topScopes = await fetchThresholdDeltaTopScopes(
+                normalizedBaseURL: normalizedBaseURL,
+                token: token
+            )
             return (
                 mappedRoutes,
                 mappedDrivers,
@@ -495,6 +523,7 @@ final class TVMonitorService {
                 subcontractorBreakdown,
                 threshold,
                 deltaAlert.count,
+                topScopes,
                 deltaAlert.windowHours,
                 deltaAlert.deltaTrigger,
                 "Monitor activo (API real)"
@@ -509,6 +538,7 @@ final class TVMonitorService {
                 mockSubcontractorBreakdown(),
                 fallbackThreshold,
                 0,
+                [],
                 24,
                 5,
                 "Monitor fallback (error conexion API)"
@@ -564,6 +594,35 @@ final class TVMonitorService {
             return (count, windowHours, deltaTrigger)
         } catch {
             return (0, defaultWindow, defaultTrigger)
+        }
+    }
+
+    private func fetchThresholdDeltaTopScopes(normalizedBaseURL: String, token: String?) async -> [TVThresholdAlertTopScope] {
+        guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history/alerts/top-scopes?limit=5") else {
+            return []
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return []
+            }
+            let decoded = try JSONDecoder().decode(QualityThresholdTopScopesEnvelope.self, from: data)
+            return decoded.data.map {
+                TVThresholdAlertTopScope(
+                    scopeType: $0.scopeType,
+                    scopeId: $0.scopeId,
+                    scopeLabel: $0.scopeLabel,
+                    alertsCount: $0.alertsCount
+                )
+            }
+        } catch {
+            return []
         }
     }
 
@@ -864,4 +923,22 @@ private struct QualityThresholdHistoryEnvelope: Decodable {
 
 private struct QualityThresholdHistoryPayload: Decodable {
     let event: String
+}
+
+private struct QualityThresholdTopScopesEnvelope: Decodable {
+    let data: [QualityThresholdTopScopePayload]
+}
+
+private struct QualityThresholdTopScopePayload: Decodable {
+    let scopeType: String
+    let scopeId: String?
+    let scopeLabel: String?
+    let alertsCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case scopeType = "scope_type"
+        case scopeId = "scope_id"
+        case scopeLabel = "scope_label"
+        case alertsCount = "alerts_count"
+    }
 }

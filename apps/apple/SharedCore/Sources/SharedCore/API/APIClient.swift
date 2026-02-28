@@ -26,6 +26,7 @@ public protocol APIClientProtocol {
     func updateQualityThreshold(threshold: Double, scopeType: String?, scopeId: String?) async throws -> QualityThresholdConfig
     func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings
     func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry]
+    func qualityThresholdAlertTopScopes(dateFrom: String?, dateTo: String?, limit: Int?) async throws -> [QualityThresholdAlertTopScope]
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
@@ -398,6 +399,25 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(PaginatedResponse<QualityThresholdHistoryEntry>.self, from: data).data
+    }
+
+    public func qualityThresholdAlertTopScopes(dateFrom: String?, dateTo: String?, limit: Int?) async throws -> [QualityThresholdAlertTopScope] {
+        guard let baseURL else {
+            return try await mock.qualityThresholdAlertTopScopes(dateFrom: dateFrom, dateTo: dateTo, limit: limit)
+        }
+
+        let normalizedLimit = max(1, min(limit ?? 5, 100))
+        let url = withQueryItems(
+            baseURL.appending(path: "kpis/quality/threshold/history/alerts/top-scopes"),
+            queryItems: [
+                URLQueryItem(name: "date_from", value: dateFrom),
+                URLQueryItem(name: "date_to", value: dateTo),
+                URLQueryItem(name: "limit", value: String(normalizedLimit)),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataEnvelope<QualityThresholdAlertTopScope>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {
