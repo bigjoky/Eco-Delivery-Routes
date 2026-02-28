@@ -545,6 +545,183 @@ paths:
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear subcontrata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [legal_name]
+              properties:
+                legal_name: { type: string, maxLength: 180 }
+                tax_id: { type: string, nullable: true, maxLength: 60 }
+                status: { type: string, enum: [active, inactive, suspended] }
+                payment_terms: { type: string, maxLength: 80 }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /subcontractors/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar subcontrata
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                legal_name: { type: string, maxLength: 180 }
+                tax_id: { type: string, nullable: true, maxLength: 60 }
+                status: { type: string, enum: [active, inactive, suspended] }
+                payment_terms: { type: string, maxLength: 80 }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /drivers:
+    get:
+      tags: [Ops]
+      summary: Listar drivers
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear driver
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string, maxLength: 60 }
+                name: { type: string, maxLength: 120 }
+                status: { type: string, enum: [active, inactive, suspended] }
+                employment_type: { type: string, enum: [employee, subcontractor] }
+                user_id: { type: string, format: uuid, nullable: true }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                home_hub_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /drivers/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar driver
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                status: { type: string, enum: [active, inactive, suspended] }
+                employment_type: { type: string, enum: [employee, subcontractor] }
+                user_id: { type: string, format: uuid, nullable: true }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                home_hub_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /vehicles:
+    get:
+      tags: [Ops]
+      summary: Listar vehiculos
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear vehiculo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, maxLength: 60 }
+                plate_number: { type: string, maxLength: 20, nullable: true }
+                vehicle_type: { type: string, maxLength: 40 }
+                capacity_kg: { type: integer, minimum: 1, nullable: true }
+                status: { type: string, enum: [active, inactive, maintenance] }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                home_hub_id: { type: string, format: uuid, nullable: true }
+                assigned_driver_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /vehicles/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar vehiculo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plate_number: { type: string, maxLength: 20, nullable: true }
+                vehicle_type: { type: string, maxLength: 40 }
+                capacity_kg: { type: integer, minimum: 1, nullable: true }
+                status: { type: string, enum: [active, inactive, maintenance] }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                home_hub_id: { type: string, format: uuid, nullable: true }
+                assigned_driver_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
 
   /settlements:
     get:

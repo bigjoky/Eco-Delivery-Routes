@@ -48,6 +48,20 @@ class OperationsSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        DB::table('vehicles')->insertOrIgnore([
+            'id' => (string) Str::uuid(),
+            'subcontractor_id' => $subcontractorId,
+            'home_hub_id' => $hubId,
+            'assigned_driver_id' => $driverId,
+            'code' => 'VEH-AGP-001',
+            'plate_number' => '1234-MLG',
+            'vehicle_type' => 'van',
+            'capacity_kg' => 1200,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $routeId = (string) Str::uuid();
         DB::table('routes')->insertOrIgnore([
             'id' => $routeId,

@@ -7,6 +7,7 @@ const menu = [
   { to: '/shipments', label: 'Envios' },
   { to: '/routes', label: 'Rutas' },
   { to: '/incidents', label: 'Incidencias' },
+  { to: '/partners', label: 'Partners' },
   { to: '/tariffs', label: 'Tarifas' },
   { to: '/advances', label: 'Anticipos' },
   { to: '/settlements', label: 'Liquidaciones' },

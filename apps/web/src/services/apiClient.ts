@@ -32,6 +32,8 @@ import {
   SettlementReconciliationTrendRow,
   SettlementRecalculatePreview,
   SubcontractorSummary,
+  DriverSummary,
+  VehicleSummary,
   ShipmentSummary,
   TariffSummary,
   UserSummary,
@@ -1704,6 +1706,150 @@ export const apiClient = {
     });
 
     return parseData<SubcontractorSummary>(response);
+  },
+
+  async createSubcontractor(payload: {
+    legal_name: string;
+    tax_id?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    payment_terms?: string;
+  }): Promise<SubcontractorSummary> {
+    if (USE_MOCK) return mockApi.createSubcontractor(payload) as Promise<SubcontractorSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/subcontractors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create subcontractor');
+    return json.data as SubcontractorSummary;
+  },
+
+  async updateSubcontractor(id: string, payload: {
+    legal_name?: string;
+    tax_id?: string | null;
+    status?: 'active' | 'inactive' | 'suspended';
+    payment_terms?: string;
+  }): Promise<SubcontractorSummary> {
+    if (USE_MOCK) return mockApi.updateSubcontractor(id, payload) as Promise<SubcontractorSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update subcontractor');
+    return json.data as SubcontractorSummary;
+  },
+
+  async getDrivers(filters: {
+    subcontractorId?: string;
+    status?: string;
+    limit?: number;
+  } = {}): Promise<DriverSummary[]> {
+    if (USE_MOCK) return mockApi.getDrivers(filters) as Promise<DriverSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/drivers${suffix}`);
+    return parseData<DriverSummary>(response);
+  },
+
+  async createDriver(payload: {
+    code: string;
+    name: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employment_type?: 'employee' | 'subcontractor';
+    user_id?: string;
+    subcontractor_id?: string;
+    home_hub_id?: string;
+  }): Promise<DriverSummary> {
+    if (USE_MOCK) return mockApi.createDriver(payload) as Promise<DriverSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/drivers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create driver');
+    return json.data as DriverSummary;
+  },
+
+  async updateDriver(id: string, payload: {
+    name?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employment_type?: 'employee' | 'subcontractor';
+    user_id?: string | null;
+    subcontractor_id?: string | null;
+    home_hub_id?: string | null;
+  }): Promise<DriverSummary> {
+    if (USE_MOCK) return mockApi.updateDriver(id, payload) as Promise<DriverSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/drivers/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update driver');
+    return json.data as DriverSummary;
+  },
+
+  async getVehicles(filters: {
+    subcontractorId?: string;
+    status?: string;
+    limit?: number;
+  } = {}): Promise<VehicleSummary[]> {
+    if (USE_MOCK) return mockApi.getVehicles(filters) as Promise<VehicleSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicles${suffix}`);
+    return parseData<VehicleSummary>(response);
+  },
+
+  async createVehicle(payload: {
+    code: string;
+    plate_number?: string;
+    vehicle_type?: string;
+    capacity_kg?: number;
+    status?: 'active' | 'inactive' | 'maintenance';
+    subcontractor_id?: string;
+    home_hub_id?: string;
+    assigned_driver_id?: string;
+  }): Promise<VehicleSummary> {
+    if (USE_MOCK) return mockApi.createVehicle(payload) as Promise<VehicleSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create vehicle');
+    return json.data as VehicleSummary;
+  },
+
+  async updateVehicle(id: string, payload: {
+    plate_number?: string | null;
+    vehicle_type?: string;
+    capacity_kg?: number | null;
+    status?: 'active' | 'inactive' | 'maintenance';
+    subcontractor_id?: string | null;
+    home_hub_id?: string | null;
+    assigned_driver_id?: string | null;
+  }): Promise<VehicleSummary> {
+    if (USE_MOCK) return mockApi.updateVehicle(id, payload) as Promise<VehicleSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicles/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update vehicle');
+    return json.data as VehicleSummary;
   },
 
   async getAdvances(filters: {

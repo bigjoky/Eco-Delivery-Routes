@@ -5,6 +5,7 @@ import { sessionStore } from '../core/auth/sessionStore';
 import { AdvancesPage } from '../features/advances/AdvancesPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
+import { PartnersPage } from '../features/partners/PartnersPage';
 import { QualityPage } from '../features/quality/QualityPage';
 import { RolesPage } from '../features/roles/RolesPage';
 import { RoleDetailPage } from '../features/roles/RoleDetailPage';
@@ -35,6 +36,7 @@ export function App() {
         <Route path="/routes" element={isAuthenticated ? <RoutesPage /> : <Navigate to="/" replace />} />
         <Route path="/routes/:id" element={isAuthenticated ? <RouteDetailPage /> : <Navigate to="/" replace />} />
         <Route path="/incidents" element={isAuthenticated ? <IncidentsPage /> : <Navigate to="/" replace />} />
+        <Route path="/partners" element={isAuthenticated ? <PartnersPage /> : <Navigate to="/" replace />} />
         <Route path="/tariffs" element={isAuthenticated ? <TariffsPage /> : <Navigate to="/" replace />} />
         <Route path="/advances" element={isAuthenticated ? <AdvancesPage /> : <Navigate to="/" replace />} />
         <Route path="/settlements" element={isAuthenticated ? <SettlementsPage /> : <Navigate to="/" replace />} />

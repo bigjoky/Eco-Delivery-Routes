@@ -58,6 +58,67 @@ let mockUsers: Array<{
     role_ids: ['r-2'],
   },
 ];
+let subcontractorSeq = 2;
+let driverSeq = 2;
+let vehicleSeq = 2;
+let mockSubcontractors: Array<{
+  id: string;
+  legal_name: string;
+  tax_id?: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  payment_terms?: string | null;
+}> = [
+  {
+    id: 'sc-1',
+    legal_name: 'Ruta Sur Express SL',
+    tax_id: 'B00000001',
+    status: 'active',
+    payment_terms: 'monthly',
+  },
+];
+let mockDrivers: Array<{
+  id: string;
+  code: string;
+  name: string;
+  status: 'active' | 'inactive' | 'suspended';
+  employment_type: 'employee' | 'subcontractor';
+  user_id?: string | null;
+  subcontractor_id?: string | null;
+  home_hub_id?: string | null;
+}> = [
+  {
+    id: 'drv-1',
+    code: 'DRV-AGP-001',
+    name: 'Driver Demo',
+    status: 'active',
+    employment_type: 'subcontractor',
+    subcontractor_id: 'sc-1',
+    home_hub_id: 'hub-1',
+  },
+];
+let mockVehicles: Array<{
+  id: string;
+  code: string;
+  plate_number?: string | null;
+  vehicle_type: string;
+  capacity_kg?: number | null;
+  status: 'active' | 'inactive' | 'maintenance';
+  subcontractor_id?: string | null;
+  home_hub_id?: string | null;
+  assigned_driver_id?: string | null;
+}> = [
+  {
+    id: 'veh-1',
+    code: 'VEH-AGP-001',
+    plate_number: '1234-MLG',
+    vehicle_type: 'van',
+    capacity_kg: 1200,
+    status: 'active',
+    subcontractor_id: 'sc-1',
+    home_hub_id: 'hub-1',
+    assigned_driver_id: 'drv-1',
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -1406,15 +1467,157 @@ export const mockApi = {
     return;
   },
 
-  async getSubcontractors(_: { q?: string; limit?: number }) {
-    return [
-      {
-        id: 'sc-1',
-        legal_name: 'Ruta Sur Express SL',
-        tax_id: 'B00000001',
-        status: 'active',
-      },
-    ];
+  async getSubcontractors(filters: { q?: string; limit?: number }) {
+    let rows = [...mockSubcontractors];
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      rows = rows.filter((item) => item.legal_name.toLowerCase().includes(q) || (item.tax_id ?? '').toLowerCase().includes(q));
+    }
+    return rows.slice(0, filters.limit ?? 20);
+  },
+
+  async createSubcontractor(payload: {
+    legal_name: string;
+    tax_id?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    payment_terms?: string;
+  }) {
+    const created = {
+      id: `sc-${subcontractorSeq++}`,
+      legal_name: payload.legal_name,
+      tax_id: payload.tax_id ?? null,
+      status: payload.status ?? 'active',
+      payment_terms: payload.payment_terms ?? 'monthly',
+    };
+    mockSubcontractors = [created, ...mockSubcontractors];
+    return created;
+  },
+
+  async updateSubcontractor(id: string, payload: {
+    legal_name?: string;
+    tax_id?: string | null;
+    status?: 'active' | 'inactive' | 'suspended';
+    payment_terms?: string;
+  }) {
+    const index = mockSubcontractors.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Subcontractor not found');
+    mockSubcontractors[index] = {
+      ...mockSubcontractors[index],
+      ...payload,
+    };
+    return mockSubcontractors[index];
+  },
+
+  async getDrivers(filters: { subcontractorId?: string; status?: string; limit?: number }) {
+    let rows = [...mockDrivers];
+    if (filters.subcontractorId) {
+      rows = rows.filter((item) => item.subcontractor_id === filters.subcontractorId);
+    }
+    if (filters.status) {
+      rows = rows.filter((item) => item.status === filters.status);
+    }
+    return rows.slice(0, filters.limit ?? 50).map((item) => ({
+      ...item,
+      subcontractor_name: mockSubcontractors.find((sub) => sub.id === item.subcontractor_id)?.legal_name ?? null,
+    }));
+  },
+
+  async createDriver(payload: {
+    code: string;
+    name: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employment_type?: 'employee' | 'subcontractor';
+    user_id?: string;
+    subcontractor_id?: string;
+    home_hub_id?: string;
+  }) {
+    const created = {
+      id: `drv-${driverSeq++}`,
+      code: payload.code,
+      name: payload.name,
+      status: payload.status ?? 'active',
+      employment_type: payload.employment_type ?? 'subcontractor',
+      user_id: payload.user_id ?? null,
+      subcontractor_id: payload.subcontractor_id ?? null,
+      home_hub_id: payload.home_hub_id ?? null,
+    };
+    mockDrivers = [created, ...mockDrivers];
+    return created;
+  },
+
+  async updateDriver(id: string, payload: {
+    name?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employment_type?: 'employee' | 'subcontractor';
+    user_id?: string | null;
+    subcontractor_id?: string | null;
+    home_hub_id?: string | null;
+  }) {
+    const index = mockDrivers.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Driver not found');
+    mockDrivers[index] = {
+      ...mockDrivers[index],
+      ...payload,
+    };
+    return mockDrivers[index];
+  },
+
+  async getVehicles(filters: { subcontractorId?: string; status?: string; limit?: number }) {
+    let rows = [...mockVehicles];
+    if (filters.subcontractorId) {
+      rows = rows.filter((item) => item.subcontractor_id === filters.subcontractorId);
+    }
+    if (filters.status) {
+      rows = rows.filter((item) => item.status === filters.status);
+    }
+    return rows.slice(0, filters.limit ?? 50).map((item) => ({
+      ...item,
+      subcontractor_name: mockSubcontractors.find((sub) => sub.id === item.subcontractor_id)?.legal_name ?? null,
+      assigned_driver_code: mockDrivers.find((driver) => driver.id === item.assigned_driver_id)?.code ?? null,
+    }));
+  },
+
+  async createVehicle(payload: {
+    code: string;
+    plate_number?: string;
+    vehicle_type?: string;
+    capacity_kg?: number;
+    status?: 'active' | 'inactive' | 'maintenance';
+    subcontractor_id?: string;
+    home_hub_id?: string;
+    assigned_driver_id?: string;
+  }) {
+    const created = {
+      id: `veh-${vehicleSeq++}`,
+      code: payload.code,
+      plate_number: payload.plate_number ?? null,
+      vehicle_type: payload.vehicle_type ?? 'van',
+      capacity_kg: payload.capacity_kg ?? null,
+      status: payload.status ?? 'active',
+      subcontractor_id: payload.subcontractor_id ?? null,
+      home_hub_id: payload.home_hub_id ?? null,
+      assigned_driver_id: payload.assigned_driver_id ?? null,
+    };
+    mockVehicles = [created, ...mockVehicles];
+    return created;
+  },
+
+  async updateVehicle(id: string, payload: {
+    plate_number?: string | null;
+    vehicle_type?: string;
+    capacity_kg?: number | null;
+    status?: 'active' | 'inactive' | 'maintenance';
+    subcontractor_id?: string | null;
+    home_hub_id?: string | null;
+    assigned_driver_id?: string | null;
+  }) {
+    const index = mockVehicles.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Vehicle not found');
+    mockVehicles[index] = {
+      ...mockVehicles[index],
+      ...payload,
+    };
+    return mockVehicles[index];
   },
 
   async getAdvances(_: { subcontractorId?: string; status?: string; period?: string }) {
