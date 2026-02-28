@@ -70,6 +70,20 @@ export function RoutesPage() {
       setCreateError('Hub, codigo y fecha son obligatorios.');
       return;
     }
+    const selectedDriver = createDriverId ? drivers.find((item) => item.id === createDriverId) : null;
+    const selectedVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
+    if (createSubcontractorId && selectedDriver?.subcontractor_id && selectedDriver.subcontractor_id !== createSubcontractorId) {
+      setCreateError('El conductor seleccionado no pertenece a la subcontrata elegida.');
+      return;
+    }
+    if (createSubcontractorId && selectedVehicle?.subcontractor_id && selectedVehicle.subcontractor_id !== createSubcontractorId) {
+      setCreateError('El vehiculo seleccionado no pertenece a la subcontrata elegida.');
+      return;
+    }
+    if (selectedDriver && selectedVehicle?.assigned_driver_id && selectedVehicle.assigned_driver_id !== selectedDriver.id) {
+      setCreateError('El vehiculo esta asignado a otro conductor.');
+      return;
+    }
     setCreating(true);
     setCreateError('');
     try {

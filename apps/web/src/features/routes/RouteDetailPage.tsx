@@ -67,6 +67,20 @@ export function RouteDetailPage() {
 
   const saveVehicleAssignment = async () => {
     if (!id) return;
+    const selectedDriver = driverId ? drivers.find((item) => item.id === driverId) : null;
+    const selectedVehicle = vehicleId ? vehicles.find((item) => item.id === vehicleId) : null;
+    if (subcontractorId && selectedDriver?.subcontractor_id && selectedDriver.subcontractor_id !== subcontractorId) {
+      setError('El conductor seleccionado no pertenece a la subcontrata elegida.');
+      return;
+    }
+    if (subcontractorId && selectedVehicle?.subcontractor_id && selectedVehicle.subcontractor_id !== subcontractorId) {
+      setError('El vehiculo seleccionado no pertenece a la subcontrata elegida.');
+      return;
+    }
+    if (selectedDriver && selectedVehicle?.assigned_driver_id && selectedVehicle.assigned_driver_id !== selectedDriver.id) {
+      setError('El vehiculo esta asignado a otro conductor.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
