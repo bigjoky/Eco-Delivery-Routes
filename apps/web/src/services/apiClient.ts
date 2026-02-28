@@ -568,6 +568,16 @@ export const apiClient = {
     return json.data as RouteStopSummary;
   },
 
+  async deleteRouteStop(routeId: string, stopId: string): Promise<RouteStopSummary[]> {
+    if (USE_MOCK) return mockApi.deleteRouteStop(routeId, stopId) as Promise<RouteStopSummary[]>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/${stopId}`, {
+      method: 'DELETE',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete route stop');
+    return json.data as RouteStopSummary[];
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
     if (USE_MOCK) return mockApi.getMyDriverRoute(filters);
     const params = new URLSearchParams();

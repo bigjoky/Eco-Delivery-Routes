@@ -71,6 +71,66 @@ class RouteStopsHttpTest extends TestCase
         $this->assertCount(1, $list->json('data'));
     }
 
+    public function test_operations_manager_can_delete_stop_and_reindex_sequences(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-DEL',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-DEL-A',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-DEL-B',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $stop1 = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentA,
+        ]);
+        $stop2 = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 2,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentB,
+        ]);
+        $stop1->assertStatus(201);
+        $stop2->assertStatus(201);
+
+        $delete = $this->deleteJson("/api/v1/routes/{$routeId}/stops/" . $stop1->json('data.id'));
+        $delete->assertOk();
+        $delete->assertJsonCount(1, 'data');
+        $delete->assertJsonPath('data.0.sequence', 1);
+        $delete->assertJsonPath('data.0.reference', 'SHP-STOPS-DEL-B');
+    }
+
     public function test_driver_cannot_create_route_stop(): void
     {
         $driver = $this->createUserWithRole('driver');

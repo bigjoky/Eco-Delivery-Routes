@@ -1349,6 +1349,21 @@ paths:
       responses:
         '200': { description: Actualizado }
         '404': { description: Ruta o parada no encontrada }
+    delete:
+      tags: [Routes]
+      summary: Eliminar parada de ruta y reindexar secuencias
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: stopId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '404': { description: Ruta o parada no encontrada }
 
   /pickups:
     get:

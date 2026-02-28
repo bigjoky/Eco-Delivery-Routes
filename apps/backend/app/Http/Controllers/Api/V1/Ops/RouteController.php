@@ -346,6 +346,55 @@ class RouteController extends Controller
         ]);
     }
 
+    public function deleteStop(Request $request, string $id, string $stopId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $existing = DB::table('route_stops')->where('id', $stopId)->where('route_id', $id)->first();
+        if (!$existing) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route stop not found.'],
+            ], 404);
+        }
+
+        DB::transaction(function () use ($id, $stopId): void {
+            DB::table('route_stops')
+                ->where('id', $stopId)
+                ->where('route_id', $id)
+                ->delete();
+
+            $remaining = DB::table('route_stops')
+                ->where('route_id', $id)
+                ->orderBy('sequence')
+                ->orderBy('id')
+                ->get(['id']);
+
+            foreach ($remaining as $index => $row) {
+                DB::table('route_stops')
+                    ->where('id', $row->id)
+                    ->update([
+                        'sequence' => $index + 1,
+                        'updated_at' => now(),
+                    ]);
+            }
+        });
+
+        return response()->json([
+            'data' => $this->fetchRouteStops($id),
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $payload
      */

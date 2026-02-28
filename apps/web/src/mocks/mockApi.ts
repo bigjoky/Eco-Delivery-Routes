@@ -746,6 +746,29 @@ export const mockApi = {
     return next;
   },
 
+  async deleteRouteStop(routeId: string, stopId: string) {
+    const index = mockRouteStops.findIndex((row) => row.route_id === routeId && row.id === stopId);
+    if (index < 0) {
+      throw new Error('Route stop not found');
+    }
+    mockRouteStops.splice(index, 1);
+
+    const routeStops = mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+    routeStops.forEach((row, idx) => {
+      row.sequence = idx + 1;
+    });
+
+    const routeIndex = mockRoutes.findIndex((row) => row.id === routeId);
+    if (routeIndex >= 0) {
+      mockRoutes[routeIndex] = { ...mockRoutes[routeIndex], stops_count: routeStops.length };
+    }
+
+    return routeStops;
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
     const route = mockRoutes.find((row) => row.id === 'r-1');
     if (!route) {

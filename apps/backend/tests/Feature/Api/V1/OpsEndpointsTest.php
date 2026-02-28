@@ -54,6 +54,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::patch('routes/{id}'", $contents);
         $this->assertStringContainsString("Route::post('routes/{id}/stops'", $contents);
         $this->assertStringContainsString("Route::patch('routes/{id}/stops/{stopId}'", $contents);
+        $this->assertStringContainsString("Route::delete('routes/{id}/stops/{stopId}'", $contents);
         $this->assertStringContainsString("Route::post('tracking-events'", $contents);
         $this->assertStringContainsString("Route::get('incidents/catalog'", $contents);
         $this->assertStringContainsString("Route::get('incidents'", $contents);

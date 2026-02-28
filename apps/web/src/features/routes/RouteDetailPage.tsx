@@ -142,6 +142,17 @@ export function RouteDetailPage() {
     }
   };
 
+  const deleteStop = async (stopId: string) => {
+    if (!id) return;
+    setError('');
+    try {
+      const updatedStops = await apiClient.deleteRouteStop(id, stopId);
+      setStops(updatedStops);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo eliminar la parada');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -261,6 +272,9 @@ export function RouteDetailPage() {
                           <option value="in_progress">in_progress</option>
                           <option value="completed">completed</option>
                         </select>
+                        <Button type="button" variant="outline" onClick={() => deleteStop(stop.id)}>
+                          Eliminar
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
