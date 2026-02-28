@@ -253,28 +253,171 @@ class RouteController extends Controller
         }
 
         return response()->json([
-            'data' => DB::table('route_stops')
-                ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
-                ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
-                ->where('route_stops.route_id', $id)
-                ->orderBy('route_stops.sequence')
-                ->get([
-                    'route_stops.id',
-                    'route_stops.route_id',
-                    'route_stops.sequence',
-                    'route_stops.stop_type',
-                    'route_stops.shipment_id',
-                    'route_stops.pickup_id',
-                    'route_stops.status',
-                    'route_stops.planned_at',
-                    'route_stops.completed_at',
-                    'route_stops.created_at',
-                    'route_stops.updated_at',
-                    DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
-                    DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
-                    DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
-                ]),
+            'data' => $this->fetchRouteStops($id),
         ]);
+    }
+
+    public function addStop(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'sequence' => ['required', 'integer', 'min:1'],
+            'stop_type' => ['required', 'in:DELIVERY,PICKUP'],
+            'shipment_id' => ['nullable', 'uuid', 'exists:shipments,id'],
+            'pickup_id' => ['nullable', 'uuid', 'exists:pickups,id'],
+            'status' => ['nullable', 'in:planned,in_progress,completed'],
+            'planned_at' => ['nullable', 'date'],
+        ]);
+        $this->assertStopPayloadConsistency($payload);
+
+        $stopId = (string) Str::uuid();
+        DB::table('route_stops')->insert([
+            'id' => $stopId,
+            'route_id' => $id,
+            'sequence' => $payload['sequence'],
+            'stop_type' => $payload['stop_type'],
+            'shipment_id' => $payload['shipment_id'] ?? null,
+            'pickup_id' => $payload['pickup_id'] ?? null,
+            'status' => $payload['status'] ?? 'planned',
+            'planned_at' => $payload['planned_at'] ?? null,
+            'completed_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'data' => $this->fetchStopById($stopId),
+        ], 201);
+    }
+
+    public function updateStop(Request $request, string $id, string $stopId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $existing = DB::table('route_stops')->where('id', $stopId)->where('route_id', $id)->first();
+        if (!$existing) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route stop not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'sequence' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', 'in:planned,in_progress,completed'],
+            'planned_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date'],
+        ]);
+
+        if ($payload !== []) {
+            DB::table('route_stops')
+                ->where('id', $stopId)
+                ->where('route_id', $id)
+                ->update([
+                    ...$payload,
+                    'updated_at' => now(),
+                ]);
+        }
+
+        return response()->json([
+            'data' => $this->fetchStopById($stopId),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertStopPayloadConsistency(array $payload): void
+    {
+        if ($payload['stop_type'] === 'DELIVERY') {
+            if (empty($payload['shipment_id']) || !empty($payload['pickup_id'])) {
+                throw ValidationException::withMessages([
+                    'shipment_id' => ['Delivery stop requires shipment_id and must not include pickup_id.'],
+                ]);
+            }
+            return;
+        }
+
+        if (empty($payload['pickup_id']) || !empty($payload['shipment_id'])) {
+            throw ValidationException::withMessages([
+                'pickup_id' => ['Pickup stop requires pickup_id and must not include shipment_id.'],
+            ]);
+        }
+    }
+
+    private function fetchStopById(string $stopId): ?object
+    {
+        return DB::table('route_stops')
+            ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+            ->where('route_stops.id', $stopId)
+            ->first([
+                'route_stops.id',
+                'route_stops.route_id',
+                'route_stops.sequence',
+                'route_stops.stop_type',
+                'route_stops.shipment_id',
+                'route_stops.pickup_id',
+                'route_stops.status',
+                'route_stops.planned_at',
+                'route_stops.completed_at',
+                'route_stops.created_at',
+                'route_stops.updated_at',
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
+                DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
+                DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
+            ]);
+    }
+
+    /**
+     * @return array<int, object>
+     */
+    private function fetchRouteStops(string $routeId): array
+    {
+        return DB::table('route_stops')
+            ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+            ->where('route_stops.route_id', $routeId)
+            ->orderBy('route_stops.sequence')
+            ->get([
+                'route_stops.id',
+                'route_stops.route_id',
+                'route_stops.sequence',
+                'route_stops.stop_type',
+                'route_stops.shipment_id',
+                'route_stops.pickup_id',
+                'route_stops.status',
+                'route_stops.planned_at',
+                'route_stops.completed_at',
+                'route_stops.created_at',
+                'route_stops.updated_at',
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
+                DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
+                DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
+            ])
+            ->all();
     }
 
     private function forbidden(): JsonResponse

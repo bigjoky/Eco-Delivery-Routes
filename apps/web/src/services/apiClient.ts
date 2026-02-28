@@ -532,6 +532,42 @@ export const apiClient = {
     return json.data as RouteSummary;
   },
 
+  async createRouteStop(routeId: string, payload: {
+    sequence: number;
+    stop_type: 'DELIVERY' | 'PICKUP';
+    shipment_id?: string | null;
+    pickup_id?: string | null;
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+  }): Promise<RouteStopSummary> {
+    if (USE_MOCK) return mockApi.createRouteStop(routeId, payload) as Promise<RouteStopSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route stop');
+    return json.data as RouteStopSummary;
+  },
+
+  async updateRouteStop(routeId: string, stopId: string, payload: {
+    sequence?: number;
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+  }): Promise<RouteStopSummary> {
+    if (USE_MOCK) return mockApi.updateRouteStop(routeId, stopId, payload) as Promise<RouteStopSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/${stopId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route stop');
+    return json.data as RouteStopSummary;
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
     if (USE_MOCK) return mockApi.getMyDriverRoute(filters);
     const params = new URLSearchParams();

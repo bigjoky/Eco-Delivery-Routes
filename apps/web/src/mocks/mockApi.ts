@@ -2,6 +2,7 @@ let trackingSeq = 1;
 let podSeq = 1;
 let incidentSeq = 2;
 let userSeq = 3;
+let routeStopSeq = 3;
 let mockIncidents = [
   {
     id: 'i-1',
@@ -163,6 +164,43 @@ let mockRoutes: Array<{
     subcontractor_id: null,
     vehicle_id: null,
     stops_count: 31,
+  },
+];
+let mockRouteStops: Array<{
+  id: string;
+  route_id: string;
+  sequence: number;
+  stop_type: 'DELIVERY' | 'PICKUP';
+  status: 'planned' | 'in_progress' | 'completed';
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  entity_type: 'shipment' | 'pickup';
+  entity_id: string;
+  reference?: string | null;
+}> = [
+  {
+    id: 'st-1',
+    route_id: 'r-1',
+    sequence: 1,
+    stop_type: 'DELIVERY',
+    status: 'in_progress',
+    shipment_id: '00000000-0000-0000-0000-000000000101',
+    pickup_id: null,
+    entity_type: 'shipment',
+    entity_id: '00000000-0000-0000-0000-000000000101',
+    reference: 'SHP-AGP-0001',
+  },
+  {
+    id: 'st-2',
+    route_id: 'r-1',
+    sequence: 2,
+    stop_type: 'PICKUP',
+    status: 'planned',
+    shipment_id: null,
+    pickup_id: '00000000-0000-0000-0000-000000000201',
+    entity_type: 'pickup',
+    entity_id: '00000000-0000-0000-0000-000000000201',
+    reference: 'PCK-AGP-0001',
   },
 ];
 
@@ -655,33 +693,57 @@ export const mockApi = {
   },
 
   async getRouteStops(routeId: string) {
-    const all = [
-      {
-        id: 'st-1',
-        route_id: 'r-1',
-        sequence: 1,
-        stop_type: 'DELIVERY',
-        status: 'in_progress',
-        shipment_id: '00000000-0000-0000-0000-000000000101',
-        pickup_id: null,
-        entity_type: 'shipment',
-        entity_id: '00000000-0000-0000-0000-000000000101',
-        reference: 'SHP-AGP-0001',
-      },
-      {
-        id: 'st-2',
-        route_id: 'r-1',
-        sequence: 2,
-        stop_type: 'PICKUP',
-        status: 'planned',
-        shipment_id: null,
-        pickup_id: '00000000-0000-0000-0000-000000000201',
-        entity_type: 'pickup',
-        entity_id: '00000000-0000-0000-0000-000000000201',
-        reference: 'PCK-AGP-0001',
-      },
-    ];
-    return all.filter((row) => row.route_id === routeId);
+    return mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+  },
+
+  async createRouteStop(routeId: string, payload: {
+    sequence: number;
+    stop_type: 'DELIVERY' | 'PICKUP';
+    shipment_id?: string | null;
+    pickup_id?: string | null;
+    status?: 'planned' | 'in_progress' | 'completed';
+  }) {
+    const stop = {
+      id: `st-${routeStopSeq++}`,
+      route_id: routeId,
+      sequence: payload.sequence,
+      stop_type: payload.stop_type,
+      status: payload.status ?? 'planned',
+      shipment_id: payload.shipment_id ?? null,
+      pickup_id: payload.pickup_id ?? null,
+      entity_type: payload.stop_type === 'DELIVERY' ? 'shipment' as const : 'pickup' as const,
+      entity_id: payload.stop_type === 'DELIVERY' ? (payload.shipment_id ?? '') : (payload.pickup_id ?? ''),
+      reference: payload.stop_type === 'DELIVERY'
+        ? `SHP-${String(payload.shipment_id ?? '').slice(-6)}`
+        : `PCK-${String(payload.pickup_id ?? '').slice(-6)}`,
+    };
+    mockRouteStops = [...mockRouteStops, stop];
+    const routeIndex = mockRoutes.findIndex((row) => row.id === routeId);
+    if (routeIndex >= 0) {
+      mockRoutes[routeIndex] = { ...mockRoutes[routeIndex], stops_count: mockRoutes[routeIndex].stops_count + 1 };
+    }
+    return stop;
+  },
+
+  async updateRouteStop(routeId: string, stopId: string, payload: {
+    sequence?: number;
+    status?: 'planned' | 'in_progress' | 'completed';
+  }) {
+    const index = mockRouteStops.findIndex((row) => row.route_id === routeId && row.id === stopId);
+    if (index < 0) {
+      throw new Error('Route stop not found');
+    }
+    const current = mockRouteStops[index];
+    const next = {
+      ...current,
+      sequence: payload.sequence ?? current.sequence,
+      status: payload.status ?? current.status,
+    };
+    mockRouteStops[index] = next;
+    return next;
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
