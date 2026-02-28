@@ -728,12 +728,32 @@ export const apiClient = {
     return json.data as QualityThresholdConfig;
   },
 
-  async getIncidents(): Promise<IncidentSummary[]> {
-    if (USE_MOCK) return mockApi.getIncidents();
-    const response = await fetch(`${API_BASE_URL}/incidents`, {
+  async getIncidents(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    incidentableId?: string;
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+    catalogCode?: string;
+    resolved?: 'open' | 'resolved';
+    page?: number;
+    perPage?: number;
+  } = {}): Promise<PaginatedResult<IncidentSummary>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 20;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getIncidents(filters), page, perPage);
+    }
+    const params = new URLSearchParams();
+    if (filters.incidentableType) params.set('incidentable_type', filters.incidentableType);
+    if (filters.incidentableId) params.set('incidentable_id', filters.incidentableId);
+    if (filters.category) params.set('category', filters.category);
+    if (filters.catalogCode) params.set('catalog_code', filters.catalogCode);
+    if (filters.resolved) params.set('resolved', filters.resolved);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+    const response = await fetch(`${API_BASE_URL}/incidents?${params.toString()}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
-    return parseData<IncidentSummary>(response);
+    return parsePaginatedData<IncidentSummary>(response);
   },
 
   async createIncident(payload: {
@@ -754,6 +774,20 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
 
+    const data = await response.json();
+    return data.data as IncidentSummary;
+  },
+
+  async resolveIncident(id: string, notes?: string): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.resolveIncident(id, notes) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}/resolve`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ notes }),
+    });
     const data = await response.json();
     return data.data as IncidentSummary;
   },

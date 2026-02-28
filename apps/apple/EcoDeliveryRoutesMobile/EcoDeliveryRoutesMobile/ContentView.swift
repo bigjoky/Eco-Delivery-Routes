@@ -170,7 +170,7 @@ struct ContentView: View {
                                     incidentableType: target.entityType,
                                     incidentableId: target.entityId,
                                     catalogCode: incidentCode,
-                                    category: "absent",
+                                    category: incidentCategory(for: incidentCode),
                                     notes: incidentNotes
                                 )
                                 driverMessage = "Incidencia registrada"
@@ -262,6 +262,14 @@ struct ContentView: View {
             }
             return stop
         }
+    }
+
+    private func incidentCategory(for code: String) -> String {
+        let normalized = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized.hasPrefix("ABSENT") { return "absent" }
+        if normalized.hasPrefix("RETRY") { return "retry" }
+        if normalized.hasPrefix("FAILED") { return "failed" }
+        return "general"
     }
 }
 

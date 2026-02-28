@@ -1,5 +1,17 @@
 let trackingSeq = 1;
 let podSeq = 1;
+let incidentSeq = 2;
+let mockIncidents = [
+  {
+    id: 'i-1',
+    incidentable_type: 'shipment' as const,
+    incidentable_id: '00000000-0000-0000-0000-000000000101',
+    catalog_code: 'ABSENT_HOME',
+    category: 'absent' as const,
+    notes: 'Cliente no localizado',
+    resolved_at: null as string | null,
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -675,18 +687,23 @@ export const mockApi = {
     return;
   },
 
-  async getIncidents() {
-    return [
-      {
-        id: 'i-1',
-        incidentable_type: 'shipment',
-        incidentable_id: 'SHP-AGP-0001',
-        catalog_code: 'ABSENT_HOME',
-        category: 'absent',
-        notes: 'Cliente no localizado',
-        resolved_at: null,
-      },
-    ];
+  async getIncidents(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    incidentableId?: string;
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+    catalogCode?: string;
+    resolved?: 'open' | 'resolved';
+  } = {}) {
+    return mockIncidents
+      .filter((item) => (filters.incidentableType ? item.incidentable_type === filters.incidentableType : true))
+      .filter((item) => (filters.incidentableId ? item.incidentable_id === filters.incidentableId : true))
+      .filter((item) => (filters.category ? item.category === filters.category : true))
+      .filter((item) => (filters.catalogCode ? item.catalog_code === filters.catalogCode : true))
+      .filter((item) => {
+        if (!filters.resolved) return true;
+        if (filters.resolved === 'open') return item.resolved_at === null;
+        return item.resolved_at !== null;
+      });
   },
 
   async createIncident(payload: {
@@ -696,11 +713,36 @@ export const mockApi = {
     category: 'failed' | 'absent' | 'retry' | 'general';
     notes?: string;
   }) {
-    return {
-      id: 'i-new',
+    const item = {
+      id: `i-${incidentSeq++}`,
       ...payload,
       resolved_at: null,
     };
+    mockIncidents = [item, ...mockIncidents];
+    return item;
+  },
+
+  async resolveIncident(id: string, notes?: string) {
+    const now = new Date().toISOString();
+    const target = mockIncidents.find((item) => item.id === id);
+    if (!target) {
+      return {
+        id,
+        incidentable_type: 'shipment' as const,
+        incidentable_id: '00000000-0000-0000-0000-000000000000',
+        catalog_code: 'UNKNOWN',
+        category: 'general' as const,
+        notes: notes ?? null,
+        resolved_at: now,
+      };
+    }
+    const resolved = {
+      ...target,
+      notes: notes ?? target.notes,
+      resolved_at: now,
+    };
+    mockIncidents = mockIncidents.map((item) => (item.id === id ? resolved : item));
+    return resolved;
   },
 
   async getIncidentCatalog() {
