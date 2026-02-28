@@ -43,5 +43,18 @@ describe('route stops CRUD contract', () => {
     if (remaining.length > 0) {
       expect(remaining[0].sequence).toBe(1);
     }
+
+    const restored = await apiClient.createRouteStop('r-1', {
+      sequence: 1,
+      stop_type: 'DELIVERY',
+      shipment_id: '00000000-0000-0000-0000-000000009999',
+      status: 'planned',
+      undo_of_stop_id: created.id,
+    });
+    expect(restored.route_id).toBe('r-1');
+    expect(restored.entity_type).toBe('shipment');
+
+    await expect(apiClient.exportRouteManifestCsv('r-1')).resolves.toBeUndefined();
+    await expect(apiClient.exportRouteManifestPdf('r-1')).resolves.toBeUndefined();
   });
 });
