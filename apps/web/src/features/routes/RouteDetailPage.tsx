@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DriverSummary, PickupSummary, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 export function RouteDetailPage() {
@@ -31,14 +31,34 @@ export function RouteDetailPage() {
   const [savingStop, setSavingStop] = useState(false);
   const [draggingStopId, setDraggingStopId] = useState<string | null>(null);
   const [reorderingStops, setReorderingStops] = useState(false);
+  const [bulkShipmentIds, setBulkShipmentIds] = useState<string[]>([]);
+  const [bulkPickupIds, setBulkPickupIds] = useState<string[]>([]);
+  const [bulkAdding, setBulkAdding] = useState(false);
+  const [manifest, setManifest] = useState<RouteManifest | null>(null);
+  const [manifestLoading, setManifestLoading] = useState(false);
+  const [lastDeletedStop, setLastDeletedStop] = useState<RouteStopSummary | null>(null);
+  const [undoDeleting, setUndoDeleting] = useState(false);
+
+  const refreshManifest = async (routeId: string) => {
+    setManifestLoading(true);
+    try {
+      const data = await apiClient.getRouteManifest(routeId);
+      setManifest(data);
+    } catch {
+      setManifest(null);
+    } finally {
+      setManifestLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
     setError('');
     apiClient.getRouteStops(id).then(setStops).catch(() => setStops([]));
     apiClient.getSubcontractors({ limit: 100 }).then(setSubcontractors).catch(() => setSubcontractors([]));
-    apiClient.getShipments({ status: 'created', perPage: 100, page: 1 }).then((result) => setShipments(result.data)).catch(() => setShipments([]));
+    apiClient.getShipments({ perPage: 100, page: 1 }).then((result) => setShipments(result.data)).catch(() => setShipments([]));
     apiClient.getPickups({ status: 'planned', limit: 100 }).then(setPickups).catch(() => setPickups([]));
+    void refreshManifest(id);
     apiClient
       .getDrivers({ status: 'active', limit: 100 })
       .then(setDrivers)
@@ -141,6 +161,7 @@ export function RouteDetailPage() {
       setSelectedShipmentId('');
       setSelectedPickupId('');
       setStopSequence((value) => value + 1);
+      void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo crear la parada');
     } finally {
@@ -170,6 +191,7 @@ export function RouteDetailPage() {
     try {
       const saved = await apiClient.reorderRouteStops(id, nextStops.map((stop) => stop.id));
       setStops(saved);
+      void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo guardar el nuevo orden de paradas');
       apiClient.getRouteStops(id).then(setStops).catch(() => {});
@@ -211,14 +233,77 @@ export function RouteDetailPage() {
     void persistStopOrder(normalized);
   };
 
+  const bulkAddStops = async () => {
+    if (!id) return;
+    if (bulkShipmentIds.length === 0 && bulkPickupIds.length === 0) {
+      setError('Selecciona al menos un envio o una recogida para carga masiva.');
+      return;
+    }
+    setBulkAdding(true);
+    setError('');
+    try {
+      const result = await apiClient.bulkAddRouteStops(id, {
+        shipment_ids: bulkShipmentIds,
+        pickup_ids: bulkPickupIds,
+        status: 'planned',
+      });
+      setStops(result.stops);
+      setBulkShipmentIds([]);
+      setBulkPickupIds([]);
+      void refreshManifest(id);
+      if (result.skipped_existing_count > 0) {
+        setError(`Se omitieron ${result.skipped_existing_count} paradas ya existentes en la ruta.`);
+      }
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo agregar paradas en bloque');
+    } finally {
+      setBulkAdding(false);
+    }
+  };
+
   const deleteStop = async (stopId: string) => {
     if (!id) return;
+    const target = stops.find((stop) => stop.id === stopId);
+    if (!target) return;
+    const confirmed = window.confirm(`Eliminar parada ${target.reference ?? target.id}?`);
+    if (!confirmed) return;
     setError('');
     try {
       const updatedStops = await apiClient.deleteRouteStop(id, stopId);
       setStops(updatedStops);
+      setLastDeletedStop(target);
+      void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo eliminar la parada');
+    }
+  };
+
+  const undoDeleteStop = async () => {
+    if (!id || !lastDeletedStop) return;
+    setUndoDeleting(true);
+    setError('');
+    try {
+      const recreated = await apiClient.createRouteStop(id, {
+        sequence: stops.length + 1,
+        stop_type: lastDeletedStop.stop_type,
+        shipment_id: lastDeletedStop.shipment_id ?? null,
+        pickup_id: lastDeletedStop.pickup_id ?? null,
+        status: lastDeletedStop.status as 'planned' | 'in_progress' | 'completed',
+      });
+      const merged = [...stops, recreated];
+      const targetIndex = Math.max(0, Math.min(merged.length - 1, lastDeletedStop.sequence - 1));
+      const recreatedIndex = merged.findIndex((stop) => stop.id === recreated.id);
+      const reordered = merged.slice();
+      const [item] = reordered.splice(recreatedIndex, 1);
+      reordered.splice(targetIndex, 0, item);
+      const saved = await apiClient.reorderRouteStops(id, reordered.map((stop) => stop.id));
+      setStops(saved);
+      setLastDeletedStop(null);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo deshacer la eliminacion');
+    } finally {
+      setUndoDeleting(false);
     }
   };
 
@@ -281,6 +366,55 @@ export function RouteDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="inline-actions">
+            <strong>Manifest:</strong>
+            {manifestLoading ? (
+              <span className="helper">Cargando...</span>
+            ) : (
+              <span className="helper">
+                Stops {manifest?.totals.stops ?? stops.length} | Deliveries {manifest?.totals.deliveries ?? 0}
+                {' | '}Pickups {manifest?.totals.pickups ?? 0} | Completed {manifest?.totals.completed ?? 0}
+              </span>
+            )}
+          </div>
+          <div className="inline-actions">
+            <strong>Bulk add:</strong>
+            <label htmlFor="bulk-shipment-ids">Envios</label>
+            <select
+              id="bulk-shipment-ids"
+              multiple
+              value={bulkShipmentIds}
+              onChange={(event) => {
+                const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                setBulkShipmentIds(values);
+              }}
+            >
+              {filteredShipments.map((shipment) => (
+                <option key={shipment.id} value={shipment.id}>
+                  {shipment.reference} ({shipment.status})
+                </option>
+              ))}
+            </select>
+            <label htmlFor="bulk-pickup-ids">Recogidas</label>
+            <select
+              id="bulk-pickup-ids"
+              multiple
+              value={bulkPickupIds}
+              onChange={(event) => {
+                const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                setBulkPickupIds(values);
+              }}
+            >
+              {filteredPickups.map((pickup) => (
+                <option key={pickup.id} value={pickup.id}>
+                  {pickup.reference} ({pickup.pickup_type})
+                </option>
+              ))}
+            </select>
+            <Button type="button" onClick={bulkAddStops} disabled={bulkAdding}>
+              {bulkAdding ? 'Agregando...' : 'Agregar seleccionados'}
+            </Button>
+          </div>
+          <div className="inline-actions">
             <label htmlFor="stop-type">Tipo</label>
             <select id="stop-type" value={stopType} onChange={(event) => setStopType(event.target.value as 'DELIVERY' | 'PICKUP')}>
               <option value="DELIVERY">DELIVERY</option>
@@ -333,6 +467,11 @@ export function RouteDetailPage() {
             <Button type="button" onClick={createStop} disabled={savingStop}>
               {savingStop ? 'Creando...' : 'Agregar parada'}
             </Button>
+            {lastDeletedStop ? (
+              <Button type="button" variant="outline" disabled={undoDeleting} onClick={undoDeleteStop}>
+                {undoDeleting ? 'Revirtiendo...' : 'Deshacer eliminacion'}
+              </Button>
+            ) : null}
           </div>
           <TableWrapper>
             <Table>

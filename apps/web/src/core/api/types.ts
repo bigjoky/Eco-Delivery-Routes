@@ -95,6 +95,31 @@ export type RouteStopSummary = {
   completed_at?: string | null;
 };
 
+export type RouteManifest = {
+  route: {
+    id: string;
+    code: string;
+    route_date: string;
+    status: string;
+    driver_code?: string | null;
+    vehicle_code?: string | null;
+  };
+  totals: {
+    stops: number;
+    deliveries: number;
+    pickups: number;
+    completed: number;
+  };
+  stops: RouteStopSummary[];
+  generated_at: string;
+};
+
+export type RouteBulkAddStopsResult = {
+  created_count: number;
+  skipped_existing_count: number;
+  stops: RouteStopSummary[];
+};
+
 export type DriverRouteMeResponse = {
   driver?: {
     id: string;

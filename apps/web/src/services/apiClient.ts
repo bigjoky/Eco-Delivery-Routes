@@ -20,6 +20,8 @@ import {
   QualityTopRoutesResult,
   RoleDetail,
   RoleSummary,
+  RouteBulkAddStopsResult,
+  RouteManifest,
   RouteStopSummary,
   RouteSummary,
   SettlementDetail,
@@ -603,6 +605,30 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot reorder route stops');
     return json.data as RouteStopSummary[];
+  },
+
+  async bulkAddRouteStops(routeId: string, payload: {
+    shipment_ids?: string[];
+    pickup_ids?: string[];
+    status?: 'planned' | 'in_progress' | 'completed';
+  }): Promise<RouteBulkAddStopsResult> {
+    if (USE_MOCK) return mockApi.bulkAddRouteStops(routeId, payload) as Promise<RouteBulkAddStopsResult>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/bulk-add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot bulk add route stops');
+    return json.data as RouteBulkAddStopsResult;
+  },
+
+  async getRouteManifest(routeId: string): Promise<RouteManifest> {
+    if (USE_MOCK) return mockApi.getRouteManifest(routeId) as Promise<RouteManifest>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/manifest`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot fetch route manifest');
+    return json.data as RouteManifest;
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
