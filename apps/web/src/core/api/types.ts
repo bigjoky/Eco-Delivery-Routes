@@ -29,6 +29,21 @@ export type RoleSummary = {
   name: string;
 };
 
+export type PermissionSummary = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type RoleDetail = {
+  id: string;
+  code: string;
+  name: string;
+  permissions: PermissionSummary[];
+  available_permissions?: PermissionSummary[];
+  users_count: number;
+};
+
 export type ShipmentSummary = {
   id: string;
   reference: string;

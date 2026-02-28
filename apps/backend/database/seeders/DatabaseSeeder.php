@@ -18,5 +18,11 @@ class DatabaseSeeder extends Seeder
             AdvanceSeeder::class,
             SettlementExclusionReasonSeeder::class,
         ]);
+
+        if (app()->environment('staging')) {
+            $this->call([
+                MalagaStagingSeeder::class,
+            ]);
+        }
     }
 }

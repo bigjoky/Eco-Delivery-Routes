@@ -309,6 +309,8 @@ struct TVSubcontractorBreakdown {
 }
 
 final class TVMonitorService {
+    private var runtimeToken: String? = ProcessInfo.processInfo.environment["API_TOKEN"]
+
     func snapshot() async -> TVSnapshot {
         let apiSnapshot = await fetchQualityFromAPI()
 
@@ -395,27 +397,13 @@ final class TVMonitorService {
             )
         }
 
-        var routeRequest = URLRequest(url: routeURL)
-        routeRequest.httpMethod = "GET"
-        var driverRequest = URLRequest(url: driverURL)
-        driverRequest.httpMethod = "GET"
-        var subcontractorRequest = URLRequest(url: subcontractorURL)
-        subcontractorRequest.httpMethod = "GET"
-        let token = ProcessInfo.processInfo.environment["API_TOKEN"]
-        if let token, !token.isEmpty {
-            routeRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            driverRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            subcontractorRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        var token = await resolveAuthToken(normalizedBaseURL: normalizedBaseURL, explicitToken: nil)
 
         do {
-            let (routeData, routeResponse) = try await URLSession.shared.data(for: routeRequest)
-            let (driverData, driverResponse) = try await URLSession.shared.data(for: driverRequest)
-            let (subcontractorData, subcontractorResponse) = try await URLSession.shared.data(for: subcontractorRequest)
             guard
-                let routeHTTP = routeResponse as? HTTPURLResponse, (200...299).contains(routeHTTP.statusCode),
-                let driverHTTP = driverResponse as? HTTPURLResponse, (200...299).contains(driverHTTP.statusCode),
-                let subcontractorHTTP = subcontractorResponse as? HTTPURLResponse, (200...299).contains(subcontractorHTTP.statusCode)
+                let routeResult = try await authorizedGet(url: routeURL, normalizedBaseURL: normalizedBaseURL, token: token),
+                let driverResult = try await authorizedGet(url: driverURL, normalizedBaseURL: normalizedBaseURL, token: token),
+                let subcontractorResult = try await authorizedGet(url: subcontractorURL, normalizedBaseURL: normalizedBaseURL, token: token)
             else {
                 return (
                     mockRouteQuality(),
@@ -432,6 +420,10 @@ final class TVMonitorService {
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
+            let routeData = routeResult.data
+            let driverData = driverResult.data
+            let subcontractorData = subcontractorResult.data
+            token = subcontractorResult.token ?? driverResult.token ?? routeResult.token ?? token
 
             let routeDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: routeData)
             let driverDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: driverData)
@@ -546,6 +538,100 @@ final class TVMonitorService {
         }
     }
 
+    private func resolveAuthToken(normalizedBaseURL: String, explicitToken: String?) async -> String? {
+        if let explicitToken, !explicitToken.isEmpty {
+            runtimeToken = explicitToken
+            return explicitToken
+        }
+        if let runtimeToken, !runtimeToken.isEmpty {
+            return runtimeToken
+        }
+
+        guard
+            let email = ProcessInfo.processInfo.environment["API_EMAIL"],
+            let password = ProcessInfo.processInfo.environment["API_PASSWORD"],
+            !email.isEmpty,
+            !password.isEmpty,
+            let loginURL = URL(string: "\(normalizedBaseURL)/auth/login")
+        else {
+            return nil
+        }
+
+        var request = URLRequest(url: loginURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "email": email,
+            "password": password,
+            "device_name": "apple-tv-monitor",
+        ])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return nil
+            }
+            let decoded = try JSONDecoder().decode(LoginEnvelope.self, from: data)
+            runtimeToken = decoded.token
+            return decoded.token
+        } catch {
+            return nil
+        }
+    }
+
+    private func authorizedGet(
+        url: URL,
+        normalizedBaseURL: String,
+        token: String?
+    ) async throws -> (data: Data, token: String?)? {
+        let activeToken = await resolveAuthToken(normalizedBaseURL: normalizedBaseURL, explicitToken: token)
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let activeToken, !activeToken.isEmpty {
+            request.setValue("Bearer \(activeToken)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { return nil }
+        if (200...299).contains(http.statusCode) {
+            return (data, activeToken)
+        }
+        if http.statusCode == 401, let activeToken, let refreshed = await refreshAuthToken(normalizedBaseURL: normalizedBaseURL, currentToken: activeToken) {
+            var retry = URLRequest(url: url)
+            retry.httpMethod = "GET"
+            retry.setValue("Bearer \(refreshed)", forHTTPHeaderField: "Authorization")
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: retry)
+            guard let retryHttp = retryResponse as? HTTPURLResponse, (200...299).contains(retryHttp.statusCode) else {
+                return nil
+            }
+            runtimeToken = refreshed
+            return (retryData, refreshed)
+        }
+        return nil
+    }
+
+    private func refreshAuthToken(normalizedBaseURL: String, currentToken: String) async -> String? {
+        guard let refreshURL = URL(string: "\(normalizedBaseURL)/auth/refresh") else {
+            return nil
+        }
+        var request = URLRequest(url: refreshURL)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                runtimeToken = nil
+                return nil
+            }
+            let decoded = try JSONDecoder().decode(LoginEnvelope.self, from: data)
+            runtimeToken = decoded.token
+            return decoded.token
+        } catch {
+            runtimeToken = nil
+            return nil
+        }
+    }
+
     private func fetchThresholdDeltaAlertSummary(normalizedBaseURL: String, token: String?) async -> (count: Int, windowHours: Int, deltaTrigger: Double) {
         let defaultWindow = 24
         let defaultTrigger = 5.0
@@ -553,18 +639,11 @@ final class TVMonitorService {
             return (0, defaultWindow, defaultTrigger)
         }
 
-        var settingsRequest = URLRequest(url: settingsURL)
-        settingsRequest.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            settingsRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
         do {
-            let (settingsData, settingsResponse) = try await URLSession.shared.data(for: settingsRequest)
-            guard let settingsHTTP = settingsResponse as? HTTPURLResponse, (200...299).contains(settingsHTTP.statusCode) else {
+            guard let settingsResult = try await authorizedGet(url: settingsURL, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return (0, defaultWindow, defaultTrigger)
             }
-            let settingsDecoded = try JSONDecoder().decode(QualityThresholdAlertSettingsEnvelope.self, from: settingsData)
+            let settingsDecoded = try JSONDecoder().decode(QualityThresholdAlertSettingsEnvelope.self, from: settingsResult.data)
             let windowHours = settingsDecoded.data.windowHours
             let deltaTrigger = settingsDecoded.data.largeDeltaThreshold
 
@@ -579,17 +658,10 @@ final class TVMonitorService {
             guard let historyURL = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history?date_from=\(dateFrom)&date_to=\(dateTo)&page=1&per_page=100") else {
                 return (0, windowHours, deltaTrigger)
             }
-
-            var historyRequest = URLRequest(url: historyURL)
-            historyRequest.httpMethod = "GET"
-            if let token, !token.isEmpty {
-                historyRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            }
-            let (historyData, historyResponse) = try await URLSession.shared.data(for: historyRequest)
-            guard let historyHTTP = historyResponse as? HTTPURLResponse, (200...299).contains(historyHTTP.statusCode) else {
+            guard let historyResult = try await authorizedGet(url: historyURL, normalizedBaseURL: normalizedBaseURL, token: settingsResult.token) else {
                 return (0, windowHours, deltaTrigger)
             }
-            let historyDecoded = try JSONDecoder().decode(QualityThresholdHistoryEnvelope.self, from: historyData)
+            let historyDecoded = try JSONDecoder().decode(QualityThresholdHistoryEnvelope.self, from: historyResult.data)
             let count = historyDecoded.data.filter { $0.event == "quality.threshold.alert.large_delta" }.count
             return (count, windowHours, deltaTrigger)
         } catch {
@@ -601,18 +673,12 @@ final class TVMonitorService {
         guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history/alerts/top-scopes?limit=5") else {
             return []
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return []
             }
-            let decoded = try JSONDecoder().decode(QualityThresholdTopScopesEnvelope.self, from: data)
+            let decoded = try JSONDecoder().decode(QualityThresholdTopScopesEnvelope.self, from: result.data)
             return decoded.data.map {
                 TVThresholdAlertTopScope(
                     scopeType: $0.scopeType,
@@ -630,18 +696,12 @@ final class TVMonitorService {
         guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold") else {
             return fallbackThreshold
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return fallbackThreshold
             }
-            let decoded = try JSONDecoder().decode(QualityThresholdEnvelope.self, from: data)
+            let decoded = try JSONDecoder().decode(QualityThresholdEnvelope.self, from: result.data)
             return decoded.data.threshold
         } catch {
             return fallbackThreshold
@@ -652,18 +712,12 @@ final class TVMonitorService {
         guard let routeId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/routes/\(routeId)/breakdown") else {
             return nil
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return nil
             }
-            let decoded = try JSONDecoder().decode(RouteBreakdownEnvelope.self, from: data)
+            let decoded = try JSONDecoder().decode(RouteBreakdownEnvelope.self, from: result.data)
             return TVRouteBreakdown(
                 routeId: decoded.data.routeId,
                 routeCode: decoded.data.routeCode ?? decoded.data.routeId,
@@ -718,17 +772,11 @@ final class TVMonitorService {
         guard let driverId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/drivers/\(driverId)/breakdown") else {
             return nil
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return nil
             }
-            let decoded = try JSONDecoder().decode(DriverBreakdownEnvelope.self, from: data)
+            let decoded = try JSONDecoder().decode(DriverBreakdownEnvelope.self, from: result.data)
             return TVDriverBreakdown(
                 driverId: decoded.data.driverId,
                 driverCode: decoded.data.driverCode ?? decoded.data.driverId,
@@ -761,17 +809,11 @@ final class TVMonitorService {
         guard let subcontractorId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/subcontractors/\(subcontractorId)/breakdown") else {
             return nil
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
                 return nil
             }
-            let decoded = try JSONDecoder().decode(SubcontractorBreakdownEnvelope.self, from: data)
+            let decoded = try JSONDecoder().decode(SubcontractorBreakdownEnvelope.self, from: result.data)
             return TVSubcontractorBreakdown(
                 subcontractorId: decoded.data.subcontractorId,
                 subcontractorCode: decoded.data.subcontractorCode ?? decoded.data.subcontractorId,
@@ -941,4 +983,8 @@ private struct QualityThresholdTopScopePayload: Decodable {
         case scopeLabel = "scope_label"
         case alertsCount = "alerts_count"
     }
+}
+
+private struct LoginEnvelope: Decodable {
+    let token: String
 }

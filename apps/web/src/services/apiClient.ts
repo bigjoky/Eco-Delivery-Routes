@@ -18,6 +18,7 @@ import {
   QualityThresholdAlertTopScope,
   QualityThresholdHistoryEntry,
   QualityTopRoutesResult,
+  RoleDetail,
   RoleSummary,
   RouteStopSummary,
   RouteSummary,
@@ -131,7 +132,16 @@ function paginateLocal<T>(items: T[], page: number, perPage: number): PaginatedR
 
 export const apiClient = {
   async login(payload: { email: string; password: string }): Promise<LoginResponse> {
-    if (USE_MOCK) return mockApi.login(payload);
+    if (USE_MOCK) {
+      const data = await mockApi.login(payload);
+      sessionStore.setToken(data.token ?? null);
+      try {
+        await this.getCurrentUser();
+      } catch {
+        // Non-blocking; role context can be refreshed later.
+      }
+      return data;
+    }
 
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
@@ -286,7 +296,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -314,7 +324,7 @@ export const apiClient = {
   },
 
   async exportAuditLogsCsv(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
     dateFrom?: string;
@@ -347,6 +357,32 @@ export const apiClient = {
     if (USE_MOCK) return mockApi.getRoles();
     const response = await authorizedFetch(`${API_BASE_URL}/roles`);
     return parseData<RoleSummary>(response);
+  },
+
+  async getRoleById(roleId: string): Promise<RoleDetail> {
+    if (USE_MOCK) return mockApi.getRoleById(roleId) as Promise<RoleDetail>;
+    const response = await authorizedFetch(`${API_BASE_URL}/roles/${roleId}`);
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot load role');
+    }
+    return json.data as RoleDetail;
+  },
+
+  async updateRolePermissions(roleId: string, permissionIds: string[]): Promise<RoleDetail> {
+    if (USE_MOCK) return mockApi.updateRolePermissions(roleId, permissionIds) as Promise<RoleDetail>;
+    const response = await authorizedFetch(`${API_BASE_URL}/roles/${roleId}/permissions`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ permission_ids: permissionIds }),
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot update role permissions');
+    }
+    return json.data as RoleDetail;
   },
 
   async getHubs(filters: { onlyActive?: boolean } = {}): Promise<HubSummary[]> {

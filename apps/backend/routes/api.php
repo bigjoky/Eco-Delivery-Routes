@@ -40,6 +40,8 @@ Route::prefix('v1')->group(function () {
         Route::post('users/{id}/roles', [UserController::class, 'assignRoles']);
 
         Route::get('roles', [RoleController::class, 'index']);
+        Route::get('roles/{id}', [RoleController::class, 'show']);
+        Route::put('roles/{id}/permissions', [RoleController::class, 'updatePermissions']);
         Route::get('audit-logs', [AuditLogController::class, 'index']);
         Route::get('audit-logs/export.csv', [AuditLogController::class, 'exportCsv']);
 

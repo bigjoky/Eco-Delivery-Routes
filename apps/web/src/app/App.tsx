@@ -7,6 +7,7 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
 import { QualityPage } from '../features/quality/QualityPage';
 import { RolesPage } from '../features/roles/RolesPage';
+import { RoleDetailPage } from '../features/roles/RoleDetailPage';
 import { RouteDetailPage } from '../features/routes/RouteDetailPage';
 import { RoutesPage } from '../features/routes/RoutesPage';
 import { SettlementDetailPage } from '../features/settlements/SettlementDetailPage';
@@ -43,6 +44,7 @@ export function App() {
         <Route path="/users" element={isAuthenticated ? <UsersPage /> : <Navigate to="/" replace />} />
         <Route path="/users/:id" element={isAuthenticated ? <UserDetailPage /> : <Navigate to="/" replace />} />
         <Route path="/roles" element={isAuthenticated ? <RolesPage /> : <Navigate to="/" replace />} />
+        <Route path="/roles/:id" element={isAuthenticated ? <RoleDetailPage /> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/shipments' : '/'} replace />} />
       </Routes>
     </AppShell>
