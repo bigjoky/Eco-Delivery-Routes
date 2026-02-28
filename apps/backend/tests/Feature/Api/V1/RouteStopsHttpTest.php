@@ -292,6 +292,62 @@ class RouteStopsHttpTest extends TestCase
         $reorder->assertJsonPath('data.1.sequence', 2);
     }
 
+    public function test_operations_manager_can_bulk_add_stops_and_read_manifest(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-BULK',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        $pickupId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-STOPS-BULK-1',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('pickups')->insert([
+            'id' => $pickupId,
+            'hub_id' => $hubId,
+            'reference' => 'PCK-STOPS-BULK-1',
+            'pickup_type' => 'NORMAL',
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $bulk = $this->postJson("/api/v1/routes/{$routeId}/stops/bulk-add", [
+            'shipment_ids' => [$shipmentId],
+            'pickup_ids' => [$pickupId],
+            'status' => 'planned',
+        ]);
+
+        $bulk->assertOk();
+        $bulk->assertJsonPath('data.created_count', 2);
+        $bulk->assertJsonPath('data.skipped_existing_count', 0);
+
+        $manifest = $this->getJson("/api/v1/routes/{$routeId}/manifest");
+        $manifest->assertOk();
+        $manifest->assertJsonPath('data.route.id', $routeId);
+        $manifest->assertJsonPath('data.totals.stops', 2);
+        $manifest->assertJsonPath('data.totals.deliveries', 1);
+        $manifest->assertJsonPath('data.totals.pickups', 1);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

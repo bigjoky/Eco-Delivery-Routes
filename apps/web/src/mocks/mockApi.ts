@@ -808,6 +808,103 @@ export const mockApi = {
       .sort((a, b) => a.sequence - b.sequence);
   },
 
+  async bulkAddRouteStops(routeId: string, payload: {
+    shipment_ids?: string[];
+    pickup_ids?: string[];
+    status?: 'planned' | 'in_progress' | 'completed';
+  }) {
+    const existingShipmentIds = new Set(
+      mockRouteStops.filter((row) => row.route_id === routeId && row.shipment_id).map((row) => row.shipment_id as string)
+    );
+    const existingPickupIds = new Set(
+      mockRouteStops.filter((row) => row.route_id === routeId && row.pickup_id).map((row) => row.pickup_id as string)
+    );
+    const newShipmentIds = (payload.shipment_ids ?? []).filter((id) => !existingShipmentIds.has(id));
+    const newPickupIds = (payload.pickup_ids ?? []).filter((id) => !existingPickupIds.has(id));
+    const skippedExistingCount = (payload.shipment_ids ?? []).length - newShipmentIds.length
+      + (payload.pickup_ids ?? []).length - newPickupIds.length;
+
+    const nextSequenceStart = (mockRouteStops.filter((row) => row.route_id === routeId).reduce((max, row) => Math.max(max, row.sequence), 0)) + 1;
+    let nextSequence = nextSequenceStart;
+
+    newShipmentIds.forEach((shipmentId) => {
+      mockRouteStops.push({
+        id: `st-${routeStopSeq++}`,
+        route_id: routeId,
+        sequence: nextSequence++,
+        stop_type: 'DELIVERY',
+        status: payload.status ?? 'planned',
+        shipment_id: shipmentId,
+        pickup_id: null,
+        entity_type: 'shipment',
+        entity_id: shipmentId,
+        reference: `SHP-${shipmentId.slice(-6)}`,
+      });
+    });
+    newPickupIds.forEach((pickupId) => {
+      mockRouteStops.push({
+        id: `st-${routeStopSeq++}`,
+        route_id: routeId,
+        sequence: nextSequence++,
+        stop_type: 'PICKUP',
+        status: payload.status ?? 'planned',
+        shipment_id: null,
+        pickup_id: pickupId,
+        entity_type: 'pickup',
+        entity_id: pickupId,
+        reference: `PCK-${pickupId.slice(-6)}`,
+      });
+    });
+
+    const routeStops = mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+    const routeIndex = mockRoutes.findIndex((row) => row.id === routeId);
+    if (routeIndex >= 0) {
+      mockRoutes[routeIndex] = { ...mockRoutes[routeIndex], stops_count: routeStops.length };
+    }
+
+    return {
+      created_count: newShipmentIds.length + newPickupIds.length,
+      skipped_existing_count: skippedExistingCount,
+      stops: routeStops,
+    };
+  },
+
+  async getRouteManifest(routeId: string) {
+    const route = mockRoutes.find((row) => row.id === routeId);
+    if (!route) throw new Error('Route not found');
+    const stops = mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+    const deliveries = stops.filter((row) => row.stop_type === 'DELIVERY').length;
+    const pickups = stops.filter((row) => row.stop_type === 'PICKUP').length;
+    const completed = stops.filter((row) => row.status === 'completed').length;
+    const driver = route.driver_id ? mockDrivers.find((row) => row.id === route.driver_id) : null;
+    const vehicle = route.vehicle_id ? mockVehicles.find((row) => row.id === route.vehicle_id) : null;
+
+    return {
+      route: {
+        id: route.id,
+        code: route.code,
+        route_date: route.route_date,
+        status: route.status,
+        driver_code: driver?.code ?? null,
+        vehicle_code: vehicle?.code ?? null,
+      },
+      totals: {
+        stops: stops.length,
+        deliveries,
+        pickups,
+        completed,
+      },
+      stops,
+      generated_at: new Date().toISOString(),
+    };
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
     const route = mockRoutes.find((row) => row.id === 'r-1');
     if (!route) {

@@ -450,6 +450,158 @@ class RouteController extends Controller
         ]);
     }
 
+    public function bulkAddStops(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'shipment_ids' => ['nullable', 'array'],
+            'shipment_ids.*' => ['required', 'uuid', 'exists:shipments,id'],
+            'pickup_ids' => ['nullable', 'array'],
+            'pickup_ids.*' => ['required', 'uuid', 'exists:pickups,id'],
+            'status' => ['nullable', 'in:planned,in_progress,completed'],
+        ]);
+
+        $shipmentIds = array_values(array_unique($payload['shipment_ids'] ?? []));
+        $pickupIds = array_values(array_unique($payload['pickup_ids'] ?? []));
+        if ($shipmentIds === [] && $pickupIds === []) {
+            throw ValidationException::withMessages([
+                'shipment_ids' => ['Provide at least one shipment_id or pickup_id.'],
+            ]);
+        }
+
+        $existingShipmentIds = DB::table('route_stops')
+            ->where('route_id', $id)
+            ->whereNotNull('shipment_id')
+            ->pluck('shipment_id')
+            ->all();
+        $existingPickupIds = DB::table('route_stops')
+            ->where('route_id', $id)
+            ->whereNotNull('pickup_id')
+            ->pluck('pickup_id')
+            ->all();
+
+        $newShipmentIds = array_values(array_diff($shipmentIds, $existingShipmentIds));
+        $newPickupIds = array_values(array_diff($pickupIds, $existingPickupIds));
+        $skippedCount = (count($shipmentIds) - count($newShipmentIds)) + (count($pickupIds) - count($newPickupIds));
+
+        $createdCount = 0;
+        DB::transaction(function () use ($id, $payload, $newShipmentIds, $newPickupIds, &$createdCount): void {
+            $nextSequence = (int) DB::table('route_stops')->where('route_id', $id)->max('sequence');
+            foreach ($newShipmentIds as $shipmentId) {
+                $nextSequence++;
+                DB::table('route_stops')->insert([
+                    'id' => (string) Str::uuid(),
+                    'route_id' => $id,
+                    'sequence' => $nextSequence,
+                    'stop_type' => 'DELIVERY',
+                    'shipment_id' => $shipmentId,
+                    'pickup_id' => null,
+                    'status' => $payload['status'] ?? 'planned',
+                    'planned_at' => null,
+                    'completed_at' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $createdCount++;
+            }
+            foreach ($newPickupIds as $pickupId) {
+                $nextSequence++;
+                DB::table('route_stops')->insert([
+                    'id' => (string) Str::uuid(),
+                    'route_id' => $id,
+                    'sequence' => $nextSequence,
+                    'stop_type' => 'PICKUP',
+                    'shipment_id' => null,
+                    'pickup_id' => $pickupId,
+                    'status' => $payload['status'] ?? 'planned',
+                    'planned_at' => null,
+                    'completed_at' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $createdCount++;
+            }
+        });
+
+        return response()->json([
+            'data' => [
+                'created_count' => $createdCount,
+                'skipped_existing_count' => $skippedCount,
+                'stops' => $this->fetchRouteStops($id),
+            ],
+        ]);
+    }
+
+    public function manifest(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.read')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')
+            ->leftJoin('drivers', 'drivers.id', '=', 'routes.driver_id')
+            ->leftJoin('vehicles', 'vehicles.id', '=', 'routes.vehicle_id')
+            ->where('routes.id', $id)
+            ->select(
+                'routes.id',
+                'routes.code',
+                'routes.route_date',
+                'routes.status',
+                'drivers.code as driver_code',
+                'vehicles.code as vehicle_code'
+            )
+            ->first();
+
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $stops = $this->fetchRouteStops($id);
+        $deliveries = 0;
+        $pickups = 0;
+        $completed = 0;
+        foreach ($stops as $stop) {
+            if ($stop->stop_type === 'DELIVERY') {
+                $deliveries++;
+            } else {
+                $pickups++;
+            }
+            if ($stop->status === 'completed') {
+                $completed++;
+            }
+        }
+
+        return response()->json([
+            'data' => [
+                'route' => $route,
+                'totals' => [
+                    'stops' => count($stops),
+                    'deliveries' => $deliveries,
+                    'pickups' => $pickups,
+                    'completed' => $completed,
+                ],
+                'stops' => $stops,
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $payload
      */

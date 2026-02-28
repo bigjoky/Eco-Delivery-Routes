@@ -1327,6 +1327,35 @@ paths:
         '201': { description: Creado }
         '404': { description: Ruta no encontrada }
 
+  /routes/{id}/stops/bulk-add:
+    post:
+      tags: [Routes]
+      summary: Crear paradas masivamente en ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shipment_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                pickup_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                status:
+                  type: string
+                  enum: [planned, in_progress, completed]
+      responses:
+        '200': { description: Paradas creadas }
+        '404': { description: Ruta no encontrada }
+
   /routes/{id}/stops/reorder:
     post:
       tags: [Routes]
@@ -1351,6 +1380,19 @@ paths:
         '200': { description: Reordenado }
         '404': { description: Ruta no encontrada }
         '422': { description: stop_ids invalidos }
+
+  /routes/{id}/manifest:
+    get:
+      tags: [Routes]
+      summary: Obtener manifiesto de ruta (totales + detalle de paradas)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '404': { description: Ruta no encontrada }
 
   /routes/{id}/stops/{stopId}:
     patch:

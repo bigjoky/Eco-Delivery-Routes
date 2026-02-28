@@ -27,6 +27,17 @@ describe('route stops CRUD contract', () => {
     expect(reordered[0].id).toBe(updated.id);
     expect(reordered[0].sequence).toBe(1);
 
+    const bulk = await apiClient.bulkAddRouteStops('r-1', {
+      shipment_ids: ['00000000-0000-0000-0000-000000001111'],
+      pickup_ids: ['00000000-0000-0000-0000-000000002222'],
+      status: 'planned',
+    });
+    expect(bulk.created_count).toBeGreaterThanOrEqual(1);
+
+    const manifest = await apiClient.getRouteManifest('r-1');
+    expect(manifest.route.id).toBe('r-1');
+    expect(manifest.totals.stops).toBeGreaterThan(0);
+
     const remaining = await apiClient.deleteRouteStop('r-1', created.id);
     expect(remaining.find((row) => row.id === created.id)).toBeUndefined();
     if (remaining.length > 0) {
