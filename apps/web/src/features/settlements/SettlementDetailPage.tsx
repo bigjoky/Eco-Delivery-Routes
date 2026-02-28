@@ -33,6 +33,7 @@ export function SettlementDetailPage() {
   const [bulkRouteId, setBulkRouteId] = useState('');
   const [bulkSubcontractorId, setBulkSubcontractorId] = useState('');
   const [bulkPreview, setBulkPreview] = useState<SettlementBulkReconcilePreview | null>(null);
+  const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
 
   const reload = async () => {
     if (!settlementId) return;
@@ -112,10 +113,18 @@ export function SettlementDetailPage() {
 
   const onRejectAdjustment = async (adjustmentId: string) => {
     if (!settlementId) return;
-    const rejectReason = window.prompt('Motivo del rechazo', 'Rechazado por validacion de contabilidad');
-    if (!rejectReason) return;
+    const rejectReason = (rejectReasons[adjustmentId] ?? '').trim();
+    if (!rejectReason) {
+      setFeedback('Indica un motivo de rechazo para el ajuste.');
+      return;
+    }
     await apiClient.rejectSettlementAdjustment(settlementId, adjustmentId, rejectReason);
     setFeedback(`Ajuste ${adjustmentId} rechazado`);
+    setRejectReasons((prev) => {
+      const next = { ...prev };
+      delete next[adjustmentId];
+      return next;
+    });
     await reload();
     await loadAudit();
   };
@@ -405,6 +414,12 @@ export function SettlementDetailPage() {
                     <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>
                     <TableCell>
                       <div className="inline-actions">
+                        <Input
+                          value={rejectReasons[item.id] ?? ''}
+                          onChange={(event) => setRejectReasons((prev) => ({ ...prev, [item.id]: event.target.value }))}
+                          placeholder="Motivo rechazo"
+                          disabled={!canApproveAdjustments || !isDraft || item.status !== 'pending'}
+                        />
                         <Button
                           type="button"
                           variant="outline"

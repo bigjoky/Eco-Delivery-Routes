@@ -379,6 +379,47 @@ class QualityByRouteHttpTest extends TestCase
         $pdf->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_subcontractor_breakdown_returns_aggregate_and_exports(): void
+    {
+        $subcontractorId = (string) DB::table('subcontractors')->value('id');
+        $this->assertNotEmpty($subcontractorId);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'subcontractor',
+            'scope_id' => $subcontractorId,
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+            'period_granularity' => 'monthly',
+            'assigned_with_attempt' => 110,
+            'delivered_completed' => 93,
+            'failed_count' => 5,
+            'absent_count' => 3,
+            'retry_count' => 4,
+            'pickups_completed' => 7,
+            'service_quality_score' => 90.9,
+            'calculated_at' => now(),
+            'payload' => json_encode(['threshold' => 95]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/kpis/quality/subcontractors/' . $subcontractorId . '/breakdown?granularity=month');
+        $response->assertOk();
+        $response->assertJsonPath('data.subcontractor_id', $subcontractorId);
+        $response->assertJsonPath('data.scope_type', 'subcontractor');
+        $response->assertJsonPath('data.components.assigned_with_attempt', 110);
+        $response->assertJsonPath('data.components.completed_total', 100);
+
+        $csv = $this->get('/api/v1/kpis/quality/subcontractors/' . $subcontractorId . '/breakdown/export.csv?granularity=week');
+        $csv->assertOk();
+        $csv->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+        $pdf = $this->get('/api/v1/kpis/quality/subcontractors/' . $subcontractorId . '/breakdown/export.pdf?granularity=month');
+        $pdf->assertOk();
+        $pdf->assertHeader('content-type', 'application/pdf');
+    }
+
     public function test_risk_summary_requires_dashboard_quality_permission(): void
     {
         /** @var \App\Models\User|null $user */

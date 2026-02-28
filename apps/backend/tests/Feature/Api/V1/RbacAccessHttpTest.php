@@ -41,6 +41,28 @@ class RbacAccessHttpTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
+    public function test_driver_cannot_recalculate_quality_snapshot(): void
+    {
+        $this->actingAs($this->createUserWithRole('driver'), 'sanctum');
+
+        $response = $this->postJson('/api/v1/kpis/quality/recalculate', [
+            'scope_type' => 'route',
+            'scope_id' => (string) Str::uuid(),
+            'period_start' => '2026-02-01',
+            'period_end' => '2026-02-28',
+        ]);
+
+        $response->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
+    }
+
+    public function test_driver_cannot_export_quality_breakdown_csv(): void
+    {
+        $this->actingAs($this->createUserWithRole('driver'), 'sanctum');
+
+        $response = $this->get('/api/v1/kpis/quality/subcontractors/' . Str::uuid() . '/breakdown/export.csv');
+        $response->assertStatus(403);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

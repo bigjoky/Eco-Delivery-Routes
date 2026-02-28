@@ -397,6 +397,145 @@ class QualityController extends Controller
         ]);
     }
 
+    public function subcontractorBreakdown(Request $request, string $subcontractorId): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboardQuality($actor)) {
+            return $this->forbidden();
+        }
+
+        $subcontractor = DB::table('subcontractors')->where('id', $subcontractorId)->first();
+        if (!$subcontractor) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_SUBCONTRACTOR_NOT_FOUND',
+                    'message' => 'Subcontractor not found.',
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $this->buildBreakdownPayload(
+                rows: $this->scopeRows($request, 'subcontractor', $subcontractorId),
+                scopeKey: 'subcontractor',
+                scopeId: $subcontractorId,
+                scopeLabel: $subcontractor->legal_name ?? $subcontractorId,
+                hubId: null,
+                subcontractorId: $subcontractorId,
+                granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+            ),
+        ]);
+    }
+
+    public function subcontractorBreakdownExportCsv(Request $request, string $subcontractorId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $subcontractor = DB::table('subcontractors')->where('id', $subcontractorId)->first();
+        if (!$subcontractor) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_SUBCONTRACTOR_NOT_FOUND',
+                    'message' => 'Subcontractor not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'subcontractor', $subcontractorId),
+            scopeKey: 'subcontractor',
+            scopeId: $subcontractorId,
+            scopeLabel: $subcontractor->legal_name ?? $subcontractorId,
+            hubId: null,
+            subcontractorId: $subcontractorId,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $csvRows = [
+            'scope_type,scope_id,scope_label,granularity,period_key,period_start,period_end,assigned_with_attempt,delivered_completed,pickups_completed,failed_count,absent_count,retry_count,completed_total,completion_ratio',
+        ];
+        foreach ($payload['periods'] as $period) {
+            $csvRows[] = implode(',', [
+                $this->csv((string) $payload['scope_type']),
+                $this->csv((string) $payload['scope_id']),
+                $this->csv((string) ($payload['scope_label'] ?? '')),
+                $this->csv((string) $payload['granularity']),
+                $this->csv((string) ($period['period_key'] ?? '')),
+                $this->csv((string) ($period['period_start'] ?? '')),
+                $this->csv((string) ($period['period_end'] ?? '')),
+                (string) ($period['components']['assigned_with_attempt'] ?? 0),
+                (string) ($period['components']['delivered_completed'] ?? 0),
+                (string) ($period['components']['pickups_completed'] ?? 0),
+                (string) ($period['components']['failed_count'] ?? 0),
+                (string) ($period['components']['absent_count'] ?? 0),
+                (string) ($period['components']['retry_count'] ?? 0),
+                (string) ($period['components']['completed_total'] ?? 0),
+                (string) ($period['components']['completion_ratio'] ?? 0),
+            ]);
+        }
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="quality_subcontractor_breakdown.csv"',
+        ]);
+    }
+
+    public function subcontractorBreakdownExportPdf(Request $request, string $subcontractorId): Response|JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('quality.export')) {
+            return $this->forbidden();
+        }
+
+        $subcontractor = DB::table('subcontractors')->where('id', $subcontractorId)->first();
+        if (!$subcontractor) {
+            return response()->json([
+                'error' => [
+                    'code' => 'QUALITY_SUBCONTRACTOR_NOT_FOUND',
+                    'message' => 'Subcontractor not found.',
+                ],
+            ], 404);
+        }
+
+        $payload = $this->buildBreakdownPayload(
+            rows: $this->scopeRows($request, 'subcontractor', $subcontractorId),
+            scopeKey: 'subcontractor',
+            scopeId: $subcontractorId,
+            scopeLabel: $subcontractor->legal_name ?? $subcontractorId,
+            hubId: null,
+            subcontractorId: $subcontractorId,
+            granularity: $this->normalizeBreakdownGranularity((string) $request->query('granularity', 'month'))
+        );
+
+        $lines = [
+            'Eco Delivery Routes - Subcontractor Breakdown',
+            sprintf('Subcontractor: %s', (string) ($payload['scope_label'] ?? $payload['scope_id'])),
+            sprintf('Granularity: %s', (string) $payload['granularity']),
+            sprintf('Quality score: %.2f%%', (float) $payload['service_quality_score']),
+            sprintf('Assigned: %d | Completed: %d', (int) $payload['components']['assigned_with_attempt'], (int) $payload['components']['completed_total']),
+        ];
+        foreach ($payload['periods'] as $period) {
+            $lines[] = sprintf(
+                '%s | %.2f%% | completed %d/%d',
+                (string) ($period['period_key'] ?? ''),
+                (float) ($period['components']['completion_ratio'] ?? 0),
+                (int) ($period['components']['completed_total'] ?? 0),
+                (int) ($period['components']['assigned_with_attempt'] ?? 0)
+            );
+        }
+
+        return response($this->buildSimplePdf($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="quality_subcontractor_breakdown.pdf"',
+        ]);
+    }
+
     public function exportCsv(Request $request): Response|JsonResponse
     {
         /** @var User $actor */

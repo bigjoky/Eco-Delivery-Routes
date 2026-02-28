@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -27,8 +27,10 @@ export function QualityPage() {
   const [riskSummary, setRiskSummary] = useState<QualityRiskSummaryRow[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState('');
   const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedSubcontractorBreakdownId, setSelectedSubcontractorBreakdownId] = useState('');
   const [routeBreakdown, setRouteBreakdown] = useState<QualityRouteBreakdown | null>(null);
   const [driverBreakdown, setDriverBreakdown] = useState<QualityDriverBreakdown | null>(null);
+  const [subcontractorBreakdown, setSubcontractorBreakdown] = useState<QualitySubcontractorBreakdown | null>(null);
   const [breakdownGranularity, setBreakdownGranularity] = useState<'week' | 'month'>('month');
 
   useEffect(() => {
@@ -106,6 +108,20 @@ export function QualityPage() {
       })
       .then(setDriverBreakdown);
   }, [selectedDriverId, periodStart, periodEnd, breakdownGranularity, hubId, subcontractorId]);
+
+  useEffect(() => {
+    if (!selectedSubcontractorBreakdownId) {
+      setSubcontractorBreakdown(null);
+      return;
+    }
+    apiClient
+      .getQualitySubcontractorBreakdown(selectedSubcontractorBreakdownId, {
+        periodStart: periodStart || undefined,
+        periodEnd: periodEnd || undefined,
+        granularity: breakdownGranularity,
+      })
+      .then(setSubcontractorBreakdown);
+  }, [selectedSubcontractorBreakdownId, periodStart, periodEnd, breakdownGranularity]);
 
   const avg = useMemo(() => {
     if (items.length === 0) return 0;
@@ -265,6 +281,14 @@ export function QualityPage() {
                         >
                           Ver detalle conductor
                         </Button>
+                      ) : item.scope_type === 'subcontractor' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSelectedSubcontractorBreakdownId(item.scope_id)}
+                        >
+                          Ver detalle subcontrata
+                        </Button>
                       ) : (
                         '-'
                       )}
@@ -398,6 +422,65 @@ export function QualityPage() {
               <div style={{ display: 'grid', gap: 8 }}>
                 {driverBreakdown.periods.map((period) => (
                   <div key={`driver-${period.period_key}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{period.period_key}</span>
+                      <span>{period.components.completion_ratio}%</span>
+                    </div>
+                    <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8 }}>
+                      <div
+                        style={{
+                          width: `${normalizeChartWidth(period.components.completion_ratio)}%`,
+                          height: '100%',
+                          borderRadius: 6,
+                          background: chartColorByRatio(period.components.completion_ratio),
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {subcontractorBreakdown && (
+            <>
+              <h3>Detalle KPI por subcontrata</h3>
+              <div className="inline-actions">
+                <Badge variant={subcontractorBreakdown.service_quality_score >= 95 ? 'success' : 'warning'}>
+                  {subcontractorBreakdown.service_quality_score}%
+                </Badge>
+                <span>Subcontrata: {subcontractorBreakdown.subcontractor_code ?? subcontractorBreakdown.subcontractor_id}</span>
+                <span>Snapshots: {subcontractorBreakdown.snapshots_count}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualitySubcontractorBreakdownCsv(subcontractorBreakdown.subcontractor_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar CSV subcontrata
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    apiClient.exportQualitySubcontractorBreakdownPdf(subcontractorBreakdown.subcontractor_id, {
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                      granularity: breakdownGranularity,
+                    })
+                  }
+                >
+                  Exportar PDF subcontrata
+                </Button>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {subcontractorBreakdown.periods.map((period) => (
+                  <div key={`subcontractor-${period.period_key}`}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
                       <span>{period.period_key}</span>
                       <span>{period.components.completion_ratio}%</span>

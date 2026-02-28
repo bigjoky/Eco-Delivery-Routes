@@ -63,6 +63,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/drivers/{driverId}/breakdown/export.pdf'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/subcontractors/{subcontractorId}/breakdown'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/subcontractors/{subcontractorId}/breakdown/export.csv'", $contents);
+        $this->assertStringContainsString("Route::get('kpis/quality/subcontractors/{subcontractorId}/breakdown/export.pdf'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/export.pdf'", $contents);
     }
@@ -127,6 +130,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/drivers/{driverId}/breakdown/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/subcontractors/{subcontractorId}/breakdown:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/subcontractors/{subcontractorId}/breakdown/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/kpis/quality/subcontractors/{subcontractorId}/breakdown/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

@@ -1226,6 +1226,72 @@ paths:
         '200': { description: PDF export }
         '404': { description: Conductor no encontrado }
 
+  /kpis/quality/subcontractors/{subcontractorId}/breakdown:
+    get:
+      tags: [Quality]
+      summary: Obtener desglose auditable de calidad por subcontrata
+      parameters:
+        - in: path
+          name: subcontractorId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: OK }
+        '404': { description: Subcontrata no encontrada }
+
+  /kpis/quality/subcontractors/{subcontractorId}/breakdown/export.csv:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por subcontrata a CSV
+      parameters:
+        - in: path
+          name: subcontractorId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: CSV export }
+        '404': { description: Subcontrata no encontrada }
+
+  /kpis/quality/subcontractors/{subcontractorId}/breakdown/export.pdf:
+    get:
+      tags: [Quality]
+      summary: Exportar desglose de calidad por subcontrata a PDF
+      parameters:
+        - in: path
+          name: subcontractorId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+        - in: query
+          name: period_end
+          schema: { type: string, format: date }
+        - in: query
+          name: granularity
+          schema: { type: string, enum: [week, month], default: month }
+      responses:
+        '200': { description: PDF export }
+        '404': { description: Subcontrata no encontrada }
+
   /kpis/quality/export.csv:
     get:
       tags: [Quality]

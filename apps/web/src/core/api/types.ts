@@ -137,7 +137,7 @@ export type QualityRiskSummaryResult = {
 };
 
 export type QualityRouteBreakdown = {
-  scope_type: 'route' | 'driver';
+  scope_type: 'route';
   scope_id: string;
   scope_label?: string | null;
   route_id: string;
@@ -188,6 +188,22 @@ export type QualityDriverBreakdown = {
   driver_code?: string | null;
   hub_id?: string | null;
   subcontractor_id?: string | null;
+  granularity: 'week' | 'month';
+  latest_snapshot_id?: string | null;
+  latest_period_start?: string | null;
+  latest_period_end?: string | null;
+  snapshots_count: number;
+  service_quality_score: number;
+  periods: QualityRouteBreakdown['periods'];
+  components: QualityRouteBreakdown['components'];
+};
+
+export type QualitySubcontractorBreakdown = {
+  scope_type: 'subcontractor';
+  scope_id: string;
+  scope_label?: string | null;
+  subcontractor_id: string;
+  subcontractor_code?: string | null;
   granularity: 'week' | 'month';
   latest_snapshot_id?: string | null;
   latest_period_start?: string | null;

@@ -582,6 +582,99 @@ export const mockApi = {
     return;
   },
 
+  async getQualitySubcontractorBreakdown(subcontractorId: string, filters: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  } = {}) {
+    const rows = await this.getQualitySnapshots({
+      scopeType: 'subcontractor',
+      scopeId: subcontractorId,
+      subcontractorId,
+      periodStart: filters.periodStart,
+      periodEnd: filters.periodEnd,
+    }) as Array<{
+      id: string;
+      scope_id: string;
+      scope_label?: string;
+      period_start: string;
+      period_end: string;
+      assigned_with_attempt: number;
+      delivered_completed: number;
+      pickups_completed: number;
+      failed_count?: number;
+      absent_count?: number;
+      retry_count?: number;
+    }>;
+
+    const assigned = rows.reduce((acc, row) => acc + row.assigned_with_attempt, 0);
+    const delivered = rows.reduce((acc, row) => acc + row.delivered_completed, 0);
+    const pickups = rows.reduce((acc, row) => acc + row.pickups_completed, 0);
+    const failed = rows.reduce((acc, row) => acc + (row.failed_count ?? 0), 0);
+    const absent = rows.reduce((acc, row) => acc + (row.absent_count ?? 0), 0);
+    const retry = rows.reduce((acc, row) => acc + (row.retry_count ?? 0), 0);
+    const completed = delivered + pickups;
+    const ratio = assigned > 0 ? Number(((completed / assigned) * 100).toFixed(2)) : 0;
+    const granularity = filters.granularity ?? 'month';
+    const latest = rows[0];
+
+    return {
+      scope_type: 'subcontractor',
+      scope_id: subcontractorId,
+      scope_label: latest?.scope_label ?? subcontractorId,
+      subcontractor_id: subcontractorId,
+      subcontractor_code: latest?.scope_label ?? subcontractorId,
+      granularity,
+      latest_snapshot_id: latest?.id ?? null,
+      latest_period_start: latest?.period_start ?? null,
+      latest_period_end: latest?.period_end ?? null,
+      snapshots_count: rows.length,
+      service_quality_score: ratio,
+      periods: [{
+        period_key: granularity === 'week' ? '2026-W08' : '2026-02',
+        period_start: rows[rows.length - 1]?.period_start ?? '2026-02-01',
+        period_end: rows[0]?.period_end ?? '2026-02-28',
+        service_quality_score: ratio,
+        components: {
+          assigned_with_attempt: assigned,
+          delivered_completed: delivered,
+          pickups_completed: pickups,
+          failed_count: failed,
+          absent_count: absent,
+          retry_count: retry,
+          completed_total: completed,
+          completion_ratio: ratio,
+        },
+      }],
+      components: {
+        assigned_with_attempt: assigned,
+        delivered_completed: delivered,
+        pickups_completed: pickups,
+        failed_count: failed,
+        absent_count: absent,
+        retry_count: retry,
+        completed_total: completed,
+        completion_ratio: ratio,
+      },
+    };
+  },
+
+  async exportQualitySubcontractorBreakdownCsv(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
+  },
+
+  async exportQualitySubcontractorBreakdownPdf(_: string, __: {
+    periodStart?: string;
+    periodEnd?: string;
+    granularity?: 'week' | 'month';
+  }) {
+    return;
+  },
+
   async getIncidents() {
     return [
       {
