@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Users\AssignRolesRequest;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,10 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function __construct(private readonly ListUsersAction $listUsersAction)
+    public function __construct(
+        private readonly ListUsersAction $listUsersAction,
+        private readonly AuditLogWriter $auditLogWriter
+    )
     {
     }
 
@@ -26,8 +30,17 @@ class UserController extends Controller
             return $this->forbidden();
         }
 
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = max(1, min((int) $request->query('per_page', 20), 100));
+        $sort = (string) $request->query('sort', 'name');
+        $dir = (string) $request->query('dir', 'asc');
+        $query = $request->filled('q') ? (string) $request->query('q') : null;
+        $status = $request->filled('status') ? (string) $request->query('status') : null;
+        $payload = $this->listUsersAction->execute($query, $status, $sort, $dir, $page, $perPage);
+
         return response()->json([
-            'data' => $this->listUsersAction->execute(),
+            'data' => $payload['data'],
+            'meta' => $payload['meta'],
             'message' => 'Users index',
         ]);
     }
@@ -52,9 +65,26 @@ class UserController extends Controller
             $roles = Role::query()->whereIn('id', $payload['role_ids'])->pluck('id')->all();
             $user->roles()->sync($roles);
         }
+        $user->load('roles:id,code,name');
+        $this->auditLogWriter->write($actor->id, 'user.created', [
+            'user_id' => $user->id,
+            'status' => $user->status,
+            'role_ids' => $user->roles->pluck('id')->all(),
+        ]);
 
         return response()->json([
-            'data' => $user->only(['id', 'name', 'email', 'status']),
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'last_login_at' => optional($user->last_login_at)?->toISOString(),
+                'roles' => $user->roles->map(fn ($role) => [
+                    'id' => $role->id,
+                    'code' => $role->code,
+                    'name' => $role->name,
+                ])->values()->all(),
+            ],
             'message' => 'User created',
         ], 201);
     }
@@ -77,10 +107,21 @@ class UserController extends Controller
         if (!$actor->hasPermission('users.read') && $actor->id !== $user->id) {
             return $this->forbidden();
         }
+        $user->load('roles:id,code,name');
 
         return response()->json([
-            'data' => $user->only(['id', 'name', 'email', 'status', 'last_login_at']),
-            'roles' => $user->roles()->get(['id', 'code', 'name']),
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'last_login_at' => optional($user->last_login_at)?->toISOString(),
+                'roles' => $user->roles->map(fn ($role) => [
+                    'id' => $role->id,
+                    'code' => $role->code,
+                    'name' => $role->name,
+                ])->values()->all(),
+            ],
             'message' => 'User detail',
         ]);
     }
@@ -104,10 +145,28 @@ class UserController extends Controller
             return $this->forbidden();
         }
 
+        $before = $user->only(['name', 'email', 'status']);
         $user->fill($request->validated())->save();
+        $user->load('roles:id,code,name');
+        $this->auditLogWriter->write($actor->id, 'user.updated', [
+            'user_id' => $user->id,
+            'before' => $before,
+            'after' => $user->only(['name', 'email', 'status']),
+        ]);
 
         return response()->json([
-            'data' => $user->only(['id', 'name', 'email', 'status']),
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'last_login_at' => optional($user->last_login_at)?->toISOString(),
+                'roles' => $user->roles->map(fn ($role) => [
+                    'id' => $role->id,
+                    'code' => $role->code,
+                    'name' => $role->name,
+                ])->values()->all(),
+            ],
             'message' => 'User updated',
         ]);
     }
@@ -136,6 +195,10 @@ class UserController extends Controller
             ->all();
 
         $user->roles()->sync($validatedIds);
+        $this->auditLogWriter->write($actor->id, 'user.roles.assigned', [
+            'user_id' => $user->id,
+            'role_ids' => $validatedIds,
+        ]);
 
         return response()->json([
             'data' => [

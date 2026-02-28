@@ -6,6 +6,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.ecodeliveryroutes.core.session.SessionStore
 import com.ecodeliveryroutes.features.auth.LoginScreen
 import com.ecodeliveryroutes.features.driver.DriverRouteScreen
 import com.ecodeliveryroutes.features.quality.RouteQualityScreen
@@ -13,12 +14,23 @@ import com.ecodeliveryroutes.features.quality.RouteQualityScreen
 @Composable
 fun AppNavHost() {
     val navController = rememberNavController()
+    val startDestination = if (SessionStore.isAuthenticated()) "driver_route" else "login"
 
-    NavHost(navController = navController, startDestination = "login") {
-        composable("login") { LoginScreen(onSuccess = { navController.navigate("driver_route") }) }
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("login") {
+            LoginScreen(onSuccess = {
+                navController.navigate("driver_route") {
+                    popUpTo("login") { inclusive = true }
+                }
+            })
+        }
         composable("driver_route") {
             DriverRouteScreen(onOpenRouteQuality = { routeId ->
                 navController.navigate("route_quality/$routeId")
+            }, onLogout = {
+                navController.navigate("login") {
+                    popUpTo("driver_route") { inclusive = true }
+                }
             })
         }
         composable(

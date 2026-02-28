@@ -3,6 +3,7 @@ import Foundation
 public protocol APIClientProtocol {
     func setAuthToken(_ token: String?)
     func login(email: String, password: String) async throws -> AuthToken
+    func logout() async
     func myRoute(routeDate: String?, status: String?) async throws -> DriverRouteMePayload
     func myRouteStops() async throws -> [DriverStop]
     func advances(status: String?, period: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<AdvanceSummary>
@@ -45,6 +46,21 @@ public final class APIClient: APIClientProtocol {
 
     public func setAuthToken(_ token: String?) {
         self.token = token
+    }
+
+    public func logout() async {
+        guard let baseURL else {
+            token = nil
+            return
+        }
+
+        var request = URLRequest(url: baseURL.appending(path: "auth/logout"))
+        request.httpMethod = "POST"
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        _ = try? await URLSession.shared.data(for: request)
+        token = nil
     }
 
     public func login(email: String, password: String) async throws -> AuthToken {
@@ -430,14 +446,43 @@ public final class APIClient: APIClientProtocol {
     }
 
     private func execute(_ request: URLRequest) async throws -> Data {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        var currentRequest = request
+        let (data, response) = try await URLSession.shared.data(for: currentRequest)
         guard let http = response as? HTTPURLResponse else {
             throw APIClientError.invalidResponse
+        }
+        if http.statusCode == 401, try await refreshToken(), let refreshed = token {
+            currentRequest.setValue("Bearer \(refreshed)", forHTTPHeaderField: "Authorization")
+            let (retryData, retryResponse) = try await URLSession.shared.data(for: currentRequest)
+            guard let retryHttp = retryResponse as? HTTPURLResponse else {
+                throw APIClientError.invalidResponse
+            }
+            guard (200...299).contains(retryHttp.statusCode) else {
+                throw APIClientError.httpStatus(retryHttp.statusCode)
+            }
+            return retryData
         }
         guard (200...299).contains(http.statusCode) else {
             throw APIClientError.httpStatus(http.statusCode)
         }
         return data
+    }
+
+    private func refreshToken() async throws -> Bool {
+        guard let baseURL, let token else { return false }
+
+        var request = URLRequest(url: baseURL.appending(path: "auth/refresh"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            self.token = nil
+            return false
+        }
+
+        let decoded = try JSONDecoder().decode(LoginResponse.self, from: data)
+        self.token = decoded.token
+        return true
     }
 
     private func withQueryItems(_ url: URL, queryItems: [URLQueryItem]) -> URL {

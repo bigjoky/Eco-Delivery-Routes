@@ -3,6 +3,12 @@ export type UserSummary = {
   name: string;
   email: string;
   status: string;
+  last_login_at?: string | null;
+  roles?: Array<{
+    id: string;
+    code: string;
+    name: string;
+  }>;
 };
 
 export type PaginationMeta = {

@@ -11,16 +11,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ecodeliveryroutes.core.model.QualitySnapshot
 import com.ecodeliveryroutes.core.model.RouteStop
 import com.ecodeliveryroutes.core.network.ApiProvider
+import com.ecodeliveryroutes.core.session.SessionStore
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
-fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}) {
+fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () -> Unit = {}) {
+    val context = LocalContext.current
     val stops = remember { mutableStateOf<List<RouteStop>>(emptyList()) }
     val selectedStopId = remember { mutableStateOf<String?>(null) }
     val routeDateFilter = remember { mutableStateOf(LocalDate.now().toString()) }
@@ -178,6 +181,15 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}) {
                 message.value = if (ok) "Incidencia registrada" else "Error incidencia"
             }
         }) { Text("Registrar Incidencia") }
+
+        Button(onClick = {
+            scope.launch {
+                ApiProvider.client.logout()
+                SessionStore.updateToken(null)
+                SessionStore.persist(context)
+                onLogout()
+            }
+        }) { Text("Cerrar sesión") }
 
         if (message.value.isNotBlank()) Text(message.value)
     }

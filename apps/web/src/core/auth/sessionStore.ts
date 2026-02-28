@@ -2,6 +2,7 @@ const STORAGE_KEY = 'eco_delivery_routes_token';
 const ROLES_STORAGE_KEY = 'eco_delivery_routes_roles';
 let token: string | null = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
 let roles: string[] = [];
+const listeners = new Set<() => void>();
 if (typeof window !== 'undefined') {
   try {
     const raw = window.localStorage.getItem(ROLES_STORAGE_KEY) ?? '[]';
@@ -22,6 +23,7 @@ export const sessionStore = {
         window.localStorage.removeItem(STORAGE_KEY);
       }
     }
+    listeners.forEach((listener) => listener());
   },
   getToken() {
     return token;
@@ -31,11 +33,16 @@ export const sessionStore = {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(value));
     }
+    listeners.forEach((listener) => listener());
   },
   getRoles() {
     return roles;
   },
   isAuthenticated() {
     return !!token;
+  },
+  subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   },
 };

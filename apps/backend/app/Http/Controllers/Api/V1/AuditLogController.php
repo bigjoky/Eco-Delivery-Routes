@@ -107,11 +107,15 @@ class AuditLogController extends Controller
             } elseif ($resource === 'quality_threshold') {
                 $query->where('event', 'like', 'quality.threshold.%');
                 $query->whereRaw("json_extract(metadata, '$.scope_id') = ?", [$id]);
+            } elseif ($resource === 'user') {
+                $query->whereRaw("json_extract(metadata, '$.user_id') = ?", [$id]);
             }
         } elseif ($request->filled('resource')) {
             $resource = (string) $request->query('resource');
             if ($resource === 'quality_threshold') {
                 $query->where('event', 'like', 'quality.threshold.%');
+            } elseif ($resource === 'user') {
+                $query->where('event', 'like', 'user.%');
             }
         }
 
