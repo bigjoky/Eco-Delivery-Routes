@@ -107,7 +107,7 @@ class RouteController extends Controller
         }
 
         $payload = $request->validate([
-            'hub_id' => ['required', 'uuid'],
+            'hub_id' => ['required', 'uuid', 'exists:hubs,id'],
             'code' => ['required', 'string', 'max:60'],
             'route_date' => ['required', 'date'],
             'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
@@ -152,7 +152,7 @@ class RouteController extends Controller
             'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
             'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
-            'status' => ['nullable', 'string', 'max:40'],
+            'status' => ['nullable', 'in:planned,in_progress,completed'],
         ]);
         $merged = [
             'driver_id' => array_key_exists('driver_id', $payload) ? $payload['driver_id'] : $route->driver_id,

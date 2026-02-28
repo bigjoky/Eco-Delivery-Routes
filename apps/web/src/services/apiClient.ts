@@ -488,6 +488,25 @@ export const apiClient = {
     return parsePaginatedData<RouteSummary>(response);
   },
 
+  async createRoute(payload: {
+    hub_id: string;
+    code: string;
+    route_date: string;
+    subcontractor_id?: string | null;
+    driver_id?: string | null;
+    vehicle_id?: string | null;
+  }): Promise<RouteSummary> {
+    if (USE_MOCK) return mockApi.createRoute(payload) as Promise<RouteSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route');
+    return json.data as RouteSummary;
+  },
+
   async getRouteStops(routeId: string): Promise<RouteStopSummary[]> {
     if (USE_MOCK) return mockApi.getRouteStops(routeId);
     const response = await fetch(`${API_BASE_URL}/routes/${routeId}/stops`, {

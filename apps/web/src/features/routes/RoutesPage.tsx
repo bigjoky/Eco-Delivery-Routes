@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { PaginationMeta, RouteSummary } from '../../core/api/types';
+import { DriverSummary, HubSummary, PaginationMeta, RouteSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 export function RoutesPage() {
@@ -13,6 +13,18 @@ export function RoutesPage() {
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [hubs, setHubs] = useState<HubSummary[]>([]);
+  const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
+  const [drivers, setDrivers] = useState<DriverSummary[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [createHubId, setCreateHubId] = useState('');
+  const [createCode, setCreateCode] = useState('');
+  const [createRouteDate, setCreateRouteDate] = useState('');
+  const [createSubcontractorId, setCreateSubcontractorId] = useState('');
+  const [createDriverId, setCreateDriverId] = useState('');
+  const [createVehicleId, setCreateVehicleId] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const reload = (page: number) =>
     apiClient
@@ -34,8 +46,118 @@ export function RoutesPage() {
     reload(1);
   }, [status, dateFrom, dateTo]);
 
+  useEffect(() => {
+    apiClient.getHubs({ onlyActive: true }).then((rows) => {
+      setHubs(rows);
+      if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
+    }).catch(() => setHubs([]));
+    apiClient.getSubcontractors({ limit: 100 }).then(setSubcontractors).catch(() => setSubcontractors([]));
+    apiClient.getDrivers({ status: 'active', limit: 100 }).then(setDrivers).catch(() => setDrivers([]));
+    apiClient.getVehicles({ status: 'active', limit: 100 }).then(setVehicles).catch(() => setVehicles([]));
+    setCreateRouteDate(new Date().toISOString().slice(0, 10));
+  }, []);
+
+  const filteredDrivers = createSubcontractorId
+    ? drivers.filter((item) => !item.subcontractor_id || item.subcontractor_id === createSubcontractorId)
+    : drivers;
+
+  const filteredVehicles = createSubcontractorId
+    ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === createSubcontractorId)
+    : vehicles;
+
+  const createRoute = async () => {
+    if (!createHubId || !createCode || !createRouteDate) {
+      setCreateError('Hub, codigo y fecha son obligatorios.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await apiClient.createRoute({
+        hub_id: createHubId,
+        code: createCode,
+        route_date: createRouteDate,
+        subcontractor_id: createSubcontractorId || null,
+        driver_id: createDriverId || null,
+        vehicle_id: createVehicleId || null,
+      });
+      setCreateCode('');
+      setCreateSubcontractorId('');
+      setCreateDriverId('');
+      setCreateVehicleId('');
+      await reload(1);
+    } catch (exception) {
+      setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear la ruta');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <section className="page-grid">
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Crear Ruta</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="inline-actions">
+            <label htmlFor="create-route-hub">Hub</label>
+            <select id="create-route-hub" value={createHubId} onChange={(event) => setCreateHubId(event.target.value)}>
+              <option value="">Selecciona hub</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+              ))}
+            </select>
+            <label htmlFor="create-route-code">Codigo</label>
+            <input
+              id="create-route-code"
+              value={createCode}
+              onChange={(event) => setCreateCode(event.target.value)}
+              placeholder="R-AGP-20260305-01"
+            />
+            <label htmlFor="create-route-date">Fecha</label>
+            <input
+              id="create-route-date"
+              type="date"
+              value={createRouteDate}
+              onChange={(event) => setCreateRouteDate(event.target.value)}
+            />
+          </div>
+          <div className="inline-actions">
+            <label htmlFor="create-route-subcontractor">Subcontrata</label>
+            <select
+              id="create-route-subcontractor"
+              value={createSubcontractorId}
+              onChange={(event) => setCreateSubcontractorId(event.target.value)}
+            >
+              <option value="">Sin asignar</option>
+              {subcontractors.map((subcontractor) => (
+                <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
+              ))}
+            </select>
+            <label htmlFor="create-route-driver">Conductor</label>
+            <select id="create-route-driver" value={createDriverId} onChange={(event) => setCreateDriverId(event.target.value)}>
+              <option value="">Sin asignar</option>
+              {filteredDrivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.code} - {driver.name}</option>
+              ))}
+            </select>
+            <label htmlFor="create-route-vehicle">Vehiculo</label>
+            <select id="create-route-vehicle" value={createVehicleId} onChange={(event) => setCreateVehicleId(event.target.value)}>
+              <option value="">Sin asignar</option>
+              {filteredVehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.code} {vehicle.plate_number ? `(${vehicle.plate_number})` : ''}
+                </option>
+              ))}
+            </select>
+            <Button type="button" onClick={createRoute} disabled={creating}>
+              {creating ? 'Creando...' : 'Crear ruta'}
+            </Button>
+          </div>
+          {createError ? <div className="helper">{createError}</div> : null}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Rutas</CardTitle>

@@ -2007,7 +2007,7 @@ components:
         driver_id: { type: string, format: uuid, nullable: true }
         subcontractor_id: { type: string, format: uuid, nullable: true }
         vehicle_id: { type: string, format: uuid, nullable: true }
-        status: { type: string, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed], nullable: true }
     CreatePickupRequest:
       type: object
       required: [hub_id, reference, pickup_type]

@@ -61,6 +61,7 @@ let mockUsers: Array<{
 let subcontractorSeq = 2;
 let driverSeq = 2;
 let vehicleSeq = 2;
+let routeSeq = 4;
 let mockSubcontractors: Array<{
   id: string;
   legal_name: string;
@@ -121,6 +122,7 @@ let mockVehicles: Array<{
 ];
 let mockRoutes: Array<{
   id: string;
+  hub_id: string;
   code: string;
   route_date: string;
   status: string;
@@ -131,6 +133,7 @@ let mockRoutes: Array<{
 }> = [
   {
     id: 'r-1',
+    hub_id: 'hub-1',
     code: 'R-AGP-20260227',
     route_date: '2026-02-27',
     status: 'in_progress',
@@ -141,6 +144,7 @@ let mockRoutes: Array<{
   },
   {
     id: 'r-2',
+    hub_id: 'hub-1',
     code: 'R-AGP-20260228',
     route_date: '2026-02-28',
     status: 'planned',
@@ -151,6 +155,7 @@ let mockRoutes: Array<{
   },
   {
     id: 'r-3',
+    hub_id: 'hub-2',
     code: 'R-AGP-20260301',
     route_date: '2026-03-01',
     status: 'completed',
@@ -618,6 +623,35 @@ export const mockApi = {
     const dir = filters.dir === 'asc' ? 1 : -1;
     rows = rows.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? dir : -dir));
     return rows;
+  },
+
+  async createRoute(payload: {
+    hub_id: string;
+    code: string;
+    route_date: string;
+    subcontractor_id?: string | null;
+    driver_id?: string | null;
+    vehicle_id?: string | null;
+  }) {
+    const route = {
+      id: `r-${routeSeq++}`,
+      hub_id: payload.hub_id,
+      code: payload.code,
+      route_date: payload.route_date,
+      status: 'planned',
+      subcontractor_id: payload.subcontractor_id ?? null,
+      driver_id: payload.driver_id ?? null,
+      vehicle_id: payload.vehicle_id ?? null,
+      stops_count: 0,
+    };
+    mockRoutes = [route, ...mockRoutes];
+    const driver = route.driver_id ? mockDrivers.find((item) => item.id === route.driver_id) : null;
+    const vehicle = route.vehicle_id ? mockVehicles.find((item) => item.id === route.vehicle_id) : null;
+    return {
+      ...route,
+      driver_code: driver?.code ?? null,
+      vehicle_code: vehicle?.code ?? null,
+    };
   },
 
   async getRouteStops(routeId: string) {

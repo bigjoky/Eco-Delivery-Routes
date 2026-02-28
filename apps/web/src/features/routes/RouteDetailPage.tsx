@@ -17,6 +17,7 @@ export function RouteDetailPage() {
   const [subcontractorId, setSubcontractorId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+  const [routeStatus, setRouteStatus] = useState('planned');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,12 +42,14 @@ export function RouteDetailPage() {
         setSubcontractorId(selected?.subcontractor_id ?? '');
         setDriverId(selected?.driver_id ?? '');
         setVehicleId(selected?.vehicle_id ?? '');
+        setRouteStatus(selected?.status ?? 'planned');
       })
       .catch(() => {
         setRoute(null);
         setSubcontractorId('');
         setDriverId('');
         setVehicleId('');
+        setRouteStatus('planned');
       });
   }, [id]);
 
@@ -67,11 +70,13 @@ export function RouteDetailPage() {
         subcontractor_id: subcontractorId || null,
         driver_id: driverId || null,
         vehicle_id: vehicleId || null,
+        status: routeStatus,
       });
       setRoute(updated);
       setSubcontractorId(updated.subcontractor_id ?? '');
       setDriverId(updated.driver_id ?? '');
       setVehicleId(updated.vehicle_id ?? '');
+      setRouteStatus(updated.status ?? 'planned');
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la ruta');
     } finally {
@@ -113,6 +118,12 @@ export function RouteDetailPage() {
                   {vehicle.code} {vehicle.plate_number ? `(${vehicle.plate_number})` : ''}
                 </option>
               ))}
+            </select>
+            <label htmlFor="route-status">Estado</label>
+            <select id="route-status" value={routeStatus} onChange={(event) => setRouteStatus(event.target.value)}>
+              <option value="planned">planned</option>
+              <option value="in_progress">in_progress</option>
+              <option value="completed">completed</option>
             </select>
             <Button type="button" onClick={saveVehicleAssignment} disabled={saving}>
               {saving ? 'Guardando...' : 'Guardar'}
