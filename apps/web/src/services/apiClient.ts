@@ -488,12 +488,94 @@ export const apiClient = {
     return parsePaginatedData<RouteSummary>(response);
   },
 
+  async createRoute(payload: {
+    hub_id: string;
+    code: string;
+    route_date: string;
+    subcontractor_id?: string | null;
+    driver_id?: string | null;
+    vehicle_id?: string | null;
+  }): Promise<RouteSummary> {
+    if (USE_MOCK) return mockApi.createRoute(payload) as Promise<RouteSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route');
+    return json.data as RouteSummary;
+  },
+
   async getRouteStops(routeId: string): Promise<RouteStopSummary[]> {
     if (USE_MOCK) return mockApi.getRouteStops(routeId);
     const response = await fetch(`${API_BASE_URL}/routes/${routeId}/stops`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<RouteStopSummary>(response);
+  },
+
+  async updateRoute(id: string, payload: {
+    driver_id?: string | null;
+    subcontractor_id?: string | null;
+    vehicle_id?: string | null;
+    status?: string;
+  }): Promise<RouteSummary> {
+    if (USE_MOCK) return mockApi.updateRoute(id, payload) as Promise<RouteSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route');
+    return json.data as RouteSummary;
+  },
+
+  async createRouteStop(routeId: string, payload: {
+    sequence: number;
+    stop_type: 'DELIVERY' | 'PICKUP';
+    shipment_id?: string | null;
+    pickup_id?: string | null;
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+  }): Promise<RouteStopSummary> {
+    if (USE_MOCK) return mockApi.createRouteStop(routeId, payload) as Promise<RouteStopSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route stop');
+    return json.data as RouteStopSummary;
+  },
+
+  async updateRouteStop(routeId: string, stopId: string, payload: {
+    sequence?: number;
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+  }): Promise<RouteStopSummary> {
+    if (USE_MOCK) return mockApi.updateRouteStop(routeId, stopId, payload) as Promise<RouteStopSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/${stopId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route stop');
+    return json.data as RouteStopSummary;
+  },
+
+  async deleteRouteStop(routeId: string, stopId: string): Promise<RouteStopSummary[]> {
+    if (USE_MOCK) return mockApi.deleteRouteStop(routeId, stopId) as Promise<RouteStopSummary[]>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/${stopId}`, {
+      method: 'DELETE',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete route stop');
+    return json.data as RouteStopSummary[];
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {

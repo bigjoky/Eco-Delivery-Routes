@@ -1269,6 +1269,25 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /routes/{id}:
+    patch:
+      tags: [Routes]
+      summary: Actualizar asignaciones/estado de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteRequest'
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Ruta no encontrada }
+
   /routes/{id}/stops:
     get:
       tags: [Routes]
@@ -1290,6 +1309,61 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/DriverRouteStop'
+    post:
+      tags: [Routes]
+      summary: Crear parada en ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteStopRequest'
+      responses:
+        '201': { description: Creado }
+        '404': { description: Ruta no encontrada }
+
+  /routes/{id}/stops/{stopId}:
+    patch:
+      tags: [Routes]
+      summary: Actualizar parada de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: stopId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteStopRequest'
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Ruta o parada no encontrada }
+    delete:
+      tags: [Routes]
+      summary: Eliminar parada de ruta y reindexar secuencias
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: stopId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '404': { description: Ruta o parada no encontrada }
 
   /pickups:
     get:
@@ -1981,6 +2055,31 @@ components:
         route_date: { type: string, format: date }
         driver_id: { type: string, format: uuid }
         subcontractor_id: { type: string, format: uuid }
+        vehicle_id: { type: string, format: uuid }
+    UpdateRouteRequest:
+      type: object
+      properties:
+        driver_id: { type: string, format: uuid, nullable: true }
+        subcontractor_id: { type: string, format: uuid, nullable: true }
+        vehicle_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+    CreateRouteStopRequest:
+      type: object
+      required: [sequence, stop_type]
+      properties:
+        sequence: { type: integer, minimum: 1 }
+        stop_type: { type: string, enum: [DELIVERY, PICKUP] }
+        shipment_id: { type: string, format: uuid, nullable: true }
+        pickup_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed] }
+        planned_at: { type: string, format: date-time, nullable: true }
+    UpdateRouteStopRequest:
+      type: object
+      properties:
+        sequence: { type: integer, minimum: 1, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+        planned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
     CreatePickupRequest:
       type: object
       required: [hub_id, reference, pickup_type]
