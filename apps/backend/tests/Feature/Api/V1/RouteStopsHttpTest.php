@@ -156,6 +156,67 @@ class RouteStopsHttpTest extends TestCase
         $forbidden->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
+    public function test_undo_stop_creation_writes_restore_audit_event(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-UNDO',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-STOPS-UNDO-1',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $original = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+            'status' => 'planned',
+        ]);
+        $original->assertStatus(201);
+        $deletedStopId = (string) $original->json('data.id');
+
+        $this->deleteJson("/api/v1/routes/{$routeId}/stops/{$deletedStopId}")
+            ->assertOk();
+
+        $restore = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+            'status' => 'planned',
+            'undo_of_stop_id' => $deletedStopId,
+        ]);
+        $restore->assertStatus(201);
+
+        $undoAudit = DB::table('audit_logs')
+            ->where('event', 'route.stop.undo_restored')
+            ->orderByDesc('created_at')
+            ->first(['metadata']);
+
+        $this->assertNotNull($undoAudit);
+        $metadata = json_decode((string) ($undoAudit->metadata ?? '{}'), true);
+        $this->assertSame('route', $metadata['resource_type'] ?? null);
+        $this->assertSame($routeId, $metadata['resource_id'] ?? null);
+        $this->assertSame($deletedStopId, $metadata['undo_of_stop_id'] ?? null);
+    }
+
     public function test_cannot_create_or_update_stop_with_duplicate_sequence(): void
     {
         $manager = $this->createUserWithRole('operations_manager');
