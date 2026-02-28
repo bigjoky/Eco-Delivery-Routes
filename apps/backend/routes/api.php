@@ -60,6 +60,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('routes/{id}', [RouteController::class, 'update']);
         Route::get('routes/{id}/stops', [RouteController::class, 'stops']);
         Route::post('routes/{id}/stops', [RouteController::class, 'addStop']);
+        Route::post('routes/{id}/stops/reorder', [RouteController::class, 'reorderStops']);
         Route::patch('routes/{id}/stops/{stopId}', [RouteController::class, 'updateStop']);
         Route::delete('routes/{id}/stops/{stopId}', [RouteController::class, 'deleteStop']);
 

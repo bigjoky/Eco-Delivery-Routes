@@ -225,6 +225,73 @@ class RouteStopsHttpTest extends TestCase
         $duplicateUpdate->assertJsonValidationErrors(['sequence']);
     }
 
+    public function test_operations_manager_can_reorder_stops_in_single_call(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-REORDER',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-REORDER-A',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-STOPS-REORDER-B',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $stopA = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentA,
+        ]);
+        $stopB = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 2,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentB,
+        ]);
+        $stopA->assertStatus(201);
+        $stopB->assertStatus(201);
+
+        $reorder = $this->postJson("/api/v1/routes/{$routeId}/stops/reorder", [
+            'stop_ids' => [
+                $stopB->json('data.id'),
+                $stopA->json('data.id'),
+            ],
+        ]);
+
+        $reorder->assertOk();
+        $reorder->assertJsonPath('data.0.id', $stopB->json('data.id'));
+        $reorder->assertJsonPath('data.0.sequence', 1);
+        $reorder->assertJsonPath('data.1.id', $stopA->json('data.id'));
+        $reorder->assertJsonPath('data.1.sequence', 2);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

@@ -29,6 +29,8 @@ export function RouteDetailPage() {
   const [selectedPickupId, setSelectedPickupId] = useState('');
   const [stopSequence, setStopSequence] = useState(1);
   const [savingStop, setSavingStop] = useState(false);
+  const [draggingStopId, setDraggingStopId] = useState<string | null>(null);
+  const [reorderingStops, setReorderingStops] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -159,6 +161,54 @@ export function RouteDetailPage() {
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la parada');
     }
+  };
+
+  const persistStopOrder = async (nextStops: RouteStopSummary[]) => {
+    if (!id) return;
+    setReorderingStops(true);
+    setError('');
+    try {
+      const saved = await apiClient.reorderRouteStops(id, nextStops.map((stop) => stop.id));
+      setStops(saved);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo guardar el nuevo orden de paradas');
+      apiClient.getRouteStops(id).then(setStops).catch(() => {});
+    } finally {
+      setReorderingStops(false);
+    }
+  };
+
+  const moveStopByDrop = (targetStopId: string) => {
+    if (!draggingStopId || draggingStopId === targetStopId || reorderingStops) {
+      return;
+    }
+    const fromIndex = stops.findIndex((stop) => stop.id === draggingStopId);
+    const toIndex = stops.findIndex((stop) => stop.id === targetStopId);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+      return;
+    }
+
+    const reordered = stops.slice();
+    const [dragged] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, dragged);
+    const normalized = reordered.map((stop, index) => ({ ...stop, sequence: index + 1 }));
+    setStops(normalized);
+    void persistStopOrder(normalized);
+  };
+
+  const moveStopByOffset = (stopId: string, offset: number) => {
+    if (reorderingStops || offset === 0) return;
+    const fromIndex = stops.findIndex((stop) => stop.id === stopId);
+    if (fromIndex < 0) return;
+    const toIndex = fromIndex + offset;
+    if (toIndex < 0 || toIndex >= stops.length) return;
+
+    const reordered = stops.slice();
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    const normalized = reordered.map((stop, index) => ({ ...stop, sequence: index + 1 }));
+    setStops(normalized);
+    void persistStopOrder(normalized);
   };
 
   const deleteStop = async (stopId: string) => {
@@ -297,8 +347,18 @@ export function RouteDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stops.map((stop) => (
-                  <TableRow key={stop.id}>
+                {stops.map((stop, index) => (
+                  <TableRow
+                    key={stop.id}
+                    draggable={!reorderingStops}
+                    onDragStart={() => setDraggingStopId(stop.id)}
+                    onDragEnd={() => setDraggingStopId(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => {
+                      moveStopByDrop(stop.id);
+                      setDraggingStopId(null);
+                    }}
+                  >
                     <TableCell>{stop.sequence}</TableCell>
                     <TableCell>{stop.stop_type}</TableCell>
                     <TableCell>{stop.reference ?? stop.entity_id}</TableCell>
@@ -306,13 +366,24 @@ export function RouteDetailPage() {
                     <TableCell><Badge variant="secondary">{stop.status}</Badge></TableCell>
                     <TableCell>
                       <div className="inline-actions">
-                        <Button type="button" variant="outline" onClick={() => updateStop(stop.id, { sequence: Math.max(1, stop.sequence - 1) })}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={reorderingStops || index === 0}
+                          onClick={() => moveStopByOffset(stop.id, -1)}
+                        >
                           Subir
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => updateStop(stop.id, { sequence: stop.sequence + 1 })}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={reorderingStops || index === stops.length - 1}
+                          onClick={() => moveStopByOffset(stop.id, 1)}
+                        >
                           Bajar
                         </Button>
                         <select
+                          disabled={reorderingStops}
                           value={stop.status}
                           onChange={(event) => updateStop(stop.id, { status: event.target.value as 'planned' | 'in_progress' | 'completed' })}
                         >
@@ -320,7 +391,7 @@ export function RouteDetailPage() {
                           <option value="in_progress">in_progress</option>
                           <option value="completed">completed</option>
                         </select>
-                        <Button type="button" variant="outline" onClick={() => deleteStop(stop.id)}>
+                        <Button type="button" variant="outline" disabled={reorderingStops} onClick={() => deleteStop(stop.id)}>
                           Eliminar
                         </Button>
                       </div>
@@ -330,6 +401,9 @@ export function RouteDetailPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="helper">
+            Arrastra y suelta una fila para reordenar paradas. {reorderingStops ? 'Guardando orden...' : ''}
+          </div>
         </CardContent>
       </Card>
     </section>

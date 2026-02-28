@@ -593,6 +593,18 @@ export const apiClient = {
     return json.data as RouteStopSummary[];
   },
 
+  async reorderRouteStops(routeId: string, stopIds: string[]): Promise<RouteStopSummary[]> {
+    if (USE_MOCK) return mockApi.reorderRouteStops(routeId, stopIds) as Promise<RouteStopSummary[]>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stop_ids: stopIds }),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot reorder route stops');
+    return json.data as RouteStopSummary[];
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}): Promise<DriverRouteMeResponse> {
     if (USE_MOCK) return mockApi.getMyDriverRoute(filters);
     const params = new URLSearchParams();
