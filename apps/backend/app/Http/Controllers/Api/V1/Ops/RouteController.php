@@ -399,6 +399,57 @@ class RouteController extends Controller
         ]);
     }
 
+    public function reorderStops(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'stop_ids' => ['required', 'array', 'min:1'],
+            'stop_ids.*' => ['required', 'uuid'],
+        ]);
+
+        $existingIds = DB::table('route_stops')
+            ->where('route_id', $id)
+            ->pluck('id')
+            ->all();
+        $providedIds = $payload['stop_ids'];
+        sort($existingIds);
+        $sortedProvided = $providedIds;
+        sort($sortedProvided);
+        if ($existingIds !== $sortedProvided) {
+            throw ValidationException::withMessages([
+                'stop_ids' => ['stop_ids must include exactly all route stop ids.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($id, $providedIds): void {
+            foreach ($providedIds as $index => $stopId) {
+                DB::table('route_stops')
+                    ->where('route_id', $id)
+                    ->where('id', $stopId)
+                    ->update([
+                        'sequence' => $index + 1,
+                        'updated_at' => now(),
+                    ]);
+            }
+        });
+
+        return response()->json([
+            'data' => $this->fetchRouteStops($id),
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $payload
      */

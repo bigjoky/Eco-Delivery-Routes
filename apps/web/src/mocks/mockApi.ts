@@ -784,6 +784,30 @@ export const mockApi = {
     return routeStops;
   },
 
+  async reorderRouteStops(routeId: string, stopIds: string[]) {
+    const routeStops = mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+    const existingIds = routeStops.map((row) => row.id).sort();
+    const providedIds = stopIds.slice().sort();
+    if (existingIds.join(',') !== providedIds.join(',')) {
+      throw new Error('stop_ids must include all route stops');
+    }
+
+    stopIds.forEach((stopId, index) => {
+      const row = mockRouteStops.find((item) => item.route_id === routeId && item.id === stopId);
+      if (row) {
+        row.sequence = index + 1;
+      }
+    });
+
+    return mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+  },
+
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {
     const route = mockRoutes.find((row) => row.id === 'r-1');
     if (!route) {

@@ -1327,6 +1327,31 @@ paths:
         '201': { description: Creado }
         '404': { description: Ruta no encontrada }
 
+  /routes/{id}/stops/reorder:
+    post:
+      tags: [Routes]
+      summary: Reordenar paradas de ruta (asigna secuencia 1..n)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stop_ids]
+              properties:
+                stop_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        '200': { description: Reordenado }
+        '404': { description: Ruta no encontrada }
+        '422': { description: stop_ids invalidos }
+
   /routes/{id}/stops/{stopId}:
     patch:
       tags: [Routes]

@@ -23,6 +23,10 @@ describe('route stops CRUD contract', () => {
     expect(updated.status).toBe('in_progress');
     expect(updated.sequence).toBe(10);
 
+    const reordered = await apiClient.reorderRouteStops('r-1', [updated.id, 'st-1', 'st-2']);
+    expect(reordered[0].id).toBe(updated.id);
+    expect(reordered[0].sequence).toBe(1);
+
     const remaining = await apiClient.deleteRouteStop('r-1', created.id);
     expect(remaining.find((row) => row.id === created.id)).toBeUndefined();
     if (remaining.length > 0) {
