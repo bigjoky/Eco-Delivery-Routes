@@ -66,6 +66,33 @@ class RolePermissionsHttpTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
+    public function test_assign_permissions_validates_uuid_payload(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $roleId = (string) DB::table('roles')->where('code', 'traffic_operator')->value('id');
+        $this->assertNotSame('', $roleId);
+
+        $this->actingAs($admin, 'sanctum');
+        $response = $this->putJson("/api/v1/roles/{$roleId}/permissions", [
+            'permission_ids' => ['not-a-uuid'],
+        ]);
+        $response->assertStatus(422)->assertJsonValidationErrors(['permission_ids.0']);
+    }
+
+    public function test_assign_permissions_returns_not_found_for_unknown_role(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $permissionId = (string) DB::table('permissions')->where('code', 'shipments.read')->value('id');
+        $this->assertNotSame('', $permissionId);
+        $missingRoleId = (string) Str::uuid();
+
+        $this->actingAs($admin, 'sanctum');
+        $response = $this->putJson("/api/v1/roles/{$missingRoleId}/permissions", [
+            'permission_ids' => [$permissionId],
+        ]);
+        $response->assertStatus(404)->assertJsonPath('error.code', 'RESOURCE_NOT_FOUND');
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

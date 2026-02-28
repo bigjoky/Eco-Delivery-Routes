@@ -161,6 +161,59 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
 
+  /users/{id}/suspend:
+    post:
+      tags: [Users]
+      summary: Suspender usuario
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+        '422': { description: Error de validacion de negocio }
+
+  /users/{id}/reactivate:
+    post:
+      tags: [Users]
+      summary: Reactivar usuario
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /users/{id}/reset-password:
+    post:
+      tags: [Users]
+      summary: Restablecer password de usuario
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+        '422': { description: Validacion fallida }
+
   /roles:
     get:
       tags: [Roles]

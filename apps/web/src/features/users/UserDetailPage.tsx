@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -11,11 +12,14 @@ export function UserDetailPage() {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
   const [auditEventFilter, setAuditEventFilter] = useState('user.');
+  const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   const load = async () => {
     if (!id) return;
     setError('');
+    setMessage('');
     try {
       const [userResult, auditResult] = await Promise.all([
         apiClient.getUserById(id),
@@ -31,6 +35,46 @@ export function UserDetailPage() {
       setAuditRows(auditResult.data);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el usuario');
+    }
+  };
+
+  const onSuspend = async () => {
+    if (!id) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.suspendUser(id);
+      setMessage('Usuario suspendido');
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'No se pudo suspender el usuario');
+    }
+  };
+
+  const onReactivate = async () => {
+    if (!id) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.reactivateUser(id);
+      setMessage('Usuario reactivado');
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'No se pudo reactivar el usuario');
+    }
+  };
+
+  const onResetPassword = async () => {
+    if (!id || !newPassword) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.resetUserPassword(id, newPassword);
+      setNewPassword('');
+      setMessage('Contrasena restablecida');
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'No se pudo restablecer la contrasena');
     }
   };
 
@@ -60,6 +104,17 @@ export function UserDetailPage() {
                 onChange={(event) => setAuditEventFilter(event.target.value)}
                 placeholder="Filtro evento (ej: user.)"
               />
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={onSuspend}>Suspender</Button>
+                <Button type="button" variant="outline" onClick={onReactivate}>Reactivar</Button>
+                <Input
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder="Nueva contrasena (min 8)"
+                  type="password"
+                />
+                <Button type="button" onClick={onResetPassword}>Reset password</Button>
+              </div>
               <TableWrapper>
                 <Table>
                   <TableHeader>
@@ -84,6 +139,7 @@ export function UserDetailPage() {
               </TableWrapper>
             </div>
           )}
+          {message && <p className="helper">{message}</p>}
           {error && <p className="helper">{error}</p>}
         </CardContent>
       </Card>

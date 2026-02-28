@@ -38,6 +38,32 @@ public final class MockAPIClient {
             approvedAt: "2026-02-15T10:00:00Z"
         ),
     ]
+    private let mockUsers: [User] = [
+        User(
+            id: "u-1",
+            name: "Admin Demo",
+            email: "admin@eco.local",
+            status: "active",
+            lastLoginAt: "2026-02-28T08:30:00Z",
+            roles: [UserRole(id: "r-1", code: "super_admin", name: "Super Admin")]
+        ),
+        User(
+            id: "u-2",
+            name: "Ops Demo",
+            email: "ops@eco.local",
+            status: "active",
+            lastLoginAt: "2026-02-28T07:05:00Z",
+            roles: [UserRole(id: "r-2", code: "operations_manager", name: "Operations Manager")]
+        ),
+        User(
+            id: "u-3",
+            name: "Driver Demo",
+            email: "driver@eco.local",
+            status: "suspended",
+            lastLoginAt: "2026-02-20T17:10:00Z",
+            roles: [UserRole(id: "r-3", code: "driver", name: "Driver")]
+        ),
+    ]
 
     public init() {}
 
@@ -88,6 +114,28 @@ public final class MockAPIClient {
                 status: "planned"
             )
         ])
+    }
+
+    public func users(status: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<User> {
+        let filtered = status == nil || status?.isEmpty == true
+            ? mockUsers
+            : mockUsers.filter { $0.status == status }
+        let boundedPage = max(page, 1)
+        let boundedPerPage = max(perPage, 1)
+        let start = (boundedPage - 1) * boundedPerPage
+        let end = min(start + boundedPerPage, filtered.count)
+        let pageData = start < filtered.count ? Array(filtered[start..<end]) : []
+        let lastPage = Int(ceil(Double(filtered.count) / Double(boundedPerPage)))
+
+        return PaginatedResponse(
+            data: pageData,
+            meta: PaginationMeta(
+                page: boundedPage,
+                perPage: boundedPerPage,
+                total: filtered.count,
+                lastPage: max(lastPage, 1)
+            )
+        )
     }
 
     public func advances(status: String?, period: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<AdvanceSummary> {

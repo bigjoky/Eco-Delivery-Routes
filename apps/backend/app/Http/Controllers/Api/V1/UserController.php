@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Application\Users\ListUsersAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Users\AssignRolesRequest;
+use App\Http\Requests\Users\ResetUserPasswordRequest;
 use App\Http\Requests\Users\StoreUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
 use App\Infrastructure\Auth\AuditLogWriter;
@@ -73,18 +74,7 @@ class UserController extends Controller
         ]);
 
         return response()->json([
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'status' => $user->status,
-                'last_login_at' => optional($user->last_login_at)?->toISOString(),
-                'roles' => $user->roles->map(fn ($role) => [
-                    'id' => $role->id,
-                    'code' => $role->code,
-                    'name' => $role->name,
-                ])->values()->all(),
-            ],
+            'data' => $this->serializeUser($user),
             'message' => 'User created',
         ], 201);
     }
@@ -110,18 +100,7 @@ class UserController extends Controller
         $user->load('roles:id,code,name');
 
         return response()->json([
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'status' => $user->status,
-                'last_login_at' => optional($user->last_login_at)?->toISOString(),
-                'roles' => $user->roles->map(fn ($role) => [
-                    'id' => $role->id,
-                    'code' => $role->code,
-                    'name' => $role->name,
-                ])->values()->all(),
-            ],
+            'data' => $this->serializeUser($user),
             'message' => 'User detail',
         ]);
     }
@@ -155,18 +134,7 @@ class UserController extends Controller
         ]);
 
         return response()->json([
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'status' => $user->status,
-                'last_login_at' => optional($user->last_login_at)?->toISOString(),
-                'roles' => $user->roles->map(fn ($role) => [
-                    'id' => $role->id,
-                    'code' => $role->code,
-                    'name' => $role->name,
-                ])->values()->all(),
-            ],
+            'data' => $this->serializeUser($user),
             'message' => 'User updated',
         ]);
     }
@@ -209,6 +177,104 @@ class UserController extends Controller
         ]);
     }
 
+    public function suspend(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('users.suspend')) {
+            return $this->forbidden();
+        }
+
+        $user = User::query()->find($id);
+        if (!$user) {
+            return $this->notFound();
+        }
+        if ($actor->id === $user->id) {
+            return response()->json([
+                'error' => [
+                    'code' => 'USER_SELF_SUSPEND_NOT_ALLOWED',
+                    'message' => 'You cannot suspend your own account.',
+                ],
+            ], 422);
+        }
+
+        if ($user->status !== 'suspended') {
+            $before = $user->status;
+            $user->status = 'suspended';
+            $user->save();
+            $this->auditLogWriter->write($actor->id, 'user.suspended', [
+                'user_id' => $user->id,
+                'before' => ['status' => $before],
+                'after' => ['status' => $user->status],
+            ]);
+        }
+        $user->load('roles:id,code,name');
+
+        return response()->json([
+            'data' => $this->serializeUser($user),
+            'message' => 'User suspended',
+        ]);
+    }
+
+    public function reactivate(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('users.suspend')) {
+            return $this->forbidden();
+        }
+
+        $user = User::query()->find($id);
+        if (!$user) {
+            return $this->notFound();
+        }
+
+        if ($user->status !== 'active') {
+            $before = $user->status;
+            $user->status = 'active';
+            $user->save();
+            $this->auditLogWriter->write($actor->id, 'user.reactivated', [
+                'user_id' => $user->id,
+                'before' => ['status' => $before],
+                'after' => ['status' => $user->status],
+            ]);
+        }
+        $user->load('roles:id,code,name');
+
+        return response()->json([
+            'data' => $this->serializeUser($user),
+            'message' => 'User reactivated',
+        ]);
+    }
+
+    public function resetPassword(ResetUserPasswordRequest $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('users.update')) {
+            return $this->forbidden();
+        }
+
+        $user = User::query()->find($id);
+        if (!$user) {
+            return $this->notFound();
+        }
+
+        $user->password = (string) $request->validated('password');
+        $user->save();
+        $user->tokens()->delete();
+        $this->auditLogWriter->write($actor->id, 'user.password.reset', [
+            'user_id' => $user->id,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'user_id' => $user->id,
+            ],
+            'message' => 'User password reset',
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([
@@ -217,5 +283,31 @@ class UserController extends Controller
                 'message' => 'Unauthorized.',
             ],
         ], 403);
+    }
+
+    private function notFound(): JsonResponse
+    {
+        return response()->json([
+            'error' => [
+                'code' => 'RESOURCE_NOT_FOUND',
+                'message' => 'User not found.',
+            ],
+        ], 404);
+    }
+
+    private function serializeUser(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'status' => $user->status,
+            'last_login_at' => optional($user->last_login_at)?->toISOString(),
+            'roles' => $user->roles->map(fn ($role) => [
+                'id' => $role->id,
+                'code' => $role->code,
+                'name' => $role->name,
+            ])->values()->all(),
+        ];
     }
 }

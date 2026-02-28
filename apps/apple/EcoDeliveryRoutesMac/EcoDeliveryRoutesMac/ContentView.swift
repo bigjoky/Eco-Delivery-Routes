@@ -9,6 +9,7 @@ struct ContentView: View {
         case advances = "Anticipos"
         case tariffs = "Tarifas"
         case settlements = "Liquidaciones"
+        case users = "Usuarios"
 
         var id: String { rawValue }
 
@@ -19,6 +20,7 @@ struct ContentView: View {
             case .advances: "eurosign.circle"
             case .tariffs: "list.bullet.clipboard"
             case .settlements: "doc.plaintext"
+            case .users: "person.3"
             }
         }
     }
@@ -61,10 +63,13 @@ struct ContentView: View {
     @State private var advances: [AdvanceSummary] = []
     @State private var tariffs: [TariffSummary] = []
     @State private var settlements: [SettlementSummary] = []
+    @State private var users: [User] = []
+    @State private var userStatusFilter: String = ""
 
     @State private var scanCode: String = ""
     @State private var operationalMessage: String = "Recepcion lista"
     @State private var advancesMessage: String = ""
+    @State private var usersMessage: String = ""
     @State private var email: String = "admin@eco.local"
     @State private var password: String = "password123"
     @State private var loginMessage: String = "No autenticado"
@@ -100,6 +105,8 @@ struct ContentView: View {
                         tariffsTab
                     case .settlements:
                         settlementsTab
+                    case .users:
+                        usersTab
                     }
                 }
                 .toolbar {
@@ -227,6 +234,47 @@ struct ContentView: View {
                         .background(.thinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding()
+                }
+            }
+        }
+    }
+
+    private var usersTab: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("Estado", selection: $userStatusFilter) {
+                    Text("Todos").tag("")
+                    Text("active").tag("active")
+                    Text("pending").tag("pending")
+                    Text("suspended").tag("suspended")
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: userStatusFilter) { _, _ in
+                    Task { await loadUsers() }
+                }
+
+                List(users) { user in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(user.name).font(.headline)
+                        Text("\(user.email) · \(user.status)").font(.subheadline)
+                        Text(user.roles.map(\.code).joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
+
+                if !usersMessage.isEmpty {
+                    Text(usersMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+            .navigationTitle("Usuarios")
+            .toolbar {
+                Button("Recargar") {
+                    Task { await loadUsers() }
                 }
             }
         }
@@ -569,6 +617,7 @@ struct ContentView: View {
         await loadAdvances()
         await loadTariffs()
         await loadSettlements()
+        await loadUsers()
     }
 
     private func loadRoute() async {
@@ -692,6 +741,20 @@ struct ContentView: View {
 
     private func loadSettlements() async {
         settlements = (try? await apiClient.settlements(status: nil, period: nil, page: 1, perPage: 50).data) ?? []
+    }
+
+    private func loadUsers() async {
+        do {
+            users = try await apiClient.users(
+                status: userStatusFilter.isEmpty ? nil : userStatusFilter,
+                page: 1,
+                perPage: 100
+            ).data
+            usersMessage = ""
+        } catch {
+            users = []
+            usersMessage = "No se pudieron cargar usuarios"
+        }
     }
 
     private func approveAdvance(id: String) async {
