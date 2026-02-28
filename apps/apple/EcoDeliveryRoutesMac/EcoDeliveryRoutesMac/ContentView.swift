@@ -53,6 +53,7 @@ struct ContentView: View {
     @State private var qualityThresholdBeforeValue: Double?
     @State private var qualityThresholdAfterValue: Double?
     @State private var qualityThresholdLargeDeltaCount: Int = 0
+    @State private var qualityThresholdTopScopes: [QualityThresholdAlertTopScope] = []
     @State private var qualityThresholdAlertWindowHours: Int = 24
     @State private var qualityThresholdDeltaTrigger: Double = 5
     @State private var canManageQualityThreshold: Bool = false
@@ -256,6 +257,17 @@ struct ContentView: View {
                             Text("Trigger: ±\(qualityThresholdDeltaTrigger, specifier: "%.2f")")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                        }
+                        if !qualityThresholdTopScopes.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Top scopes alertas delta")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                ForEach(qualityThresholdTopScopes.prefix(5)) { scope in
+                                    Text("\(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-"): \(scope.alertsCount)")
+                                        .font(.caption2)
+                                }
+                            }
                         }
                     }
 
@@ -607,6 +619,7 @@ struct ContentView: View {
 
         let history = (try? await apiClient.qualityThresholdHistory(dateFrom: dateFrom, dateTo: dateTo)) ?? []
         qualityThresholdLargeDeltaCount = history.filter { $0.event == "quality.threshold.alert.large_delta" }.count
+        qualityThresholdTopScopes = (try? await apiClient.qualityThresholdAlertTopScopes(dateFrom: dateFrom, dateTo: dateTo, limit: 5)) ?? []
     }
 
     private func loadRouteBreakdown(routeId: String) async {
