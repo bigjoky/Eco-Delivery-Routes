@@ -87,6 +87,9 @@ export const apiClient = {
     });
 
     const data = (await response.json()) as LoginResponse;
+    if (!response.ok || !data.token) {
+      throw new Error((data as { error?: { message?: string } })?.error?.message ?? 'Login failed');
+    }
     sessionStore.setToken(data.token ?? null);
     try {
       await this.getCurrentUser();
@@ -94,6 +97,24 @@ export const apiClient = {
       // Non-blocking; role context can be refreshed later.
     }
     return data;
+  },
+
+  async logout(): Promise<void> {
+    if (USE_MOCK) {
+      sessionStore.setToken(null);
+      sessionStore.setRoles([]);
+      return;
+    }
+
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+      });
+    } finally {
+      sessionStore.setToken(null);
+      sessionStore.setRoles([]);
+    }
   },
 
   async getCurrentUser(): Promise<CurrentUserProfile> {
@@ -112,12 +133,98 @@ export const apiClient = {
     return profile;
   },
 
-  async getUsers(): Promise<UserSummary[]> {
-    if (USE_MOCK) return mockApi.getUsers();
-    const response = await fetch(`${API_BASE_URL}/users`, {
+  async getUsers(filters: {
+    q?: string;
+    status?: 'pending' | 'active' | 'suspended';
+    page?: number;
+    perPage?: number;
+    sort?: 'name' | 'email' | 'last_login_at' | 'created_at';
+    dir?: 'asc' | 'desc';
+  } = {}): Promise<PaginatedResult<UserSummary>> {
+    const page = filters.page ?? 1;
+    const perPage = filters.perPage ?? 20;
+    if (USE_MOCK) {
+      return paginateLocal(await mockApi.getUsers(filters), page, perPage);
+    }
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.status) params.set('status', filters.status);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+    if (filters.sort) params.set('sort', filters.sort);
+    if (filters.dir) params.set('dir', filters.dir);
+    const response = await fetch(`${API_BASE_URL}/users?${params.toString()}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
-    return parseData<UserSummary>(response);
+    return parsePaginatedData<UserSummary>(response);
+  },
+
+  async createUser(payload: {
+    name: string;
+    email: string;
+    password: string;
+    status: 'pending' | 'active' | 'suspended';
+    roleIds?: string[];
+  }): Promise<UserSummary> {
+    if (USE_MOCK) return mockApi.createUser(payload) as Promise<UserSummary>;
+
+    const response = await fetch(`${API_BASE_URL}/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        status: payload.status,
+        role_ids: payload.roleIds ?? [],
+      }),
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot create user');
+    }
+    return json.data as UserSummary;
+  },
+
+  async updateUser(id: string, payload: {
+    name?: string;
+    email?: string;
+    status?: 'pending' | 'active' | 'suspended';
+    password?: string;
+  }): Promise<UserSummary> {
+    if (USE_MOCK) return mockApi.updateUser(id, payload) as Promise<UserSummary>;
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot update user');
+    }
+    return json.data as UserSummary;
+  },
+
+  async assignUserRoles(userId: string, roleIds: string[]): Promise<void> {
+    if (USE_MOCK) return mockApi.assignUserRoles(userId, roleIds) as Promise<void>;
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/roles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ role_ids: roleIds }),
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(json?.error?.message ?? 'Cannot assign roles');
+    }
   },
 
   async getAuditLogs(filters: {

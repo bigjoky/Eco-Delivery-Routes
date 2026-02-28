@@ -1,18 +1,46 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
 export function LoginPage() {
   const [email, setEmail] = useState('admin@eco.local');
   const [password, setPassword] = useState('password123');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionStore.isAuthenticated()) {
+      navigate('/shipments', { replace: true });
+    }
+  }, [navigate]);
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const result = await apiClient.login({ email, password });
-    setMessage(result.message);
+    setLoading(true);
+    setError('');
+    try {
+      const result = await apiClient.login({ email, password });
+      setMessage(result.message);
+      navigate('/shipments', { replace: true });
+    } catch (submitError) {
+      const nextError = submitError instanceof Error ? submitError.message : 'No se ha podido iniciar sesion';
+      setError(nextError);
+      setMessage('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onLogout = async () => {
+    await apiClient.logout();
+    setMessage('Sesion cerrada');
+    setError('');
   };
 
   return (
@@ -26,9 +54,11 @@ export function LoginPage() {
           <form className="page-grid" onSubmit={onSubmit}>
             <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
             <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
-            <Button type="submit">Entrar</Button>
+            <Button type="submit" disabled={loading}>{loading ? 'Entrando...' : 'Entrar'}</Button>
+            <Button type="button" variant="outline" onClick={onLogout}>Cerrar sesion</Button>
           </form>
           {message && <p className="helper">{message}</p>}
+          {error && <p className="helper">{error}</p>}
         </CardContent>
       </Card>
       <Card>

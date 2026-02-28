@@ -1,6 +1,7 @@
 let trackingSeq = 1;
 let podSeq = 1;
 let incidentSeq = 2;
+let userSeq = 3;
 let mockIncidents = [
   {
     id: 'i-1',
@@ -12,6 +13,36 @@ let mockIncidents = [
     resolved_at: null as string | null,
   },
 ];
+const mockRoles = [
+  { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
+  { id: 'r-2', code: 'operations_manager', name: 'Operations Manager' },
+  { id: 'r-3', code: 'driver', name: 'Driver' },
+];
+let mockUsers: Array<{
+  id: string;
+  name: string;
+  email: string;
+  status: 'pending' | 'active' | 'suspended';
+  last_login_at?: string | null;
+  role_ids: string[];
+}> = [
+  {
+    id: 'u-1',
+    name: 'Admin Demo',
+    email: 'admin@eco.local',
+    status: 'active',
+    last_login_at: '2026-02-28T08:30:00Z',
+    role_ids: ['r-1'],
+  },
+  {
+    id: 'u-2',
+    name: 'Ops Demo',
+    email: 'ops@eco.local',
+    status: 'active',
+    last_login_at: '2026-02-28T07:05:00Z',
+    role_ids: ['r-2'],
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -19,22 +50,120 @@ export const mockApi = {
   },
 
   async getCurrentUser() {
+    const admin = mockUsers.find((item) => item.id === 'u-1')!;
     return {
-      id: 'u-1',
-      name: 'Admin Demo',
-      email: 'admin@eco.local',
-      status: 'active',
-      roles: [
-        { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
-      ],
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      status: admin.status,
+      roles: admin.role_ids
+        .map((roleId) => mockRoles.find((role) => role.id === roleId))
+        .filter((role): role is (typeof mockRoles)[number] => !!role),
     };
   },
 
-  async getUsers() {
-    return [
-      { id: 'u-1', name: 'Admin Demo', email: 'admin@eco.local', status: 'active' },
-      { id: 'u-2', name: 'Ops Demo', email: 'ops@eco.local', status: 'active' },
-    ];
+  async getUsers(filters: {
+    q?: string;
+    status?: 'pending' | 'active' | 'suspended';
+    sort?: 'name' | 'email' | 'last_login_at' | 'created_at';
+    dir?: 'asc' | 'desc';
+  } = {}) {
+    let rows = mockUsers.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      status: user.status,
+      last_login_at: user.last_login_at ?? null,
+      roles: user.role_ids
+        .map((roleId) => mockRoles.find((role) => role.id === roleId))
+        .filter((role): role is (typeof mockRoles)[number] => !!role),
+    }));
+
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      rows = rows.filter((row) => row.name.toLowerCase().includes(q) || row.email.toLowerCase().includes(q));
+    }
+    if (filters.status) {
+      rows = rows.filter((row) => row.status === filters.status);
+    }
+    const sortKey = filters.sort ?? 'name';
+    const sortDir = filters.dir === 'asc' ? 1 : -1;
+    rows = rows.slice().sort((a, b) => {
+      const aValue = sortKey === 'created_at' ? a.id : (a[sortKey] ?? '');
+      const bValue = sortKey === 'created_at' ? b.id : (b[sortKey] ?? '');
+      if (aValue === bValue) return 0;
+      return aValue > bValue ? sortDir : -sortDir;
+    });
+    return rows;
+  },
+
+  async createUser(payload: {
+    name: string;
+    email: string;
+    password: string;
+    status: 'pending' | 'active' | 'suspended';
+    roleIds?: string[];
+  }) {
+    const created = {
+      id: `u-${userSeq++}`,
+      name: payload.name,
+      email: payload.email,
+      status: payload.status,
+      last_login_at: null,
+      role_ids: payload.roleIds ?? [],
+    };
+    mockUsers = [created, ...mockUsers];
+    return {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      status: created.status,
+      last_login_at: created.last_login_at,
+      roles: created.role_ids
+        .map((roleId) => mockRoles.find((role) => role.id === roleId))
+        .filter((role): role is (typeof mockRoles)[number] => !!role),
+    };
+  },
+
+  async updateUser(id: string, payload: {
+    name?: string;
+    email?: string;
+    status?: 'pending' | 'active' | 'suspended';
+    password?: string;
+  }) {
+    const index = mockUsers.findIndex((item) => item.id === id);
+    if (index < 0) {
+      throw new Error('User not found');
+    }
+    const current = mockUsers[index];
+    const next = {
+      ...current,
+      name: payload.name ?? current.name,
+      email: payload.email ?? current.email,
+      status: payload.status ?? current.status,
+    };
+    mockUsers[index] = next;
+    return {
+      id: next.id,
+      name: next.name,
+      email: next.email,
+      status: next.status,
+      last_login_at: next.last_login_at ?? null,
+      roles: next.role_ids
+        .map((roleId) => mockRoles.find((role) => role.id === roleId))
+        .filter((role): role is (typeof mockRoles)[number] => !!role),
+    };
+  },
+
+  async assignUserRoles(userId: string, roleIds: string[]) {
+    const index = mockUsers.findIndex((item) => item.id === userId);
+    if (index < 0) {
+      throw new Error('User not found');
+    }
+    mockUsers[index] = {
+      ...mockUsers[index],
+      role_ids: roleIds,
+    };
   },
 
   async getAuditLogs(_: {
@@ -203,11 +332,7 @@ export const mockApi = {
   },
 
   async getRoles() {
-    return [
-      { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
-      { id: 'r-2', code: 'operations_manager', name: 'Operations Manager' },
-      { id: 'r-3', code: 'driver', name: 'Driver' },
-    ];
+    return mockRoles;
   },
 
   async getHubs(_: { onlyActive?: boolean } = {}) {
