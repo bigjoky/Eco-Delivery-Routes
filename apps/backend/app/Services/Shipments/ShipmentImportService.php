@@ -15,7 +15,23 @@ final class ShipmentImportService
     {
         $minScheduled = Carbon::now()->subDays(30);
         $maxScheduled = Carbon::now()->addDays(180);
-        $allowedHeaders = ['hub_code', 'reference', 'consignee_name', 'address_line', 'scheduled_at', 'service_type'];
+        $allowedHeaders = [
+            'hub_code',
+            'reference',
+            'consignee_name',
+            'address_line',
+            'address_street',
+            'address_number',
+            'postal_code',
+            'city',
+            'province',
+            'country',
+            'address_notes',
+            'consignee_phone',
+            'consignee_email',
+            'scheduled_at',
+            'service_type',
+        ];
 
         $handle = fopen($path, 'r');
         if ($handle === false) {
@@ -111,8 +127,17 @@ final class ShipmentImportService
                     'id' => (string) Str::uuid(),
                     'hub_id' => $hubId,
                     'reference' => $reference,
-                    'consignee_name' => $row['consignee_name'] !== '' ? $row['consignee_name'] : null,
-                    'address_line' => $row['address_line'] !== '' ? $row['address_line'] : null,
+                    'consignee_name' => $this->normalizeTitle($row['consignee_name'] ?? null),
+                    'address_line' => $this->composeAddressLine($row),
+                    'address_street' => $this->normalizeTitle($row['address_street'] ?? null),
+                    'address_number' => $this->normalizeText($row['address_number'] ?? null),
+                    'postal_code' => $this->normalizeText($row['postal_code'] ?? null),
+                    'city' => $this->normalizeTitle($row['city'] ?? null),
+                    'province' => $this->normalizeTitle($row['province'] ?? null),
+                    'country' => $this->normalizeText($row['country'] ?? null),
+                    'address_notes' => $this->normalizeText($row['address_notes'] ?? null),
+                    'consignee_phone' => $this->normalizeText($row['consignee_phone'] ?? null),
+                    'consignee_email' => $this->normalizeText($row['consignee_email'] ?? null),
                     'scheduled_at' => $scheduledAtValue?->format('Y-m-d H:i:s'),
                     'service_type' => $serviceType,
                     'status' => 'created',
@@ -151,5 +176,56 @@ final class ShipmentImportService
             'warnings' => $warnings,
             'unknown_columns' => $unknownColumns,
         ];
+    }
+
+    private function composeAddressLine(array $row): ?string
+    {
+        $street = $this->normalizeTitle($row['address_street'] ?? null) ?? '';
+        $number = $this->normalizeText($row['address_number'] ?? null) ?? '';
+        $postal = $this->normalizeText($row['postal_code'] ?? null) ?? '';
+        $city = $this->normalizeTitle($row['city'] ?? null) ?? '';
+        $province = $this->normalizeTitle($row['province'] ?? null) ?? '';
+        $country = $this->normalizeText($row['country'] ?? null) ?? '';
+        $fallback = $this->normalizeText($row['address_line'] ?? null) ?? '';
+
+        $parts = [];
+        if ($street !== '') {
+            $parts[] = $number !== '' ? $street . ' ' . $number : $street;
+        }
+        $locality = trim($postal . ' ' . $city);
+        if ($locality !== '') {
+            $parts[] = $locality;
+        }
+        if ($province !== '') {
+            $parts[] = $province;
+        }
+        if ($country !== '') {
+            $parts[] = $country;
+        }
+
+        if ($parts === []) {
+            return $fallback !== '' ? $fallback : null;
+        }
+
+        return implode(', ', $parts);
+    }
+
+    private function normalizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim(preg_replace('/\\s+/', ' ', (string) $value));
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function normalizeTitle(?string $value): ?string
+    {
+        $normalized = $this->normalizeText($value);
+        if ($normalized === null) {
+            return null;
+        }
+        $lower = mb_strtolower($normalized, 'UTF-8');
+        return mb_convert_case($lower, MB_CASE_TITLE, 'UTF-8');
     }
 }

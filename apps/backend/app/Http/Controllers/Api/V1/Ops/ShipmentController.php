@@ -173,23 +173,23 @@ class ShipmentController extends Controller
         }
 
         $id = (string) Str::uuid();
-        $addressLine = $payload['address_line'] ?? $this->composeAddressLine($payload);
+        $addressLine = $this->normalizeText($payload['address_line'] ?? '') ?: $this->composeAddressLine($payload);
 
         DB::table('shipments')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
             'reference' => $payload['reference'],
-            'consignee_name' => $payload['consignee_name'] ?? null,
+            'consignee_name' => $this->normalizeTitle($payload['consignee_name'] ?? null),
             'address_line' => $addressLine,
-            'address_street' => $payload['address_street'] ?? null,
-            'address_number' => $payload['address_number'] ?? null,
-            'postal_code' => $payload['postal_code'] ?? null,
-            'city' => $payload['city'] ?? null,
-            'province' => $payload['province'] ?? null,
-            'country' => $payload['country'] ?? null,
-            'address_notes' => $payload['address_notes'] ?? null,
-            'consignee_phone' => $payload['consignee_phone'] ?? null,
-            'consignee_email' => $payload['consignee_email'] ?? null,
+            'address_street' => $this->normalizeTitle($payload['address_street'] ?? null),
+            'address_number' => $this->normalizeText($payload['address_number'] ?? null),
+            'postal_code' => $this->normalizeText($payload['postal_code'] ?? null),
+            'city' => $this->normalizeTitle($payload['city'] ?? null),
+            'province' => $this->normalizeTitle($payload['province'] ?? null),
+            'country' => $this->normalizeText($payload['country'] ?? null),
+            'address_notes' => $this->normalizeText($payload['address_notes'] ?? null),
+            'consignee_phone' => $this->normalizeText($payload['consignee_phone'] ?? null),
+            'consignee_email' => $this->normalizeText($payload['consignee_email'] ?? null),
             'scheduled_at' => $payload['scheduled_at'] ?? null,
             'status' => 'created',
             'created_at' => now(),
@@ -233,6 +233,15 @@ class ShipmentController extends Controller
             'status',
             'consignee_name',
             'address_line',
+            'address_street',
+            'address_number',
+            'postal_code',
+            'city',
+            'province',
+            'country',
+            'address_notes',
+            'consignee_phone',
+            'consignee_email',
             'scheduled_at',
             'delivered_at',
             'hub_id',
@@ -301,6 +310,15 @@ class ShipmentController extends Controller
             'status' => 'Status',
             'consignee_name' => 'Consignee',
             'address_line' => 'Address',
+            'address_street' => 'Street',
+            'address_number' => 'Number',
+            'postal_code' => 'Postal Code',
+            'city' => 'City',
+            'province' => 'Province',
+            'country' => 'Country',
+            'address_notes' => 'Address Notes',
+            'consignee_phone' => 'Phone',
+            'consignee_email' => 'Email',
             'scheduled_at' => 'Scheduled',
             'delivered_at' => 'Delivered',
             'hub_id' => 'Hub',
@@ -349,8 +367,8 @@ class ShipmentController extends Controller
 
         $hubCode = (string) (DB::table('hubs')->value('code') ?? 'HUB-000');
         $rows = [
-            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type',
-            $hubCode . ',SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery',
+            'hub_code,reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type',
+            $hubCode . ',SHP-AGP-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05T08:30:00Z,delivery',
         ];
 
         $this->auditLogWriter->write($actor->id, 'shipments.template.downloaded', [
@@ -542,12 +560,12 @@ class ShipmentController extends Controller
 
     private function composeAddressLine(array $payload): ?string
     {
-        $street = trim((string) ($payload['address_street'] ?? ''));
-        $number = trim((string) ($payload['address_number'] ?? ''));
-        $postal = trim((string) ($payload['postal_code'] ?? ''));
-        $city = trim((string) ($payload['city'] ?? ''));
-        $province = trim((string) ($payload['province'] ?? ''));
-        $country = trim((string) ($payload['country'] ?? ''));
+        $street = $this->normalizeTitle($payload['address_street'] ?? null) ?? '';
+        $number = $this->normalizeText($payload['address_number'] ?? null) ?? '';
+        $postal = $this->normalizeText($payload['postal_code'] ?? null) ?? '';
+        $city = $this->normalizeTitle($payload['city'] ?? null) ?? '';
+        $province = $this->normalizeTitle($payload['province'] ?? null) ?? '';
+        $country = $this->normalizeText($payload['country'] ?? null) ?? '';
 
         $parts = [];
         if ($street !== '') {
@@ -569,6 +587,25 @@ class ShipmentController extends Controller
         }
 
         return implode(', ', $parts);
+    }
+
+    private function normalizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim(preg_replace('/\\s+/', ' ', $value));
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function normalizeTitle(?string $value): ?string
+    {
+        $normalized = $this->normalizeText($value);
+        if ($normalized === null) {
+            return null;
+        }
+        $lower = mb_strtolower($normalized, 'UTF-8');
+        return mb_convert_case($lower, MB_CASE_TITLE, 'UTF-8');
     }
 
     public function markDelivered(Request $request, string $id): JsonResponse

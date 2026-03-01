@@ -169,7 +169,12 @@ export function ShipmentsPage() {
     'reference',
     'status',
     'consignee_name',
-    'address_line',
+    'address_street',
+    'address_number',
+    'postal_code',
+    'city',
+    'province',
+    'country',
     'scheduled_at',
     'delivered_at',
     'hub_id',
@@ -178,13 +183,19 @@ export function ShipmentsPage() {
     'reference',
     'status',
     'consignee_name',
-    'address_line',
+    'address_street',
+    'address_number',
+    'postal_code',
+    'city',
+    'province',
+    'country',
     'scheduled_at',
     'delivered_at',
     'hub_id',
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const recentAddressesStorageKey = 'eco_delivery_routes_recent_addresses';
+  const recentConsigneesStorageKey = 'eco_delivery_routes_recent_consignees';
   const [recentAddresses, setRecentAddresses] = useState<Array<{
     street: string;
     number: string;
@@ -192,6 +203,11 @@ export function ShipmentsPage() {
     city: string;
     province: string;
     country: string;
+  }>>([]);
+  const [recentConsignees, setRecentConsignees] = useState<Array<{
+    name: string;
+    phone: string;
+    email: string;
   }>>([]);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -323,6 +339,20 @@ export function ShipmentsPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recentConsigneesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        setRecentConsignees(parsed.filter((item) => item && typeof item === 'object').slice(0, 10));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (!canImport || !importJobId) return;
     let active = true;
     const poll = async () => {
@@ -376,6 +406,18 @@ export function ShipmentsPage() {
     setCreateHubCode(codePart);
   }, [createHubId, hubs]);
 
+  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+  const minScheduledAt = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return formatDate(date);
+  })();
+  const maxScheduledAt = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 180);
+    return formatDate(date);
+  })();
+
   const createShipment = async () => {
     const nextErrors: {
       hub?: string;
@@ -414,13 +456,11 @@ export function ShipmentsPage() {
     if (createScheduledAt) {
       const parsed = Date.parse(createScheduledAt);
       if (Number.isNaN(parsed)) nextErrors.scheduledAt = 'Fecha/hora no valida (usa ISO).';
-      const min = new Date();
-      min.setDate(min.getDate() - 30);
-      const max = new Date();
-      max.setDate(max.getDate() + 180);
       if (!Number.isNaN(parsed)) {
-        if (parsed < min.getTime()) nextErrors.scheduledAt = `La fecha debe ser posterior a ${formatDate(min)}.`;
-        if (parsed > max.getTime()) nextErrors.scheduledAt = `La fecha debe ser anterior a ${formatDate(max)}.`;
+        const minDate = new Date(`${minScheduledAt}T00:00:00Z`);
+        const maxDate = new Date(`${maxScheduledAt}T23:59:59Z`);
+        if (parsed < minDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser posterior a ${minScheduledAt}.`;
+        if (parsed > maxDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser anterior a ${maxScheduledAt}.`;
       }
     }
     setCreateFieldErrors(nextErrors);
@@ -466,6 +506,11 @@ export function ShipmentsPage() {
       setCreateEmail('');
       setCreateScheduledAt('');
       setCreateFieldErrors({});
+      saveRecentConsignee({
+        name: createConsignee,
+        phone: createPhone,
+        email: createEmail,
+      });
       saveRecentAddress({
         street: createStreet,
         number: createNumber,
@@ -583,18 +628,6 @@ export function ShipmentsPage() {
     setExportColumns(defaultExportColumns);
   };
 
-  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
-  const minScheduledAt = (() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return formatDate(date);
-  })();
-  const maxScheduledAt = (() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 180);
-    return formatDate(date);
-  })();
-
   const saveRecentAddress = (entry: {
     street: string;
     number: string;
@@ -630,6 +663,28 @@ export function ShipmentsPage() {
     }
   };
 
+  const saveRecentConsignee = (entry: { name: string; phone: string; email: string }) => {
+    const normalized = {
+      name: entry.name.trim(),
+      phone: entry.phone.trim(),
+      email: entry.email.trim(),
+    };
+    if (!normalized.name && !normalized.phone && !normalized.email) return;
+    const next = [
+      normalized,
+      ...recentConsignees.filter(
+        (item) =>
+          item.name !== normalized.name ||
+          item.phone !== normalized.phone ||
+          item.email !== normalized.email
+      ),
+    ].slice(0, 10);
+    setRecentConsignees(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(recentConsigneesStorageKey, JSON.stringify(next));
+    }
+  };
+
   const applyRecentAddress = (index: number) => {
     const entry = recentAddresses[index];
     if (!entry) return;
@@ -639,6 +694,14 @@ export function ShipmentsPage() {
     setCreateCity(entry.city);
     setCreateProvince(entry.province);
     setCreateCountry(entry.country);
+  };
+
+  const applyRecentConsignee = (index: number) => {
+    const entry = recentConsignees[index];
+    if (!entry) return;
+    setCreateConsignee(entry.name);
+    setCreatePhone(entry.phone);
+    setCreateEmail(entry.email);
   };
 
   const toggleExportColumn = (column: string) => {
@@ -664,8 +727,8 @@ export function ShipmentsPage() {
     try {
       await apiClient.downloadShipmentsTemplate();
     } catch {
-      const header = 'hub_code,reference,consignee_name,address_line,scheduled_at,service_type';
-      const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery';
+      const header = 'hub_code,reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type';
+      const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05T08:30:00Z,delivery';
       const content = `${header}\n${sample}\n`;
       const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
@@ -735,6 +798,21 @@ export function ShipmentsPage() {
             />
             <div className="helper">Formato: SHP-{createHubCode}-0001</div>
             {createFieldErrors.reference ? <div className="helper">{createFieldErrors.reference}</div> : null}
+            <label htmlFor="create-shipment-consignee-recent">Destinatarios recientes</label>
+            <select
+              id="create-shipment-consignee-recent"
+              onChange={(event) => {
+                if (!event.target.value) return;
+                applyRecentConsignee(Number(event.target.value));
+              }}
+            >
+              <option value="">Selecciona destinatario</option>
+              {recentConsignees.map((entry, index) => (
+                <option key={`${entry.name}-${entry.phone}-${index}`} value={index}>
+                  {entry.name || 'Sin nombre'} · {entry.phone || 'sin telefono'}
+                </option>
+              ))}
+            </select>
             <label htmlFor="create-shipment-consignee">Destinatario</label>
             <input
               id="create-shipment-consignee"
@@ -918,7 +996,20 @@ export function ShipmentsPage() {
           />
           <div className="inline-actions">
             <span className="helper">Columnas export</span>
-            {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
+            {[
+              'reference',
+              'status',
+              'consignee_name',
+              'address_street',
+              'address_number',
+              'postal_code',
+              'city',
+              'province',
+              'country',
+              'scheduled_at',
+              'delivered_at',
+              'hub_id',
+            ].map((column) => (
               <label key={column}>
                 <input
                   type="checkbox"
