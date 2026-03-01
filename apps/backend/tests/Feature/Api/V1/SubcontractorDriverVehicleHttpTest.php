@@ -37,6 +37,7 @@ class SubcontractorDriverVehicleHttpTest extends TestCase
         $createDriver = $this->postJson('/api/v1/drivers', [
             'code' => 'DRV-MOD-001',
             'name' => 'Driver Modulo Uno',
+            'dni' => '12345678Z',
             'status' => 'active',
             'employment_type' => 'subcontractor',
             'subcontractor_id' => $subcontractorId,
@@ -118,4 +119,3 @@ class SubcontractorDriverVehicleHttpTest extends TestCase
         return $user;
     }
 }
-

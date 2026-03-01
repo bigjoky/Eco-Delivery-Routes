@@ -75,7 +75,7 @@ class RouteVehicleAssignmentHttpTest extends TestCase
         $create->assertJsonPath('data.driver_id', $driverA);
         $create->assertJsonPath('data.driver_code', 'DRV-RT-001');
         $create->assertJsonPath('data.vehicle_id', $vehicleA);
-        $create->assertJsonPath('data.vehicle_code', 'VEH-RT-001');
+        $create->assertJsonPath('data.vehicle_code', 'RT1001');
 
         $driverB = (string) Str::uuid();
         DB::table('drivers')->insert([
@@ -112,7 +112,7 @@ class RouteVehicleAssignmentHttpTest extends TestCase
         $update->assertJsonPath('data.driver_id', $driverB);
         $update->assertJsonPath('data.driver_code', 'DRV-RT-002');
         $update->assertJsonPath('data.vehicle_id', $vehicleB);
-        $update->assertJsonPath('data.vehicle_code', 'VEH-RT-002');
+        $update->assertJsonPath('data.vehicle_code', 'RT1002');
         $update->assertJsonPath('data.status', 'in_progress');
 
         $list = $this->getJson('/api/v1/routes?sort=route_date&dir=desc');
@@ -120,7 +120,7 @@ class RouteVehicleAssignmentHttpTest extends TestCase
         $matched = collect($list->json('data'))->firstWhere('id', $routeId);
         $this->assertNotNull($matched);
         $this->assertSame('DRV-RT-002', $matched['driver_code']);
-        $this->assertSame('VEH-RT-002', $matched['vehicle_code']);
+        $this->assertSame('RT1002', $matched['vehicle_code']);
     }
 
     public function test_driver_cannot_update_route_vehicle_assignment(): void

@@ -164,7 +164,7 @@ class ShipmentsHttpTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_rejects_duplicate_reference(): void
+    public function test_generates_reference_even_if_payload_reference_is_provided(): void
     {
         $manager = $this->createUserWithRole('operations_manager');
         $this->actingAs($manager, 'sanctum');
@@ -185,11 +185,13 @@ class ShipmentsHttpTest extends TestCase
             'hub_id' => $hubId,
             'reference' => 'SHP-DUP-001',
             'consignee_name' => 'Cliente Duplicado',
+            'sender_document_id' => '12345678A',
+            'service_type' => 'express_1030',
         ];
 
         $response = $this->postJson('/api/v1/shipments', $payload);
-        $response->assertStatus(409);
-        $response->assertJsonPath('error.code', 'SHIPMENT_REFERENCE_EXISTS');
+        $response->assertStatus(201);
+        $response->assertJsonMissing(['data' => ['reference' => 'SHP-DUP-001']]);
     }
 
     public function test_can_show_shipment_detail_with_tracking_pods_incidents(): void
@@ -314,7 +316,7 @@ class ShipmentsHttpTest extends TestCase
         ]);
 
         $response->assertOk();
-        $this->assertSame(2, DB::table('shipments')->whereIn('reference', ['SHP-IMPORT-003', 'SHP-IMPORT-004'])->count());
+        $this->assertSame(2, DB::table('shipments')->whereIn('external_reference', ['SHP-IMPORT-003', 'SHP-IMPORT-004'])->count());
     }
 
     public function test_import_returns_warning_for_unknown_columns(): void
