@@ -350,6 +350,21 @@ export function RouteDetailPage() {
     }
   };
 
+  const toLocalDateTime = (value?: string | null) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (num: number) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const toIsoDateTime = (value: string) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString();
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -612,6 +627,22 @@ export function RouteDetailPage() {
                           <option value="in_progress">in_progress</option>
                           <option value="completed">completed</option>
                         </select>
+                        <input
+                          type="datetime-local"
+                          value={toLocalDateTime(stop.planned_at)}
+                          onChange={(event) => {
+                            const iso = toIsoDateTime(event.target.value);
+                            updateStop(stop.id, { planned_at: iso });
+                          }}
+                        />
+                        <input
+                          type="datetime-local"
+                          value={toLocalDateTime(stop.completed_at)}
+                          onChange={(event) => {
+                            const iso = toIsoDateTime(event.target.value);
+                            updateStop(stop.id, { completed_at: iso });
+                          }}
+                        />
                         <Button type="button" variant="outline" disabled={reorderingStops} onClick={() => deleteStop(stop.id)}>
                           Eliminar
                         </Button>

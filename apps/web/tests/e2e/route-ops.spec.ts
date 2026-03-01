@@ -23,7 +23,13 @@ test('route ops flow: login, open route, update manifest notes, undo stop', asyn
   await expect(page.getByText('Guardar notas')).toBeVisible();
 
   page.on('dialog', (dialog) => dialog.accept());
-  await page.click('text=Eliminar');
+  const deleteButtons = page.getByText('Eliminar');
+  if ((await deleteButtons.count()) === 0) {
+    await page.selectOption('#stop-type', 'DELIVERY');
+    await page.selectOption('#stop-entity-id', { index: 1 });
+    await page.click('text=Agregar parada');
+  }
+  await deleteButtons.first().click();
   await expect(page.getByText('Deshacer eliminacion')).toBeVisible({ timeout: 5000 });
   await page.click('text=Deshacer eliminacion');
 
