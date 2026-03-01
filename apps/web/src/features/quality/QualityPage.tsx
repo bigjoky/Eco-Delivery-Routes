@@ -58,9 +58,13 @@ export function QualityPage() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   });
   const [thresholdAlertLastPage, setThresholdAlertLastPage] = useState(1);
-  const [displayTimeZone, setDisplayTimeZone] = useState<string>(
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid'
-  );
+  const [displayTimeZone, setDisplayTimeZone] = useState<string>(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Madrid';
+    } catch {
+      return 'Europe/Madrid';
+    }
+  });
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
 
   useEffect(() => {
@@ -76,22 +80,41 @@ export function QualityPage() {
   }, [alertScopeType, alertScopeId, thresholdAlertPage, setSearchParams]);
 
   useEffect(() => {
-    apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
-    apiClient.getHubs({ onlyActive: true }).then(setHubs);
-    apiClient.getRoles().then(setRoles).catch(() => setRoles([]));
-    apiClient.getUsers().then(setUsers).catch(() => setUsers([]));
-    apiClient.getQualityThreshold().then((config) => {
-      setThreshold(String(config.threshold));
-      setCanManageThreshold(Boolean(config.can_manage));
-      setThresholdSource(config.source_type);
-    });
-    apiClient.getQualityThresholdAlertSettings().then((config) => {
-      setThresholdAlertDeltaText(String(config.large_delta_threshold));
-      setThresholdAlertWindowText(String(config.window_hours));
-      if (typeof config.can_manage === 'boolean') {
-        setCanManageThreshold((current) => current && config.can_manage);
-      }
-    });
+    apiClient.getSubcontractors({ limit: 20 })
+      .then((rows) => setSubcontractors(Array.isArray(rows) ? rows : []))
+      .catch(() => setSubcontractors([]));
+    apiClient.getHubs({ onlyActive: true })
+      .then((rows) => setHubs(Array.isArray(rows) ? rows : []))
+      .catch(() => setHubs([]));
+    apiClient.getRoles()
+      .then((rows) => setRoles(Array.isArray(rows) ? rows : []))
+      .catch(() => setRoles([]));
+    apiClient.getUsers()
+      .then((rows) => setUsers(Array.isArray(rows) ? rows : []))
+      .catch(() => setUsers([]));
+    apiClient.getQualityThreshold()
+      .then((config) => {
+        setThreshold(String(config.threshold));
+        setCanManageThreshold(Boolean(config.can_manage));
+        setThresholdSource(config.source_type);
+      })
+      .catch(() => {
+        setThreshold('95');
+        setCanManageThreshold(false);
+        setThresholdSource('default');
+      });
+    apiClient.getQualityThresholdAlertSettings()
+      .then((config) => {
+        setThresholdAlertDeltaText(String(config.large_delta_threshold));
+        setThresholdAlertWindowText(String(config.window_hours));
+        if (typeof config.can_manage === 'boolean') {
+          setCanManageThreshold((current) => current && config.can_manage);
+        }
+      })
+      .catch(() => {
+        setThresholdAlertDeltaText('5');
+        setThresholdAlertWindowText('24');
+      });
     apiClient
       .getQualityThresholdHistory({
         scopeType: thresholdScopeType,
@@ -99,7 +122,7 @@ export function QualityPage() {
         page: 1,
         perPage: 20,
       })
-      .then((response) => setThresholdAuditRows(response.data))
+      .then((response) => setThresholdAuditRows(Array.isArray(response?.data) ? response.data : []))
       .catch(() => setThresholdAuditRows([]));
     apiClient
       .getQualityThresholdAlertSummary({
@@ -118,7 +141,7 @@ export function QualityPage() {
         dateTo: periodEnd || undefined,
         limit: 5,
       })
-      .then(setThresholdAlertTopScopes)
+      .then((rows) => setThresholdAlertTopScopes(Array.isArray(rows) ? rows : []))
       .catch(() => setThresholdAlertTopScopes([]));
   }, [thresholdScopeType, thresholdScopeId, alertScopeType, alertScopeId, periodStart, periodEnd]);
 
@@ -134,8 +157,8 @@ export function QualityPage() {
         perPage: 10,
       })
       .then((response) => {
-        setThresholdAlertRows(response.data);
-        setThresholdAlertLastPage(Math.max(1, response.meta.last_page));
+        setThresholdAlertRows(Array.isArray(response?.data) ? response.data : []);
+        setThresholdAlertLastPage(Math.max(1, response?.meta?.last_page ?? 1));
       })
       .catch(() => {
         setThresholdAlertRows([]);
@@ -154,7 +177,7 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
       })
       .then((rows) => {
-        setItems(rows);
+        setItems(Array.isArray(rows) ? rows : []);
         setQualityLoadError(false);
       })
       .catch(() => {
@@ -174,7 +197,7 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
-      .then((result) => setUnderThresholdRoutes(result.data))
+      .then((result) => setUnderThresholdRoutes(Array.isArray(result?.data) ? result.data : []))
       .catch(() => {
         setUnderThresholdRoutes([]);
         setQualityLoadError(true);
@@ -192,7 +215,7 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
-      .then((result) => setRiskSummary(result.data))
+      .then((result) => setRiskSummary(Array.isArray(result?.data) ? result.data : []))
       .catch(() => {
         setRiskSummary([]);
         setQualityLoadError(true);
@@ -445,7 +468,7 @@ export function QualityPage() {
                     });
                   })
                   .then((response) => {
-                    if (response) setThresholdAuditRows(response.data);
+                    if (response) setThresholdAuditRows(Array.isArray(response?.data) ? response.data : []);
                   })
                   .then(() =>
                     apiClient.getQualityThresholdAlertSummary({
@@ -467,7 +490,7 @@ export function QualityPage() {
                     });
                   })
                   .then((rows) => {
-                    if (rows) setThresholdAlertTopScopes(rows);
+                    if (rows) setThresholdAlertTopScopes(Array.isArray(rows) ? rows : []);
                   })
                   .catch(() => setThresholdSaveMessage('No se pudo guardar el umbral'))
               }
@@ -506,7 +529,7 @@ export function QualityPage() {
                     });
                   })
                   .then((response) => {
-                    if (response) setThresholdAuditRows(response.data);
+                    if (response) setThresholdAuditRows(Array.isArray(response?.data) ? response.data : []);
                   })
                   .then(() =>
                     apiClient.getQualityThresholdAlertSummary({
@@ -528,7 +551,7 @@ export function QualityPage() {
                     });
                   })
                   .then((rows) => {
-                    if (rows) setThresholdAlertTopScopes(rows);
+                    if (rows) setThresholdAlertTopScopes(Array.isArray(rows) ? rows : []);
                   })
                   .catch(() => setThresholdAlertSaveMessage('No se pudo guardar la configuración de alerta'))
               }

@@ -36,6 +36,16 @@ export function IncidentsPage() {
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
 
+  const incidentSummary = useMemo(() => {
+    const openCount = items.filter((item) => !item.resolved_at).length;
+    const resolvedCount = items.length - openCount;
+    return {
+      pageCount: items.length,
+      open: openCount,
+      resolved: resolvedCount,
+    };
+  }, [items]);
+
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
     incidentableType: listTypeFilter || undefined,
@@ -160,7 +170,7 @@ export function IncidentsPage() {
   };
 
   return (
-    <section className="page-grid two">
+    <section className="page-grid">
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Registrar Incidencia</CardTitle>
@@ -169,29 +179,48 @@ export function IncidentsPage() {
         <CardContent>
           <form className="page-grid" onSubmit={onSubmit}>
             <div className="form-row">
-              <Select value={incidentableType} onChange={(e) => setIncidentableType(e.target.value as 'shipment' | 'pickup')}>
-                <option value="shipment">shipment</option>
-                <option value="pickup">pickup</option>
-              </Select>
-              <Input value={incidentableId} onChange={(e) => setIncidentableId(e.target.value)} placeholder="Incidentable ID" />
+              <div>
+                <label>Tipo</label>
+                <Select value={incidentableType} onChange={(e) => setIncidentableType(e.target.value as 'shipment' | 'pickup')}>
+                  <option value="shipment">shipment</option>
+                  <option value="pickup">pickup</option>
+                </Select>
+              </div>
+              <div>
+                <label>Referencia objetivo</label>
+                <Input value={incidentableId} onChange={(e) => setIncidentableId(e.target.value)} placeholder="Shipment/ pickup id" />
+              </div>
             </div>
             <div className="form-row">
-              <Select
-                value={catalogCode}
-                onChange={(e) => {
-                  const selected = availableCatalog.find((item) => item.code === e.target.value);
-                  setCatalogCode(e.target.value);
-                  if (selected) setCategory(selected.category);
-                }}
-              >
-                {availableCatalog.map((item) => (
-                  <option key={item.code} value={item.code}>{item.code} - {item.name}</option>
-                ))}
-              </Select>
-              <Input value={category} readOnly />
+              <div>
+                <label>Catalogo</label>
+                <Select
+                  value={catalogCode}
+                  onChange={(e) => {
+                    const selected = availableCatalog.find((item) => item.code === e.target.value);
+                    setCatalogCode(e.target.value);
+                    if (selected) setCategory(selected.category);
+                  }}
+                >
+                  {availableCatalog.map((item) => (
+                    <option key={item.code} value={item.code}>{item.code} - {item.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label>Categoria</label>
+                <Input value={category} readOnly />
+              </div>
             </div>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas" />
-            <Button type="submit">Registrar</Button>
+            <div className="form-row">
+              <div>
+                <label>Notas</label>
+                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Detalle breve" />
+              </div>
+            </div>
+            <div className="inline-actions">
+              <Button type="submit">Registrar incidencia</Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -199,18 +228,42 @@ export function IncidentsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Incidencias recientes</CardTitle>
-          <CardDescription>
-            <div className="form-row">
+          <CardDescription>Filtra por estado, tipo, categoria o referencia.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="kpi-grid">
+            <div className="kpi-item">
+              <div className="kpi-label">En página</div>
+              <div className="kpi-value">{incidentSummary.pageCount}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Abiertas</div>
+              <div className="kpi-value">{incidentSummary.open}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Resueltas</div>
+              <div className="kpi-value">{incidentSummary.resolved}</div>
+            </div>
+          </div>
+          <div className="form-row">
+            <div>
+              <label>Estado</label>
               <Select value={resolvedFilter} onChange={(e) => { setResolvedFilter(e.target.value as 'open' | 'resolved' | ''); setPage(1); }}>
                 <option value="">todas</option>
                 <option value="open">abiertas</option>
                 <option value="resolved">resueltas</option>
               </Select>
+            </div>
+            <div>
+              <label>Tipo</label>
               <Select value={listTypeFilter} onChange={(e) => { setListTypeFilter(e.target.value as 'shipment' | 'pickup' | ''); setPage(1); }}>
                 <option value="">tipo</option>
                 <option value="shipment">shipment</option>
                 <option value="pickup">pickup</option>
               </Select>
+            </div>
+            <div>
+              <label>Categoria</label>
               <Select value={listCategoryFilter} onChange={(e) => { setListCategoryFilter(e.target.value as 'failed' | 'absent' | 'retry' | 'general' | ''); setPage(1); }}>
                 <option value="">categoria</option>
                 <option value="failed">failed</option>
@@ -218,18 +271,25 @@ export function IncidentsPage() {
                 <option value="retry">retry</option>
                 <option value="general">general</option>
               </Select>
+            </div>
+            <div>
+              <label>Catalogo</label>
               <Select value={listCatalogFilter} onChange={(e) => { setListCatalogFilter(e.target.value); setPage(1); }}>
                 <option value="">catalogo</option>
                 {catalog.map((item) => (
                   <option key={item.code} value={item.code}>{item.code}</option>
                 ))}
               </Select>
+            </div>
+            <div>
+              <label>Referencia objetivo</label>
               <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
+            </div>
+            <div>
+              <label>Buscar</label>
               <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
             </div>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -261,14 +321,19 @@ export function IncidentsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>Sin incidencias para los filtros seleccionados.</TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </TableWrapper>
-          <div className="form-row">
+          <div className="inline-actions">
             <Button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
               Anterior
             </Button>
-            <span>Pagina {page} de {lastPage}</span>
+            <span className="helper">Pagina {page} de {lastPage}</span>
             <Button type="button" onClick={() => setPage((value) => Math.min(lastPage, value + 1))} disabled={page >= lastPage}>
               Siguiente
             </Button>

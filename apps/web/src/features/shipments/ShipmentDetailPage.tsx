@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { ShipmentDetail } from '../../core/api/types';
@@ -18,24 +19,42 @@ export function ShipmentDetailPage() {
   const [detail, setDetail] = useState<ShipmentDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    setError('');
-    apiClient
-      .getShipmentDetail(id)
-      .then((data) => {
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await apiClient.getShipmentDetail(id);
         setDetail(data);
-      })
-      .catch((exception) => {
+      } catch (exception) {
         setDetail(null);
         setError(exception instanceof Error ? exception.message : 'No se pudo cargar el envio');
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [id]);
 
   const shipment = detail?.shipment;
+
+  const resolveIncident = async (incidentId: string) => {
+    if (!id) return;
+    setResolvingId(incidentId);
+    setError('');
+    try {
+      await apiClient.resolveIncident(incidentId, 'Resuelta desde detalle de envio');
+      const refreshed = await apiClient.getShipmentDetail(id);
+      setDetail(refreshed);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   return (
     <section className="page-grid">
@@ -54,6 +73,10 @@ export function ShipmentDetailPage() {
               <div>
                 <div className="helper">Referencia</div>
                 <div>{shipment.reference}</div>
+              </div>
+              <div>
+                <div className="helper">Referencia externa</div>
+                <div>{shipment.external_reference ?? '-'}</div>
               </div>
               <div>
                 <div className="helper">Estado</div>
@@ -159,6 +182,7 @@ export function ShipmentDetailPage() {
                   <TableHead>Notas</TableHead>
                   <TableHead>Creado</TableHead>
                   <TableHead>Resuelto</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -169,10 +193,24 @@ export function ShipmentDetailPage() {
                     <TableCell>{incident.notes ?? '-'}</TableCell>
                     <TableCell>{incident.created_at ?? '-'}</TableCell>
                     <TableCell>{incident.resolved_at ?? '-'}</TableCell>
+                    <TableCell>
+                      {incident.resolved_at ? (
+                        <span className="helper">Resuelta</span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={resolvingId === incident.id}
+                          onClick={() => resolveIncident(incident.id)}
+                        >
+                          {resolvingId === incident.id ? 'Resolviendo...' : 'Resolver'}
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={5}>Sin incidencias</TableCell>
+                    <TableCell colSpan={6}>Sin incidencias</TableCell>
                   </TableRow>
                 )}
               </TableBody>

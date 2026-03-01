@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { canAccess } from '../core/auth/access';
 import { sessionStore } from '../core/auth/sessionStore';
 import { apiClient } from '../services/apiClient';
@@ -90,7 +91,13 @@ export function App() {
         />
         <Route
           path="/quality"
-          element={isAuthenticated && canAccess('quality', roles) ? <QualityPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('quality', roles)
+            ? (
+              <ErrorBoundary fallback={<div className="helper">No se pudo cargar KPI Calidad.</div>}>
+                <QualityPage />
+              </ErrorBoundary>
+            )
+            : <Navigate to="/" replace />}
         />
         <Route
           path="/users"

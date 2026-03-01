@@ -1418,6 +1418,7 @@ export function ShipmentsPage() {
                       Estado {sortIndicator('status')}
                     </button>
                   </TableHead>
+                  <TableHead>Servicio</TableHead>
                   <TableHead>Destinatario</TableHead>
                   <TableHead>Direccion</TableHead>
                   <TableHead>
@@ -1429,6 +1430,7 @@ export function ShipmentsPage() {
                       Programado {sortIndicator('scheduled_at')}
                     </button>
                   </TableHead>
+                  <TableHead>Hub</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1442,9 +1444,11 @@ export function ShipmentsPage() {
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
                     </TableCell>
                     <TableCell><Badge variant={shipmentVariant(item.status)}>{item.status}</Badge></TableCell>
+                    <TableCell>{item.service_type ?? '-'}</TableCell>
                     <TableCell>{item.consignee_name ?? '-'}</TableCell>
                     <TableCell>{item.address_line ?? '-'}</TableCell>
                     <TableCell>{item.scheduled_at ?? '-'}</TableCell>
+                    <TableCell>{item.hub_id ?? '-'}</TableCell>
                     <TableCell>
                       <div className="table-actions">
                         <Button
@@ -1467,7 +1471,7 @@ export function ShipmentsPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>Sin envíos para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={8}>Sin envíos para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

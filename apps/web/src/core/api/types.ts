@@ -47,8 +47,10 @@ export type RoleDetail = {
 export type ShipmentSummary = {
   id: string;
   reference: string;
+  external_reference?: string | null;
   status: string;
   consignee_name?: string | null;
+  consignee_document_id?: string | null;
   address_line?: string | null;
   address_street?: string | null;
   address_number?: string | null;
@@ -58,9 +60,30 @@ export type ShipmentSummary = {
   country?: string | null;
   address_notes?: string | null;
   consignee_phone?: string | null;
+  consignee_phone_alt?: string | null;
   consignee_email?: string | null;
   scheduled_at?: string | null;
+  service_type?: string | null;
   hub_id?: string | null;
+};
+
+export type ContactSummary = {
+  id: string;
+  display_name?: string | null;
+  legal_name?: string | null;
+  document_id?: string | null;
+  phone?: string | null;
+  phone_alt?: string | null;
+  email?: string | null;
+  address_line?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  address_notes?: string | null;
+  kind?: string | null;
 };
 
 export type PickupSummary = {
