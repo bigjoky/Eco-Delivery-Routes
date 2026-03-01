@@ -36,6 +36,7 @@ import {
   SubcontractorSummary,
   DriverSummary,
   VehicleSummary,
+  ContactSummary,
   ShipmentSummary,
   ShipmentDetail,
   PickupSummary,
@@ -476,10 +477,26 @@ export const apiClient = {
     return parsePaginatedData<ShipmentSummary>(response);
   },
 
+  async getContacts(filters: {
+    phone?: string;
+    email?: string;
+    q?: string;
+  } = {}): Promise<ContactSummary[]> {
+    if (USE_MOCK) return mockApi.getContacts(filters) as Promise<ContactSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.phone) params.set('phone', filters.phone);
+    if (filters.email) params.set('email', filters.email);
+    if (filters.q) params.set('q', filters.q);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
+    return parseData<ContactSummary>(response);
+  },
+
   async createShipment(payload: {
     hub_id: string;
-    reference: string;
+    external_reference?: string | null;
     consignee_name?: string | null;
+    consignee_document_id?: string | null;
     address_line?: string | null;
     address_street?: string | null;
     address_number?: string | null;
@@ -490,7 +507,21 @@ export const apiClient = {
     address_notes?: string | null;
     consignee_phone?: string | null;
     consignee_email?: string | null;
+    sender_name?: string | null;
+    sender_legal_name?: string | null;
+    sender_document_id?: string | null;
+    sender_phone?: string | null;
+    sender_email?: string | null;
+    sender_address_line?: string | null;
+    sender_address_street?: string | null;
+    sender_address_number?: string | null;
+    sender_postal_code?: string | null;
+    sender_city?: string | null;
+    sender_province?: string | null;
+    sender_country?: string | null;
+    sender_address_notes?: string | null;
     scheduled_at?: string | null;
+    service_type?: string | null;
   }): Promise<ShipmentSummary> {
     if (USE_MOCK) return mockApi.createShipment(payload) as Promise<ShipmentSummary>;
     const response = await authorizedFetch(`${API_BASE_URL}/shipments`, {
@@ -499,10 +530,17 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
     const json = await response.json();
-    if (response.status === 409) {
-      throw new Error('Referencia ya existe.');
-    }
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create shipment');
+    return json.data as ShipmentSummary;
+  },
+
+  async markShipmentDelivered(id: string): Promise<ShipmentSummary> {
+    if (USE_MOCK) return mockApi.markShipmentDelivered(id) as Promise<ShipmentSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/${id}/deliver`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot mark shipment delivered');
     return json.data as ShipmentSummary;
   },
 
@@ -651,6 +689,25 @@ export const apiClient = {
       filtered = filtered.slice(0, Math.max(1, filters.limit));
     }
     return filtered;
+  },
+
+  async createPickup(payload: {
+    hub_id: string;
+    external_reference?: string | null;
+    pickup_type: 'NORMAL' | 'RETURN';
+    requester_name?: string | null;
+    address_line?: string | null;
+    scheduled_at?: string | null;
+  }): Promise<PickupSummary> {
+    if (USE_MOCK) return mockApi.createPickup(payload) as Promise<PickupSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/pickups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create pickup');
+    return json.data as PickupSummary;
   },
 
   async getRoutes(filters: {

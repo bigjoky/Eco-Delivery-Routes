@@ -638,8 +638,8 @@ export const mockApi = {
     scheduledTo?: string;
   } = {}) {
     let rows = [
-      { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1' },
-      { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2' },
+      { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1' },
+      { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2' },
     ];
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
@@ -664,10 +664,52 @@ export const mockApi = {
     return rows;
   },
 
+  async getContacts(filters: { phone?: string; email?: string; q?: string } = {}) {
+    const rows = [
+      {
+        id: 'c-1',
+        display_name: 'Cliente Demo',
+        document_id: '12345678A',
+        phone: '+34950111222',
+        email: 'cliente@eco.local',
+        address_line: 'Calle 1, 29001 Malaga',
+        city: 'Malaga',
+        country: 'ES',
+        kind: 'recipient',
+      },
+      {
+        id: 'c-2',
+        display_name: 'Remitente Demo',
+        document_id: 'B12345678',
+        phone: '+34950111333',
+        email: 'remitente@eco.local',
+        address_line: 'Calle 2, 29002 Malaga',
+        city: 'Malaga',
+        country: 'ES',
+        kind: 'sender',
+      },
+    ];
+    if (filters.phone) {
+      return rows.filter((row) => (row.phone ?? '').includes(filters.phone ?? ''));
+    }
+    if (filters.email) {
+      return rows.filter((row) => (row.email ?? '').includes(filters.email ?? ''));
+    }
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      return rows.filter((row) =>
+        (row.display_name ?? '').toLowerCase().includes(q) ||
+        (row.phone ?? '').toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  },
+
   async createShipment(payload: {
     hub_id: string;
-    reference: string;
+    external_reference?: string | null;
     consignee_name?: string | null;
+    consignee_document_id?: string | null;
     address_line?: string | null;
     address_street?: string | null;
     address_number?: string | null;
@@ -678,13 +720,29 @@ export const mockApi = {
     address_notes?: string | null;
     consignee_phone?: string | null;
     consignee_email?: string | null;
+    sender_name?: string | null;
+    sender_legal_name?: string | null;
+    sender_document_id?: string | null;
+    sender_phone?: string | null;
+    sender_email?: string | null;
+    sender_address_line?: string | null;
+    sender_address_street?: string | null;
+    sender_address_number?: string | null;
+    sender_postal_code?: string | null;
+    sender_city?: string | null;
+    sender_province?: string | null;
+    sender_country?: string | null;
+    sender_address_notes?: string | null;
     scheduled_at?: string | null;
+    service_type?: string | null;
   }) {
     return {
       id: `s-${Math.floor(Math.random() * 10000)}`,
-      reference: payload.reference,
+      reference: String(Math.floor(100000 + Math.random() * 900000)),
+      external_reference: payload.external_reference ?? null,
       status: 'created',
       consignee_name: payload.consignee_name ?? null,
+      consignee_document_id: payload.consignee_document_id ?? null,
       address_line: payload.address_line ?? null,
       address_street: payload.address_street ?? null,
       address_number: payload.address_number ?? null,
@@ -700,13 +758,28 @@ export const mockApi = {
     };
   },
 
+  async markShipmentDelivered(id: string) {
+    return {
+      id,
+      reference: id.toUpperCase(),
+      external_reference: null,
+      status: 'delivered',
+      consignee_name: 'Cliente Demo',
+      address_line: 'Calle 1',
+      scheduled_at: '2026-03-01T08:00:00Z',
+      hub_id: 'hub-1',
+    };
+  },
+
   async getShipmentDetail(id: string) {
     return {
       shipment: {
         id,
         reference: id === 's-2' ? 'SHP-AGP-0002' : 'SHP-AGP-0001',
+        external_reference: id === 's-2' ? 'REF-CLIENTE-002' : 'REF-CLIENTE-001',
         status: id === 's-2' ? 'delivered' : 'out_for_delivery',
         consignee_name: id === 's-2' ? 'Cliente Centro' : 'Cliente Demo',
+        consignee_document_id: id === 's-2' ? '12345678B' : '12345678A',
         address_line: id === 's-2' ? 'Calle 2' : 'Calle 1',
         address_street: id === 's-2' ? 'Calle 2' : 'Calle 1',
         address_number: id === 's-2' ? '20' : '10',
@@ -716,6 +789,7 @@ export const mockApi = {
         country: 'ES',
         address_notes: 'Portal azul',
         consignee_phone: '+34950111222',
+        consignee_phone_alt: null,
         consignee_email: 'cliente@eco.local',
         scheduled_at: '2026-03-01T08:00:00Z',
         hub_id: 'hub-1',
@@ -895,6 +969,23 @@ export const mockApi = {
       rows = rows.slice(0, Math.max(1, filters.limit));
     }
     return rows;
+  },
+
+  async createPickup(payload: {
+    hub_id: string;
+    external_reference?: string | null;
+    pickup_type: 'NORMAL' | 'RETURN';
+    requester_name?: string | null;
+    address_line?: string | null;
+    scheduled_at?: string | null;
+  }) {
+    return {
+      id: `p-${Math.floor(Math.random() * 10000)}`,
+      reference: String(Math.floor(100000 + Math.random() * 900000)),
+      pickup_type: payload.pickup_type,
+      status: 'planned',
+      requester_name: payload.requester_name ?? null,
+    };
   },
 
   async getRoutes(filters: {

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { AuditLogEntry, HubSummary, PaginationMeta, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { Modal } from '../../components/ui/modal';
+import { AuditLogEntry, HubSummary, IncidentCatalogItem, PaginationMeta, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
@@ -59,7 +60,7 @@ function ShipmentFilters({
         id="shipment-query"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Referencia, ID o destinatario"
+        placeholder="Referencia, externa, ID o destinatario"
       />
       <div className="inline-actions">
         <span className="helper">Estados rapidos</span>
@@ -139,9 +140,12 @@ export function ShipmentsPage() {
   const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [createHubId, setCreateHubId] = useState('');
-  const [createHubCode, setCreateHubCode] = useState('XXX');
-  const [createReference, setCreateReference] = useState('');
+  const [createExternalReference, setCreateExternalReference] = useState('');
   const [createConsignee, setCreateConsignee] = useState('');
+  const [createConsigneeDocumentId, setCreateConsigneeDocumentId] = useState('');
+  const [createConsigneeDocType, setCreateConsigneeDocType] = useState<'DNI' | 'NIE' | 'PASSPORT' | 'CIF'>('DNI');
+  const [createConsigneeFirstName, setCreateConsigneeFirstName] = useState('');
+  const [createConsigneeLastName, setCreateConsigneeLastName] = useState('');
   const [createStreet, setCreateStreet] = useState('');
   const [createNumber, setCreateNumber] = useState('');
   const [createPostalCode, setCreatePostalCode] = useState('');
@@ -151,22 +155,46 @@ export function ShipmentsPage() {
   const [createAddressNotes, setCreateAddressNotes] = useState('');
   const [createPhone, setCreatePhone] = useState('');
   const [createEmail, setCreateEmail] = useState('');
+  const [createSenderLegalName, setCreateSenderLegalName] = useState('');
+  const [createSenderDocumentId, setCreateSenderDocumentId] = useState('');
+  const [createSenderDocType, setCreateSenderDocType] = useState<'DNI' | 'NIE' | 'PASSPORT' | 'CIF'>('DNI');
+  const [createSenderFirstName, setCreateSenderFirstName] = useState('');
+  const [createSenderLastName, setCreateSenderLastName] = useState('');
+  const [createSenderStreet, setCreateSenderStreet] = useState('');
+  const [createSenderNumber, setCreateSenderNumber] = useState('');
+  const [createSenderPostalCode, setCreateSenderPostalCode] = useState('');
+  const [createSenderCity, setCreateSenderCity] = useState('');
+  const [createSenderProvince, setCreateSenderProvince] = useState('');
+  const [createSenderCountry, setCreateSenderCountry] = useState('ES');
+  const [createSenderAddressNotes, setCreateSenderAddressNotes] = useState('');
+  const [createSenderPhone, setCreateSenderPhone] = useState('');
+  const [createSenderEmail, setCreateSenderEmail] = useState('');
+  const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
+  const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
   const [createScheduledAt, setCreateScheduledAt] = useState('');
+  const [recipientModalOpen, setRecipientModalOpen] = useState(false);
+  const [senderModalOpen, setSenderModalOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createFieldErrors, setCreateFieldErrors] = useState<{
     hub?: string;
-    reference?: string;
     scheduledAt?: string;
     street?: string;
     city?: string;
     postalCode?: string;
     phone?: string;
     email?: string;
+    senderPhone?: string;
+    senderEmail?: string;
+    senderStreet?: string;
+    senderCity?: string;
+    senderDocument?: string;
+    senderName?: string;
   }>({});
   const [creating, setCreating] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exportColumns, setExportColumns] = useState<string[]>([
     'reference',
+    'external_reference',
     'status',
     'consignee_name',
     'address_street',
@@ -181,6 +209,7 @@ export function ShipmentsPage() {
   ]);
   const defaultExportColumns = [
     'reference',
+    'external_reference',
     'status',
     'consignee_name',
     'address_street',
@@ -194,21 +223,9 @@ export function ShipmentsPage() {
     'hub_id',
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
-  const recentAddressesStorageKey = 'eco_delivery_routes_recent_addresses';
-  const recentConsigneesStorageKey = 'eco_delivery_routes_recent_consignees';
-  const [recentAddresses, setRecentAddresses] = useState<Array<{
-    street: string;
-    number: string;
-    postal_code: string;
-    city: string;
-    province: string;
-    country: string;
-  }>>([]);
-  const [recentConsignees, setRecentConsignees] = useState<Array<{
-    name: string;
-    phone: string;
-    email: string;
-  }>>([]);
+  const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
+  const [consigneeLookupError, setConsigneeLookupError] = useState('');
+  const [consigneeLookupLoading, setConsigneeLookupLoading] = useState(false);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
@@ -227,6 +244,16 @@ export function ShipmentsPage() {
   const [importJob, setImportJob] = useState<ShipmentImportJob | null>(null);
   const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [incidentCatalog, setIncidentCatalog] = useState<IncidentCatalogItem[]>([]);
+  const [incidentModalOpen, setIncidentModalOpen] = useState(false);
+  const [incidentTarget, setIncidentTarget] = useState<ShipmentSummary | null>(null);
+  const [incidentCatalogCode, setIncidentCatalogCode] = useState('');
+  const [incidentCategory, setIncidentCategory] = useState<'failed' | 'absent' | 'retry' | 'general'>('general');
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [incidentSubmitting, setIncidentSubmitting] = useState(false);
+  const [incidentError, setIncidentError] = useState('');
   const [roles, setRoles] = useState(sessionStore.getRoles());
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
@@ -236,6 +263,26 @@ export function ShipmentsPage() {
   const canImport = isMock || roles.some((role) => (
     role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator'
   ));
+
+  const shipmentSummary = useMemo(() => {
+    const counts = items.reduce((acc, item) => {
+      acc[item.status] = (acc[item.status] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    return {
+      total: meta.total,
+      created: counts.created ?? 0,
+      out: counts.out_for_delivery ?? 0,
+      delivered: counts.delivered ?? 0,
+      incident: counts.incident ?? 0,
+      pageCount: items.length,
+    };
+  }, [items, meta.total]);
+
+  const availableIncidentCatalog = useMemo(
+    () => incidentCatalog.filter((item) => item.applies_to === 'shipment' || item.applies_to === 'both'),
+    [incidentCatalog]
+  );
 
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
@@ -325,34 +372,6 @@ export function ShipmentsPage() {
   }, [exportColumns]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = window.localStorage.getItem(recentAddressesStorageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed)) {
-        setRecentAddresses(parsed.filter((item) => item && typeof item === 'object').slice(0, 10));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = window.localStorage.getItem(recentConsigneesStorageKey);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed)) {
-        setRecentConsignees(parsed.filter((item) => item && typeof item === 'object').slice(0, 10));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
     if (!canImport || !importJobId) return;
     let active = true;
     const poll = async () => {
@@ -393,18 +412,15 @@ export function ShipmentsPage() {
   }, []);
 
   useEffect(() => {
-    if (!createHubId) {
-      setCreateHubCode('XXX');
-      return;
-    }
-    const hub = hubs.find((item) => item.id === createHubId);
-    if (!hub) {
-      setCreateHubCode('XXX');
-      return;
-    }
-    const codePart = hub.code.split('-')[0] ?? 'XXX';
-    setCreateHubCode(codePart);
-  }, [createHubId, hubs]);
+    apiClient.getIncidentCatalog().then((entries) => {
+      setIncidentCatalog(entries);
+      if (!incidentCatalogCode && entries.length > 0) {
+        const defaultItem = entries.find((item) => item.applies_to === 'shipment' || item.applies_to === 'both') ?? entries[0];
+        setIncidentCatalogCode(defaultItem.code);
+        setIncidentCategory(defaultItem.category);
+      }
+    }).catch(() => setIncidentCatalog([]));
+  }, []);
 
   const formatDate = (value: Date) => value.toISOString().slice(0, 10);
   const minScheduledAt = (() => {
@@ -421,28 +437,29 @@ export function ShipmentsPage() {
   const createShipment = async () => {
     const nextErrors: {
       hub?: string;
-      reference?: string;
       scheduledAt?: string;
       street?: string;
       city?: string;
       postalCode?: string;
       phone?: string;
       email?: string;
+      senderPhone?: string;
+      senderEmail?: string;
     } = {};
-    const reference = createReference.trim();
-    const referencePattern = new RegExp(`^SHP-${createHubCode}-\\\\d{4}$`);
     const hasAddressFields = [createStreet, createNumber, createPostalCode, createCity, createProvince, createCountry].some(
       (value) => value.trim() !== ''
     );
+    const hasSenderAddressFields = [createSenderStreet, createSenderNumber, createSenderPostalCode, createSenderCity, createSenderProvince, createSenderCountry].some(
+      (value) => value.trim() !== ''
+    );
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
-    if (!reference) nextErrors.reference = 'La referencia es obligatoria.';
-    if (reference && reference.length < 5) nextErrors.reference = 'La referencia debe tener al menos 5 caracteres.';
-    if (reference && !referencePattern.test(reference)) {
-      nextErrors.reference = 'Formato esperado: SHP-XXX-0000';
-    }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad es obligatoria.';
+    }
+    if (hasSenderAddressFields) {
+      if (!createSenderStreet.trim()) nextErrors.senderStreet = 'La calle del remitente es obligatoria.';
+      if (!createSenderCity.trim()) nextErrors.senderCity = 'La ciudad del remitente es obligatoria.';
     }
     if (createPostalCode && !/^[0-9A-Za-z -]{4,10}$/.test(createPostalCode.trim())) {
       nextErrors.postalCode = 'Codigo postal invalido.';
@@ -450,8 +467,24 @@ export function ShipmentsPage() {
     if (createPhone && !/^[+0-9 -]{7,20}$/.test(createPhone.trim())) {
       nextErrors.phone = 'Telefono invalido.';
     }
+    if (createSenderPhone && !/^[+0-9 -]{7,20}$/.test(createSenderPhone.trim())) {
+      nextErrors.senderPhone = 'Telefono remitente invalido.';
+    }
     if (createEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(createEmail.trim())) {
       nextErrors.email = 'Email invalido.';
+    }
+    if (createSenderEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(createSenderEmail.trim())) {
+      nextErrors.senderEmail = 'Email remitente invalido.';
+    }
+    if (!createSenderDocumentId.trim()) {
+      nextErrors.senderDocument = 'Documento remitente obligatorio.';
+    }
+    if (createSenderDocType === 'CIF') {
+      if (!createSenderLegalName.trim()) nextErrors.senderName = 'Razon social obligatoria.';
+    } else {
+      if (!createSenderFirstName.trim() || !createSenderLastName.trim()) {
+        nextErrors.senderName = 'Nombre y apellidos obligatorios.';
+      }
     }
     if (createScheduledAt) {
       const parsed = Date.parse(createScheduledAt);
@@ -477,24 +510,66 @@ export function ShipmentsPage() {
         .map((value) => value.trim())
         .filter((value) => value !== '')
         .join(', ');
-      await apiClient.createShipment({
-        hub_id: createHubId,
-        reference,
-        consignee_name: createConsignee || null,
-        address_line: composedAddress || null,
-        address_street: createStreet || null,
-        address_number: createNumber || null,
-        postal_code: createPostalCode || null,
-        city: createCity || null,
-        province: createProvince || null,
-        country: createCountry || null,
-        address_notes: createAddressNotes || null,
-        consignee_phone: createPhone || null,
-        consignee_email: createEmail || null,
-        scheduled_at: createScheduledAt || null,
-      });
-      setCreateReference('');
+      const senderAddressLine = [createSenderStreet, createSenderNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const senderLocality = [createSenderPostalCode, createSenderCity].filter((value) => value.trim() !== '').join(' ').trim();
+      const composedSenderAddress = [senderAddressLine, senderLocality, createSenderProvince, createSenderCountry]
+        .map((value) => value.trim())
+        .filter((value) => value !== '')
+        .join(', ');
+      const recipientName = createConsigneeDocType === 'CIF'
+        ? createConsignee
+        : [createConsigneeFirstName, createConsigneeLastName].filter((value) => value.trim() !== '').join(' ');
+      const senderName = createSenderDocType === 'CIF'
+        ? createSenderLegalName
+        : [createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ');
+      if (createOperation === 'shipment') {
+        await apiClient.createShipment({
+          hub_id: createHubId,
+          external_reference: createExternalReference || null,
+          consignee_name: recipientName || null,
+          consignee_document_id: createConsigneeDocumentId || null,
+          address_line: composedAddress || null,
+          address_street: createStreet || null,
+          address_number: createNumber || null,
+          postal_code: createPostalCode || null,
+          city: createCity || null,
+          province: createProvince || null,
+          country: createCountry || null,
+          address_notes: createAddressNotes || null,
+          consignee_phone: createPhone || null,
+          consignee_email: createEmail || null,
+          sender_name: senderName || null,
+          sender_legal_name: createSenderDocType === 'CIF' ? createSenderLegalName || null : null,
+          sender_document_id: createSenderDocumentId || null,
+          sender_phone: createSenderPhone || null,
+          sender_email: createSenderEmail || null,
+          sender_address_line: composedSenderAddress || null,
+          sender_address_street: createSenderStreet || null,
+          sender_address_number: createSenderNumber || null,
+          sender_postal_code: createSenderPostalCode || null,
+          sender_city: createSenderCity || null,
+          sender_province: createSenderProvince || null,
+          sender_country: createSenderCountry || null,
+          sender_address_notes: createSenderAddressNotes || null,
+          scheduled_at: createScheduledAt || null,
+          service_type: createServiceType,
+        });
+      } else {
+        await apiClient.createPickup({
+          hub_id: createHubId,
+          external_reference: createExternalReference || null,
+          pickup_type: createOperation === 'pickup_return' ? 'RETURN' : 'NORMAL',
+          requester_name: senderName || null,
+          address_line: composedSenderAddress || null,
+          scheduled_at: createScheduledAt || null,
+        });
+      }
+      setCreateExternalReference('');
       setCreateConsignee('');
+      setCreateConsigneeDocumentId('');
+      setCreateConsigneeDocType('DNI');
+      setCreateConsigneeFirstName('');
+      setCreateConsigneeLastName('');
       setCreateStreet('');
       setCreateNumber('');
       setCreatePostalCode('');
@@ -504,31 +579,117 @@ export function ShipmentsPage() {
       setCreateAddressNotes('');
       setCreatePhone('');
       setCreateEmail('');
+      setCreateSenderLegalName('');
+      setCreateSenderDocumentId('');
+      setCreateSenderDocType('DNI');
+      setCreateSenderFirstName('');
+      setCreateSenderLastName('');
+      setCreateSenderStreet('');
+      setCreateSenderNumber('');
+      setCreateSenderPostalCode('');
+      setCreateSenderCity('');
+      setCreateSenderProvince('');
+      setCreateSenderCountry('ES');
+      setCreateSenderAddressNotes('');
+      setCreateSenderPhone('');
+      setCreateSenderEmail('');
       setCreateScheduledAt('');
+      setCreateOperation('shipment');
+      setCreateServiceType('express_1030');
       setCreateFieldErrors({});
-      saveRecentConsignee({
-        name: createConsignee,
-        phone: createPhone,
-        email: createEmail,
-      });
-      saveRecentAddress({
-        street: createStreet,
-        number: createNumber,
-        postal_code: createPostalCode,
-        city: createCity,
-        province: createProvince,
-        country: createCountry,
-      });
       await reload(1);
     } catch (exception) {
-      if (exception instanceof Error && exception.message.includes('Referencia ya existe')) {
-        setCreateFieldErrors((current) => ({ ...current, reference: 'La referencia ya existe.' }));
-        setCreateError('La referencia ya existe. Usa una referencia distinta.');
-      } else {
-        setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
-      }
+      setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const clearRecipient = () => {
+    setCreateConsignee('');
+    setCreateConsigneeDocumentId('');
+    setCreateConsigneeDocType('DNI');
+    setCreateConsigneeFirstName('');
+    setCreateConsigneeLastName('');
+    setCreateStreet('');
+    setCreateNumber('');
+    setCreatePostalCode('');
+    setCreateCity('');
+    setCreateProvince('');
+    setCreateCountry('ES');
+    setCreateAddressNotes('');
+    setCreatePhone('');
+    setCreateEmail('');
+  };
+
+  const clearSender = () => {
+    setCreateSenderLegalName('');
+    setCreateSenderDocumentId('');
+    setCreateSenderDocType('DNI');
+    setCreateSenderFirstName('');
+    setCreateSenderLastName('');
+    setCreateSenderStreet('');
+    setCreateSenderNumber('');
+    setCreateSenderPostalCode('');
+    setCreateSenderCity('');
+    setCreateSenderProvince('');
+    setCreateSenderCountry('ES');
+    setCreateSenderAddressNotes('');
+    setCreateSenderPhone('');
+    setCreateSenderEmail('');
+  };
+
+  const openIncidentModal = (item: ShipmentSummary) => {
+    setIncidentTarget(item);
+    setIncidentNotes('');
+    setIncidentError('');
+    const defaultItem = availableIncidentCatalog[0] ?? incidentCatalog[0];
+    if (defaultItem) {
+      setIncidentCatalogCode(defaultItem.code);
+      setIncidentCategory(defaultItem.category);
+    }
+    setIncidentModalOpen(true);
+  };
+
+  const submitIncident = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!incidentTarget) return;
+    if (!incidentCatalogCode) {
+      setIncidentError('Selecciona un catalogo.');
+      return;
+    }
+    setIncidentSubmitting(true);
+    setIncidentError('');
+    try {
+      await apiClient.createIncident({
+        incidentable_type: 'shipment',
+        incidentable_id: incidentTarget.id,
+        catalog_code: incidentCatalogCode,
+        category: incidentCategory,
+        notes: incidentNotes || undefined,
+      });
+      setIncidentModalOpen(false);
+      setIncidentTarget(null);
+      setIncidentNotes('');
+      await reload(meta.page || 1);
+    } catch (exception) {
+      setIncidentError(exception instanceof Error ? exception.message : 'No se pudo registrar la incidencia');
+    } finally {
+      setIncidentSubmitting(false);
+    }
+  };
+
+  const markDelivered = async (item: ShipmentSummary) => {
+    if (item.status === 'delivered') return;
+    setActionLoadingId(item.id);
+    setActionError('');
+    try {
+      const updated = await apiClient.markShipmentDelivered(item.id);
+      setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, ...updated } : row)));
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : 'No se pudo marcar como entregado');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -628,82 +789,6 @@ export function ShipmentsPage() {
     setExportColumns(defaultExportColumns);
   };
 
-  const saveRecentAddress = (entry: {
-    street: string;
-    number: string;
-    postal_code: string;
-    city: string;
-    province: string;
-    country: string;
-  }) => {
-    const normalized = {
-      street: entry.street.trim(),
-      number: entry.number.trim(),
-      postal_code: entry.postal_code.trim(),
-      city: entry.city.trim(),
-      province: entry.province.trim(),
-      country: entry.country.trim(),
-    };
-    if (!normalized.street && !normalized.city && !normalized.postal_code) return;
-    const next = [
-      normalized,
-      ...recentAddresses.filter(
-        (item) =>
-          item.street !== normalized.street ||
-          item.number !== normalized.number ||
-          item.postal_code !== normalized.postal_code ||
-          item.city !== normalized.city ||
-          item.province !== normalized.province ||
-          item.country !== normalized.country
-      ),
-    ].slice(0, 10);
-    setRecentAddresses(next);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(recentAddressesStorageKey, JSON.stringify(next));
-    }
-  };
-
-  const saveRecentConsignee = (entry: { name: string; phone: string; email: string }) => {
-    const normalized = {
-      name: entry.name.trim(),
-      phone: entry.phone.trim(),
-      email: entry.email.trim(),
-    };
-    if (!normalized.name && !normalized.phone && !normalized.email) return;
-    const next = [
-      normalized,
-      ...recentConsignees.filter(
-        (item) =>
-          item.name !== normalized.name ||
-          item.phone !== normalized.phone ||
-          item.email !== normalized.email
-      ),
-    ].slice(0, 10);
-    setRecentConsignees(next);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(recentConsigneesStorageKey, JSON.stringify(next));
-    }
-  };
-
-  const applyRecentAddress = (index: number) => {
-    const entry = recentAddresses[index];
-    if (!entry) return;
-    setCreateStreet(entry.street);
-    setCreateNumber(entry.number);
-    setCreatePostalCode(entry.postal_code);
-    setCreateCity(entry.city);
-    setCreateProvince(entry.province);
-    setCreateCountry(entry.country);
-  };
-
-  const applyRecentConsignee = (index: number) => {
-    const entry = recentConsignees[index];
-    if (!entry) return;
-    setCreateConsignee(entry.name);
-    setCreatePhone(entry.phone);
-    setCreateEmail(entry.email);
-  };
-
   const toggleExportColumn = (column: string) => {
     setExportColumns((current) => (
       current.includes(column)
@@ -727,8 +812,8 @@ export function ShipmentsPage() {
     try {
       await apiClient.downloadShipmentsTemplate();
     } catch {
-      const header = 'hub_code,reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type';
-      const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05T08:30:00Z,delivery';
+      const header = 'hub_code,external_reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type';
+      const sample = 'AGP-HUB-01,REF-CLIENTE-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05,express_1030';
       const content = `${header}\n${sample}\n`;
       const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
@@ -778,156 +863,539 @@ export function ShipmentsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Crear Envio</CardTitle>
+          <div className="page-subtitle">Operación, contactos y programación en un flujo rápido.</div>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <label htmlFor="create-shipment-hub">Hub</label>
-            <select id="create-shipment-hub" value={createHubId} onChange={(event) => setCreateHubId(event.target.value)}>
-              <option value="">Selecciona hub</option>
-              {hubs.map((hub) => (
-                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
-              ))}
-            </select>
-            {createFieldErrors.hub ? <div className="helper">{createFieldErrors.hub}</div> : null}
-            <label htmlFor="create-shipment-ref">Referencia</label>
-            <input
-              id="create-shipment-ref"
-              value={createReference}
-              onChange={(event) => setCreateReference(event.target.value)}
-              placeholder={`SHP-${createHubCode}-0001`}
-            />
-            <div className="helper">Formato: SHP-{createHubCode}-0001</div>
-            {createFieldErrors.reference ? <div className="helper">{createFieldErrors.reference}</div> : null}
-            <label htmlFor="create-shipment-consignee-recent">Destinatarios recientes</label>
-            <select
-              id="create-shipment-consignee-recent"
-              onChange={(event) => {
-                if (!event.target.value) return;
-                applyRecentConsignee(Number(event.target.value));
-              }}
-            >
-              <option value="">Selecciona destinatario</option>
-              {recentConsignees.map((entry, index) => (
-                <option key={`${entry.name}-${entry.phone}-${index}`} value={index}>
-                  {entry.name || 'Sin nombre'} · {entry.phone || 'sin telefono'}
-                </option>
-              ))}
-            </select>
-            <label htmlFor="create-shipment-consignee">Destinatario</label>
-            <input
-              id="create-shipment-consignee"
-              value={createConsignee}
-              onChange={(event) => setCreateConsignee(event.target.value)}
-              placeholder="Nombre cliente"
-            />
+          <div className="form-row">
+            <div>
+              <label htmlFor="create-shipment-hub">Hub</label>
+              <select id="create-shipment-hub" value={createHubId} onChange={(event) => setCreateHubId(event.target.value)}>
+                <option value="">Selecciona hub</option>
+                {hubs.map((hub) => (
+                  <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+                ))}
+              </select>
+              {createFieldErrors.hub ? <div className="helper">{createFieldErrors.hub}</div> : null}
+            </div>
+            <div>
+              <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
+              <input
+                id="create-shipment-external-ref"
+                value={createExternalReference}
+                onChange={(event) => setCreateExternalReference(event.target.value)}
+                placeholder="Ej: REF-ACME-2026-0001"
+              />
+            </div>
+            <div>
+              <label htmlFor="create-shipment-operation">Operacion</label>
+              <select
+                id="create-shipment-operation"
+                value={createOperation}
+                onChange={(event) => setCreateOperation(event.target.value as 'shipment' | 'pickup_normal' | 'pickup_return')}
+              >
+                <option value="shipment">Envio</option>
+                <option value="pickup_normal">Recogida</option>
+                <option value="pickup_return">Devolucion</option>
+              </select>
+            </div>
+            {createOperation === 'shipment' ? (
+              <div>
+                <label htmlFor="create-shipment-service">Tipo de envio</label>
+                <select
+                  id="create-shipment-service"
+                  value={createServiceType}
+                  onChange={(event) => setCreateServiceType(event.target.value as typeof createServiceType)}
+                >
+                  <option value="express_1030">Express 10:30</option>
+                  <option value="express_1400">Express 14:00</option>
+                  <option value="express_1900">Express 19:00</option>
+                  <option value="economy_parcel">Economy Parcel</option>
+                  <option value="business_parcel">Business Parcel</option>
+                  <option value="thermo_parcel">Thermo Parcel</option>
+                </select>
+              </div>
+            ) : null}
+            <div>
+              <label htmlFor="create-shipment-scheduled">Fecha programada</label>
+              <input
+                id="create-shipment-scheduled"
+                type="date"
+                value={createScheduledAt}
+                onChange={(event) => setCreateScheduledAt(event.target.value)}
+                min={minScheduledAt}
+                max={maxScheduledAt}
+              />
+              <div className="helper">Ventana: {minScheduledAt} a {maxScheduledAt}</div>
+              {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
+            </div>
           </div>
+
+          <div className="page-grid two">
+            <Card>
+              <CardHeader>
+                <CardTitle>Destinatario</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="helper">
+                  {createConsigneeDocType === 'CIF'
+                    ? (createConsignee || 'Sin destinatario')
+                    : ([createConsigneeFirstName, createConsigneeLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin destinatario')}
+                </div>
+                <div className="helper">{createPhone || '-'}</div>
+                <div className="helper">{createStreet || ''} {createNumber || ''} {createCity || ''}</div>
+                <div className="inline-actions">
+                  <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
+                    Editar destinatario
+                  </Button>
+                  <Button type="button" variant="outline" onClick={clearRecipient}>
+                    Limpiar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Remitente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="helper">
+                  {createSenderDocType === 'CIF'
+                    ? (createSenderLegalName || 'Sin remitente')
+                    : ([createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin remitente')}
+                </div>
+                <div className="helper">{createSenderPhone || '-'}</div>
+                <div className="helper">{createSenderStreet || ''} {createSenderNumber || ''} {createSenderCity || ''}</div>
+                <div className="inline-actions">
+                  <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
+                    Editar remitente
+                  </Button>
+                  <Button type="button" variant="outline" onClick={clearSender}>
+                    Limpiar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="inline-actions">
-            <label htmlFor="create-shipment-recent">Direcciones recientes</label>
-            <select
-              id="create-shipment-recent"
-              onChange={(event) => {
-                if (!event.target.value) return;
-                applyRecentAddress(Number(event.target.value));
-              }}
-            >
-              <option value="">Selecciona una direccion</option>
-              {recentAddresses.map((entry, index) => (
-                <option key={`${entry.street}-${entry.postal_code}-${index}`} value={index}>
-                  {entry.street} {entry.number} · {entry.postal_code} {entry.city}
-                </option>
-              ))}
-            </select>
-            <label htmlFor="create-shipment-street">Calle</label>
-            <input
-              id="create-shipment-street"
-              value={createStreet}
-              onChange={(event) => setCreateStreet(event.target.value)}
-              placeholder="Calle y via"
-            />
-            {createFieldErrors.street ? <div className="helper">{createFieldErrors.street}</div> : null}
-            <label htmlFor="create-shipment-number">Numero</label>
-            <input
-              id="create-shipment-number"
-              value={createNumber}
-              onChange={(event) => setCreateNumber(event.target.value)}
-              placeholder="Portal, piso"
-            />
-            <label htmlFor="create-shipment-postal">Codigo postal</label>
-            <input
-              id="create-shipment-postal"
-              value={createPostalCode}
-              onChange={(event) => setCreatePostalCode(event.target.value)}
-              placeholder="29001"
-            />
-            {createFieldErrors.postalCode ? <div className="helper">{createFieldErrors.postalCode}</div> : null}
-            <label htmlFor="create-shipment-city">Ciudad</label>
-            <input
-              id="create-shipment-city"
-              value={createCity}
-              onChange={(event) => setCreateCity(event.target.value)}
-              placeholder="Malaga"
-            />
-            {createFieldErrors.city ? <div className="helper">{createFieldErrors.city}</div> : null}
-            <label htmlFor="create-shipment-province">Provincia</label>
-            <input
-              id="create-shipment-province"
-              value={createProvince}
-              onChange={(event) => setCreateProvince(event.target.value)}
-              placeholder="Malaga"
-            />
-            <label htmlFor="create-shipment-country">Pais</label>
-            <input
-              id="create-shipment-country"
-              value={createCountry}
-              onChange={(event) => setCreateCountry(event.target.value)}
-              placeholder="ES"
-            />
-            <label htmlFor="create-shipment-notes">Notas direccion</label>
-            <input
-              id="create-shipment-notes"
-              value={createAddressNotes}
-              onChange={(event) => setCreateAddressNotes(event.target.value)}
-              placeholder="Puerta, horario, contacto"
-            />
-            <label htmlFor="create-shipment-phone">Telefono</label>
-            <input
-              id="create-shipment-phone"
-              value={createPhone}
-              onChange={(event) => setCreatePhone(event.target.value)}
-              placeholder="+34 950 111 222"
-            />
-            {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
-            <label htmlFor="create-shipment-email">Email</label>
-            <input
-              id="create-shipment-email"
-              value={createEmail}
-              onChange={(event) => setCreateEmail(event.target.value)}
-              placeholder="cliente@eco.local"
-            />
-            {createFieldErrors.email ? <div className="helper">{createFieldErrors.email}</div> : null}
-            <label htmlFor="create-shipment-scheduled">Programado</label>
-            <input
-              id="create-shipment-scheduled"
-              type="datetime-local"
-              value={createScheduledAt}
-              onChange={(event) => setCreateScheduledAt(event.target.value)}
-              min={`${minScheduledAt}T00:00`}
-              max={`${maxScheduledAt}T23:59`}
-            />
-            <div className="helper">Ventana permitida: {minScheduledAt} a {maxScheduledAt}</div>
-            {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
             <Button type="button" onClick={createShipment} disabled={creating}>
-              {creating ? 'Creando...' : 'Crear envio'}
+              {creating ? 'Creando...' : createOperation === 'shipment' ? 'Crear envio' : 'Crear recogida'}
             </Button>
           </div>
           {createError ? <div className="helper">{createError}</div> : null}
         </CardContent>
       </Card>
+      <Modal
+        open={recipientModalOpen}
+        onClose={() => setRecipientModalOpen(false)}
+        title="Destinatario"
+        footer={
+          <Button type="button" onClick={() => setRecipientModalOpen(false)}>
+            Guardar
+          </Button>
+        }
+      >
+        <div className="form-row">
+          <label htmlFor="create-shipment-consignee-lookup">Buscar por movil</label>
+          <input
+            id="create-shipment-consignee-lookup"
+            value={consigneeLookupPhone}
+            onChange={(event) => setConsigneeLookupPhone(event.target.value)}
+            placeholder="+34 600 000 000"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={consigneeLookupLoading}
+            onClick={async () => {
+              const phone = consigneeLookupPhone.trim();
+              if (!phone) {
+                setConsigneeLookupError('Introduce un movil para buscar.');
+                return;
+              }
+              setConsigneeLookupError('');
+              setConsigneeLookupLoading(true);
+              try {
+                const matches = await apiClient.getContacts({ phone });
+                if (!matches.length) {
+                  setConsigneeLookupError('No se encontro destinatario con ese movil.');
+                } else {
+                  const contact = matches[0];
+                  const docId = (contact.document_id ?? '').trim();
+                  const isCif = /^[A-Za-z]/.test(docId);
+                  setCreateConsigneeDocType(isCif ? 'CIF' : 'DNI');
+                  setCreateConsigneeDocumentId(docId);
+                  if (isCif) {
+                    setCreateConsignee(contact.display_name ?? '');
+                    setCreateConsigneeFirstName('');
+                    setCreateConsigneeLastName('');
+                  } else {
+                    const fullName = (contact.display_name ?? '').trim();
+                    const parts = fullName.split(' ').filter(Boolean);
+                    setCreateConsigneeFirstName(parts.shift() ?? '');
+                    setCreateConsigneeLastName(parts.join(' '));
+                  }
+                  setCreatePhone(contact.phone ?? '');
+                  setCreateEmail(contact.email ?? '');
+                  setCreateStreet(contact.address_street ?? '');
+                  setCreateNumber(contact.address_number ?? '');
+                  setCreatePostalCode(contact.postal_code ?? '');
+                  setCreateCity(contact.city ?? '');
+                  setCreateProvince(contact.province ?? '');
+                  setCreateCountry(contact.country ?? 'ES');
+                  setCreateAddressNotes(contact.address_notes ?? '');
+                }
+              } catch (error) {
+                setConsigneeLookupError(error instanceof Error ? error.message : 'No se pudo buscar el contacto');
+              } finally {
+                setConsigneeLookupLoading(false);
+              }
+            }}
+          >
+            {consigneeLookupLoading ? 'Buscando...' : 'Buscar'}
+          </Button>
+          {consigneeLookupError ? <div className="helper">{consigneeLookupError}</div> : null}
+        </div>
+        <div className="form-row">
+          <label htmlFor="create-shipment-consignee-doc-type">Tipo documento</label>
+          <select
+            id="create-shipment-consignee-doc-type"
+            value={createConsigneeDocType}
+            onChange={(event) => setCreateConsigneeDocType(event.target.value as typeof createConsigneeDocType)}
+          >
+            <option value="DNI">DNI</option>
+            <option value="NIE">NIE</option>
+            <option value="PASSPORT">Pasaporte</option>
+            <option value="CIF">CIF</option>
+          </select>
+          <label htmlFor="create-shipment-consignee-document">Documento</label>
+          <input
+            id="create-shipment-consignee-document"
+            value={createConsigneeDocumentId}
+            onChange={(event) => setCreateConsigneeDocumentId(event.target.value)}
+            placeholder="DNI/CIF"
+          />
+          {createConsigneeDocType === 'CIF' ? (
+            <>
+              <label htmlFor="create-shipment-consignee-legal-name">Razon social</label>
+              <input
+                id="create-shipment-consignee-legal-name"
+                value={createConsignee}
+                onChange={(event) => setCreateConsignee(event.target.value)}
+                placeholder="Razon social"
+              />
+            </>
+          ) : (
+            <>
+              <label htmlFor="create-shipment-consignee-first">Nombre</label>
+              <input
+                id="create-shipment-consignee-first"
+                value={createConsigneeFirstName}
+                onChange={(event) => setCreateConsigneeFirstName(event.target.value)}
+                placeholder="Nombre"
+              />
+              <label htmlFor="create-shipment-consignee-last">Apellidos</label>
+              <input
+                id="create-shipment-consignee-last"
+                value={createConsigneeLastName}
+                onChange={(event) => setCreateConsigneeLastName(event.target.value)}
+                placeholder="Apellidos"
+              />
+            </>
+          )}
+          <label htmlFor="create-shipment-phone">Telefono</label>
+          <input
+            id="create-shipment-phone"
+            value={createPhone}
+            onChange={(event) => setCreatePhone(event.target.value)}
+            placeholder="+34 950 111 222"
+          />
+          {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
+          <label htmlFor="create-shipment-email">Email</label>
+          <input
+            id="create-shipment-email"
+            value={createEmail}
+            onChange={(event) => setCreateEmail(event.target.value)}
+            placeholder="cliente@eco.local"
+          />
+          {createFieldErrors.email ? <div className="helper">{createFieldErrors.email}</div> : null}
+        </div>
+        <div className="form-row">
+          <label htmlFor="create-shipment-street">Calle</label>
+          <input
+            id="create-shipment-street"
+            value={createStreet}
+            onChange={(event) => setCreateStreet(event.target.value)}
+            placeholder="Calle y via"
+          />
+          {createFieldErrors.street ? <div className="helper">{createFieldErrors.street}</div> : null}
+          <label htmlFor="create-shipment-number">Numero</label>
+          <input
+            id="create-shipment-number"
+            value={createNumber}
+            onChange={(event) => setCreateNumber(event.target.value)}
+            placeholder="Portal, piso"
+          />
+          <label htmlFor="create-shipment-postal">Codigo postal</label>
+          <input
+            id="create-shipment-postal"
+            value={createPostalCode}
+            onChange={(event) => setCreatePostalCode(event.target.value)}
+            placeholder="29001"
+          />
+          {createFieldErrors.postalCode ? <div className="helper">{createFieldErrors.postalCode}</div> : null}
+          <label htmlFor="create-shipment-city">Ciudad</label>
+          <input
+            id="create-shipment-city"
+            value={createCity}
+            onChange={(event) => setCreateCity(event.target.value)}
+            placeholder="Malaga"
+          />
+          {createFieldErrors.city ? <div className="helper">{createFieldErrors.city}</div> : null}
+          <label htmlFor="create-shipment-province">Provincia</label>
+          <input
+            id="create-shipment-province"
+            value={createProvince}
+            onChange={(event) => setCreateProvince(event.target.value)}
+            placeholder="Malaga"
+          />
+          <label htmlFor="create-shipment-country">Pais</label>
+          <input
+            id="create-shipment-country"
+            value={createCountry}
+            onChange={(event) => setCreateCountry(event.target.value)}
+            placeholder="ES"
+          />
+          <label htmlFor="create-shipment-notes">Notas direccion</label>
+          <input
+            id="create-shipment-notes"
+            value={createAddressNotes}
+            onChange={(event) => setCreateAddressNotes(event.target.value)}
+            placeholder="Puerta, horario, contacto"
+          />
+        </div>
+      </Modal>
+      <Modal
+        open={senderModalOpen}
+        onClose={() => setSenderModalOpen(false)}
+        title="Remitente"
+        footer={
+          <Button type="button" onClick={() => setSenderModalOpen(false)}>
+            Guardar
+          </Button>
+        }
+      >
+        <div className="form-row">
+          <label htmlFor="create-sender-doc-type">Tipo documento</label>
+          <select
+            id="create-sender-doc-type"
+            value={createSenderDocType}
+            onChange={(event) => setCreateSenderDocType(event.target.value as typeof createSenderDocType)}
+          >
+            <option value="DNI">DNI</option>
+            <option value="NIE">NIE</option>
+            <option value="PASSPORT">Pasaporte</option>
+            <option value="CIF">CIF</option>
+          </select>
+          <label htmlFor="create-sender-document">Documento</label>
+          <input
+            id="create-sender-document"
+            value={createSenderDocumentId}
+            onChange={(event) => setCreateSenderDocumentId(event.target.value)}
+            placeholder="DNI/CIF"
+          />
+          {createFieldErrors.senderDocument ? <div className="helper">{createFieldErrors.senderDocument}</div> : null}
+          {createSenderDocType === 'CIF' ? (
+            <>
+              <label htmlFor="create-sender-legal-name">Razon social</label>
+              <input
+                id="create-sender-legal-name"
+                value={createSenderLegalName}
+                onChange={(event) => setCreateSenderLegalName(event.target.value)}
+                placeholder="Razon social"
+              />
+            </>
+          ) : (
+            <>
+              <label htmlFor="create-sender-first-name">Nombre</label>
+              <input
+                id="create-sender-first-name"
+                value={createSenderFirstName}
+                onChange={(event) => setCreateSenderFirstName(event.target.value)}
+                placeholder="Nombre"
+              />
+              <label htmlFor="create-sender-last-name">Apellidos</label>
+              <input
+                id="create-sender-last-name"
+                value={createSenderLastName}
+                onChange={(event) => setCreateSenderLastName(event.target.value)}
+                placeholder="Apellidos"
+              />
+            </>
+          )}
+          <label htmlFor="create-sender-phone">Telefono</label>
+          <input
+            id="create-sender-phone"
+            value={createSenderPhone}
+            onChange={(event) => setCreateSenderPhone(event.target.value)}
+            placeholder="+34 600 111 222"
+          />
+          {createFieldErrors.senderPhone ? <div className="helper">{createFieldErrors.senderPhone}</div> : null}
+          <label htmlFor="create-sender-email">Email</label>
+          <input
+            id="create-sender-email"
+            value={createSenderEmail}
+            onChange={(event) => setCreateSenderEmail(event.target.value)}
+            placeholder="remitente@eco.local"
+          />
+          {createFieldErrors.senderEmail ? <div className="helper">{createFieldErrors.senderEmail}</div> : null}
+        </div>
+        <div className="form-row">
+          <label htmlFor="create-sender-street">Calle</label>
+          <input
+            id="create-sender-street"
+            value={createSenderStreet}
+            onChange={(event) => setCreateSenderStreet(event.target.value)}
+            placeholder="Calle y via"
+          />
+          {createFieldErrors.senderStreet ? <div className="helper">{createFieldErrors.senderStreet}</div> : null}
+          <label htmlFor="create-sender-number">Numero</label>
+          <input
+            id="create-sender-number"
+            value={createSenderNumber}
+            onChange={(event) => setCreateSenderNumber(event.target.value)}
+            placeholder="Portal, piso"
+          />
+          <label htmlFor="create-sender-postal">Codigo postal</label>
+          <input
+            id="create-sender-postal"
+            value={createSenderPostalCode}
+            onChange={(event) => setCreateSenderPostalCode(event.target.value)}
+            placeholder="29001"
+          />
+          <label htmlFor="create-sender-city">Ciudad</label>
+          <input
+            id="create-sender-city"
+            value={createSenderCity}
+            onChange={(event) => setCreateSenderCity(event.target.value)}
+            placeholder="Malaga"
+          />
+          {createFieldErrors.senderCity ? <div className="helper">{createFieldErrors.senderCity}</div> : null}
+          <label htmlFor="create-sender-province">Provincia</label>
+          <input
+            id="create-sender-province"
+            value={createSenderProvince}
+            onChange={(event) => setCreateSenderProvince(event.target.value)}
+            placeholder="Malaga"
+          />
+          <label htmlFor="create-sender-country">Pais</label>
+          <input
+            id="create-sender-country"
+            value={createSenderCountry}
+            onChange={(event) => setCreateSenderCountry(event.target.value)}
+            placeholder="ES"
+          />
+          <label htmlFor="create-sender-notes">Notas</label>
+          <input
+            id="create-sender-notes"
+            value={createSenderAddressNotes}
+            onChange={(event) => setCreateSenderAddressNotes(event.target.value)}
+            placeholder="Observaciones remitente"
+          />
+        </div>
+      </Modal>
+      <Modal
+        open={incidentModalOpen}
+        onClose={() => setIncidentModalOpen(false)}
+        title="Registrar incidencia"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIncidentModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="shipment-incident-form" disabled={incidentSubmitting}>
+              {incidentSubmitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </>
+        }
+      >
+        <form id="shipment-incident-form" className="page-grid" onSubmit={submitIncident}>
+          <div className="form-row">
+            <div>
+              <label>Envio</label>
+              <input value={incidentTarget?.reference ?? ''} readOnly />
+            </div>
+            <div>
+              <label>Destinatario</label>
+              <input value={incidentTarget?.consignee_name ?? ''} readOnly />
+            </div>
+          </div>
+          <div className="form-row">
+            <label htmlFor="shipment-incident-catalog">Catalogo</label>
+            <select
+              id="shipment-incident-catalog"
+              value={incidentCatalogCode}
+              onChange={(event) => {
+                const code = event.target.value;
+                setIncidentCatalogCode(code);
+                const selected = availableIncidentCatalog.find((item) => item.code === code);
+                if (selected) setIncidentCategory(selected.category);
+              }}
+            >
+              {availableIncidentCatalog.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.name} ({item.code})
+                </option>
+              ))}
+            </select>
+            <label>Categoria</label>
+            <input value={incidentCategory} readOnly />
+          </div>
+          <div className="form-row">
+            <label htmlFor="shipment-incident-notes">Notas</label>
+            <input
+              id="shipment-incident-notes"
+              value={incidentNotes}
+              onChange={(event) => setIncidentNotes(event.target.value)}
+              placeholder="Detalles operativos"
+            />
+          </div>
+          {incidentError ? <div className="helper error">{incidentError}</div> : null}
+        </form>
+      </Modal>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Envios</CardTitle>
+          <div className="page-subtitle">Listado operativo con filtros rápidos y exportación.</div>
         </CardHeader>
         <CardContent>
+          <div className="kpi-grid">
+            <div className="kpi-item">
+              <div className="kpi-label">Total</div>
+              <div className="kpi-value">{shipmentSummary.total}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">En página</div>
+              <div className="kpi-value">{shipmentSummary.pageCount}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Created</div>
+              <div className="kpi-value">{shipmentSummary.created}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Out</div>
+              <div className="kpi-value">{shipmentSummary.out}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Delivered</div>
+              <div className="kpi-value">{shipmentSummary.delivered}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Incident</div>
+              <div className="kpi-value">{shipmentSummary.incident}</div>
+            </div>
+          </div>
+          {actionError ? <div className="helper error">{actionError}</div> : null}
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -961,18 +1429,47 @@ export function ShipmentsPage() {
                       Programado {sortIndicator('scheduled_at')}
                     </button>
                   </TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell><Link to={`/shipments/${item.id}`}>{item.reference}</Link></TableCell>
+                    <TableCell>
+                      <div>
+                        <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
+                      </div>
+                      {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
+                    </TableCell>
                     <TableCell><Badge variant={shipmentVariant(item.status)}>{item.status}</Badge></TableCell>
                     <TableCell>{item.consignee_name ?? '-'}</TableCell>
                     <TableCell>{item.address_line ?? '-'}</TableCell>
                     <TableCell>{item.scheduled_at ?? '-'}</TableCell>
+                    <TableCell>
+                      <div className="table-actions">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => markDelivered(item)}
+                          disabled={item.status === 'delivered' || actionLoadingId === item.id}
+                        >
+                          {actionLoadingId === item.id ? 'Marcando...' : 'Marcar entregado'}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
+                          Incidencia
+                        </Button>
+                        <Link to={`/shipments/${item.id}`} className="btn btn-outline">
+                          Ver
+                        </Link>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
+                {items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>Sin envíos para los filtros seleccionados.</TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </TableWrapper>
@@ -998,6 +1495,7 @@ export function ShipmentsPage() {
             <span className="helper">Columnas export</span>
             {[
               'reference',
+              'external_reference',
               'status',
               'consignee_name',
               'address_street',
