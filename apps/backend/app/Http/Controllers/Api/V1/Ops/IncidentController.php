@@ -51,7 +51,12 @@ class IncidentController extends Controller
             return $this->forbidden();
         }
 
-        $query = DB::table('incidents')->orderByDesc('created_at');
+        $query = DB::table('incidents')
+            ->leftJoin('shipments', function ($join) {
+                $join->on('shipments.id', '=', 'incidents.incidentable_id')
+                    ->where('incidents.incidentable_type', '=', 'shipment');
+            })
+            ->orderByDesc('incidents.created_at');
 
         foreach (['incidentable_type', 'incidentable_id', 'category', 'catalog_code'] as $field) {
             $value = $request->query($field);
@@ -64,9 +69,10 @@ class IncidentController extends Controller
         if (is_string($search) && $search !== '') {
             $like = '%' . str_replace('%', '\\%', $search) . '%';
             $query->where(function ($inner) use ($like): void {
-                $inner->where('incidentable_id', 'like', $like)
-                    ->orWhere('notes', 'like', $like)
-                    ->orWhere('catalog_code', 'like', $like);
+                $inner->where('incidents.incidentable_id', 'like', $like)
+                    ->orWhere('incidents.notes', 'like', $like)
+                    ->orWhere('incidents.catalog_code', 'like', $like)
+                    ->orWhere('shipments.reference', 'like', $like);
             });
         }
 
@@ -88,7 +94,10 @@ class IncidentController extends Controller
         $total = (clone $query)->count();
         $items = $query
             ->forPage($page, $perPage)
-            ->get();
+            ->get([
+                'incidents.*',
+                'shipments.reference as shipment_reference',
+            ]);
 
         return response()->json([
             'data' => $items,

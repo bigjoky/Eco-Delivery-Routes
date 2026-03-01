@@ -391,6 +391,7 @@ export type IncidentSummary = {
   id: string;
   incidentable_type: 'shipment' | 'pickup';
   incidentable_id: string;
+  shipment_reference?: string | null;
   catalog_code: string;
   category: 'failed' | 'absent' | 'retry' | 'general';
   notes?: string | null;

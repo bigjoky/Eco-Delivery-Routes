@@ -8,6 +8,7 @@ let mockIncidents = [
     id: 'i-1',
     incidentable_type: 'shipment' as const,
     incidentable_id: '00000000-0000-0000-0000-000000000101',
+    shipment_reference: 'SHP-AGP-0001',
     catalog_code: 'ABSENT_HOME',
     category: 'absent' as const,
     notes: 'Cliente no localizado',
@@ -1733,6 +1734,7 @@ export const mockApi = {
   async getIncidents(filters: {
     incidentableType?: 'shipment' | 'pickup';
     incidentableId?: string;
+    q?: string;
     category?: 'failed' | 'absent' | 'retry' | 'general';
     catalogCode?: string;
     resolved?: 'open' | 'resolved';
@@ -1742,6 +1744,16 @@ export const mockApi = {
       .filter((item) => (filters.incidentableId ? item.incidentable_id === filters.incidentableId : true))
       .filter((item) => (filters.category ? item.category === filters.category : true))
       .filter((item) => (filters.catalogCode ? item.catalog_code === filters.catalogCode : true))
+      .filter((item) => {
+        if (!filters.q) return true;
+        const q = filters.q.toLowerCase();
+        return (
+          item.incidentable_id.toLowerCase().includes(q) ||
+          (item.shipment_reference ?? '').toLowerCase().includes(q) ||
+          (item.notes ?? '').toLowerCase().includes(q) ||
+          item.catalog_code.toLowerCase().includes(q)
+        );
+      })
       .filter((item) => {
         if (!filters.resolved) return true;
         if (filters.resolved === 'open') return item.resolved_at === null;
@@ -1759,6 +1771,7 @@ export const mockApi = {
     const item = {
       id: `i-${incidentSeq++}`,
       ...payload,
+      shipment_reference: payload.incidentable_type === 'shipment' ? 'SHP-AGP-NEW' : null,
       resolved_at: null,
     };
     mockIncidents = [item, ...mockIncidents];

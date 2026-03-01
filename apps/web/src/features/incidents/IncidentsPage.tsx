@@ -198,6 +198,7 @@ export function IncidentsPage() {
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
+                  <TableHead>Ref. envio</TableHead>
                   <TableHead>Catalogo</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Estado</TableHead>
@@ -209,6 +210,7 @@ export function IncidentsPage() {
                   <TableRow key={item.id}>
                     <TableCell>{item.incidentable_type}</TableCell>
                     <TableCell>{item.incidentable_id}</TableCell>
+                    <TableCell>{item.shipment_reference ?? '-'}</TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
                     <TableCell><Badge variant={categoryVariant(item.category)}>{item.category}</Badge></TableCell>
                     <TableCell>{item.resolved_at ? 'resuelta' : 'abierta'}</TableCell>
