@@ -477,4 +477,26 @@ public final class MockAPIClient {
     public func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws {
         _ = (subcontractorId, periodStart, periodEnd, granularity)
     }
+
+    public func downloadShipmentsTemplate() async throws -> Data {
+        let content = "hub_code,reference,consignee_name,address_line,scheduled_at,service_type\nAGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery\n"
+        return Data(content.utf8)
+    }
+
+    public func importShipmentsCsv(fileUrl: URL, dryRun: Bool) async throws -> ShipmentsImportResult {
+        _ = fileUrl
+        return ShipmentsImportResult(
+            dryRun: dryRun,
+            createdCount: dryRun ? 0 : 2,
+            skippedCount: 1,
+            errorCount: 1,
+            rows: [
+                ShipmentsImportResult.Row(id: UUID().uuidString, row: 2, reference: "SHP-AGP-0011", status: "ok", errors: nil),
+                ShipmentsImportResult.Row(id: UUID().uuidString, row: 3, reference: "SHP-AGP-0012", status: "ok", errors: nil),
+                ShipmentsImportResult.Row(id: UUID().uuidString, row: 4, reference: "SHP-AGP-0001", status: "error", errors: ["reference ya existe"]),
+            ],
+            warnings: [],
+            unknownColumns: []
+        )
+    }
 }

@@ -55,6 +55,8 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.export');
         Route::get('shipments/export.pdf', [ShipmentController::class, 'exportPdf'])
             ->middleware('can:shipments.export');
+        Route::get('shipments/template.csv', [ShipmentController::class, 'templateCsv'])
+            ->middleware('can:shipments.import');
         Route::post('shipments/import', [ShipmentController::class, 'importCsv'])
             ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);

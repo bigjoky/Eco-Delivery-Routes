@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
+use App\Services\Shipments\ShipmentImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +15,11 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ShipmentController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogWriter $auditLogWriter,
+        private readonly ShipmentImportService $importService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -225,6 +232,12 @@ class ShipmentController extends Controller
             $csvRows[] = implode(',', $line);
         }
 
+        $this->auditLogWriter->write($actor->id, 'shipments.exported.csv', [
+            'filters' => $request->query(),
+            'columns' => $columns,
+            'rows' => count($rows),
+        ]);
+
         return response(implode("\n", $csvRows), 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="shipments_export.csv"',
@@ -286,8 +299,38 @@ class ShipmentController extends Controller
         }
         $html .= '</tbody></table>';
 
+        $this->auditLogWriter->write($actor->id, 'shipments.exported.pdf', [
+            'filters' => $request->query(),
+            'columns' => array_keys($allowedColumns),
+            'rows' => count($rows),
+        ]);
+
         $pdf = Pdf::loadHTML($html)->setPaper('A4', 'landscape');
         return $pdf->download('shipments_export.pdf');
+    }
+
+    public function templateCsv(Request $request)
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.import')) {
+            return $this->forbidden();
+        }
+
+        $hubCode = (string) (DB::table('hubs')->value('code') ?? 'HUB-000');
+        $rows = [
+            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type',
+            $hubCode . ',SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery',
+        ];
+
+        $this->auditLogWriter->write($actor->id, 'shipments.template.downloaded', [
+            'hub_code' => $hubCode,
+        ]);
+
+        return response(implode("\n", $rows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="shipments_import_template.csv"',
+        ]);
     }
 
     public function importCsv(Request $request): JsonResponse
@@ -304,138 +347,45 @@ class ShipmentController extends Controller
         }
 
         $dryRun = $request->boolean('dry_run');
-        $minScheduled = Carbon::now()->subDays(30);
-        $maxScheduled = Carbon::now()->addDays(180);
-
-        $handle = fopen($file->getRealPath(), 'r');
-        if ($handle === false) {
-            return response()->json(['error' => ['message' => 'No se pudo leer el CSV']], 422);
+        $async = $request->boolean('async');
+        if ($async && $dryRun) {
+            return response()->json(['error' => ['message' => 'dry_run no soportado en modo async']], 422);
         }
 
-        $header = fgetcsv($handle);
-        if ($header === false) {
-            fclose($handle);
-            return response()->json(['error' => ['message' => 'CSV sin cabecera']], 422);
+        if ($async) {
+            $targetDir = 'imports/shipments';
+            $filename = (string) Str::uuid() . '.csv';
+            $path = $file->storeAs($targetDir, $filename);
+
+            $this->auditLogWriter->write($actor->id, 'shipments.import.queued', [
+                'path' => $path,
+            ]);
+
+            \App\Jobs\ImportShipmentsCsvJob::dispatch($path, $actor->id);
+
+            return response()->json([
+                'data' => [
+                    'job_dispatched' => true,
+                    'job_id' => $filename,
+                    'queued_at' => now()->toDateTimeString(),
+                ],
+            ], 202);
         }
 
-        $normalizedHeader = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
-        $requiredHeaders = ['hub_code', 'reference'];
-        foreach ($requiredHeaders as $required) {
-            if (!in_array($required, $normalizedHeader, true)) {
-                fclose($handle);
-                return response()->json(['error' => ['message' => "Falta columna requerida: {$required}"]], 422);
-            }
+        try {
+            $result = $this->importService->importFromCsvPath($file->getRealPath(), $dryRun);
+        } catch (\RuntimeException $exception) {
+            return response()->json(['error' => ['message' => $exception->getMessage()]], 422);
         }
 
-        $rows = [];
-        $errors = [];
-        $seenReferences = [];
-        $insertRows = [];
-        $rowNumber = 1;
-
-        while (($data = fgetcsv($handle)) !== false) {
-            $rowNumber++;
-            if ($data === [null] || $data === false) {
-                continue;
-            }
-            $row = [];
-            foreach ($normalizedHeader as $index => $column) {
-                $row[$column] = isset($data[$index]) ? trim((string) $data[$index]) : '';
-            }
-
-            $reference = $row['reference'] ?? '';
-            $hubCode = $row['hub_code'] ?? '';
-            $scheduledAt = $row['scheduled_at'] ?? '';
-            $serviceType = $row['service_type'] ?? 'delivery';
-
-            $rowErrors = [];
-            if ($hubCode === '') {
-                $rowErrors[] = 'hub_code requerido';
-            }
-            if ($reference === '') {
-                $rowErrors[] = 'reference requerido';
-            }
-
-            $hubId = null;
-            if ($hubCode !== '') {
-                $hubId = DB::table('hubs')->where('code', $hubCode)->value('id');
-                if (!$hubId) {
-                    $rowErrors[] = 'hub_code no existe';
-                }
-            }
-
-            if ($reference !== '') {
-                if (isset($seenReferences[$reference])) {
-                    $rowErrors[] = 'reference duplicada en CSV';
-                } else {
-                    $seenReferences[$reference] = true;
-                }
-                if (DB::table('shipments')->where('reference', $reference)->exists()) {
-                    $rowErrors[] = 'reference ya existe';
-                }
-            }
-
-            $scheduledAtValue = null;
-            if ($scheduledAt !== '') {
-                try {
-                    $scheduledAtValue = Carbon::parse($scheduledAt);
-                    if ($scheduledAtValue->lt($minScheduled) || $scheduledAtValue->gt($maxScheduled)) {
-                        $rowErrors[] = 'scheduled_at fuera de ventana';
-                    }
-                } catch (\Throwable $e) {
-                    $rowErrors[] = 'scheduled_at invalido';
-                }
-            }
-
-            if ($serviceType === '') {
-                $serviceType = 'delivery';
-            }
-
-            if ($rowErrors === []) {
-                $insertRows[] = [
-                    'id' => (string) Str::uuid(),
-                    'hub_id' => $hubId,
-                    'reference' => $reference,
-                    'consignee_name' => $row['consignee_name'] !== '' ? $row['consignee_name'] : null,
-                    'address_line' => $row['address_line'] !== '' ? $row['address_line'] : null,
-                    'scheduled_at' => $scheduledAtValue?->format('Y-m-d H:i:s'),
-                    'service_type' => $serviceType,
-                    'status' => 'created',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-                $rows[] = [
-                    'row' => $rowNumber,
-                    'reference' => $reference,
-                    'status' => 'ok',
-                ];
-            } else {
-                $errors[] = [
-                    'row' => $rowNumber,
-                    'reference' => $reference,
-                    'status' => 'error',
-                    'errors' => $rowErrors,
-                ];
-            }
-        }
-
-        fclose($handle);
-
-        $createdCount = 0;
-        if (!$dryRun && $insertRows !== []) {
-            DB::table('shipments')->insert($insertRows);
-            $createdCount = count($insertRows);
-        }
-
-        return response()->json([
-            'data' => [
-                'dry_run' => $dryRun,
-                'created_count' => $dryRun ? 0 : $createdCount,
-                'skipped_count' => count($errors),
-                'error_count' => count($errors),
-                'rows' => array_merge($rows, $errors),
-            ],
+        $this->auditLogWriter->write($actor->id, 'shipments.imported', [
+            'dry_run' => $dryRun,
+            'created_count' => $result['created_count'] ?? 0,
+            'error_count' => $result['error_count'] ?? 0,
+            'warnings' => $result['warnings'] ?? [],
         ]);
+
+        return response()->json(['data' => $result]);
     }
 
     private function baseQueryForActor(User $actor)

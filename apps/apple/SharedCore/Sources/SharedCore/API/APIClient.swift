@@ -33,6 +33,8 @@ public protocol APIClientProtocol {
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
+    func downloadShipmentsTemplate() async throws -> Data
+    func importShipmentsCsv(fileUrl: URL, dryRun: Bool) async throws -> ShipmentsImportResult
 }
 
 public final class APIClient: APIClientProtocol {
@@ -384,6 +386,30 @@ public final class APIClient: APIClientProtocol {
         _ = try await execute(request)
     }
 
+    public func downloadShipmentsTemplate() async throws -> Data {
+        guard let baseURL else { return try await mock.downloadShipmentsTemplate() }
+
+        let request = authorizedRequest(url: baseURL.appending(path: "shipments/template.csv"), method: "GET")
+        return try await execute(request)
+    }
+
+    public func importShipmentsCsv(fileUrl: URL, dryRun: Bool) async throws -> ShipmentsImportResult {
+        guard let baseURL else { return try await mock.importShipmentsCsv(fileUrl: fileUrl, dryRun: dryRun) }
+
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let url = withQueryItems(
+            baseURL.appending(path: "shipments/import"),
+            queryItems: [
+                URLQueryItem(name: "dry_run", value: dryRun ? "1" : "0"),
+            ]
+        )
+        var request = authorizedRequest(url: url, method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try multipartBody(fileUrl: fileUrl, fieldName: "file", boundary: boundary)
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<ShipmentsImportResult>.self, from: data).data
+    }
+
     public func qualityThreshold() async throws -> QualityThresholdConfig {
         guard let baseURL else { return try await mock.qualityThreshold() }
 
@@ -515,6 +541,21 @@ public final class APIClient: APIClientProtocol {
         }
         components.queryItems = filtered.isEmpty ? nil : filtered
         return components.url ?? url
+    }
+
+    private func multipartBody(fileUrl: URL, fieldName: String, boundary: String) throws -> Data {
+        let fileData = try Data(contentsOf: fileUrl)
+        let filename = fileUrl.lastPathComponent
+        let mimeType = "text/csv"
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        return body
     }
 }
 

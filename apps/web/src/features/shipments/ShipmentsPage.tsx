@@ -167,19 +167,23 @@ export function ShipmentsPage() {
     return summary;
   };
 
-  const downloadImportTemplate = () => {
-    const header = 'hub_code,reference,consignee_name,address_line,scheduled_at,service_type';
-    const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery';
-    const content = `${header}\n${sample}\n`;
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'shipments_import_template.csv';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.URL.revokeObjectURL(url);
+  const downloadImportTemplate = async () => {
+    try {
+      await apiClient.downloadShipmentsTemplate();
+    } catch {
+      const header = 'hub_code,reference,consignee_name,address_line,scheduled_at,service_type';
+      const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery';
+      const content = `${header}\n${sample}\n`;
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'shipments_import_template.csv';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    }
   };
 
   const runImport = async () => {
@@ -385,9 +389,9 @@ export function ShipmentsPage() {
               <Button type="button" onClick={runImport} disabled={importing}>
                 {importing ? 'Importando...' : 'Importar'}
               </Button>
-              <Button type="button" variant="outline" onClick={downloadImportTemplate}>
-                Descargar plantilla
-              </Button>
+            <Button type="button" variant="outline" onClick={() => void downloadImportTemplate()}>
+              Descargar plantilla
+            </Button>
             </div>
             {importError ? <div className="helper">{importError}</div> : null}
             {importResult ? (

@@ -19,6 +19,8 @@
 - `scheduled_at` fuera de ventana se rechaza (ventana actual: desde hoy - 30 dias hasta hoy + 180 dias).
 - Valores vacios se interpretan como `null`.
 - Si se envia `dry_run=1`, no se insertan filas y se devuelve el preview con errores.
+- Endpoint plantilla: `GET /api/v1/shipments/template.csv`.
+- Importacion async: `POST /api/v1/shipments/import?async=1` (encola el proceso).
 
 ## Ejemplo
 ```

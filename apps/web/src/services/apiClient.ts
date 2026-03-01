@@ -588,6 +588,23 @@ export const apiClient = {
     return json.data;
   },
 
+  async downloadShipmentsTemplate(): Promise<void> {
+    if (USE_MOCK) return mockApi.downloadShipmentsTemplate();
+    const response = await fetch(`${API_BASE_URL}/shipments/template.csv`, {
+      headers: buildAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Cannot download template');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'shipments_import_template.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {
     if (USE_MOCK) return mockApi.getPickups(filters) as Promise<PickupSummary[]>;
     const response = await authorizedFetch(`${API_BASE_URL}/pickups`);

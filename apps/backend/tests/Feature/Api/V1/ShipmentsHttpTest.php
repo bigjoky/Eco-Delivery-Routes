@@ -242,6 +242,56 @@ class ShipmentsHttpTest extends TestCase
         $this->assertSame(2, DB::table('shipments')->whereIn('reference', ['SHP-IMPORT-003', 'SHP-IMPORT-004'])->count());
     }
 
+    public function test_import_returns_warning_for_unknown_columns(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hub = DB::table('hubs')->first();
+        $csv = implode("\n", [
+            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type,extra_col',
+            "{$hub->code},SHP-IMPORT-005,Cliente Cinco,Calle 5,2026-03-05T12:00:00Z,delivery,VAL",
+        ]);
+        $file = UploadedFile::fake()->createWithContent('shipments.csv', $csv);
+
+        $response = $this->post('/api/v1/shipments/import?dry_run=1', [
+            'file' => $file,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.unknown_columns.0', 'extra_col');
+    }
+
+    public function test_can_download_template_csv(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $response = $this->get('/api/v1/shipments/template.csv');
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+    }
+
+    public function test_can_queue_async_import(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hub = DB::table('hubs')->first();
+        $csv = implode("\n", [
+            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type',
+            "{$hub->code},SHP-IMPORT-006,Cliente Seis,Calle 6,2026-03-05T13:00:00Z,delivery",
+        ]);
+        $file = UploadedFile::fake()->createWithContent('shipments.csv', $csv);
+
+        $response = $this->post('/api/v1/shipments/import?async=1', [
+            'file' => $file,
+        ]);
+
+        $response->assertStatus(202);
+        $response->assertJsonPath('data.job_dispatched', true);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

@@ -774,6 +774,10 @@ export const mockApi = {
     };
   },
 
+  async downloadShipmentsTemplate() {
+    return;
+  },
+
   async getPickups(filters: { status?: string; limit?: number } = {}) {
     let rows = [
       { id: '00000000-0000-0000-0000-000000000201', reference: 'PCK-AGP-0001', pickup_type: 'NORMAL', status: 'planned', requester_name: 'Cliente Pickup 1' },

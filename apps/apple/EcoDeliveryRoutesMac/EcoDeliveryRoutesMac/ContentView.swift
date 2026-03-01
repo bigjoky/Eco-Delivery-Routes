@@ -1,5 +1,6 @@
 import SharedCore
 import SwiftUI
+import UniformTypeIdentifiers
 import Foundation
 import AppKit
 
@@ -160,6 +161,13 @@ struct ContentView: View {
     @State private var manifestRows: [RouteManifestRow] = []
     @State private var manifestLoading: Bool = false
     @State private var manifestError: String?
+    @State private var showImportPicker: Bool = false
+    @State private var importFileUrl: URL?
+    @State private var importDryRun: Bool = true
+    @State private var importResult: ShipmentsImportResult?
+    @State private var importMessage: String = ""
+    @State private var importWarnings: [String] = []
+    @State private var importRunning: Bool = false
 
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
@@ -324,12 +332,78 @@ struct ContentView: View {
                     }
                     .frame(maxHeight: 180)
                 }
+                Divider()
+                Text("Importar envios CSV")
+                    .font(.headline)
+                HStack {
+                    Button(importFileUrl == nil ? "Seleccionar CSV" : "CSV seleccionado") {
+                        showImportPicker = true
+                    }
+                    Toggle("Dry run", isOn: $importDryRun)
+                        .toggleStyle(.switch)
+                    Button(importRunning ? "Importando..." : "Importar") {
+                        Task { await importShipmentsCsv() }
+                    }
+                    .disabled(importRunning || importFileUrl == nil)
+                    Button("Descargar plantilla") {
+                        Task { await downloadShipmentsTemplate() }
+                    }
+                }
+                if let importFileUrl {
+                    Text(importFileUrl.lastPathComponent)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !importMessage.isEmpty {
+                    Text(importMessage)
+                        .font(.caption)
+                        .foregroundStyle(importMessage.contains("Error") ? .red : .secondary)
+                }
+                if let importResult {
+                    Text("Creados: \(importResult.createdCount) · Errores: \(importResult.errorCount)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if !importWarnings.isEmpty {
+                        Text("Avisos: \(importWarnings.joined(separator: ", "))")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                    if !importResult.rows.isEmpty {
+                        List(importResult.rows.prefix(5)) { row in
+                            VStack(alignment: .leading) {
+                                Text("Fila \(row.row): \(row.reference ?? "-")")
+                                    .font(.caption)
+                                Text(row.status)
+                                    .font(.caption2)
+                                    .foregroundStyle(row.status == "error" ? .red : .secondary)
+                                if let errors = row.errors, !errors.isEmpty {
+                                    Text(errors.joined(separator: ", "))
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 160)
+                    }
+                }
                 Spacer()
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .navigationTitle("Manifiesto")
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: [UTType.commaSeparatedText],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                importFileUrl = urls.first
+            case .failure:
+                importMessage = "Error seleccionando CSV"
+            }
+        }
     }
 
     private var advancesTab: some View {
@@ -861,6 +935,46 @@ struct ContentView: View {
             }
         } catch {
             manifestError = "No se pudo exportar manifest"
+        }
+    }
+
+    private func importShipmentsCsv() async {
+        guard let importFileUrl else {
+            importMessage = "Selecciona un CSV primero"
+            return
+        }
+        importRunning = true
+        importMessage = ""
+        do {
+            let result = try await apiClient.importShipmentsCsv(fileUrl: importFileUrl, dryRun: importDryRun)
+            importResult = result
+            importWarnings = result.warnings
+            importMessage = result.dryRun ? "Dry run completado" : "Importacion completada"
+        } catch {
+            importMessage = "Error importando CSV"
+        }
+        importRunning = false
+    }
+
+    private func downloadShipmentsTemplate() async {
+        do {
+            let data = try await apiClient.downloadShipmentsTemplate()
+            await MainActor.run {
+                let panel = NSSavePanel()
+                panel.nameFieldStringValue = "shipments_import_template.csv"
+                panel.canCreateDirectories = true
+                panel.begin { response in
+                    guard response == .OK, let target = panel.url else { return }
+                    do {
+                        try data.write(to: target)
+                        importMessage = "Plantilla guardada"
+                    } catch {
+                        importMessage = "No se pudo guardar la plantilla"
+                    }
+                }
+            }
+        } catch {
+            importMessage = "Error descargando plantilla"
         }
     }
 
