@@ -7,6 +7,7 @@ test('shipments flow: list, export buttons, open detail', async ({ page }) => {
   await page.click('text=Entrar');
   await page.waitForURL('**/shipments');
 
+  await expect(page.getByRole('heading', { name: 'Envios', exact: true })).toBeVisible();
   await expect(page.getByText('Export CSV')).toBeVisible();
   await expect(page.getByText('Export PDF')).toBeVisible();
 

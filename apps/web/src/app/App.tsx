@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { canAccess } from '../core/auth/access';
 import { sessionStore } from '../core/auth/sessionStore';
+import { apiClient } from '../services/apiClient';
 import { AdvancesPage } from '../features/advances/AdvancesPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
@@ -26,11 +27,18 @@ export function App() {
   const [roles, setRoles] = useState(sessionStore.getRoles());
 
   useEffect(() => {
+    sessionStore.syncFromStorage();
     return sessionStore.subscribe(() => {
       setIsAuthenticated(sessionStore.isAuthenticated());
       setRoles(sessionStore.getRoles());
     });
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (roles.length > 0) return;
+    apiClient.getCurrentUser().catch(() => undefined);
+  }, [isAuthenticated, roles.length]);
 
   return (
     <AppShell isAuthenticated={isAuthenticated} roles={roles}>

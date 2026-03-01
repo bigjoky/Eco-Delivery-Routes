@@ -4,7 +4,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, PaginationMeta, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, HubSummary, PaginationMeta, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
@@ -29,6 +29,7 @@ export function ShipmentsPage() {
   const [createAddress, setCreateAddress] = useState('');
   const [createScheduledAt, setCreateScheduledAt] = useState('');
   const [createError, setCreateError] = useState('');
+  const [createFieldErrors, setCreateFieldErrors] = useState<{ hub?: string; reference?: string; scheduledAt?: string }>({});
   const [creating, setCreating] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exportColumns, setExportColumns] = useState<string[]>([
@@ -51,8 +52,22 @@ export function ShipmentsPage() {
     rows: Array<{ row: number; reference?: string; status: string; errors?: string[] }>;
   }>(null);
   const [importError, setImportError] = useState('');
+  const [importMessage, setImportMessage] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importAsync, setImportAsync] = useState(false);
+  const [importJobId, setImportJobId] = useState<string | null>(null);
+  const [importJob, setImportJob] = useState<ShipmentImportJob | null>(null);
+  const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [roles, setRoles] = useState(sessionStore.getRoles());
+  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+  const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
+  const canExport = isMock || roles.some((role) => (
+    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator' || role === 'accountant'
+  ));
+  const canImport = isMock || roles.some((role) => (
+    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator'
+  ));
 
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
@@ -77,12 +92,38 @@ export function ShipmentsPage() {
     });
   }, []);
 
-  const canExport = roles.some((role) => (
-    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator' || role === 'accountant'
-  ));
-  const canImport = roles.some((role) => (
-    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator'
-  ));
+  useEffect(() => {
+    if (!canImport || !importJobId) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const job = await apiClient.getShipmentImportStatus(importJobId);
+        if (!active) return;
+        setImportJob(job);
+        if (job.status === 'completed' || job.status === 'failed') {
+          return;
+        }
+        setTimeout(poll, 5000);
+      } catch {
+        if (!active) return;
+        setTimeout(poll, 8000);
+      }
+    };
+    poll();
+    return () => {
+      active = false;
+    };
+  }, [canImport, importJobId]);
+
+  useEffect(() => {
+    if (!canImport) return;
+    setAuditLoading(true);
+    apiClient
+      .getAuditLogs({ event: 'shipments.', page: 1, perPage: 20 })
+      .then((result) => setAuditRows(result.data))
+      .catch(() => setAuditRows([]))
+      .finally(() => setAuditLoading(false));
+  }, [canImport]);
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {
@@ -92,8 +133,18 @@ export function ShipmentsPage() {
   }, []);
 
   const createShipment = async () => {
-    if (!createHubId || !createReference) {
-      setCreateError('Hub y referencia son obligatorios.');
+    const nextErrors: { hub?: string; reference?: string; scheduledAt?: string } = {};
+    const reference = createReference.trim();
+    if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
+    if (!reference) nextErrors.reference = 'La referencia es obligatoria.';
+    if (reference && reference.length < 5) nextErrors.reference = 'La referencia debe tener al menos 5 caracteres.';
+    if (createScheduledAt) {
+      const parsed = Date.parse(createScheduledAt);
+      if (Number.isNaN(parsed)) nextErrors.scheduledAt = 'Fecha/hora no valida (usa ISO).';
+    }
+    setCreateFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setCreateError('Revisa los campos marcados antes de crear el envio.');
       return;
     }
     setCreating(true);
@@ -101,7 +152,7 @@ export function ShipmentsPage() {
     try {
       await apiClient.createShipment({
         hub_id: createHubId,
-        reference: createReference,
+        reference,
         consignee_name: createConsignee || null,
         address_line: createAddress || null,
         scheduled_at: createScheduledAt || null,
@@ -110,12 +161,42 @@ export function ShipmentsPage() {
       setCreateConsignee('');
       setCreateAddress('');
       setCreateScheduledAt('');
+      setCreateFieldErrors({});
       await reload(1);
     } catch (exception) {
       setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
     } finally {
       setCreating(false);
     }
+  };
+
+  const setQuickRange = (range: 'today' | 'tomorrow' | 'next7' | 'clear') => {
+    if (range === 'clear') {
+      setScheduledFrom('');
+      setScheduledTo('');
+      return;
+    }
+    const today = new Date();
+    const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
+    if (range === 'today') {
+      const day = toIsoDate(today);
+      setScheduledFrom(day);
+      setScheduledTo(day);
+      return;
+    }
+    if (range === 'tomorrow') {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const day = toIsoDate(tomorrow);
+      setScheduledFrom(day);
+      setScheduledTo(day);
+      return;
+    }
+    const start = toIsoDate(today);
+    const end = new Date(today);
+    end.setDate(today.getDate() + 6);
+    setScheduledFrom(start);
+    setScheduledTo(toIsoDate(end));
   };
 
   const exportCsv = async () => {
@@ -192,13 +273,24 @@ export function ShipmentsPage() {
       return;
     }
     setImportError('');
+    setImportMessage('');
     setImportResult(null);
     setImportSummary(null);
+    setImportJobId(null);
+    setImportJob(null);
     setImporting(true);
     try {
-      const result = await apiClient.importShipmentsCsv(importFile, { dryRun: importDryRun });
-      setImportResult(result);
-      setImportSummary(summarizeImportErrors(result.rows));
+      const result = await apiClient.importShipmentsCsv(importFile, { dryRun: importDryRun, async: importAsync });
+      if ('job_dispatched' in result) {
+        setImportJobId(result.import_id);
+        setImportMessage(`Importacion en cola: ${result.import_id}`);
+      } else {
+        setImportResult(result);
+        setImportSummary(summarizeImportErrors(result.rows));
+        if (result.import_id) {
+          setImportJobId(result.import_id);
+        }
+      }
     } catch (exception) {
       setImportError(exception instanceof Error ? exception.message : 'No se pudo importar');
     } finally {
@@ -221,6 +313,7 @@ export function ShipmentsPage() {
                 <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
               ))}
             </select>
+            {createFieldErrors.hub ? <div className="helper">{createFieldErrors.hub}</div> : null}
             <label htmlFor="create-shipment-ref">Referencia</label>
             <input
               id="create-shipment-ref"
@@ -228,6 +321,7 @@ export function ShipmentsPage() {
               onChange={(event) => setCreateReference(event.target.value)}
               placeholder="SHP-AGP-0001"
             />
+            {createFieldErrors.reference ? <div className="helper">{createFieldErrors.reference}</div> : null}
             <label htmlFor="create-shipment-consignee">Destinatario</label>
             <input
               id="create-shipment-consignee"
@@ -251,6 +345,7 @@ export function ShipmentsPage() {
               value={createScheduledAt}
               onChange={(event) => setCreateScheduledAt(event.target.value)}
             />
+            {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
             <Button type="button" onClick={createShipment} disabled={creating}>
               {creating ? 'Creando...' : 'Crear envio'}
             </Button>
@@ -321,35 +416,35 @@ export function ShipmentsPage() {
               value={scheduledTo}
               onChange={(event) => setScheduledTo(event.target.value)}
             />
-            {canExport ? (
-              <>
-                <Button type="button" variant="outline" onClick={exportCsv}>
-                  Export CSV
-                </Button>
-                <Button type="button" variant="outline" onClick={exportPdf}>
-                  Export PDF
-                </Button>
-              </>
-            ) : null}
+            <div className="inline-actions">
+              <span className="helper">Rangos rapidos</span>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
+            </div>
+            <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
+              Export CSV
+            </Button>
+            <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
+              Export PDF
+            </Button>
           </div>
-          {canExport ? (
-            <>
-              <div className="inline-actions">
-                <span className="helper">Columnas export</span>
-                {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
-                  <label key={column}>
-                    <input
-                      type="checkbox"
-                      checked={exportColumns.includes(column)}
-                      onChange={() => toggleExportColumn(column)}
-                    />
-                    {column}
-                  </label>
-                ))}
-              </div>
-              {exportError ? <div className="helper">{exportError}</div> : null}
-            </>
-          ) : null}
+          <div className="inline-actions">
+            <span className="helper">Columnas export</span>
+            {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
+              <label key={column}>
+                <input
+                  type="checkbox"
+                  checked={exportColumns.includes(column)}
+                  onChange={() => toggleExportColumn(column)}
+                  disabled={!canExport}
+                />
+                {column}
+              </label>
+            ))}
+          </div>
+          {exportError ? <div className="helper">{exportError}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
@@ -378,26 +473,66 @@ export function ShipmentsPage() {
                 accept=".csv"
                 onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
               />
-              <label>
-                <input
-                  type="checkbox"
-                  checked={importDryRun}
-                  onChange={(event) => setImportDryRun(event.target.checked)}
-                />
-                Dry run
-              </label>
-              <Button type="button" onClick={runImport} disabled={importing}>
-                {importing ? 'Importando...' : 'Importar'}
-              </Button>
+            <label>
+              <input
+                type="checkbox"
+                checked={importDryRun}
+                onChange={(event) => setImportDryRun(event.target.checked)}
+                disabled={importAsync}
+              />
+              Dry run
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={importAsync}
+                onChange={(event) => {
+                  const next = event.target.checked;
+                  setImportAsync(next);
+                  if (next) setImportDryRun(false);
+                }}
+              />
+              Async
+            </label>
+            <Button type="button" onClick={runImport} disabled={importing}>
+              {importing ? 'Importando...' : 'Importar'}
+            </Button>
             <Button type="button" variant="outline" onClick={() => void downloadImportTemplate()}>
               Descargar plantilla
             </Button>
             </div>
-            {importError ? <div className="helper">{importError}</div> : null}
-            {importResult ? (
-              <div className="kpi-grid">
+          {importError ? <div className="helper">{importError}</div> : null}
+          {importMessage ? <div className="helper">{importMessage}</div> : null}
+          {importJob ? (
+            <div className="kpi-grid">
+              <div>
+                <div className="helper">Import ID</div>
+                <div>{importJob.id}</div>
+              </div>
+              <div>
+                <div className="helper">Estado</div>
+                <div>{importJob.status}</div>
+              </div>
+              <div>
+                <div className="helper">Creados</div>
+                <div>{importJob.created_count}</div>
+              </div>
+              <div>
+                <div className="helper">Errores</div>
+                <div>{importJob.error_count}</div>
+              </div>
+              {importJob.error_message ? (
                 <div>
-                  <div className="helper">Dry run</div>
+                  <div className="helper">Error</div>
+                  <div>{importJob.error_message}</div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {importResult ? (
+            <div className="kpi-grid">
+              <div>
+                <div className="helper">Dry run</div>
                   <div>{importResult.dry_run ? 'si' : 'no'}</div>
                 </div>
                 <div>
@@ -408,17 +543,17 @@ export function ShipmentsPage() {
                   <div className="helper">Errores</div>
                   <div>{importResult.error_count}</div>
                 </div>
-                {importSummary ? Object.entries(importSummary).map(([reason, count]) => (
-                  <div key={reason}>
-                    <div className="helper">{reason}</div>
-                    <div>{count}</div>
-                  </div>
-                )) : null}
-              </div>
-            ) : null}
-            {importResult?.rows?.length ? (
-              <TableWrapper>
-                <Table>
+              {importSummary ? Object.entries(importSummary).map(([reason, count]) => (
+                <div key={reason}>
+                  <div className="helper">{reason}</div>
+                  <div>{count}</div>
+                </div>
+              )) : null}
+            </div>
+          ) : null}
+          {importResult?.rows?.length ? (
+            <TableWrapper>
+              <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fila</TableHead>
@@ -438,8 +573,44 @@ export function ShipmentsPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </TableWrapper>
-            ) : null}
+            </TableWrapper>
+          ) : null}
+        </CardContent>
+      </Card>
+    ) : null}
+      {canImport ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="page-title">Auditoria envios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {auditLoading ? <div className="helper">Cargando...</div> : null}
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Meta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditRows.length ? auditRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.created_at}</TableCell>
+                      <TableCell>{row.event}</TableCell>
+                      <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                      <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={4}>Sin eventos</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableWrapper>
           </CardContent>
         </Card>
       ) : null}

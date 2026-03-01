@@ -14,6 +14,18 @@ if (typeof window !== 'undefined') {
 }
 
 export const sessionStore = {
+  syncFromStorage() {
+    if (typeof window === 'undefined') return;
+    token = window.localStorage.getItem(STORAGE_KEY);
+    try {
+      const raw = window.localStorage.getItem(ROLES_STORAGE_KEY) ?? '[]';
+      const parsed = JSON.parse(raw) as unknown;
+      roles = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+      roles = [];
+    }
+    listeners.forEach((listener) => listener());
+  },
   setToken(value: string | null) {
     token = value;
     if (typeof window !== 'undefined') {
