@@ -490,6 +490,9 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
     const json = await response.json();
+    if (response.status === 409) {
+      throw new Error('Referencia ya existe.');
+    }
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create shipment');
     return json.data as ShipmentSummary;
   },
@@ -504,6 +507,7 @@ export const apiClient = {
 
   async exportShipmentsCsv(filters: {
     status?: string;
+    hubId?: string;
     q?: string;
     scheduledFrom?: string;
     scheduledTo?: string;
@@ -514,6 +518,7 @@ export const apiClient = {
     if (USE_MOCK) return mockApi.exportShipmentsCsv(filters) as Promise<void>;
     const params = new URLSearchParams();
     if (filters.status) params.set('status', filters.status);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.q) params.set('q', filters.q);
     if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
     if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
@@ -538,6 +543,7 @@ export const apiClient = {
 
   async exportShipmentsPdf(filters: {
     status?: string;
+    hubId?: string;
     q?: string;
     scheduledFrom?: string;
     scheduledTo?: string;
@@ -548,6 +554,7 @@ export const apiClient = {
     if (USE_MOCK) return mockApi.exportShipmentsPdf(filters) as Promise<void>;
     const params = new URLSearchParams();
     if (filters.status) params.set('status', filters.status);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.q) params.set('q', filters.q);
     if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
     if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);

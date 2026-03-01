@@ -756,11 +756,29 @@ export const mockApi = {
     };
   },
 
-  async exportShipmentsCsv(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string; columns?: string[] }) {
+  async exportShipmentsCsv(_: {
+    status?: string;
+    hubId?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
+    columns?: string[];
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  }) {
     return;
   },
 
-  async exportShipmentsPdf(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string; columns?: string[] }) {
+  async exportShipmentsPdf(_: {
+    status?: string;
+    hubId?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
+    columns?: string[];
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  }) {
     return;
   },
 

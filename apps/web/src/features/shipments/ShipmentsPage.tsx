@@ -19,6 +19,8 @@ export function ShipmentsPage() {
   const [items, setItems] = useState<ShipmentSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
   const [status, setStatus] = useState('');
+  const [sortField, setSortField] = useState<'created_at' | 'scheduled_at' | 'reference' | 'status'>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [query, setQuery] = useState('');
   const [hubFilter, setHubFilter] = useState('');
   const [scheduledFrom, setScheduledFrom] = useState('');
@@ -79,6 +81,8 @@ export function ShipmentsPage() {
       q: query || undefined,
       scheduledFrom: scheduledFrom || undefined,
       scheduledTo: scheduledTo || undefined,
+      sort: sortField,
+      dir: sortDir,
     }).then((result) => {
       setItems(result.data);
       setMeta(result.meta);
@@ -86,7 +90,7 @@ export function ShipmentsPage() {
 
   useEffect(() => {
     reload(1);
-  }, [status, hubFilter, query, scheduledFrom, scheduledTo]);
+  }, [status, hubFilter, query, scheduledFrom, scheduledTo, sortField, sortDir]);
 
   useEffect(() => {
     return sessionStore.subscribe(() => {
@@ -137,9 +141,13 @@ export function ShipmentsPage() {
   const createShipment = async () => {
     const nextErrors: { hub?: string; reference?: string; scheduledAt?: string } = {};
     const reference = createReference.trim();
+    const referencePattern = /^SHP-[A-Z]{3}-\d{4}$/;
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
     if (!reference) nextErrors.reference = 'La referencia es obligatoria.';
     if (reference && reference.length < 5) nextErrors.reference = 'La referencia debe tener al menos 5 caracteres.';
+    if (reference && !referencePattern.test(reference)) {
+      nextErrors.reference = 'Formato esperado: SHP-XXX-0000';
+    }
     if (createScheduledAt) {
       const parsed = Date.parse(createScheduledAt);
       if (Number.isNaN(parsed)) nextErrors.scheduledAt = 'Fecha/hora no valida (usa ISO).';
@@ -209,6 +217,9 @@ export function ShipmentsPage() {
         q: query || undefined,
         scheduledFrom: scheduledFrom || undefined,
         scheduledTo: scheduledTo || undefined,
+        sort: sortField,
+        dir: sortDir,
+        hubId: hubFilter || undefined,
         columns: exportColumns,
       });
     } catch (exception) {
@@ -224,11 +235,28 @@ export function ShipmentsPage() {
         q: query || undefined,
         scheduledFrom: scheduledFrom || undefined,
         scheduledTo: scheduledTo || undefined,
+        sort: sortField,
+        dir: sortDir,
+        hubId: hubFilter || undefined,
         columns: exportColumns,
       });
     } catch (exception) {
       setExportError(exception instanceof Error ? exception.message : 'No se pudo exportar PDF');
     }
+  };
+
+  const setSort = (field: 'created_at' | 'scheduled_at' | 'reference' | 'status') => {
+    if (sortField === field) {
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (field: 'created_at' | 'scheduled_at' | 'reference' | 'status') => {
+    if (sortField !== field) return '';
+    return sortDir === 'asc' ? '↑' : '↓';
   };
 
   const toggleExportColumn = (column: string) => {
@@ -364,11 +392,23 @@ export function ShipmentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Referencia</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>
+                    <button type="button" className="btn btn-outline" onClick={() => setSort('reference')}>
+                      Referencia {sortIndicator('reference')}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button type="button" className="btn btn-outline" onClick={() => setSort('status')}>
+                      Estado {sortIndicator('status')}
+                    </button>
+                  </TableHead>
                   <TableHead>Destinatario</TableHead>
                   <TableHead>Direccion</TableHead>
-                  <TableHead>Programado</TableHead>
+                  <TableHead>
+                    <button type="button" className="btn btn-outline" onClick={() => setSort('scheduled_at')}>
+                      Programado {sortIndicator('scheduled_at')}
+                    </button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -392,6 +432,14 @@ export function ShipmentsPage() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Referencia, ID o destinatario"
             />
+            <div className="inline-actions">
+              <span className="helper">Estados rapidos</span>
+              <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
+              <Button type="button" variant={status === 'created' ? 'secondary' : 'outline'} onClick={() => setStatus('created')}>Created</Button>
+              <Button type="button" variant={status === 'out_for_delivery' ? 'secondary' : 'outline'} onClick={() => setStatus('out_for_delivery')}>Out</Button>
+              <Button type="button" variant={status === 'delivered' ? 'secondary' : 'outline'} onClick={() => setStatus('delivered')}>Delivered</Button>
+              <Button type="button" variant={status === 'incident' ? 'secondary' : 'outline'} onClick={() => setStatus('incident')}>Incident</Button>
+            </div>
             <label htmlFor="shipment-status">Estado</label>
             <select
               id="shipment-status"
