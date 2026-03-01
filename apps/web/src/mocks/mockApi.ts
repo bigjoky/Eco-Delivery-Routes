@@ -638,8 +638,8 @@ export const mockApi = {
     scheduledTo?: string;
   } = {}) {
     let rows = [
-      { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', service_type: 'express_1030' },
-      { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', service_type: 'business_parcel' },
+      { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
+      { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
     ];
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);

@@ -65,6 +65,7 @@ export type ShipmentSummary = {
   scheduled_at?: string | null;
   service_type?: string | null;
   hub_id?: string | null;
+  hub_code?: string | null;
 };
 
 export type ContactSummary = {

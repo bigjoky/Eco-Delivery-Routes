@@ -2551,6 +2551,7 @@ components:
               properties:
                 id: { type: string, format: uuid }
                 hub_id: { type: string, format: uuid }
+                hub_code: { type: string, nullable: true }
                 route_id: { type: string, format: uuid, nullable: true }
                 assigned_driver_id: { type: string, format: uuid, nullable: true }
                 subcontractor_id: { type: string, format: uuid, nullable: true }

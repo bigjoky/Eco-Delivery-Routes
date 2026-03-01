@@ -1448,7 +1448,7 @@ export function ShipmentsPage() {
                     <TableCell>{item.consignee_name ?? '-'}</TableCell>
                     <TableCell>{item.address_line ?? '-'}</TableCell>
                     <TableCell>{item.scheduled_at ?? '-'}</TableCell>
-                    <TableCell>{item.hub_id ?? '-'}</TableCell>
+                    <TableCell>{item.hub_code ?? item.hub_id ?? '-'}</TableCell>
                     <TableCell>
                       <div className="table-actions">
                         <Button

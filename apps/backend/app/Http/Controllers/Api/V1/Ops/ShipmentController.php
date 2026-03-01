@@ -560,7 +560,9 @@ class ShipmentController extends Controller
 
     private function baseQueryForActor(User $actor)
     {
-        $query = DB::table('shipments');
+        $query = DB::table('shipments')
+            ->leftJoin('hubs', 'hubs.id', '=', 'shipments.hub_id')
+            ->select('shipments.*', 'hubs.code as hub_code');
         if ($actor->hasRole('driver')) {
             $driverId = DB::table('drivers')->where('user_id', $actor->id)->value('id');
             if (!$driverId) {

@@ -32,6 +32,8 @@ export function IncidentsPage() {
   const [listSearch, setListSearch] = useState('');
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
@@ -165,8 +167,16 @@ export function IncidentsPage() {
   };
 
   const onResolve = async (id: string) => {
-    await apiClient.resolveIncident(id, 'Resuelta desde panel web');
-    await reload();
+    setResolvingId(id);
+    setResolveError('');
+    try {
+      await apiClient.resolveIncident(id, 'Resuelta desde panel web');
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
+    } finally {
+      setResolvingId(null);
+    }
   };
 
   return (
@@ -245,6 +255,7 @@ export function IncidentsPage() {
               <div className="kpi-value">{incidentSummary.resolved}</div>
             </div>
           </div>
+          {resolveError ? <div className="helper error">{resolveError}</div> : null}
           <div className="form-row">
             <div>
               <label>Estado</label>
@@ -316,7 +327,9 @@ export function IncidentsPage() {
                       {item.resolved_at ? (
                         <span>-</span>
                       ) : (
-                        <Button type="button" onClick={() => onResolve(item.id)}>Resolver</Button>
+                        <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
+                          {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>

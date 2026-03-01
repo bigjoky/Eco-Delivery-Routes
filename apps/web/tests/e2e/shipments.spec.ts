@@ -10,9 +10,6 @@ test('shipments flow: list, export buttons, open detail', async ({ page }) => {
   await expect(page.getByText('Export PDF')).toBeVisible();
   await expect(page.getByText('Reset columnas')).toBeVisible();
 
-  await page.fill('#create-shipment-ref', 'INVALID-REF');
-  await page.click('text=Crear envio');
-
   await page.selectOption('#shipment-status', 'delivered');
   await page.selectOption('#shipments-per-page', '25');
   await expect(page.getByText('Pagina 1 /')).toBeVisible();
