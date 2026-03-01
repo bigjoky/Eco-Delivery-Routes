@@ -30,6 +30,26 @@ export function ShipmentsPage() {
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [exportColumns, setExportColumns] = useState<string[]>([
+    'reference',
+    'status',
+    'consignee_name',
+    'address_line',
+    'scheduled_at',
+    'delivered_at',
+    'hub_id',
+  ]);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importDryRun, setImportDryRun] = useState(true);
+  const [importResult, setImportResult] = useState<null | {
+    dry_run: boolean;
+    created_count: number;
+    skipped_count: number;
+    error_count: number;
+    rows: Array<{ row: number; reference?: string; status: string; errors?: string[] }>;
+  }>(null);
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
@@ -90,6 +110,7 @@ export function ShipmentsPage() {
         q: query || undefined,
         scheduledFrom: scheduledFrom || undefined,
         scheduledTo: scheduledTo || undefined,
+        columns: exportColumns,
       });
     } catch (exception) {
       setExportError(exception instanceof Error ? exception.message : 'No se pudo exportar CSV');
@@ -104,9 +125,36 @@ export function ShipmentsPage() {
         q: query || undefined,
         scheduledFrom: scheduledFrom || undefined,
         scheduledTo: scheduledTo || undefined,
+        columns: exportColumns,
       });
     } catch (exception) {
       setExportError(exception instanceof Error ? exception.message : 'No se pudo exportar PDF');
+    }
+  };
+
+  const toggleExportColumn = (column: string) => {
+    setExportColumns((current) => (
+      current.includes(column)
+        ? current.filter((item) => item !== column)
+        : [...current, column]
+    ));
+  };
+
+  const runImport = async () => {
+    if (!importFile) {
+      setImportError('Selecciona un CSV para importar.');
+      return;
+    }
+    setImportError('');
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const result = await apiClient.importShipmentsCsv(importFile, { dryRun: importDryRun });
+      setImportResult(result);
+    } catch (exception) {
+      setImportError(exception instanceof Error ? exception.message : 'No se pudo importar');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -232,6 +280,19 @@ export function ShipmentsPage() {
               Export PDF
             </Button>
           </div>
+          <div className="inline-actions">
+            <span className="helper">Columnas export</span>
+            {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
+              <label key={column}>
+                <input
+                  type="checkbox"
+                  checked={exportColumns.includes(column)}
+                  onChange={() => toggleExportColumn(column)}
+                />
+                {column}
+              </label>
+            ))}
+          </div>
           {exportError ? <div className="helper">{exportError}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
@@ -247,6 +308,72 @@ export function ShipmentsPage() {
               Siguiente
             </Button>
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Importar CSV</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="inline-actions">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+            />
+            <label>
+              <input
+                type="checkbox"
+                checked={importDryRun}
+                onChange={(event) => setImportDryRun(event.target.checked)}
+              />
+              Dry run
+            </label>
+            <Button type="button" onClick={runImport} disabled={importing}>
+              {importing ? 'Importando...' : 'Importar'}
+            </Button>
+          </div>
+          {importError ? <div className="helper">{importError}</div> : null}
+          {importResult ? (
+            <div className="kpi-grid">
+              <div>
+                <div className="helper">Dry run</div>
+                <div>{importResult.dry_run ? 'si' : 'no'}</div>
+              </div>
+              <div>
+                <div className="helper">Creados</div>
+                <div>{importResult.created_count}</div>
+              </div>
+              <div>
+                <div className="helper">Errores</div>
+                <div>{importResult.error_count}</div>
+              </div>
+            </div>
+          ) : null}
+          {importResult?.rows?.length ? (
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fila</TableHead>
+                    <TableHead>Referencia</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Errores</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importResult.rows.map((row) => (
+                    <TableRow key={`${row.row}-${row.reference ?? ''}`}>
+                      <TableCell>{row.row}</TableCell>
+                      <TableCell>{row.reference ?? '-'}</TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell>{row.errors?.join(', ') ?? '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          ) : null}
         </CardContent>
       </Card>
     </section>

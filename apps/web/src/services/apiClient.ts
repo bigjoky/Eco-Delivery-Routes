@@ -504,6 +504,7 @@ export const apiClient = {
     scheduledTo?: string;
     sort?: string;
     dir?: 'asc' | 'desc';
+    columns?: string[];
   } = {}): Promise<void> {
     if (USE_MOCK) return mockApi.exportShipmentsCsv(filters) as Promise<void>;
     const params = new URLSearchParams();
@@ -513,6 +514,7 @@ export const apiClient = {
     if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
+    if (filters.columns?.length) params.set('columns', filters.columns.join(','));
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/shipments/export.csv${suffix}`, {
       headers: buildAuthHeaders(),
@@ -536,6 +538,7 @@ export const apiClient = {
     scheduledTo?: string;
     sort?: string;
     dir?: 'asc' | 'desc';
+    columns?: string[];
   } = {}): Promise<void> {
     if (USE_MOCK) return mockApi.exportShipmentsPdf(filters) as Promise<void>;
     const params = new URLSearchParams();
@@ -545,6 +548,7 @@ export const apiClient = {
     if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
+    if (filters.columns?.length) params.set('columns', filters.columns.join(','));
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/shipments/export.pdf${suffix}`, {
       headers: buildAuthHeaders(),
@@ -559,6 +563,29 @@ export const apiClient = {
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  async importShipmentsCsv(file: File, options: { dryRun?: boolean } = {}): Promise<{
+    dry_run: boolean;
+    created_count: number;
+    skipped_count: number;
+    error_count: number;
+    rows: Array<{ row: number; reference?: string; status: string; errors?: string[] }>;
+  }> {
+    if (USE_MOCK) return mockApi.importShipmentsCsv(file, options);
+    const form = new FormData();
+    form.append('file', file);
+    const params = new URLSearchParams();
+    if (options.dryRun) params.set('dry_run', '1');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/shipments/import${suffix}`, {
+      method: 'POST',
+      headers: buildAuthHeaders(),
+      body: form,
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot import shipments');
+    return json.data;
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {

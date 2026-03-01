@@ -53,6 +53,7 @@ Route::prefix('v1')->group(function () {
         Route::get('shipments', [ShipmentController::class, 'index']);
         Route::get('shipments/export.csv', [ShipmentController::class, 'exportCsv']);
         Route::get('shipments/export.pdf', [ShipmentController::class, 'exportPdf']);
+        Route::post('shipments/import', [ShipmentController::class, 'importCsv']);
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
         Route::post('shipments/{id}/deliver', [ShipmentController::class, 'markDelivered']);

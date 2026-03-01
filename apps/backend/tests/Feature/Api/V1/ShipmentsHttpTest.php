@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class ShipmentsHttpTest extends TestCase
@@ -196,6 +197,49 @@ class ShipmentsHttpTest extends TestCase
         $this->assertCount(1, $response->json('data.pods'));
         $this->assertCount(1, $response->json('data.incidents'));
         $this->assertCount(1, $response->json('data.route_stops'));
+    }
+
+    public function test_can_import_shipments_csv_dry_run(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hub = DB::table('hubs')->first();
+        $csv = implode("\n", [
+            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type',
+            "{$hub->code},SHP-IMPORT-001,Cliente Uno,Calle 1,2026-03-05T08:00:00Z,delivery",
+            "{$hub->code},SHP-IMPORT-002,Cliente Dos,Calle 2,2026-03-05T09:00:00Z,delivery",
+        ]);
+        $file = UploadedFile::fake()->createWithContent('shipments.csv', $csv);
+
+        $response = $this->post('/api/v1/shipments/import?dry_run=1', [
+            'file' => $file,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.dry_run', true);
+        $this->assertSame(0, DB::table('shipments')->whereIn('reference', ['SHP-IMPORT-001', 'SHP-IMPORT-002'])->count());
+    }
+
+    public function test_can_import_shipments_csv_commit(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hub = DB::table('hubs')->first();
+        $csv = implode("\n", [
+            'hub_code,reference,consignee_name,address_line,scheduled_at,service_type',
+            "{$hub->code},SHP-IMPORT-003,Cliente Tres,Calle 3,2026-03-05T10:00:00Z,delivery",
+            "{$hub->code},SHP-IMPORT-004,Cliente Cuatro,Calle 4,2026-03-05T11:00:00Z,delivery",
+        ]);
+        $file = UploadedFile::fake()->createWithContent('shipments.csv', $csv);
+
+        $response = $this->post('/api/v1/shipments/import', [
+            'file' => $file,
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(2, DB::table('shipments')->whereIn('reference', ['SHP-IMPORT-003', 'SHP-IMPORT-004'])->count());
     }
 
     private function createUserWithRole(string $roleCode): User

@@ -752,12 +752,26 @@ export const mockApi = {
     };
   },
 
-  async exportShipmentsCsv(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string }) {
+  async exportShipmentsCsv(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string; columns?: string[] }) {
     return;
   },
 
-  async exportShipmentsPdf(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string }) {
+  async exportShipmentsPdf(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string; columns?: string[] }) {
     return;
+  },
+
+  async importShipmentsCsv(_: File, options: { dryRun?: boolean } = {}) {
+    return {
+      dry_run: !!options.dryRun,
+      created_count: options.dryRun ? 0 : 2,
+      skipped_count: 1,
+      error_count: 1,
+      rows: [
+        { row: 2, reference: 'SHP-AGP-0011', status: 'ok' },
+        { row: 3, reference: 'SHP-AGP-0012', status: 'ok' },
+        { row: 4, reference: 'SHP-AGP-0001', status: 'error', errors: ['reference ya existe'] },
+      ],
+    };
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}) {

@@ -189,23 +189,40 @@ class ShipmentController extends Controller
         }
 
         $rows = $query->orderBy($sort, $dir)->get();
+
+        $allowedColumns = [
+            'id',
+            'reference',
+            'status',
+            'consignee_name',
+            'address_line',
+            'scheduled_at',
+            'delivered_at',
+            'hub_id',
+            'route_id',
+            'assigned_driver_id',
+            'subcontractor_id',
+            'created_at',
+        ];
+        $requestedColumns = $request->query('columns');
+        if (is_string($requestedColumns) && $requestedColumns !== '') {
+            $columns = array_values(array_intersect($allowedColumns, array_map('trim', explode(',', $requestedColumns))));
+            if ($columns === []) {
+                $columns = $allowedColumns;
+            }
+        } else {
+            $columns = $allowedColumns;
+        }
+
         $csvRows = [];
-        $csvRows[] = 'id,reference,status,consignee_name,address_line,scheduled_at,delivered_at,hub_id,route_id,assigned_driver_id,subcontractor_id,created_at';
+        $csvRows[] = implode(',', $columns);
         foreach ($rows as $row) {
-            $csvRows[] = implode(',', [
-                $this->csvValue((string) $row->id),
-                $this->csvValue((string) $row->reference),
-                $this->csvValue((string) $row->status),
-                $this->csvValue((string) ($row->consignee_name ?? '')),
-                $this->csvValue((string) ($row->address_line ?? '')),
-                $this->csvValue((string) ($row->scheduled_at ?? '')),
-                $this->csvValue((string) ($row->delivered_at ?? '')),
-                $this->csvValue((string) ($row->hub_id ?? '')),
-                $this->csvValue((string) ($row->route_id ?? '')),
-                $this->csvValue((string) ($row->assigned_driver_id ?? '')),
-                $this->csvValue((string) ($row->subcontractor_id ?? '')),
-                $this->csvValue((string) ($row->created_at ?? '')),
-            ]);
+            $line = [];
+            foreach ($columns as $column) {
+                $value = $row->{$column} ?? '';
+                $line[] = $this->csvValue((string) $value);
+            }
+            $csvRows[] = implode(',', $line);
         }
 
         return response(implode("\n", $csvRows), 200, [
@@ -236,26 +253,189 @@ class ShipmentController extends Controller
         }
         $rows = $query->orderBy($sort, $dir)->get();
 
+        $allowedColumns = [
+            'reference' => 'Reference',
+            'status' => 'Status',
+            'consignee_name' => 'Consignee',
+            'address_line' => 'Address',
+            'scheduled_at' => 'Scheduled',
+            'delivered_at' => 'Delivered',
+            'hub_id' => 'Hub',
+        ];
+        $requestedColumns = $request->query('columns');
+        if (is_string($requestedColumns) && $requestedColumns !== '') {
+            $requested = array_values(array_intersect(array_keys($allowedColumns), array_map('trim', explode(',', $requestedColumns))));
+            if ($requested !== []) {
+                $allowedColumns = array_intersect_key($allowedColumns, array_flip($requested));
+            }
+        }
+
         $html = '<h3>Shipments Export</h3>';
         $html .= '<table width="100%" cellspacing="0" cellpadding="4" border="1">';
         $html .= '<thead><tr>';
-        $html .= '<th>Reference</th><th>Status</th><th>Consignee</th><th>Address</th><th>Scheduled</th><th>Delivered</th><th>Hub</th>';
+        foreach ($allowedColumns as $label) {
+            $html .= '<th>' . e($label) . '</th>';
+        }
         $html .= '</tr></thead><tbody>';
         foreach ($rows as $row) {
             $html .= '<tr>';
-            $html .= '<td>' . e((string) $row->reference) . '</td>';
-            $html .= '<td>' . e((string) $row->status) . '</td>';
-            $html .= '<td>' . e((string) ($row->consignee_name ?? '')) . '</td>';
-            $html .= '<td>' . e((string) ($row->address_line ?? '')) . '</td>';
-            $html .= '<td>' . e((string) ($row->scheduled_at ?? '')) . '</td>';
-            $html .= '<td>' . e((string) ($row->delivered_at ?? '')) . '</td>';
-            $html .= '<td>' . e((string) ($row->hub_id ?? '')) . '</td>';
+            foreach (array_keys($allowedColumns) as $column) {
+                $html .= '<td>' . e((string) ($row->{$column} ?? '')) . '</td>';
+            }
             $html .= '</tr>';
         }
         $html .= '</tbody></table>';
 
         $pdf = Pdf::loadHTML($html)->setPaper('A4', 'landscape');
         return $pdf->download('shipments_export.pdf');
+    }
+
+    public function importCsv(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.write')) {
+            return $this->forbidden();
+        }
+
+        $file = $request->file('file');
+        if (!$file || !$file->isValid()) {
+            return response()->json(['error' => ['message' => 'Archivo CSV invalido']], 422);
+        }
+
+        $dryRun = $request->boolean('dry_run');
+        $minScheduled = Carbon::now()->subDays(30);
+        $maxScheduled = Carbon::now()->addDays(180);
+
+        $handle = fopen($file->getRealPath(), 'r');
+        if ($handle === false) {
+            return response()->json(['error' => ['message' => 'No se pudo leer el CSV']], 422);
+        }
+
+        $header = fgetcsv($handle);
+        if ($header === false) {
+            fclose($handle);
+            return response()->json(['error' => ['message' => 'CSV sin cabecera']], 422);
+        }
+
+        $normalizedHeader = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
+        $requiredHeaders = ['hub_code', 'reference'];
+        foreach ($requiredHeaders as $required) {
+            if (!in_array($required, $normalizedHeader, true)) {
+                fclose($handle);
+                return response()->json(['error' => ['message' => "Falta columna requerida: {$required}"]], 422);
+            }
+        }
+
+        $rows = [];
+        $errors = [];
+        $seenReferences = [];
+        $insertRows = [];
+        $rowNumber = 1;
+
+        while (($data = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+            if ($data === [null] || $data === false) {
+                continue;
+            }
+            $row = [];
+            foreach ($normalizedHeader as $index => $column) {
+                $row[$column] = isset($data[$index]) ? trim((string) $data[$index]) : '';
+            }
+
+            $reference = $row['reference'] ?? '';
+            $hubCode = $row['hub_code'] ?? '';
+            $scheduledAt = $row['scheduled_at'] ?? '';
+            $serviceType = $row['service_type'] ?? 'delivery';
+
+            $rowErrors = [];
+            if ($hubCode === '') {
+                $rowErrors[] = 'hub_code requerido';
+            }
+            if ($reference === '') {
+                $rowErrors[] = 'reference requerido';
+            }
+
+            $hubId = null;
+            if ($hubCode !== '') {
+                $hubId = DB::table('hubs')->where('code', $hubCode)->value('id');
+                if (!$hubId) {
+                    $rowErrors[] = 'hub_code no existe';
+                }
+            }
+
+            if ($reference !== '') {
+                if (isset($seenReferences[$reference])) {
+                    $rowErrors[] = 'reference duplicada en CSV';
+                } else {
+                    $seenReferences[$reference] = true;
+                }
+                if (DB::table('shipments')->where('reference', $reference)->exists()) {
+                    $rowErrors[] = 'reference ya existe';
+                }
+            }
+
+            $scheduledAtValue = null;
+            if ($scheduledAt !== '') {
+                try {
+                    $scheduledAtValue = Carbon::parse($scheduledAt);
+                    if ($scheduledAtValue->lt($minScheduled) || $scheduledAtValue->gt($maxScheduled)) {
+                        $rowErrors[] = 'scheduled_at fuera de ventana';
+                    }
+                } catch (\Throwable $e) {
+                    $rowErrors[] = 'scheduled_at invalido';
+                }
+            }
+
+            if ($serviceType === '') {
+                $serviceType = 'delivery';
+            }
+
+            if ($rowErrors === []) {
+                $insertRows[] = [
+                    'id' => (string) Str::uuid(),
+                    'hub_id' => $hubId,
+                    'reference' => $reference,
+                    'consignee_name' => $row['consignee_name'] !== '' ? $row['consignee_name'] : null,
+                    'address_line' => $row['address_line'] !== '' ? $row['address_line'] : null,
+                    'scheduled_at' => $scheduledAtValue?->format('Y-m-d H:i:s'),
+                    'service_type' => $serviceType,
+                    'status' => 'created',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+                $rows[] = [
+                    'row' => $rowNumber,
+                    'reference' => $reference,
+                    'status' => 'ok',
+                ];
+            } else {
+                $errors[] = [
+                    'row' => $rowNumber,
+                    'reference' => $reference,
+                    'status' => 'error',
+                    'errors' => $rowErrors,
+                ];
+            }
+        }
+
+        fclose($handle);
+
+        $createdCount = 0;
+        if (!$dryRun && $insertRows !== []) {
+            DB::table('shipments')->insert($insertRows);
+            $createdCount = count($insertRows);
+        }
+
+        return response()->json([
+            'data' => [
+                'dry_run' => $dryRun,
+                'created_count' => $dryRun ? 0 : $createdCount,
+                'skipped_count' => count($errors),
+                'error_count' => count($errors),
+                'rows' => array_merge($rows, $errors),
+            ],
+        ]);
     }
 
     private function baseQueryForActor(User $actor)
