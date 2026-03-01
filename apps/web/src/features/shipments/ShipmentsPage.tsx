@@ -15,6 +15,115 @@ function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 
   return 'default';
 }
 
+type ShipmentFiltersProps = {
+  query: string;
+  setQuery: (value: string) => void;
+  status: string;
+  setStatus: (value: string) => void;
+  hubFilter: string;
+  setHubFilter: (value: string) => void;
+  scheduledFrom: string;
+  setScheduledFrom: (value: string) => void;
+  scheduledTo: string;
+  setScheduledTo: (value: string) => void;
+  hubs: HubSummary[];
+  setQuickRange: (range: 'today' | 'tomorrow' | 'next7' | 'clear') => void;
+  clearFilters: () => void;
+  canExport: boolean;
+  exportCsv: () => void;
+  exportPdf: () => void;
+};
+
+function ShipmentFilters({
+  query,
+  setQuery,
+  status,
+  setStatus,
+  hubFilter,
+  setHubFilter,
+  scheduledFrom,
+  setScheduledFrom,
+  scheduledTo,
+  setScheduledTo,
+  hubs,
+  setQuickRange,
+  clearFilters,
+  canExport,
+  exportCsv,
+  exportPdf,
+}: ShipmentFiltersProps) {
+  return (
+    <div className="inline-actions">
+      <label htmlFor="shipment-query">Buscar</label>
+      <input
+        id="shipment-query"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Referencia, ID o destinatario"
+      />
+      <div className="inline-actions">
+        <span className="helper">Estados rapidos</span>
+        <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
+        <Button type="button" variant={status === 'created' ? 'secondary' : 'outline'} onClick={() => setStatus('created')}>Created</Button>
+        <Button type="button" variant={status === 'out_for_delivery' ? 'secondary' : 'outline'} onClick={() => setStatus('out_for_delivery')}>Out</Button>
+        <Button type="button" variant={status === 'delivered' ? 'secondary' : 'outline'} onClick={() => setStatus('delivered')}>Delivered</Button>
+        <Button type="button" variant={status === 'incident' ? 'secondary' : 'outline'} onClick={() => setStatus('incident')}>Incident</Button>
+        <Button type="button" variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
+      </div>
+      <label htmlFor="shipment-status">Estado</label>
+      <select
+        id="shipment-status"
+        value={status}
+        onChange={(event) => setStatus(event.target.value)}
+      >
+        <option value="">Todos</option>
+        <option value="created">created</option>
+        <option value="out_for_delivery">out_for_delivery</option>
+        <option value="delivered">delivered</option>
+        <option value="incident">incident</option>
+      </select>
+      <label htmlFor="shipment-hub">Hub</label>
+      <select
+        id="shipment-hub"
+        value={hubFilter}
+        onChange={(event) => setHubFilter(event.target.value)}
+      >
+        <option value="">Todos</option>
+        {hubs.map((hub) => (
+          <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+        ))}
+      </select>
+      <label htmlFor="shipment-date-from">Desde</label>
+      <input
+        id="shipment-date-from"
+        type="date"
+        value={scheduledFrom}
+        onChange={(event) => setScheduledFrom(event.target.value)}
+      />
+      <label htmlFor="shipment-date-to">Hasta</label>
+      <input
+        id="shipment-date-to"
+        type="date"
+        value={scheduledTo}
+        onChange={(event) => setScheduledTo(event.target.value)}
+      />
+      <div className="inline-actions">
+        <span className="helper">Rangos rapidos</span>
+        <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
+        <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
+        <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
+        <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
+      </div>
+      <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
+        Export CSV
+      </Button>
+      <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
+        Export PDF
+      </Button>
+    </div>
+  );
+}
+
 export function ShipmentsPage() {
   const [items, setItems] = useState<ShipmentSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
@@ -245,8 +354,8 @@ export function ShipmentsPage() {
       const max = new Date();
       max.setDate(max.getDate() + 180);
       if (!Number.isNaN(parsed)) {
-        if (parsed < min.getTime()) nextErrors.scheduledAt = 'La fecha no puede ser anterior a 30 dias.';
-        if (parsed > max.getTime()) nextErrors.scheduledAt = 'La fecha no puede superar 180 dias.';
+        if (parsed < min.getTime()) nextErrors.scheduledAt = `La fecha debe ser posterior a ${formatDate(min)}.`;
+        if (parsed > max.getTime()) nextErrors.scheduledAt = `La fecha debe ser anterior a ${formatDate(max)}.`;
       }
     }
     setCreateFieldErrors(nextErrors);
@@ -378,6 +487,18 @@ export function ShipmentsPage() {
     setExportColumns(defaultExportColumns);
   };
 
+  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+  const minScheduledAt = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return formatDate(date);
+  })();
+  const maxScheduledAt = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 180);
+    return formatDate(date);
+  })();
+
   const toggleExportColumn = (column: string) => {
     setExportColumns((current) => (
       current.includes(column)
@@ -470,6 +591,7 @@ export function ShipmentsPage() {
               onChange={(event) => setCreateReference(event.target.value)}
               placeholder={`SHP-${createHubCode}-0001`}
             />
+            <div className="helper">Formato: SHP-{createHubCode}-0001</div>
             {createFieldErrors.reference ? <div className="helper">{createFieldErrors.reference}</div> : null}
             <label htmlFor="create-shipment-consignee">Destinatario</label>
             <input
@@ -493,7 +615,10 @@ export function ShipmentsPage() {
               type="datetime-local"
               value={createScheduledAt}
               onChange={(event) => setCreateScheduledAt(event.target.value)}
+              min={`${minScheduledAt}T00:00`}
+              max={`${maxScheduledAt}T23:59`}
             />
+            <div className="helper">Ventana permitida: {minScheduledAt} a {maxScheduledAt}</div>
             {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
             <Button type="button" onClick={createShipment} disabled={creating}>
               {creating ? 'Creando...' : 'Crear envio'}
@@ -555,74 +680,24 @@ export function ShipmentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
-          <div className="inline-actions">
-            <label htmlFor="shipment-query">Buscar</label>
-            <input
-              id="shipment-query"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Referencia, ID o destinatario"
-            />
-            <div className="inline-actions">
-              <span className="helper">Estados rapidos</span>
-              <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
-              <Button type="button" variant={status === 'created' ? 'secondary' : 'outline'} onClick={() => setStatus('created')}>Created</Button>
-              <Button type="button" variant={status === 'out_for_delivery' ? 'secondary' : 'outline'} onClick={() => setStatus('out_for_delivery')}>Out</Button>
-              <Button type="button" variant={status === 'delivered' ? 'secondary' : 'outline'} onClick={() => setStatus('delivered')}>Delivered</Button>
-              <Button type="button" variant={status === 'incident' ? 'secondary' : 'outline'} onClick={() => setStatus('incident')}>Incident</Button>
-              <Button type="button" variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
-            </div>
-            <label htmlFor="shipment-status">Estado</label>
-            <select
-              id="shipment-status"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="">Todos</option>
-              <option value="created">created</option>
-              <option value="out_for_delivery">out_for_delivery</option>
-              <option value="delivered">delivered</option>
-              <option value="incident">incident</option>
-            </select>
-            <label htmlFor="shipment-hub">Hub</label>
-            <select
-              id="shipment-hub"
-              value={hubFilter}
-              onChange={(event) => setHubFilter(event.target.value)}
-            >
-              <option value="">Todos</option>
-              {hubs.map((hub) => (
-                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
-              ))}
-            </select>
-            <label htmlFor="shipment-date-from">Desde</label>
-            <input
-              id="shipment-date-from"
-              type="date"
-              value={scheduledFrom}
-              onChange={(event) => setScheduledFrom(event.target.value)}
-            />
-            <label htmlFor="shipment-date-to">Hasta</label>
-            <input
-              id="shipment-date-to"
-              type="date"
-              value={scheduledTo}
-              onChange={(event) => setScheduledTo(event.target.value)}
-            />
-            <div className="inline-actions">
-              <span className="helper">Rangos rapidos</span>
-              <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
-              <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
-              <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
-              <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
-            </div>
-            <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
-              Export CSV
-            </Button>
-            <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
-              Export PDF
-            </Button>
-          </div>
+          <ShipmentFilters
+            query={query}
+            setQuery={setQuery}
+            status={status}
+            setStatus={setStatus}
+            hubFilter={hubFilter}
+            setHubFilter={setHubFilter}
+            scheduledFrom={scheduledFrom}
+            setScheduledFrom={setScheduledFrom}
+            scheduledTo={scheduledTo}
+            setScheduledTo={setScheduledTo}
+            hubs={hubs}
+            setQuickRange={setQuickRange}
+            clearFilters={clearFilters}
+            canExport={canExport}
+            exportCsv={exportCsv}
+            exportPdf={exportPdf}
+          />
           <div className="inline-actions">
             <span className="helper">Columnas export</span>
             {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
