@@ -900,6 +900,7 @@ export const mockApi = {
   async getRoutes(filters: {
     status?: string;
     hubId?: string;
+    subcontractorId?: string;
     q?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -920,6 +921,9 @@ export const mockApi = {
     }
     if (filters.hubId) {
       rows = rows.filter((row) => row.hub_id === filters.hubId);
+    }
+    if (filters.subcontractorId) {
+      rows = rows.filter((row) => row.subcontractor_id === filters.subcontractorId);
     }
     if (filters.q) {
       const q = filters.q.toLowerCase();

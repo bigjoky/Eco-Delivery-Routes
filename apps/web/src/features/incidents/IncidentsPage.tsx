@@ -34,6 +34,7 @@ export function IncidentsPage() {
   const [lastPage, setLastPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
+  const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
@@ -96,6 +97,43 @@ export function IncidentsPage() {
     params.set('page', String(page));
     setSearchParams(params, { replace: true });
   }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, page, setSearchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(incidentsFilterStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        resolved: string;
+        type: string;
+        category: string;
+        catalog: string;
+        incidentableId: string;
+        q: string;
+      }>;
+      if (parsed.resolved && !resolvedFilter) setResolvedFilter(parsed.resolved as 'open' | 'resolved' | '');
+      if (parsed.type && !listTypeFilter) setListTypeFilter(parsed.type as 'shipment' | 'pickup' | '');
+      if (parsed.category && !listCategoryFilter) setListCategoryFilter(parsed.category as 'failed' | 'absent' | 'retry' | 'general' | '');
+      if (parsed.catalog && !listCatalogFilter) setListCatalogFilter(parsed.catalog);
+      if (parsed.incidentableId && !listIncidentableId) setListIncidentableId(parsed.incidentableId);
+      if (parsed.q && !listSearch) setListSearch(parsed.q);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      resolved: resolvedFilter,
+      type: listTypeFilter,
+      category: listCategoryFilter,
+      catalog: listCatalogFilter,
+      incidentableId: listIncidentableId,
+      q: listSearch,
+    };
+    window.localStorage.setItem(incidentsFilterStorageKey, JSON.stringify(payload));
+  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, listSearch]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),

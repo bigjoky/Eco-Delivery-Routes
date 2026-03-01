@@ -26,6 +26,7 @@ class RouteController extends Controller
         $dateTo = $request->query('date_to');
         $hubId = $request->query('hub_id');
         $search = $request->query('q');
+        $subcontractorId = $request->query('subcontractor_id');
         $driverId = null;
 
         if ($actor->hasRole('driver')) {
@@ -43,12 +44,15 @@ class RouteController extends Controller
             }
         }
 
-        $applyFilters = function ($query) use ($status, $dateFrom, $dateTo, $hubId, $search, $driverId): void {
+        $applyFilters = function ($query) use ($status, $dateFrom, $dateTo, $hubId, $search, $driverId, $subcontractorId): void {
             if (is_string($status) && $status !== '') {
                 $query->where('routes.status', $status);
             }
             if (is_string($hubId) && $hubId !== '') {
                 $query->where('routes.hub_id', $hubId);
+            }
+            if (is_string($subcontractorId) && $subcontractorId !== '') {
+                $query->where('routes.subcontractor_id', $subcontractorId);
             }
             if (is_string($search) && $search !== '') {
                 $like = '%' . str_replace('%', '\\%', $search) . '%';

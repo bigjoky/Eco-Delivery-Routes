@@ -15,6 +15,7 @@ export function RoutesPage() {
   const [hubFilter, setHubFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const routesFilterStorageKey = 'eco_delivery_routes_routes_filters';
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
@@ -25,6 +26,7 @@ export function RoutesPage() {
   const [createCode, setCreateCode] = useState('');
   const [createRouteDate, setCreateRouteDate] = useState('');
   const [createSubcontractorId, setCreateSubcontractorId] = useState('');
+  const [subcontractorFilter, setSubcontractorFilter] = useState('');
   const [createDriverId, setCreateDriverId] = useState('');
   const [createVehicleId, setCreateVehicleId] = useState('');
   const [createError, setCreateError] = useState('');
@@ -37,6 +39,7 @@ export function RoutesPage() {
         perPage: meta.per_page,
         status: status || undefined,
         hubId: hubFilter || undefined,
+        subcontractorId: subcontractorFilter || undefined,
         q: query || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -51,7 +54,7 @@ export function RoutesPage() {
   useEffect(() => {
     if (!initializedFromParams.current) return;
     reload(1);
-  }, [status, hubFilter, query, dateFrom, dateTo]);
+  }, [status, hubFilter, subcontractorFilter, query, dateFrom, dateTo]);
 
   useEffect(() => {
     if (initializedFromParams.current) return;
@@ -64,6 +67,8 @@ export function RoutesPage() {
 
     if (statusParam) setStatus(statusParam);
     if (hubParam) setHubFilter(hubParam);
+    const subcontractorParam = searchParams.get('subcontractor_id') ?? '';
+    if (subcontractorParam) setSubcontractorFilter(subcontractorParam);
     if (qParam) setQuery(qParam);
     if (dateFromParam) setDateFrom(dateFromParam);
     if (dateToParam) setDateTo(dateToParam);
@@ -79,11 +84,49 @@ export function RoutesPage() {
     if (status) params.set('status', status);
     if (hubFilter) params.set('hub_id', hubFilter);
     if (query) params.set('q', query);
+    if (subcontractorFilter) params.set('subcontractor_id', subcontractorFilter);
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
     params.set('page', String(meta.page));
     setSearchParams(params, { replace: true });
-  }, [status, hubFilter, query, dateFrom, dateTo, meta.page, setSearchParams]);
+  }, [status, hubFilter, subcontractorFilter, query, dateFrom, dateTo, meta.page, setSearchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(routesFilterStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        status: string;
+        hubFilter: string;
+        subcontractorFilter: string;
+        query: string;
+        dateFrom: string;
+        dateTo: string;
+      }>;
+      if (parsed.status && !status) setStatus(parsed.status);
+      if (parsed.hubFilter && !hubFilter) setHubFilter(parsed.hubFilter);
+      if (parsed.subcontractorFilter && !subcontractorFilter) setSubcontractorFilter(parsed.subcontractorFilter);
+      if (parsed.query && !query) setQuery(parsed.query);
+      if (parsed.dateFrom && !dateFrom) setDateFrom(parsed.dateFrom);
+      if (parsed.dateTo && !dateTo) setDateTo(parsed.dateTo);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      status,
+      hubFilter,
+      subcontractorFilter,
+      query,
+      dateFrom,
+      dateTo,
+    };
+    window.localStorage.setItem(routesFilterStorageKey, JSON.stringify(payload));
+  }, [status, hubFilter, subcontractorFilter, query, dateFrom, dateTo]);
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {
@@ -105,22 +148,23 @@ export function RoutesPage() {
     : vehicles;
 
   const createRoute = async () => {
-    if (!createHubId || !createCode || !createRouteDate) {
-      setCreateError('Hub, codigo y fecha son obligatorios.');
-      return;
-    }
+    const nextErrors: string[] = [];
+    if (!createHubId) nextErrors.push('Hub obligatorio.');
+    if (!createCode) nextErrors.push('Codigo obligatorio.');
+    if (!createRouteDate) nextErrors.push('Fecha obligatoria.');
     const selectedDriver = createDriverId ? drivers.find((item) => item.id === createDriverId) : null;
     const selectedVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
     if (createSubcontractorId && selectedDriver?.subcontractor_id && selectedDriver.subcontractor_id !== createSubcontractorId) {
-      setCreateError('El conductor seleccionado no pertenece a la subcontrata elegida.');
-      return;
+      nextErrors.push('El conductor seleccionado no pertenece a la subcontrata elegida.');
     }
     if (createSubcontractorId && selectedVehicle?.subcontractor_id && selectedVehicle.subcontractor_id !== createSubcontractorId) {
-      setCreateError('El vehiculo seleccionado no pertenece a la subcontrata elegida.');
-      return;
+      nextErrors.push('El vehiculo seleccionado no pertenece a la subcontrata elegida.');
     }
     if (selectedDriver && selectedVehicle?.assigned_driver_id && selectedVehicle.assigned_driver_id !== selectedDriver.id) {
-      setCreateError('El vehiculo esta asignado a otro conductor.');
+      nextErrors.push('El vehiculo esta asignado a otro conductor.');
+    }
+    if (nextErrors.length > 0) {
+      setCreateError(nextErrors.join(' '));
       return;
     }
     setCreating(true);
@@ -294,6 +338,17 @@ export function RoutesPage() {
               <option value="">Todos</option>
               {hubs.map((hub) => (
                 <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+              ))}
+            </select>
+            <label htmlFor="route-subcontractor">Subcontrata</label>
+            <select
+              id="route-subcontractor"
+              value={subcontractorFilter}
+              onChange={(event) => setSubcontractorFilter(event.target.value)}
+            >
+              <option value="">Todas</option>
+              {subcontractors.map((item) => (
+                <option key={item.id} value={item.id}>{item.legal_name}</option>
               ))}
             </select>
             <label htmlFor="route-status">Estado</label>

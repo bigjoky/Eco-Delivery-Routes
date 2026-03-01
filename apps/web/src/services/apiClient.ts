@@ -656,6 +656,7 @@ export const apiClient = {
   async getRoutes(filters: {
     status?: string;
     hubId?: string;
+    subcontractorId?: string;
     q?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -674,6 +675,7 @@ export const apiClient = {
     params.set('per_page', String(perPage));
     if (filters.status) params.set('status', filters.status);
     if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     if (filters.q) params.set('q', filters.q);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
     if (filters.dateTo) params.set('date_to', filters.dateTo);

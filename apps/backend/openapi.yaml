@@ -1403,6 +1403,9 @@ paths:
           name: hub_id
           schema: { type: string, format: uuid }
         - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
           name: q
           schema: { type: string }
         - in: query
