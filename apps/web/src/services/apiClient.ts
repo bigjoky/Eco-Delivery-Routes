@@ -632,6 +632,18 @@ export const apiClient = {
     return json.data as RouteManifest;
   },
 
+  async updateRouteManifest(routeId: string, payload: { manifest_notes?: string | null }): Promise<{ route_id: string; manifest_notes: string | null }> {
+    if (USE_MOCK) return mockApi.updateRouteManifest(routeId, payload) as Promise<{ route_id: string; manifest_notes: string | null }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/manifest`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route manifest');
+    return json.data as { route_id: string; manifest_notes: string | null };
+  },
+
   async exportRouteManifestCsv(routeId: string): Promise<void> {
     if (USE_MOCK) return;
     const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/manifest/export.csv`);

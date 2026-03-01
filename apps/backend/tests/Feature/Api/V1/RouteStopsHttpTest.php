@@ -431,6 +431,36 @@ class RouteStopsHttpTest extends TestCase
         $this->assertContains('route.manifest.exported.pdf', $events);
     }
 
+    public function test_operations_manager_can_update_manifest_notes(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-MANIFEST-NOTES',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $patch = $this->patchJson("/api/v1/routes/{$routeId}/manifest", [
+            'manifest_notes' => 'Notas operativas de carga',
+        ]);
+
+        $patch->assertOk();
+        $patch->assertJsonPath('data.route_id', $routeId);
+        $patch->assertJsonPath('data.manifest_notes', 'Notas operativas de carga');
+
+        $manifest = $this->getJson("/api/v1/routes/{$routeId}/manifest");
+        $manifest->assertOk();
+        $manifest->assertJsonPath('data.route.manifest_notes', 'Notas operativas de carga');
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

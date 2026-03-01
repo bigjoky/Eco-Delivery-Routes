@@ -36,16 +36,21 @@ export function RouteDetailPage() {
   const [bulkAdding, setBulkAdding] = useState(false);
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
+  const [manifestNotes, setManifestNotes] = useState('');
+  const [manifestSaving, setManifestSaving] = useState(false);
   const [lastDeletedStop, setLastDeletedStop] = useState<RouteStopSummary | null>(null);
   const [undoDeleting, setUndoDeleting] = useState(false);
+  const [sequenceDrafts, setSequenceDrafts] = useState<Record<string, number>>({});
 
   const refreshManifest = async (routeId: string) => {
     setManifestLoading(true);
     try {
       const data = await apiClient.getRouteManifest(routeId);
       setManifest(data);
+      setManifestNotes(data.route.manifest_notes ?? '');
     } catch {
       setManifest(null);
+      setManifestNotes('');
     } finally {
       setManifestLoading(false);
     }
@@ -328,6 +333,23 @@ export function RouteDetailPage() {
     }
   };
 
+  const saveManifestNotes = async () => {
+    if (!id) return;
+    setManifestSaving(true);
+    setError('');
+    try {
+      const saved = await apiClient.updateRouteManifest(id, {
+        manifest_notes: manifestNotes.trim() === '' ? null : manifestNotes,
+      });
+      setManifestNotes(saved.manifest_notes ?? '');
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo actualizar las notas de manifest');
+    } finally {
+      setManifestSaving(false);
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -401,6 +423,19 @@ export function RouteDetailPage() {
             </Button>
             <Button type="button" variant="outline" disabled={!id} onClick={() => void exportManifestPdf()}>
               Export PDF
+            </Button>
+          </div>
+          <div className="inline-actions">
+            <label htmlFor="manifest-notes">Notas manifest</label>
+            <textarea
+              id="manifest-notes"
+              value={manifestNotes}
+              onChange={(event) => setManifestNotes(event.target.value)}
+              placeholder="Notas operativas para la ruta"
+              rows={2}
+            />
+            <Button type="button" onClick={saveManifestNotes} disabled={manifestSaving || !id}>
+              {manifestSaving ? 'Guardando...' : 'Guardar notas'}
             </Button>
           </div>
           <div className="inline-actions">
@@ -525,7 +560,27 @@ export function RouteDetailPage() {
                       setDraggingStopId(null);
                     }}
                   >
-                    <TableCell>{stop.sequence}</TableCell>
+                    <TableCell>
+                      <input
+                        type="number"
+                        min={1}
+                        value={sequenceDrafts[stop.id] ?? stop.sequence}
+                        onChange={(event) => {
+                          const value = Number(event.target.value) || 1;
+                          setSequenceDrafts((current) => ({ ...current, [stop.id]: value }));
+                        }}
+                        onBlur={() => {
+                          const next = sequenceDrafts[stop.id];
+                          if (next && next !== stop.sequence) {
+                            updateStop(stop.id, { sequence: next });
+                          }
+                          setSequenceDrafts((current) => {
+                            const { [stop.id]: _ignored, ...rest } = current;
+                            return rest;
+                          });
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>{stop.stop_type}</TableCell>
                     <TableCell>{stop.reference ?? stop.entity_id}</TableCell>
                     <TableCell>{stop.entity_type}</TableCell>

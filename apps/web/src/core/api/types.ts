@@ -103,6 +103,7 @@ export type RouteManifest = {
     status: string;
     driver_code?: string | null;
     vehicle_code?: string | null;
+    manifest_notes?: string | null;
   };
   totals: {
     stops: number;

@@ -131,6 +131,7 @@ let mockRoutes: Array<{
   subcontractor_id?: string | null;
   vehicle_id?: string | null;
   stops_count: number;
+  manifest_notes?: string | null;
 }> = [
   {
     id: 'r-1',
@@ -142,6 +143,7 @@ let mockRoutes: Array<{
     subcontractor_id: 'sc-1',
     vehicle_id: 'veh-1',
     stops_count: 28,
+    manifest_notes: 'Salir por Zona Centro primero.',
   },
   {
     id: 'r-2',
@@ -153,6 +155,7 @@ let mockRoutes: Array<{
     subcontractor_id: null,
     vehicle_id: null,
     stops_count: 24,
+    manifest_notes: null,
   },
   {
     id: 'r-3',
@@ -164,6 +167,7 @@ let mockRoutes: Array<{
     subcontractor_id: null,
     vehicle_id: null,
     stops_count: 31,
+    manifest_notes: null,
   },
 ];
 let mockRouteStops: Array<{
@@ -894,6 +898,7 @@ export const mockApi = {
         status: route.status,
         driver_code: driver?.code ?? null,
         vehicle_code: vehicle?.code ?? null,
+        manifest_notes: route.manifest_notes ?? null,
       },
       totals: {
         stops: stops.length,
@@ -904,6 +909,17 @@ export const mockApi = {
       stops,
       generated_at: new Date().toISOString(),
     };
+  },
+
+  async updateRouteManifest(routeId: string, payload: { manifest_notes?: string | null }) {
+    const index = mockRoutes.findIndex((row) => row.id === routeId);
+    if (index < 0) {
+      throw new Error('Route not found');
+    }
+    const trimmed = typeof payload.manifest_notes === 'string' ? payload.manifest_notes.trim() : null;
+    const notes = trimmed ? trimmed : null;
+    mockRoutes[index] = { ...mockRoutes[index], manifest_notes: notes };
+    return { route_id: routeId, manifest_notes: notes };
   },
 
   async getMyDriverRoute(filters: { routeDate?: string; status?: string } = {}) {

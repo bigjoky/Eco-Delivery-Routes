@@ -65,6 +65,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('routes/{id}/stops/{stopId}', [RouteController::class, 'updateStop']);
         Route::delete('routes/{id}/stops/{stopId}', [RouteController::class, 'deleteStop']);
         Route::get('routes/{id}/manifest', [RouteController::class, 'manifest']);
+        Route::patch('routes/{id}/manifest', [RouteController::class, 'updateManifest']);
         Route::get('routes/{id}/manifest/export.csv', [RouteController::class, 'manifestExportCsv']);
         Route::get('routes/{id}/manifest/export.pdf', [RouteController::class, 'manifestExportPdf']);
 

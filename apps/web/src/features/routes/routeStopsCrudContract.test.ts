@@ -37,6 +37,9 @@ describe('route stops CRUD contract', () => {
     const manifest = await apiClient.getRouteManifest('r-1');
     expect(manifest.route.id).toBe('r-1');
     expect(manifest.totals.stops).toBeGreaterThan(0);
+    const updatedNotes = await apiClient.updateRouteManifest('r-1', { manifest_notes: 'Notas de prueba' });
+    expect(updatedNotes.route_id).toBe('r-1');
+    expect(updatedNotes.manifest_notes).toBe('Notas de prueba');
 
     const remaining = await apiClient.deleteRouteStop('r-1', created.id);
     expect(remaining.find((row) => row.id === created.id)).toBeUndefined();
