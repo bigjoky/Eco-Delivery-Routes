@@ -655,6 +655,8 @@ export const apiClient = {
 
   async getRoutes(filters: {
     status?: string;
+    hubId?: string;
+    q?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -671,6 +673,8 @@ export const apiClient = {
     params.set('page', String(page));
     params.set('per_page', String(perPage));
     if (filters.status) params.set('status', filters.status);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.q) params.set('q', filters.q);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
     if (filters.dateTo) params.set('date_to', filters.dateTo);
     if (filters.sort) params.set('sort', filters.sort);

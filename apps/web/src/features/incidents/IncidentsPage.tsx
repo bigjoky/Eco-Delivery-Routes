@@ -24,11 +24,19 @@ export function IncidentsPage() {
   const [category, setCategory] = useState<'failed' | 'absent' | 'retry' | 'general'>('absent');
   const [notes, setNotes] = useState('');
   const [resolvedFilter, setResolvedFilter] = useState<'open' | 'resolved' | ''>('open');
+  const [listTypeFilter, setListTypeFilter] = useState<'shipment' | 'pickup' | ''>('');
+  const [listCategoryFilter, setListCategoryFilter] = useState<'failed' | 'absent' | 'retry' | 'general' | ''>('');
+  const [listCatalogFilter, setListCatalogFilter] = useState('');
+  const [listIncidentableId, setListIncidentableId] = useState('');
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
+    incidentableType: listTypeFilter || undefined,
+    category: listCategoryFilter || undefined,
+    catalogCode: listCatalogFilter || undefined,
+    incidentableId: listIncidentableId || undefined,
     page,
     perPage: 20,
   }).then((result) => {
@@ -45,7 +53,7 @@ export function IncidentsPage() {
         setCategory(entries[0].category);
       }
     });
-  }, [resolvedFilter, page]);
+  }, [resolvedFilter, page, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
@@ -118,6 +126,25 @@ export function IncidentsPage() {
                 <option value="open">abiertas</option>
                 <option value="resolved">resueltas</option>
               </Select>
+              <Select value={listTypeFilter} onChange={(e) => { setListTypeFilter(e.target.value as 'shipment' | 'pickup' | ''); setPage(1); }}>
+                <option value="">tipo</option>
+                <option value="shipment">shipment</option>
+                <option value="pickup">pickup</option>
+              </Select>
+              <Select value={listCategoryFilter} onChange={(e) => { setListCategoryFilter(e.target.value as 'failed' | 'absent' | 'retry' | 'general' | ''); setPage(1); }}>
+                <option value="">categoria</option>
+                <option value="failed">failed</option>
+                <option value="absent">absent</option>
+                <option value="retry">retry</option>
+                <option value="general">general</option>
+              </Select>
+              <Select value={listCatalogFilter} onChange={(e) => { setListCatalogFilter(e.target.value); setPage(1); }}>
+                <option value="">catalogo</option>
+                {catalog.map((item) => (
+                  <option key={item.code} value={item.code}>{item.code}</option>
+                ))}
+              </Select>
+              <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
             </div>
           </CardDescription>
         </CardHeader>

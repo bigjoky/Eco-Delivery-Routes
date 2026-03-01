@@ -11,6 +11,8 @@ export function RoutesPage() {
   const [items, setItems] = useState<RouteSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
   const [status, setStatus] = useState('');
+  const [query, setQuery] = useState('');
+  const [hubFilter, setHubFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [hubs, setHubs] = useState<HubSummary[]>([]);
@@ -32,6 +34,8 @@ export function RoutesPage() {
         page,
         perPage: meta.per_page,
         status: status || undefined,
+        hubId: hubFilter || undefined,
+        q: query || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         sort: 'route_date',
@@ -44,7 +48,7 @@ export function RoutesPage() {
 
   useEffect(() => {
     reload(1);
-  }, [status, dateFrom, dateTo]);
+  }, [status, hubFilter, query, dateFrom, dateTo]);
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {
@@ -105,6 +109,35 @@ export function RoutesPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const setQuickRange = (range: 'today' | 'tomorrow' | 'next7' | 'clear') => {
+    if (range === 'clear') {
+      setDateFrom('');
+      setDateTo('');
+      return;
+    }
+    const today = new Date();
+    const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
+    if (range === 'today') {
+      const day = toIsoDate(today);
+      setDateFrom(day);
+      setDateTo(day);
+      return;
+    }
+    if (range === 'tomorrow') {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const day = toIsoDate(tomorrow);
+      setDateFrom(day);
+      setDateTo(day);
+      return;
+    }
+    const start = toIsoDate(today);
+    const end = new Date(today);
+    end.setDate(today.getDate() + 6);
+    setDateFrom(start);
+    setDateTo(toIsoDate(end));
   };
 
   return (
@@ -206,6 +239,28 @@ export function RoutesPage() {
             </Table>
           </TableWrapper>
           <div className="inline-actions">
+            <label htmlFor="route-query">Buscar</label>
+            <input
+              id="route-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Codigo ruta"
+            />
+            <div className="inline-actions">
+              <span className="helper">Estados rapidos</span>
+              <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
+              <Button type="button" variant={status === 'planned' ? 'secondary' : 'outline'} onClick={() => setStatus('planned')}>Planned</Button>
+              <Button type="button" variant={status === 'in_progress' ? 'secondary' : 'outline'} onClick={() => setStatus('in_progress')}>En ruta</Button>
+              <Button type="button" variant={status === 'completed' ? 'secondary' : 'outline'} onClick={() => setStatus('completed')}>Completada</Button>
+              <Button type="button" variant={status === 'cancelled' ? 'secondary' : 'outline'} onClick={() => setStatus('cancelled')}>Cancelada</Button>
+            </div>
+            <label htmlFor="route-hub">Hub</label>
+            <select id="route-hub" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
+              <option value="">Todos</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+              ))}
+            </select>
             <label htmlFor="route-status">Estado</label>
             <select
               id="route-status"
@@ -216,6 +271,7 @@ export function RoutesPage() {
               <option value="planned">planned</option>
               <option value="in_progress">in_progress</option>
               <option value="completed">completed</option>
+              <option value="cancelled">cancelled</option>
             </select>
           </div>
           <div className="inline-actions">
@@ -233,6 +289,13 @@ export function RoutesPage() {
               value={dateTo}
               onChange={(event) => setDateTo(event.target.value)}
             />
+            <div className="inline-actions">
+              <span className="helper">Rangos rapidos</span>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
+            </div>
           </div>
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>

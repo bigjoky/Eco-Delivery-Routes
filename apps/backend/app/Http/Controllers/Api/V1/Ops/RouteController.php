@@ -24,6 +24,8 @@ class RouteController extends Controller
         $status = $request->query('status');
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
+        $hubId = $request->query('hub_id');
+        $search = $request->query('q');
         $driverId = null;
 
         if ($actor->hasRole('driver')) {
@@ -41,9 +43,16 @@ class RouteController extends Controller
             }
         }
 
-        $applyFilters = function ($query) use ($status, $dateFrom, $dateTo, $driverId): void {
+        $applyFilters = function ($query) use ($status, $dateFrom, $dateTo, $hubId, $search, $driverId): void {
             if (is_string($status) && $status !== '') {
                 $query->where('routes.status', $status);
+            }
+            if (is_string($hubId) && $hubId !== '') {
+                $query->where('routes.hub_id', $hubId);
+            }
+            if (is_string($search) && $search !== '') {
+                $like = '%' . str_replace('%', '\\%', $search) . '%';
+                $query->where('routes.code', 'like', $like);
             }
             if (is_string($dateFrom) && $dateFrom !== '') {
                 $query->whereDate('routes.route_date', '>=', $dateFrom);

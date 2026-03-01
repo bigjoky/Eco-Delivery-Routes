@@ -894,6 +894,8 @@ export const mockApi = {
 
   async getRoutes(filters: {
     status?: string;
+    hubId?: string;
+    q?: string;
     dateFrom?: string;
     dateTo?: string;
     sort?: string;
@@ -910,6 +912,13 @@ export const mockApi = {
     });
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.hubId) {
+      rows = rows.filter((row) => row.hub_id === filters.hubId);
+    }
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      rows = rows.filter((row) => row.code.toLowerCase().includes(q));
     }
     if (filters.dateFrom) {
       const from = filters.dateFrom;

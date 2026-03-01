@@ -47,6 +47,7 @@ export function QualityPage() {
   const [thresholdAlertSummary, setThresholdAlertSummary] = useState<QualityThresholdAlertSummary | null>(null);
   const [thresholdAlertRows, setThresholdAlertRows] = useState<QualityThresholdHistoryEntry[]>([]);
   const [thresholdAlertTopScopes, setThresholdAlertTopScopes] = useState<QualityThresholdAlertTopScope[]>([]);
+  const [qualityLoadError, setQualityLoadError] = useState(false);
   const [alertScopeType, setAlertScopeType] = useState<'all' | 'global' | 'role' | 'user'>(() => {
     const raw = searchParams.get('alert_scope_type');
     return raw === 'global' || raw === 'role' || raw === 'user' ? raw : 'all';
@@ -152,7 +153,14 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
-      .then(setItems);
+      .then((rows) => {
+        setItems(rows);
+        setQualityLoadError(false);
+      })
+      .catch(() => {
+        setItems([]);
+        setQualityLoadError(true);
+      });
   }, [scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
@@ -166,7 +174,11 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
-      .then((result) => setUnderThresholdRoutes(result.data));
+      .then((result) => setUnderThresholdRoutes(result.data))
+      .catch(() => {
+        setUnderThresholdRoutes([]);
+        setQualityLoadError(true);
+      });
   }, [thresholdNumber, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
@@ -180,7 +192,11 @@ export function QualityPage() {
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
       })
-      .then((result) => setRiskSummary(result.data));
+      .then((result) => setRiskSummary(result.data))
+      .catch(() => {
+        setRiskSummary([]);
+        setQualityLoadError(true);
+      });
   }, [thresholdNumber, riskGroupBy, scopeType, scopeId, hubId, subcontractorId, periodStart, periodEnd]);
 
   useEffect(() => {
@@ -194,7 +210,11 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
         granularity: breakdownGranularity,
       })
-      .then(setRouteBreakdown);
+      .then(setRouteBreakdown)
+      .catch(() => {
+        setRouteBreakdown(null);
+        setQualityLoadError(true);
+      });
   }, [selectedRouteId, periodStart, periodEnd, breakdownGranularity]);
 
   useEffect(() => {
@@ -210,7 +230,11 @@ export function QualityPage() {
         hubId: hubId || undefined,
         subcontractorId: subcontractorId || undefined,
       })
-      .then(setDriverBreakdown);
+      .then(setDriverBreakdown)
+      .catch(() => {
+        setDriverBreakdown(null);
+        setQualityLoadError(true);
+      });
   }, [selectedDriverId, periodStart, periodEnd, breakdownGranularity, hubId, subcontractorId]);
 
   useEffect(() => {
@@ -224,7 +248,11 @@ export function QualityPage() {
         periodEnd: periodEnd || undefined,
         granularity: breakdownGranularity,
       })
-      .then(setSubcontractorBreakdown);
+      .then(setSubcontractorBreakdown)
+      .catch(() => {
+        setSubcontractorBreakdown(null);
+        setQualityLoadError(true);
+      });
   }, [selectedSubcontractorBreakdownId, periodStart, periodEnd, breakdownGranularity]);
 
   const avg = useMemo(() => {
@@ -241,6 +269,10 @@ export function QualityPage() {
 
   const alerts = useMemo(() => items.filter((item) => item.service_quality_score < thresholdNumber), [items, thresholdNumber]);
   const latestLargeDeltaAlert = thresholdAlertRows[0] ?? null;
+
+  if (qualityLoadError) {
+    return <section className="page-grid" />;
+  }
 
   function applyQuickRange(days: 7 | 30) {
     const end = new Date();
