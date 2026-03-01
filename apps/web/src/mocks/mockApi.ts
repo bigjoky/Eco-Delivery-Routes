@@ -474,6 +474,10 @@ export const mockApi = {
     return;
   },
 
+  async getQualityThreshold() {
+    return { threshold: 95, source_type: 'default' as const, source_id: null, can_manage: true };
+  },
+
   async getQualityThresholdHistory(_: {
     event?: string;
     scopeType?: 'global' | 'role' | 'user';

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { IncidentCatalogItem, IncidentSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
+import { useSearchParams } from 'react-router-dom';
 
 function categoryVariant(category: IncidentSummary['category']): 'warning' | 'destructive' | 'secondary' | 'outline' {
   if (category === 'failed') return 'destructive';
@@ -28,8 +29,11 @@ export function IncidentsPage() {
   const [listCategoryFilter, setListCategoryFilter] = useState<'failed' | 'absent' | 'retry' | 'general' | ''>('');
   const [listCatalogFilter, setListCatalogFilter] = useState('');
   const [listIncidentableId, setListIncidentableId] = useState('');
+  const [listSearch, setListSearch] = useState('');
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initializedFromParams = useRef(false);
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
@@ -37,6 +41,7 @@ export function IncidentsPage() {
     category: listCategoryFilter || undefined,
     catalogCode: listCatalogFilter || undefined,
     incidentableId: listIncidentableId || undefined,
+    q: listSearch || undefined,
     page,
     perPage: 20,
   }).then((result) => {
@@ -45,6 +50,7 @@ export function IncidentsPage() {
   });
 
   useEffect(() => {
+    if (!initializedFromParams.current) return;
     reload();
     apiClient.getIncidentCatalog().then((entries) => {
       setCatalog(entries);
@@ -53,7 +59,43 @@ export function IncidentsPage() {
         setCategory(entries[0].category);
       }
     });
-  }, [resolvedFilter, page, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId]);
+  }, [resolvedFilter, page, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, listSearch]);
+
+  useEffect(() => {
+    if (initializedFromParams.current) return;
+    const resolvedParam = searchParams.get('resolved') ?? 'open';
+    const typeParam = searchParams.get('type') ?? '';
+    const categoryParam = searchParams.get('category') ?? '';
+    const catalogParam = searchParams.get('catalog') ?? '';
+    const incidentableParam = searchParams.get('incidentable_id') ?? '';
+    const searchParam = searchParams.get('q') ?? '';
+    const pageParam = Number(searchParams.get('page') ?? '1');
+
+    if (resolvedParam === 'open' || resolvedParam === 'resolved' || resolvedParam === '') {
+      setResolvedFilter(resolvedParam as 'open' | 'resolved' | '');
+    }
+    if (typeParam === 'shipment' || typeParam === 'pickup') setListTypeFilter(typeParam);
+    if (categoryParam) setListCategoryFilter(categoryParam as 'failed' | 'absent' | 'retry' | 'general' | '');
+    if (catalogParam) setListCatalogFilter(catalogParam);
+    if (incidentableParam) setListIncidentableId(incidentableParam);
+    if (searchParam) setListSearch(searchParam);
+    if (!Number.isNaN(pageParam) && pageParam > 0) setPage(pageParam);
+
+    initializedFromParams.current = true;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!initializedFromParams.current) return;
+    const params = new URLSearchParams();
+    if (resolvedFilter) params.set('resolved', resolvedFilter);
+    if (listTypeFilter) params.set('type', listTypeFilter);
+    if (listCategoryFilter) params.set('category', listCategoryFilter);
+    if (listCatalogFilter) params.set('catalog', listCatalogFilter);
+    if (listIncidentableId) params.set('incidentable_id', listIncidentableId);
+    if (listSearch) params.set('q', listSearch);
+    params.set('page', String(page));
+    setSearchParams(params, { replace: true });
+  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, page, setSearchParams]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
@@ -145,6 +187,7 @@ export function IncidentsPage() {
                 ))}
               </Select>
               <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
+              <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
             </div>
           </CardDescription>
         </CardHeader>

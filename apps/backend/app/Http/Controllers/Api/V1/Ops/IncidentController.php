@@ -60,6 +60,16 @@ class IncidentController extends Controller
             }
         }
 
+        $search = $request->query('q');
+        if (is_string($search) && $search !== '') {
+            $like = '%' . str_replace('%', '\\%', $search) . '%';
+            $query->where(function ($inner) use ($like): void {
+                $inner->where('incidentable_id', 'like', $like)
+                    ->orWhere('notes', 'like', $like)
+                    ->orWhere('catalog_code', 'like', $like);
+            });
+        }
+
         $resolved = $request->query('resolved');
         if (is_string($resolved) && $resolved !== '') {
             if (in_array(strtolower($resolved), ['1', 'true', 'resolved'], true)) {

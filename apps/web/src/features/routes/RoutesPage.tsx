@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -15,6 +15,8 @@ export function RoutesPage() {
   const [hubFilter, setHubFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
@@ -47,8 +49,41 @@ export function RoutesPage() {
       });
 
   useEffect(() => {
+    if (!initializedFromParams.current) return;
     reload(1);
   }, [status, hubFilter, query, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (initializedFromParams.current) return;
+    const statusParam = searchParams.get('status') ?? '';
+    const hubParam = searchParams.get('hub_id') ?? '';
+    const qParam = searchParams.get('q') ?? '';
+    const dateFromParam = searchParams.get('date_from') ?? '';
+    const dateToParam = searchParams.get('date_to') ?? '';
+    const pageParam = Number(searchParams.get('page') ?? '1');
+
+    if (statusParam) setStatus(statusParam);
+    if (hubParam) setHubFilter(hubParam);
+    if (qParam) setQuery(qParam);
+    if (dateFromParam) setDateFrom(dateFromParam);
+    if (dateToParam) setDateTo(dateToParam);
+
+    initializedFromParams.current = true;
+    const initialPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+    reload(initialPage);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!initializedFromParams.current) return;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (hubFilter) params.set('hub_id', hubFilter);
+    if (query) params.set('q', query);
+    if (dateFrom) params.set('date_from', dateFrom);
+    if (dateTo) params.set('date_to', dateTo);
+    params.set('page', String(meta.page));
+    setSearchParams(params, { replace: true });
+  }, [status, hubFilter, query, dateFrom, dateTo, meta.page, setSearchParams]);
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {

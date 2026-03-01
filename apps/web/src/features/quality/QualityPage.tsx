@@ -271,7 +271,21 @@ export function QualityPage() {
   const latestLargeDeltaAlert = thresholdAlertRows[0] ?? null;
 
   if (qualityLoadError) {
-    return <section className="page-grid" />;
+    return (
+      <section className="page-grid">
+        <Card>
+          <CardHeader>
+            <CardTitle className="page-title">KPI Calidad</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="helper">No se han podido cargar los KPIs. Reintenta en unos segundos.</div>
+            <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+    );
   }
 
   function applyQuickRange(days: 7 | 30) {

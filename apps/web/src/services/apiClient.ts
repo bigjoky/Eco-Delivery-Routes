@@ -1533,6 +1533,7 @@ export const apiClient = {
   async getIncidents(filters: {
     incidentableType?: 'shipment' | 'pickup';
     incidentableId?: string;
+    q?: string;
     category?: 'failed' | 'absent' | 'retry' | 'general';
     catalogCode?: string;
     resolved?: 'open' | 'resolved';
@@ -1547,6 +1548,7 @@ export const apiClient = {
     const params = new URLSearchParams();
     if (filters.incidentableType) params.set('incidentable_type', filters.incidentableType);
     if (filters.incidentableId) params.set('incidentable_id', filters.incidentableId);
+    if (filters.q) params.set('q', filters.q);
     if (filters.category) params.set('category', filters.category);
     if (filters.catalogCode) params.set('catalog_code', filters.catalogCode);
     if (filters.resolved) params.set('resolved', filters.resolved);
