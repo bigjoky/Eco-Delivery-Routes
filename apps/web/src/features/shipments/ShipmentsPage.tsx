@@ -47,6 +47,7 @@ export function ShipmentsPage() {
     'delivered_at',
     'hub_id',
   ]);
+  const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
@@ -144,6 +145,25 @@ export function ShipmentsPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(exportColumnsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) {
+        setExportColumns(parsed);
+      }
+    } catch {
+      // Ignore invalid storage
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(exportColumnsStorageKey, JSON.stringify(exportColumns));
+  }, [exportColumns]);
+
+  useEffect(() => {
     if (!canImport || !importJobId) return;
     let active = true;
     const poll = async () => {
@@ -219,7 +239,12 @@ export function ShipmentsPage() {
       setCreateFieldErrors({});
       await reload(1);
     } catch (exception) {
-      setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
+      if (exception instanceof Error && exception.message.includes('Referencia ya existe')) {
+        setCreateFieldErrors((current) => ({ ...current, reference: 'La referencia ya existe.' }));
+        setCreateError('La referencia ya existe. Usa una referencia distinta.');
+      } else {
+        setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
+      }
     } finally {
       setCreating(false);
     }
@@ -302,6 +327,19 @@ export function ShipmentsPage() {
   const sortIndicator = (field: 'created_at' | 'scheduled_at' | 'reference' | 'status') => {
     if (sortField !== field) return '';
     return sortDir === 'asc' ? '↑' : '↓';
+  };
+
+  const clearFilters = () => {
+    setStatus('');
+    setHubFilter('');
+    setQuery('');
+    setScheduledFrom('');
+    setScheduledTo('');
+    setSortField('created_at');
+    setSortDir('desc');
+    setPerPage(10);
+    setMeta((current) => ({ ...current, page: 1 }));
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   const toggleExportColumn = (column: string) => {
@@ -484,6 +522,7 @@ export function ShipmentsPage() {
               <Button type="button" variant={status === 'out_for_delivery' ? 'secondary' : 'outline'} onClick={() => setStatus('out_for_delivery')}>Out</Button>
               <Button type="button" variant={status === 'delivered' ? 'secondary' : 'outline'} onClick={() => setStatus('delivered')}>Delivered</Button>
               <Button type="button" variant={status === 'incident' ? 'secondary' : 'outline'} onClick={() => setStatus('incident')}>Incident</Button>
+              <Button type="button" variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
             </div>
             <label htmlFor="shipment-status">Estado</label>
             <select
