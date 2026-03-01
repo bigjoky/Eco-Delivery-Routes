@@ -41,7 +41,7 @@ class VehicleController extends Controller
                 'subcontractors.legal_name as subcontractor_name',
                 'drivers.code as assigned_driver_code'
             )
-            ->orderBy('vehicles.code');
+            ->orderBy('vehicles.plate_number');
 
         if (is_string($subcontractorId) && $subcontractorId !== '') {
             $query->where('vehicles.subcontractor_id', $subcontractorId);
@@ -66,8 +66,8 @@ class VehicleController extends Controller
         }
 
         $payload = $request->validate([
-            'code' => ['required', 'string', 'max:60', 'unique:vehicles,code'],
-            'plate_number' => ['nullable', 'string', 'max:20', 'unique:vehicles,plate_number'],
+            'code' => ['nullable', 'string', 'max:60', 'unique:vehicles,code'],
+            'plate_number' => ['required', 'string', 'max:20', 'unique:vehicles,plate_number'],
             'vehicle_type' => ['nullable', 'string', 'max:40'],
             'capacity_kg' => ['nullable', 'integer', 'min:1'],
             'status' => ['nullable', 'in:active,inactive,maintenance'],
@@ -79,8 +79,8 @@ class VehicleController extends Controller
         $id = (string) Str::uuid();
         DB::table('vehicles')->insert([
             'id' => $id,
-            'code' => $payload['code'],
-            'plate_number' => $payload['plate_number'] ?? null,
+            'code' => $payload['code'] ?? $payload['plate_number'],
+            'plate_number' => $payload['plate_number'],
             'vehicle_type' => $payload['vehicle_type'] ?? 'van',
             'capacity_kg' => $payload['capacity_kg'] ?? null,
             'status' => $payload['status'] ?? 'active',
@@ -135,4 +135,3 @@ class VehicleController extends Controller
         ]);
     }
 }
-

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class PickupController extends Controller
 {
+    public function __construct(private readonly SequenceService $sequenceService) {}
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -34,7 +37,7 @@ class PickupController extends Controller
 
         $payload = $request->validate([
             'hub_id' => ['required', 'uuid'],
-            'reference' => ['required', 'string', 'max:60'],
+            'external_reference' => ['nullable', 'string', 'max:80'],
             'pickup_type' => ['required', 'in:NORMAL,RETURN'],
             'requester_name' => ['nullable', 'string', 'max:120'],
             'address_line' => ['nullable', 'string', 'max:220'],
@@ -42,10 +45,12 @@ class PickupController extends Controller
         ]);
 
         $id = (string) Str::uuid();
+        $reference = (string) $this->sequenceService->next('pickups');
         DB::table('pickups')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
-            'reference' => $payload['reference'],
+            'reference' => $reference,
+            'external_reference' => $payload['external_reference'] ?? null,
             'pickup_type' => $payload['pickup_type'],
             'requester_name' => $payload['requester_name'] ?? null,
             'address_line' => $payload['address_line'] ?? null,

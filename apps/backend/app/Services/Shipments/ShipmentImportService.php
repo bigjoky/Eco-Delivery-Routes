@@ -2,12 +2,18 @@
 
 namespace App\Services\Shipments;
 
+use App\Services\Contacts\ContactResolver;
+use App\Services\SequenceService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 final class ShipmentImportService
 {
+    public function __construct(
+        private readonly SequenceService $sequenceService,
+        private readonly ContactResolver $contactResolver
+    ) {}
     /**
      * @return array<string, mixed>
      */
@@ -18,7 +24,9 @@ final class ShipmentImportService
         $allowedHeaders = [
             'hub_code',
             'reference',
+            'external_reference',
             'consignee_name',
+            'consignee_document_id',
             'address_line',
             'address_street',
             'address_number',
@@ -28,9 +36,19 @@ final class ShipmentImportService
             'country',
             'address_notes',
             'consignee_phone',
+            'consignee_phone_alt',
             'consignee_email',
             'scheduled_at',
             'service_type',
+        ];
+        $allowedServiceTypes = [
+            'express_1030',
+            'express_1400',
+            'express_1900',
+            'economy_parcel',
+            'business_parcel',
+            'thermo_parcel',
+            'delivery',
         ];
 
         $handle = fopen($path, 'r');
@@ -45,7 +63,7 @@ final class ShipmentImportService
         }
 
         $normalizedHeader = array_map(static fn ($value) => strtolower(trim((string) $value)), $header);
-        foreach (['hub_code', 'reference'] as $required) {
+        foreach (['hub_code'] as $required) {
             if (!in_array($required, $normalizedHeader, true)) {
                 fclose($handle);
                 throw new \RuntimeException("Falta columna requerida: {$required}");
@@ -74,7 +92,8 @@ final class ShipmentImportService
                 $row[$column] = isset($data[$index]) ? trim((string) $data[$index]) : '';
             }
 
-            $reference = $row['reference'] ?? '';
+            $externalReference = $row['external_reference'] ?? '';
+            $referenceColumn = $row['reference'] ?? '';
             $hubCode = $row['hub_code'] ?? '';
             $scheduledAt = $row['scheduled_at'] ?? '';
             $serviceType = $row['service_type'] ?? 'delivery';
@@ -82,9 +101,6 @@ final class ShipmentImportService
             $rowErrors = [];
             if ($hubCode === '') {
                 $rowErrors[] = 'hub_code requerido';
-            }
-            if ($reference === '') {
-                $rowErrors[] = 'reference requerido';
             }
 
             $hubId = null;
@@ -95,14 +111,13 @@ final class ShipmentImportService
                 }
             }
 
-            if ($reference !== '') {
-                if (isset($seenReferences[$reference])) {
-                    $rowErrors[] = 'reference duplicada en CSV';
+            $resolvedExternalReference = $externalReference !== '' ? $externalReference : $referenceColumn;
+            $rowReferenceLabel = $resolvedExternalReference !== '' ? $resolvedExternalReference : null;
+            if ($resolvedExternalReference !== '') {
+                if (isset($seenReferences[$resolvedExternalReference])) {
+                    $rowErrors[] = 'external_reference duplicada en CSV';
                 } else {
-                    $seenReferences[$reference] = true;
-                }
-                if (DB::table('shipments')->where('reference', $reference)->exists()) {
-                    $rowErrors[] = 'reference ya existe';
+                    $seenReferences[$resolvedExternalReference] = true;
                 }
             }
 
@@ -119,16 +134,39 @@ final class ShipmentImportService
             }
 
             if ($serviceType === '') {
-                $serviceType = 'delivery';
+                $serviceType = 'express_1030';
+            }
+            if (!in_array($serviceType, $allowedServiceTypes, true)) {
+                $rowErrors[] = 'service_type invalido';
             }
 
             if ($rowErrors === []) {
+                $reference = (string) $this->sequenceService->next('shipments');
+                $addressLine = $this->composeAddressLine($row);
+                $recipientContactId = $this->contactResolver->resolve([
+                    'name' => $row['consignee_name'] ?? null,
+                    'document_id' => $row['consignee_document_id'] ?? null,
+                    'phone' => $row['consignee_phone'] ?? null,
+                    'phone_alt' => $row['consignee_phone_alt'] ?? null,
+                    'email' => $row['consignee_email'] ?? null,
+                    'address_line' => $addressLine,
+                    'address_street' => $row['address_street'] ?? null,
+                    'address_number' => $row['address_number'] ?? null,
+                    'postal_code' => $row['postal_code'] ?? null,
+                    'city' => $row['city'] ?? null,
+                    'province' => $row['province'] ?? null,
+                    'country' => $row['country'] ?? null,
+                    'address_notes' => $row['address_notes'] ?? null,
+                ], 'recipient');
+
                 $insertRows[] = [
                     'id' => (string) Str::uuid(),
                     'hub_id' => $hubId,
                     'reference' => $reference,
+                    'external_reference' => $this->normalizeText($resolvedExternalReference !== '' ? $resolvedExternalReference : null),
+                    'recipient_contact_id' => $recipientContactId,
                     'consignee_name' => $this->normalizeTitle($row['consignee_name'] ?? null),
-                    'address_line' => $this->composeAddressLine($row),
+                    'address_line' => $addressLine,
                     'address_street' => $this->normalizeTitle($row['address_street'] ?? null),
                     'address_number' => $this->normalizeText($row['address_number'] ?? null),
                     'postal_code' => $this->normalizeText($row['postal_code'] ?? null),
@@ -152,7 +190,7 @@ final class ShipmentImportService
             } else {
                 $errors[] = [
                     'row' => $rowNumber,
-                    'reference' => $reference,
+                    'reference' => $rowReferenceLabel,
                     'status' => 'error',
                     'errors' => $rowErrors,
                 ];

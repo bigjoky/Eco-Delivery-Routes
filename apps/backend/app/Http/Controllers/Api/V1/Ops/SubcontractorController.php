@@ -58,7 +58,7 @@ class SubcontractorController extends Controller
 
         $payload = $request->validate([
             'legal_name' => ['required', 'string', 'max:180'],
-            'tax_id' => ['nullable', 'string', 'max:60'],
+            'tax_id' => ['required', 'string', 'max:60', 'unique:subcontractors,tax_id'],
             'status' => ['nullable', 'in:active,inactive,suspended'],
             'payment_terms' => ['nullable', 'string', 'max:80'],
         ]);
@@ -99,7 +99,7 @@ class SubcontractorController extends Controller
 
         $payload = $request->validate([
             'legal_name' => ['sometimes', 'string', 'max:180'],
-            'tax_id' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'tax_id' => ['sometimes', 'string', 'max:60', 'unique:subcontractors,tax_id,' . $id . ',id'],
             'status' => ['sometimes', 'in:active,inactive,suspended'],
             'payment_terms' => ['sometimes', 'string', 'max:80'],
         ]);

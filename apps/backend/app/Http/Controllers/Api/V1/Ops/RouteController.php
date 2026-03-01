@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class RouteController extends Controller
 {
+    public function __construct(private readonly SequenceService $sequenceService) {}
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -89,7 +92,7 @@ class RouteController extends Controller
             ->select(
                 'routes.*',
                 DB::raw('max(drivers.code) as driver_code'),
-                DB::raw('max(vehicles.code) as vehicle_code'),
+                DB::raw('max(vehicles.plate_number) as vehicle_code'),
                 DB::raw('count(route_stops.id) as stops_count')
             )
             ->groupBy('routes.id');
@@ -122,7 +125,7 @@ class RouteController extends Controller
 
         $payload = $request->validate([
             'hub_id' => ['required', 'uuid', 'exists:hubs,id'],
-            'code' => ['required', 'string', 'max:60'],
+            'code' => ['nullable', 'string', 'max:60'],
             'route_date' => ['required', 'date'],
             'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
             'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
@@ -131,10 +134,14 @@ class RouteController extends Controller
         $this->assertAssignmentConsistency($payload);
 
         $id = (string) Str::uuid();
+        $code = $payload['code'] ?? null;
+        if (!$code) {
+            $code = (string) $this->sequenceService->next('routes');
+        }
         DB::table('routes')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
-            'code' => $payload['code'],
+            'code' => $code,
             'route_date' => $payload['route_date'],
             'driver_id' => $payload['driver_id'] ?? null,
             'subcontractor_id' => $payload['subcontractor_id'] ?? null,
@@ -198,7 +205,7 @@ class RouteController extends Controller
             ->select(
                 'routes.*',
                 DB::raw('drivers.code as driver_code'),
-                DB::raw('vehicles.code as vehicle_code')
+                DB::raw('vehicles.plate_number as vehicle_code')
             )
             ->first();
     }
@@ -844,7 +851,7 @@ class RouteController extends Controller
                 'routes.status',
                 'routes.manifest_notes',
                 'drivers.code as driver_code',
-                'vehicles.code as vehicle_code'
+                'vehicles.plate_number as vehicle_code'
             )
             ->first();
         if (!$route) {

@@ -1228,7 +1228,6 @@ paths:
               $ref: '#/components/schemas/CreateShipmentRequest'
       responses:
         '201': { description: Creado }
-        '409': { description: Referencia duplicada }
 
   /shipments/export.csv:
     get:
@@ -1390,6 +1389,189 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '200': { description: OK }
+
+  /contacts:
+    get:
+      tags: [Contacts]
+      summary: Buscar contactos
+      parameters:
+        - in: query
+          name: phone
+          schema: { type: string }
+        - in: query
+          name: email
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /hubs:
+    post:
+      tags: [Hubs]
+      summary: Crear hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, city]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /hubs/{id}:
+    patch:
+      tags: [Hubs]
+      summary: Actualizar hub
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                name: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Hub no encontrado }
+
+  /depots:
+    get:
+      tags: [Depots]
+      summary: Listar depots
+      parameters:
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Depots]
+      summary: Crear depot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hub_id, name]
+              properties:
+                hub_id: { type: string, format: uuid }
+                code: { type: string }
+                name: { type: string }
+                address_line: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /depots/{id}:
+    patch:
+      tags: [Depots]
+      summary: Actualizar depot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                name: { type: string }
+                address_line: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Depot no encontrado }
+
+  /points:
+    get:
+      tags: [Points]
+      summary: Listar puntos
+      parameters:
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: depot_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Points]
+      summary: Crear punto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hub_id, name]
+              properties:
+                hub_id: { type: string, format: uuid }
+                depot_id: { type: string, format: uuid }
+                code: { type: string }
+                name: { type: string }
+                address_line: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /points/{id}:
+    patch:
+      tags: [Points]
+      summary: Actualizar punto
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                name: { type: string }
+                address_line: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Punto no encontrado }
 
   /routes:
     get:
@@ -2323,11 +2505,12 @@ components:
   schemas:
     CreateShipmentRequest:
       type: object
-      required: [hub_id, reference]
+      required: [hub_id]
       properties:
         hub_id: { type: string, format: uuid }
-        reference: { type: string }
+        external_reference: { type: string }
         consignee_name: { type: string }
+        consignee_document_id: { type: string }
         address_line: { type: string }
         address_street: { type: string }
         address_number: { type: string }
@@ -2337,8 +2520,26 @@ components:
         country: { type: string }
         address_notes: { type: string }
         consignee_phone: { type: string }
+        consignee_phone_alt: { type: string }
         consignee_email: { type: string, format: email }
-        scheduled_at: { type: string, format: date-time }
+        sender_name: { type: string }
+        sender_legal_name: { type: string }
+        sender_document_id: { type: string }
+        sender_phone: { type: string }
+        sender_phone_alt: { type: string }
+        sender_email: { type: string, format: email }
+        sender_address_line: { type: string }
+        sender_address_street: { type: string }
+        sender_address_number: { type: string }
+        sender_postal_code: { type: string }
+        sender_city: { type: string }
+        sender_province: { type: string }
+        sender_country: { type: string }
+        sender_address_notes: { type: string }
+        scheduled_at: { type: string, format: date }
+        service_type:
+          type: string
+          enum: [express_1030, express_1400, express_1900, economy_parcel, business_parcel, thermo_parcel, delivery]
     ShipmentDetailResponse:
       type: object
       properties:
@@ -2354,9 +2555,11 @@ components:
                 assigned_driver_id: { type: string, format: uuid, nullable: true }
                 subcontractor_id: { type: string, format: uuid, nullable: true }
                 reference: { type: string }
+                external_reference: { type: string, nullable: true }
                 service_type: { type: string }
                 status: { type: string }
                 consignee_name: { type: string, nullable: true }
+                consignee_document_id: { type: string, nullable: true }
                 address_line: { type: string, nullable: true }
                 address_street: { type: string, nullable: true }
                 address_number: { type: string, nullable: true }

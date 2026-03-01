@@ -30,6 +30,7 @@ class DriverController extends Controller
             ->select(
                 'drivers.id',
                 'drivers.code',
+                'drivers.dni',
                 'drivers.name',
                 'drivers.status',
                 'drivers.employment_type',
@@ -63,7 +64,8 @@ class DriverController extends Controller
         }
 
         $payload = $request->validate([
-            'code' => ['required', 'string', 'max:60', 'unique:drivers,code'],
+            'code' => ['nullable', 'string', 'max:60', 'unique:drivers,code'],
+            'dni' => ['required', 'string', 'max:40', 'unique:drivers,dni'],
             'name' => ['required', 'string', 'max:120'],
             'status' => ['nullable', 'in:active,inactive,suspended'],
             'employment_type' => ['nullable', 'in:employee,subcontractor'],
@@ -75,7 +77,8 @@ class DriverController extends Controller
         $id = (string) Str::uuid();
         DB::table('drivers')->insert([
             'id' => $id,
-            'code' => $payload['code'],
+            'code' => $payload['code'] ?? $payload['dni'],
+            'dni' => $payload['dni'],
             'name' => $payload['name'],
             'status' => $payload['status'] ?? 'active',
             'employment_type' => $payload['employment_type'] ?? 'subcontractor',
@@ -111,6 +114,7 @@ class DriverController extends Controller
 
         $payload = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
+            'dni' => ['sometimes', 'string', 'max:40', 'unique:drivers,dni,' . $id . ',id'],
             'status' => ['sometimes', 'in:active,inactive,suspended'],
             'employment_type' => ['sometimes', 'in:employee,subcontractor'],
             'user_id' => ['sometimes', 'nullable', 'uuid'],
@@ -129,4 +133,3 @@ class DriverController extends Controller
         ]);
     }
 }
-

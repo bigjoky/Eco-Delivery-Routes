@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,8 @@ use Illuminate\Support\Str;
 
 class IncidentController extends Controller
 {
+    public function __construct(private readonly SequenceService $sequenceService) {}
+
     public function catalog(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -69,7 +72,8 @@ class IncidentController extends Controller
         if (is_string($search) && $search !== '') {
             $like = '%' . str_replace('%', '\\%', $search) . '%';
             $query->where(function ($inner) use ($like): void {
-                $inner->where('incidents.incidentable_id', 'like', $like)
+                $inner->where('incidents.reference', 'like', $like)
+                    ->orWhere('incidents.incidentable_id', 'like', $like)
                     ->orWhere('incidents.notes', 'like', $like)
                     ->orWhere('incidents.catalog_code', 'like', $like)
                     ->orWhere('shipments.reference', 'like', $like);
@@ -163,8 +167,10 @@ class IncidentController extends Controller
         }
 
         $id = (string) Str::uuid();
+        $reference = (string) $this->sequenceService->next('incidents');
         DB::table('incidents')->insert([
             'id' => $id,
+            'reference' => $reference,
             'incidentable_type' => $payload['incidentable_type'],
             'incidentable_id' => $payload['incidentable_id'],
             'catalog_code' => $payload['catalog_code'],

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1\Ops;
 use App\Http\Controllers\Controller;
 use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
+use App\Services\Contacts\ContactResolver;
 use App\Services\Shipments\ShipmentImportService;
+use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +19,9 @@ class ShipmentController extends Controller
 {
     public function __construct(
         private readonly AuditLogWriter $auditLogWriter,
-        private readonly ShipmentImportService $importService
+        private readonly ShipmentImportService $importService,
+        private readonly SequenceService $sequenceService,
+        private readonly ContactResolver $contactResolver
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -147,8 +151,9 @@ class ShipmentController extends Controller
         $maxScheduled = Carbon::now()->addDays(180)->format('Y-m-d H:i:s');
         $payload = $request->validate([
             'hub_id' => ['required', 'uuid'],
-            'reference' => ['required', 'string', 'max:60'],
+            'external_reference' => ['nullable', 'string', 'max:80'],
             'consignee_name' => ['nullable', 'string', 'max:120'],
+            'consignee_document_id' => ['nullable', 'string', 'max:60'],
             'address_line' => ['nullable', 'string', 'max:220'],
             'address_street' => ['nullable', 'string', 'max:180'],
             'address_number' => ['nullable', 'string', 'max:40'],
@@ -158,27 +163,71 @@ class ShipmentController extends Controller
             'country' => ['nullable', 'string', 'max:80'],
             'address_notes' => ['nullable', 'string', 'max:220'],
             'consignee_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+            'consignee_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
             'consignee_email' => ['nullable', 'email', 'max:120'],
+            'sender_name' => ['nullable', 'string', 'max:120'],
+            'sender_legal_name' => ['nullable', 'string', 'max:180'],
+            'sender_document_id' => ['required', 'string', 'max:60'],
+            'sender_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+            'sender_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+            'sender_email' => ['nullable', 'email', 'max:120'],
+            'sender_address_line' => ['nullable', 'string', 'max:220'],
+            'sender_address_street' => ['nullable', 'string', 'max:180'],
+            'sender_address_number' => ['nullable', 'string', 'max:40'],
+            'sender_postal_code' => ['nullable', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
+            'sender_city' => ['nullable', 'string', 'max:80'],
+            'sender_province' => ['nullable', 'string', 'max:80'],
+            'sender_country' => ['nullable', 'string', 'max:80'],
+            'sender_address_notes' => ['nullable', 'string', 'max:220'],
             'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
+            'service_type' => ['required', 'in:express_1030,express_1400,express_1900,economy_parcel,business_parcel,thermo_parcel,delivery'],
         ]);
 
-        $exists = DB::table('shipments')->where('reference', $payload['reference'])->exists();
-        if ($exists) {
-            return response()->json([
-                'error' => [
-                    'code' => 'SHIPMENT_REFERENCE_EXISTS',
-                    'message' => 'Shipment reference already exists.',
-                ],
-            ], 409);
-        }
-
         $id = (string) Str::uuid();
+        $reference = (string) $this->sequenceService->next('shipments');
         $addressLine = $this->normalizeText($payload['address_line'] ?? '') ?: $this->composeAddressLine($payload);
+        $senderAddressLine = $this->normalizeText($payload['sender_address_line'] ?? '') ?: $this->composeAddressLineWithPrefix($payload, 'sender_');
+
+        $recipientContactId = $this->contactResolver->resolve([
+            'name' => $payload['consignee_name'] ?? null,
+            'document_id' => $payload['consignee_document_id'] ?? null,
+            'phone' => $payload['consignee_phone'] ?? null,
+            'phone_alt' => $payload['consignee_phone_alt'] ?? null,
+            'email' => $payload['consignee_email'] ?? null,
+            'address_line' => $addressLine,
+            'address_street' => $payload['address_street'] ?? null,
+            'address_number' => $payload['address_number'] ?? null,
+            'postal_code' => $payload['postal_code'] ?? null,
+            'city' => $payload['city'] ?? null,
+            'province' => $payload['province'] ?? null,
+            'country' => $payload['country'] ?? null,
+            'address_notes' => $payload['address_notes'] ?? null,
+        ], 'recipient');
+
+        $senderContactId = $this->contactResolver->resolve([
+            'name' => $payload['sender_name'] ?? null,
+            'legal_name' => $payload['sender_legal_name'] ?? null,
+            'document_id' => $payload['sender_document_id'] ?? null,
+            'phone' => $payload['sender_phone'] ?? null,
+            'phone_alt' => $payload['sender_phone_alt'] ?? null,
+            'email' => $payload['sender_email'] ?? null,
+            'address_line' => $senderAddressLine,
+            'address_street' => $payload['sender_address_street'] ?? null,
+            'address_number' => $payload['sender_address_number'] ?? null,
+            'postal_code' => $payload['sender_postal_code'] ?? null,
+            'city' => $payload['sender_city'] ?? null,
+            'province' => $payload['sender_province'] ?? null,
+            'country' => $payload['sender_country'] ?? null,
+            'address_notes' => $payload['sender_address_notes'] ?? null,
+        ], 'sender');
 
         DB::table('shipments')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
-            'reference' => $payload['reference'],
+            'sender_contact_id' => $senderContactId,
+            'recipient_contact_id' => $recipientContactId,
+            'reference' => $reference,
+            'external_reference' => $this->normalizeText($payload['external_reference'] ?? null),
             'consignee_name' => $this->normalizeTitle($payload['consignee_name'] ?? null),
             'address_line' => $addressLine,
             'address_street' => $this->normalizeTitle($payload['address_street'] ?? null),
@@ -191,6 +240,7 @@ class ShipmentController extends Controller
             'consignee_phone' => $this->normalizeText($payload['consignee_phone'] ?? null),
             'consignee_email' => $this->normalizeText($payload['consignee_email'] ?? null),
             'scheduled_at' => $payload['scheduled_at'] ?? null,
+            'service_type' => $payload['service_type'],
             'status' => 'created',
             'created_at' => now(),
             'updated_at' => now(),
@@ -230,6 +280,7 @@ class ShipmentController extends Controller
         $allowedColumns = [
             'id',
             'reference',
+            'external_reference',
             'status',
             'consignee_name',
             'address_line',
@@ -307,6 +358,7 @@ class ShipmentController extends Controller
 
         $allowedColumns = [
             'reference' => 'Reference',
+            'external_reference' => 'External Reference',
             'status' => 'Status',
             'consignee_name' => 'Consignee',
             'address_line' => 'Address',
@@ -367,8 +419,8 @@ class ShipmentController extends Controller
 
         $hubCode = (string) (DB::table('hubs')->value('code') ?? 'HUB-000');
         $rows = [
-            'hub_code,reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type',
-            $hubCode . ',SHP-AGP-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05T08:30:00Z,delivery',
+            'hub_code,external_reference,consignee_name,address_street,address_number,postal_code,city,province,country,address_notes,consignee_phone,consignee_email,scheduled_at,service_type',
+            $hubCode . ',REF-CLIENTE-0009,Cliente Demo,Calle Larios,12,29001,Malaga,Malaga,ES,Portal azul,+34950111222,cliente@eco.local,2026-03-05,express_1030',
         ];
 
         $this->auditLogWriter->write($actor->id, 'shipments.template.downloaded', [
@@ -539,6 +591,7 @@ class ShipmentController extends Controller
             $like = '%' . str_replace('%', '\\%', $search) . '%';
             $query->where(function ($inner) use ($like): void {
                 $inner->where('reference', 'like', $like)
+                    ->orWhere('external_reference', 'like', $like)
                     ->orWhere('id', 'like', $like)
                     ->orWhere('consignee_name', 'like', $like);
             });
@@ -566,6 +619,37 @@ class ShipmentController extends Controller
         $city = $this->normalizeTitle($payload['city'] ?? null) ?? '';
         $province = $this->normalizeTitle($payload['province'] ?? null) ?? '';
         $country = $this->normalizeText($payload['country'] ?? null) ?? '';
+
+        $parts = [];
+        if ($street !== '') {
+            $parts[] = $number !== '' ? $street . ' ' . $number : $street;
+        }
+        $locality = trim($postal . ' ' . $city);
+        if ($locality !== '') {
+            $parts[] = $locality;
+        }
+        if ($province !== '') {
+            $parts[] = $province;
+        }
+        if ($country !== '') {
+            $parts[] = $country;
+        }
+
+        if (empty($parts)) {
+            return null;
+        }
+
+        return implode(', ', $parts);
+    }
+
+    private function composeAddressLineWithPrefix(array $payload, string $prefix): ?string
+    {
+        $street = $this->normalizeTitle($payload[$prefix . 'address_street'] ?? null) ?? '';
+        $number = $this->normalizeText($payload[$prefix . 'address_number'] ?? null) ?? '';
+        $postal = $this->normalizeText($payload[$prefix . 'postal_code'] ?? null) ?? '';
+        $city = $this->normalizeTitle($payload[$prefix . 'city'] ?? null) ?? '';
+        $province = $this->normalizeTitle($payload[$prefix . 'province'] ?? null) ?? '';
+        $country = $this->normalizeText($payload[$prefix . 'country'] ?? null) ?? '';
 
         $parts = [];
         if ($street !== '') {

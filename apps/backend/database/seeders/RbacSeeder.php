@@ -32,6 +32,10 @@ class RbacSeeder extends Seeder
             'tariffs.read', 'tariffs.write',
             'settlements.read', 'settlements.write', 'settlements.approve', 'settlements.export', 'settlements.pay',
             'advances.read', 'advances.write',
+            'contacts.read',
+            'hubs.read', 'hubs.write',
+            'depots.read', 'depots.write',
+            'points.read', 'points.write',
         ];
 
         foreach ($roles as $role) {
@@ -69,14 +73,26 @@ class RbacSeeder extends Seeder
                 'shipments.read', 'shipments.write', 'shipments.export', 'shipments.import', 'routes.read', 'routes.write',
                 'pickups.read', 'pickups.write', 'tracking.write', 'pods.write', 'incidents.read', 'incidents.write',
                 'quality.read', 'quality.read.dashboard', 'quality.export', 'tariffs.read', 'tariffs.write', 'users.read', 'roles.read',
+                'contacts.read',
+                'hubs.read', 'hubs.write',
+                'depots.read', 'depots.write',
+                'points.read', 'points.write',
             ],
             'traffic_operator' => [
                 'shipments.read', 'shipments.write', 'shipments.export', 'shipments.import', 'routes.read', 'routes.write',
                 'pickups.read', 'pickups.write', 'tracking.write', 'incidents.read', 'incidents.write', 'quality.read', 'quality.read.dashboard', 'tariffs.read',
+                'contacts.read',
+                'hubs.read', 'hubs.write',
+                'depots.read', 'depots.write',
+                'points.read', 'points.write',
             ],
             'warehouse_operator' => [
                 'shipments.read', 'shipments.write', 'shipments.import', 'routes.read',
                 'tracking.write', 'incidents.read', 'incidents.write',
+                'contacts.read',
+                'hubs.read',
+                'depots.read',
+                'points.read',
             ],
             'accountant' => [
                 'quality.read', 'quality.read.dashboard', 'quality.recalculate', 'quality.export', 'incidents.read',
@@ -85,12 +101,20 @@ class RbacSeeder extends Seeder
                 'advances.read', 'advances.write',
                 'users.read', 'roles.read',
                 'shipments.export',
+                'contacts.read',
+                'hubs.read',
+                'depots.read',
+                'points.read',
             ],
             'driver' => [
                 'routes.read', 'shipments.read', 'pickups.read', 'pickups.write', 'tracking.write', 'pods.write', 'incidents.read', 'incidents.write',
             ],
             'viewer' => [
                 'routes.read', 'shipments.read', 'quality.read.dashboard', 'incidents.read',
+                'contacts.read',
+                'hubs.read',
+                'depots.read',
+                'points.read',
             ],
         ];
 

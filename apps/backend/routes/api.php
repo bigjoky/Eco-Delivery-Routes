@@ -3,9 +3,12 @@
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Ops\AdvanceController;
+use App\Http\Controllers\Api\V1\Ops\ContactController;
+use App\Http\Controllers\Api\V1\Ops\DepotController;
 use App\Http\Controllers\Api\V1\Ops\DriverRouteController;
 use App\Http\Controllers\Api\V1\Ops\HubController;
 use App\Http\Controllers\Api\V1\Ops\IncidentController;
+use App\Http\Controllers\Api\V1\Ops\PointController;
 use App\Http\Controllers\Api\V1\Ops\PickupController;
 use App\Http\Controllers\Api\V1\Ops\PodController;
 use App\Http\Controllers\Api\V1\Ops\QualityController;
@@ -67,6 +70,15 @@ Route::prefix('v1')->group(function () {
         Route::post('shipments', [ShipmentController::class, 'store']);
         Route::post('shipments/{id}/deliver', [ShipmentController::class, 'markDelivered']);
         Route::get('hubs', [HubController::class, 'index']);
+        Route::post('hubs', [HubController::class, 'store']);
+        Route::patch('hubs/{id}', [HubController::class, 'update']);
+        Route::get('contacts', [ContactController::class, 'index']);
+        Route::get('depots', [DepotController::class, 'index']);
+        Route::post('depots', [DepotController::class, 'store']);
+        Route::patch('depots/{id}', [DepotController::class, 'update']);
+        Route::get('points', [PointController::class, 'index']);
+        Route::post('points', [PointController::class, 'store']);
+        Route::patch('points/{id}', [PointController::class, 'update']);
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::post('routes', [RouteController::class, 'store']);

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class HubController extends Controller
+class PointController extends Controller
 {
     public function __construct(private readonly SequenceService $sequenceService) {}
 
@@ -18,85 +18,93 @@ class HubController extends Controller
     {
         /** @var User $actor */
         $actor = $request->user();
-        if (!$actor->hasPermission('hubs.read') && !$actor->hasPermission('settlements.read') && !$actor->hasPermission('routes.read')) {
+        if (!$actor->hasPermission('points.read')) {
             return response()->json([
                 'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
             ], 403);
         }
 
-        $query = DB::table('hubs')
-            ->orderBy('code');
-
-        if ($request->boolean('only_active', true)) {
-            $query->where('is_active', true);
+        $hubId = $request->query('hub_id');
+        $depotId = $request->query('depot_id');
+        $query = DB::table('points')->orderBy('code');
+        if (is_string($hubId) && $hubId !== '') {
+            $query->where('hub_id', $hubId);
+        }
+        if (is_string($depotId) && $depotId !== '') {
+            $query->where('depot_id', $depotId);
         }
 
-        return response()->json([
-            'data' => $query->get(),
-        ]);
+        return response()->json(['data' => $query->get()]);
     }
 
     public function store(Request $request): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
-        if (!$actor->hasPermission('hubs.write')) {
+        if (!$actor->hasPermission('points.write')) {
             return response()->json([
                 'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
             ], 403);
         }
 
         $payload = $request->validate([
-            'code' => ['nullable', 'string', 'max:40', 'unique:hubs,code'],
+            'hub_id' => ['required', 'uuid', 'exists:hubs,id'],
+            'depot_id' => ['nullable', 'uuid', 'exists:depots,id'],
+            'code' => ['nullable', 'string', 'max:40', 'unique:points,code'],
             'name' => ['required', 'string', 'max:120'],
-            'city' => ['required', 'string', 'max:80'],
+            'address_line' => ['nullable', 'string', 'max:220'],
+            'city' => ['nullable', 'string', 'max:80'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $id = (string) Str::uuid();
-        $code = $payload['code'] ?? (string) $this->sequenceService->next('hubs');
-        DB::table('hubs')->insert([
+        $code = $payload['code'] ?? (string) $this->sequenceService->next('points');
+        DB::table('points')->insert([
             'id' => $id,
+            'hub_id' => $payload['hub_id'],
+            'depot_id' => $payload['depot_id'] ?? null,
             'code' => $code,
             'name' => $payload['name'],
-            'city' => $payload['city'],
+            'address_line' => $payload['address_line'] ?? null,
+            'city' => $payload['city'] ?? null,
             'is_active' => $payload['is_active'] ?? true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()], 201);
+        return response()->json(['data' => DB::table('points')->where('id', $id)->first()], 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
         $actor = $request->user();
-        if (!$actor->hasPermission('hubs.write')) {
+        if (!$actor->hasPermission('points.write')) {
             return response()->json([
                 'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
             ], 403);
         }
 
-        $row = DB::table('hubs')->where('id', $id)->first();
+        $row = DB::table('points')->where('id', $id)->first();
         if (!$row) {
             return response()->json([
-                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Hub not found.'],
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Point not found.'],
             ], 404);
         }
 
         $payload = $request->validate([
-            'code' => ['sometimes', 'string', 'max:40', 'unique:hubs,code,' . $id . ',id'],
+            'code' => ['sometimes', 'string', 'max:40', 'unique:points,code,' . $id . ',id'],
             'name' => ['sometimes', 'string', 'max:120'],
-            'city' => ['sometimes', 'string', 'max:80'],
+            'address_line' => ['sometimes', 'nullable', 'string', 'max:220'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:80'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        DB::table('hubs')->where('id', $id)->update([
+        DB::table('points')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
         ]);
 
-        return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()]);
+        return response()->json(['data' => DB::table('points')->where('id', $id)->first()]);
     }
 }
