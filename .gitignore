@@ -12,6 +12,8 @@ dist/
 build/
 **/build/
 apps/web/.vite/
+apps/web/test-results/
+apps/web/playwright-report/
 
 # PHP
 vendor/
