@@ -20,6 +20,7 @@ export function ShipmentsPage() {
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
   const [status, setStatus] = useState('');
   const [query, setQuery] = useState('');
+  const [hubFilter, setHubFilter] = useState('');
   const [scheduledFrom, setScheduledFrom] = useState('');
   const [scheduledTo, setScheduledTo] = useState('');
   const [hubs, setHubs] = useState<HubSummary[]>([]);
@@ -74,6 +75,7 @@ export function ShipmentsPage() {
       page,
       perPage: meta.per_page,
       status: nextStatus || undefined,
+      hubId: hubFilter || undefined,
       q: query || undefined,
       scheduledFrom: scheduledFrom || undefined,
       scheduledTo: scheduledTo || undefined,
@@ -84,7 +86,7 @@ export function ShipmentsPage() {
 
   useEffect(() => {
     reload(1);
-  }, [status, query, scheduledFrom, scheduledTo]);
+  }, [status, hubFilter, query, scheduledFrom, scheduledTo]);
 
   useEffect(() => {
     return sessionStore.subscribe(() => {
@@ -401,6 +403,17 @@ export function ShipmentsPage() {
               <option value="out_for_delivery">out_for_delivery</option>
               <option value="delivered">delivered</option>
               <option value="incident">incident</option>
+            </select>
+            <label htmlFor="shipment-hub">Hub</label>
+            <select
+              id="shipment-hub"
+              value={hubFilter}
+              onChange={(event) => setHubFilter(event.target.value)}
+            >
+              <option value="">Todos</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+              ))}
             </select>
             <label htmlFor="shipment-date-from">Desde</label>
             <input

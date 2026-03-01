@@ -1191,6 +1191,9 @@ paths:
           name: status
           schema: { type: string }
         - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
           name: q
           schema: { type: string }
         - in: query
@@ -1235,6 +1238,9 @@ paths:
           name: status
           schema: { type: string }
         - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
           name: q
           schema: { type: string }
         - in: query
@@ -1264,6 +1270,9 @@ paths:
         - in: query
           name: status
           schema: { type: string }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
         - in: query
           name: q
           schema: { type: string }

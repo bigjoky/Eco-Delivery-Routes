@@ -53,6 +53,53 @@ class ShipmentsHttpTest extends TestCase
         $response->assertJsonPath('data.0.reference', 'SHP-SEARCH-001');
     }
 
+    public function test_can_filter_shipments_by_hub(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $secondaryHubId = (string) Str::uuid();
+        DB::table('hubs')->insert([
+            'id' => $secondaryHubId,
+            'code' => 'AGP-HUB-SECOND',
+            'name' => 'Malaga Secundario',
+            'city' => 'Malaga',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('shipments')->delete();
+        DB::table('shipments')->insert([
+            [
+                'id' => (string) Str::uuid(),
+                'hub_id' => $hubId,
+                'reference' => 'SHP-HUB-001',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Hub 1',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => (string) Str::uuid(),
+                'hub_id' => $secondaryHubId,
+                'reference' => 'SHP-HUB-002',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Hub 2',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->getJson('/api/v1/shipments?hub_id=' . $secondaryHubId);
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $response->assertJsonPath('data.0.reference', 'SHP-HUB-002');
+    }
+
     public function test_can_filter_shipments_by_scheduled_date(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

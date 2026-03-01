@@ -451,6 +451,7 @@ export const apiClient = {
     sort?: string;
     dir?: 'asc' | 'desc';
     status?: string;
+    hubId?: string;
     q?: string;
     scheduledFrom?: string;
     scheduledTo?: string;
@@ -467,6 +468,7 @@ export const apiClient = {
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
     if (filters.status) params.set('status', filters.status);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.q) params.set('q', filters.q);
     if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
     if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);

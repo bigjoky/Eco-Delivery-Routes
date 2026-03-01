@@ -475,11 +475,16 @@ class ShipmentController extends Controller
     {
         $status = $request->query('status');
         $search = $request->query('q');
+        $hubId = $request->query('hub_id');
         $scheduledFrom = $request->query('scheduled_from');
         $scheduledTo = $request->query('scheduled_to');
 
         if (is_string($status) && $status !== '') {
             $query->where('status', $status);
+        }
+
+        if (is_string($hubId) && $hubId !== '') {
+            $query->where('hub_id', $hubId);
         }
 
         if (is_string($search) && $search !== '') {

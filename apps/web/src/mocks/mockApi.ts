@@ -627,16 +627,20 @@ export const mockApi = {
 
   async getShipments(filters: {
     status?: string;
+    hubId?: string;
     q?: string;
     scheduledFrom?: string;
     scheduledTo?: string;
   } = {}) {
     let rows = [
       { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1' },
-      { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-1' },
+      { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2' },
     ];
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.hubId) {
+      rows = rows.filter((row) => row.hub_id === filters.hubId);
     }
     if (filters.q) {
       const q = filters.q.toLowerCase();
