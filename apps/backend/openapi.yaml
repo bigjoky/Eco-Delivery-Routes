@@ -1226,6 +1226,60 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /shipments/export.csv:
+    get:
+      tags: [Shipments]
+      summary: Exportar envíos en CSV
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: scheduled_from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: scheduled_to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [created_at, scheduled_at, reference, status] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /shipments/export.pdf:
+    get:
+      tags: [Shipments]
+      summary: Exportar envíos en PDF
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: scheduled_from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: scheduled_to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [created_at, scheduled_at, reference, status] }
+        - in: query
+          name: dir
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /shipments/{id}:
     get:
       tags: [Shipments]
@@ -2234,6 +2288,33 @@ components:
                   geo_lat: { type: number, format: float, nullable: true }
                   geo_lng: { type: number, format: float, nullable: true }
                   captured_at: { type: string, format: date-time }
+            incidents:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  incidentable_type: { type: string, enum: [shipment, pickup] }
+                  incidentable_id: { type: string, format: uuid }
+                  catalog_code: { type: string }
+                  category: { type: string }
+                  notes: { type: string, nullable: true }
+                  resolved_at: { type: string, format: date-time, nullable: true }
+                  created_at: { type: string, format: date-time }
+            route_stops:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  route_id: { type: string, format: uuid }
+                  route_code: { type: string, nullable: true }
+                  route_date: { type: string, format: date, nullable: true }
+                  sequence: { type: integer }
+                  stop_type: { type: string, enum: [DELIVERY, PICKUP] }
+                  status: { type: string }
+                  planned_at: { type: string, format: date-time, nullable: true }
+                  completed_at: { type: string, format: date-time, nullable: true }
     CreateRouteRequest:
       type: object
       required: [hub_id, code, route_date]

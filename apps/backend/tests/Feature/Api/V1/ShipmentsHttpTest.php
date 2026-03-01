@@ -116,6 +116,88 @@ class ShipmentsHttpTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_can_show_shipment_detail_with_tracking_pods_incidents(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-TEST-001',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'route_id' => $routeId,
+            'reference' => 'SHP-DETAIL-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Cliente Detalle',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('route_stops')->insert([
+            'id' => (string) Str::uuid(),
+            'route_id' => $routeId,
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('tracking_events')->insert([
+            'trackable_type' => 'shipment',
+            'trackable_id' => $shipmentId,
+            'event_code' => 'CREATED',
+            'status_to' => 'created',
+            'source' => 'test',
+            'occurred_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pods')->insert([
+            'id' => (string) Str::uuid(),
+            'evidenceable_type' => 'shipment',
+            'evidenceable_id' => $shipmentId,
+            'signature_name' => 'Test Sign',
+            'captured_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('incidents')->insert([
+            'id' => (string) Str::uuid(),
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => $shipmentId,
+            'catalog_code' => 'ADDR_ERR',
+            'category' => 'general',
+            'notes' => 'Direccion incorrecta',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/shipments/' . $shipmentId);
+        $response->assertOk();
+        $response->assertJsonPath('data.shipment.id', $shipmentId);
+        $this->assertCount(1, $response->json('data.tracking_events'));
+        $this->assertCount(1, $response->json('data.pods'));
+        $this->assertCount(1, $response->json('data.incidents'));
+        $this->assertCount(1, $response->json('data.route_stops'));
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

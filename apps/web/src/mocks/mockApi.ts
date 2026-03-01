@@ -722,7 +722,42 @@ export const mockApi = {
           },
         ]
         : [],
+      incidents: id === 's-2'
+        ? [
+          {
+            id: 'inc-1',
+            incidentable_type: 'shipment',
+            incidentable_id: id,
+            catalog_code: 'ADDR_ERR',
+            category: 'general',
+            notes: 'Direccion corregida en ruta',
+            resolved_at: '2026-03-01T09:45:00Z',
+            created_at: '2026-03-01T09:10:00Z',
+          },
+        ]
+        : [],
+      route_stops: [
+        {
+          id: 'stop-1',
+          route_id: 'route-1',
+          route_code: 'R-AGP-001',
+          route_date: '2026-03-01',
+          sequence: 4,
+          stop_type: 'DELIVERY',
+          status: 'completed',
+          planned_at: '2026-03-01T08:00:00Z',
+          completed_at: '2026-03-01T10:10:00Z',
+        },
+      ],
     };
+  },
+
+  async exportShipmentsCsv(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string }) {
+    return;
+  },
+
+  async exportShipmentsPdf(_: { status?: string; q?: string; scheduledFrom?: string; scheduledTo?: string }) {
+    return;
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}) {

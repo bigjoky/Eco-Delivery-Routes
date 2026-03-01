@@ -145,6 +145,82 @@ export function ShipmentDetailPage() {
           </TableWrapper>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Incidencias</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Codigo</TableHead>
+                  <TableHead>Notas</TableHead>
+                  <TableHead>Creado</TableHead>
+                  <TableHead>Resuelto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail?.incidents?.length ? detail.incidents.map((incident) => (
+                  <TableRow key={incident.id}>
+                    <TableCell>{incident.category}</TableCell>
+                    <TableCell>{incident.catalog_code}</TableCell>
+                    <TableCell>{incident.notes ?? '-'}</TableCell>
+                    <TableCell>{incident.created_at ?? '-'}</TableCell>
+                    <TableCell>{incident.resolved_at ?? '-'}</TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={5}>Sin incidencias</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Paradas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ruta</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Secuencia</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Completado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail?.route_stops?.length ? detail.route_stops.map((stop) => (
+                  <TableRow key={stop.id}>
+                    <TableCell>
+                      {stop.route_id ? <Link to={`/routes/${stop.route_id}`}>{stop.route_code ?? stop.route_id}</Link> : '-'}
+                    </TableCell>
+                    <TableCell>{stop.route_date ?? '-'}</TableCell>
+                    <TableCell>{stop.sequence}</TableCell>
+                    <TableCell>{stop.stop_type}</TableCell>
+                    <TableCell>{stop.status}</TableCell>
+                    <TableCell>{stop.planned_at ?? '-'}</TableCell>
+                    <TableCell>{stop.completed_at ?? '-'}</TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={7}>Sin paradas asociadas</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+        </CardContent>
+      </Card>
     </section>
   );
 }

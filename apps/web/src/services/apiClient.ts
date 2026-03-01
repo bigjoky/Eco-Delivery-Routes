@@ -497,6 +497,70 @@ export const apiClient = {
     return json.data as ShipmentDetail;
   },
 
+  async exportShipmentsCsv(filters: {
+    status?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportShipmentsCsv(filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
+    if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
+    if (filters.sort) params.set('sort', filters.sort);
+    if (filters.dir) params.set('dir', filters.dir);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/shipments/export.csv${suffix}`, {
+      headers: buildAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Cannot export shipments CSV');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'shipments_export.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  async exportShipmentsPdf(filters: {
+    status?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+  } = {}): Promise<void> {
+    if (USE_MOCK) return mockApi.exportShipmentsPdf(filters) as Promise<void>;
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
+    if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
+    if (filters.sort) params.set('sort', filters.sort);
+    if (filters.dir) params.set('dir', filters.dir);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/shipments/export.pdf${suffix}`, {
+      headers: buildAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Cannot export shipments PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'shipments_export.pdf';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {
     if (USE_MOCK) return mockApi.getPickups(filters) as Promise<PickupSummary[]>;
     const response = await authorizedFetch(`${API_BASE_URL}/pickups`);

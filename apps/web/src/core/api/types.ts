@@ -159,6 +159,18 @@ export type PodSummary = {
   captured_at?: string | null;
 };
 
+export type ShipmentRouteStopSummary = {
+  id: string;
+  route_id: string;
+  route_code?: string | null;
+  route_date?: string | null;
+  sequence: number;
+  stop_type: 'DELIVERY' | 'PICKUP';
+  status: string;
+  planned_at?: string | null;
+  completed_at?: string | null;
+};
+
 export type ShipmentDetail = {
   shipment: ShipmentSummary & {
     route_id?: string | null;
@@ -168,6 +180,8 @@ export type ShipmentDetail = {
   };
   tracking_events: TrackingEventSummary[];
   pods: PodSummary[];
+  incidents: IncidentSummary[];
+  route_stops: ShipmentRouteStopSummary[];
 };
 
 export type QualitySnapshot = {

@@ -29,6 +29,7 @@ export function ShipmentsPage() {
   const [createScheduledAt, setCreateScheduledAt] = useState('');
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
@@ -78,6 +79,34 @@ export function ShipmentsPage() {
       setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    setExportError('');
+    try {
+      await apiClient.exportShipmentsCsv({
+        status: status || undefined,
+        q: query || undefined,
+        scheduledFrom: scheduledFrom || undefined,
+        scheduledTo: scheduledTo || undefined,
+      });
+    } catch (exception) {
+      setExportError(exception instanceof Error ? exception.message : 'No se pudo exportar CSV');
+    }
+  };
+
+  const exportPdf = async () => {
+    setExportError('');
+    try {
+      await apiClient.exportShipmentsPdf({
+        status: status || undefined,
+        q: query || undefined,
+        scheduledFrom: scheduledFrom || undefined,
+        scheduledTo: scheduledTo || undefined,
+      });
+    } catch (exception) {
+      setExportError(exception instanceof Error ? exception.message : 'No se pudo exportar PDF');
     }
   };
 
@@ -196,7 +225,14 @@ export function ShipmentsPage() {
               value={scheduledTo}
               onChange={(event) => setScheduledTo(event.target.value)}
             />
+            <Button type="button" variant="outline" onClick={exportCsv}>
+              Export CSV
+            </Button>
+            <Button type="button" variant="outline" onClick={exportPdf}>
+              Export PDF
+            </Button>
           </div>
+          {exportError ? <div className="helper">{exportError}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
