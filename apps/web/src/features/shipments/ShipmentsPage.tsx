@@ -30,6 +30,7 @@ export function ShipmentsPage() {
   const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [createHubId, setCreateHubId] = useState('');
+  const [createHubCode, setCreateHubCode] = useState('XXX');
   const [createReference, setCreateReference] = useState('');
   const [createConsignee, setCreateConsignee] = useState('');
   const [createAddress, setCreateAddress] = useState('');
@@ -212,10 +213,24 @@ export function ShipmentsPage() {
     }).catch(() => setHubs([]));
   }, []);
 
+  useEffect(() => {
+    if (!createHubId) {
+      setCreateHubCode('XXX');
+      return;
+    }
+    const hub = hubs.find((item) => item.id === createHubId);
+    if (!hub) {
+      setCreateHubCode('XXX');
+      return;
+    }
+    const codePart = hub.code.split('-')[0] ?? 'XXX';
+    setCreateHubCode(codePart);
+  }, [createHubId, hubs]);
+
   const createShipment = async () => {
     const nextErrors: { hub?: string; reference?: string; scheduledAt?: string } = {};
     const reference = createReference.trim();
-    const referencePattern = /^SHP-[A-Z]{3}-\d{4}$/;
+    const referencePattern = new RegExp(`^SHP-${createHubCode}-\\\\d{4}$`);
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
     if (!reference) nextErrors.reference = 'La referencia es obligatoria.';
     if (reference && reference.length < 5) nextErrors.reference = 'La referencia debe tener al menos 5 caracteres.';
@@ -225,6 +240,14 @@ export function ShipmentsPage() {
     if (createScheduledAt) {
       const parsed = Date.parse(createScheduledAt);
       if (Number.isNaN(parsed)) nextErrors.scheduledAt = 'Fecha/hora no valida (usa ISO).';
+      const min = new Date();
+      min.setDate(min.getDate() - 30);
+      const max = new Date();
+      max.setDate(max.getDate() + 180);
+      if (!Number.isNaN(parsed)) {
+        if (parsed < min.getTime()) nextErrors.scheduledAt = 'La fecha no puede ser anterior a 30 dias.';
+        if (parsed > max.getTime()) nextErrors.scheduledAt = 'La fecha no puede superar 180 dias.';
+      }
     }
     setCreateFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -445,7 +468,7 @@ export function ShipmentsPage() {
               id="create-shipment-ref"
               value={createReference}
               onChange={(event) => setCreateReference(event.target.value)}
-              placeholder="SHP-AGP-0001"
+              placeholder={`SHP-${createHubCode}-0001`}
             />
             {createFieldErrors.reference ? <div className="helper">{createFieldErrors.reference}</div> : null}
             <label htmlFor="create-shipment-consignee">Destinatario</label>
