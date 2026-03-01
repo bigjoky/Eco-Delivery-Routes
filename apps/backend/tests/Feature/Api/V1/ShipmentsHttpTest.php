@@ -164,6 +164,34 @@ class ShipmentsHttpTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_rejects_duplicate_reference(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        DB::table('shipments')->insert([
+            'id' => (string) Str::uuid(),
+            'hub_id' => $hubId,
+            'reference' => 'SHP-DUP-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Cliente Duplicado',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $payload = [
+            'hub_id' => $hubId,
+            'reference' => 'SHP-DUP-001',
+            'consignee_name' => 'Cliente Duplicado',
+        ];
+
+        $response = $this->postJson('/api/v1/shipments', $payload);
+        $response->assertStatus(409);
+        $response->assertJsonPath('error.code', 'SHIPMENT_REFERENCE_EXISTS');
+    }
+
     public function test_can_show_shipment_detail_with_tracking_pods_incidents(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

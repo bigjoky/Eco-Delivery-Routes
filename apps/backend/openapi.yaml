@@ -1228,6 +1228,7 @@ paths:
               $ref: '#/components/schemas/CreateShipmentRequest'
       responses:
         '201': { description: Creado }
+        '409': { description: Referencia duplicada }
 
   /shipments/export.csv:
     get:

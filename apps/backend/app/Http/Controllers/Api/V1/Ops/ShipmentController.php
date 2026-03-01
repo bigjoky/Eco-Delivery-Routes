@@ -153,6 +153,16 @@ class ShipmentController extends Controller
             'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
         ]);
 
+        $exists = DB::table('shipments')->where('reference', $payload['reference'])->exists();
+        if ($exists) {
+            return response()->json([
+                'error' => [
+                    'code' => 'SHIPMENT_REFERENCE_EXISTS',
+                    'message' => 'Shipment reference already exists.',
+                ],
+            ], 409);
+        }
+
         $id = (string) Str::uuid();
         DB::table('shipments')->insert([
             'id' => $id,

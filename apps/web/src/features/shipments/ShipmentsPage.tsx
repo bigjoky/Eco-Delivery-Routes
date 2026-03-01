@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -25,6 +25,9 @@ export function ShipmentsPage() {
   const [hubFilter, setHubFilter] = useState('');
   const [scheduledFrom, setScheduledFrom] = useState('');
   const [scheduledTo, setScheduledTo] = useState('');
+  const [perPage, setPerPage] = useState(10);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [createHubId, setCreateHubId] = useState('');
   const [createReference, setCreateReference] = useState('');
@@ -75,7 +78,7 @@ export function ShipmentsPage() {
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
       page,
-      perPage: meta.per_page,
+      perPage,
       status: nextStatus || undefined,
       hubId: hubFilter || undefined,
       q: query || undefined,
@@ -89,8 +92,50 @@ export function ShipmentsPage() {
     });
 
   useEffect(() => {
+    if (!initializedFromParams.current) return;
     reload(1);
-  }, [status, hubFilter, query, scheduledFrom, scheduledTo, sortField, sortDir]);
+  }, [status, hubFilter, query, scheduledFrom, scheduledTo, sortField, sortDir, perPage]);
+
+  useEffect(() => {
+    if (initializedFromParams.current) return;
+    const statusParam = searchParams.get('status') ?? '';
+    const hubParam = searchParams.get('hub_id') ?? '';
+    const qParam = searchParams.get('q') ?? '';
+    const scheduledFromParam = searchParams.get('scheduled_from') ?? '';
+    const scheduledToParam = searchParams.get('scheduled_to') ?? '';
+    const sortParam = searchParams.get('sort') as 'created_at' | 'scheduled_at' | 'reference' | 'status' | null;
+    const dirParam = searchParams.get('dir') as 'asc' | 'desc' | null;
+    const perPageParam = Number(searchParams.get('per_page') ?? '');
+
+    if (statusParam) setStatus(statusParam);
+    if (hubParam) setHubFilter(hubParam);
+    if (qParam) setQuery(qParam);
+    if (scheduledFromParam) setScheduledFrom(scheduledFromParam);
+    if (scheduledToParam) setScheduledTo(scheduledToParam);
+    if (sortParam && ['created_at', 'scheduled_at', 'reference', 'status'].includes(sortParam)) setSortField(sortParam);
+    if (dirParam && (dirParam === 'asc' || dirParam === 'desc')) setSortDir(dirParam);
+    if (!Number.isNaN(perPageParam) && perPageParam > 0) setPerPage(perPageParam);
+
+    initializedFromParams.current = true;
+    const pageParam = Number(searchParams.get('page') ?? '1');
+    const initialPage = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+    reload(initialPage);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!initializedFromParams.current) return;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (hubFilter) params.set('hub_id', hubFilter);
+    if (query) params.set('q', query);
+    if (scheduledFrom) params.set('scheduled_from', scheduledFrom);
+    if (scheduledTo) params.set('scheduled_to', scheduledTo);
+    if (sortField) params.set('sort', sortField);
+    if (sortDir) params.set('dir', sortDir);
+    if (perPage) params.set('per_page', String(perPage));
+    if (meta.page) params.set('page', String(meta.page));
+    setSearchParams(params, { replace: true });
+  }, [status, hubFilter, query, scheduledFrom, scheduledTo, sortField, sortDir, perPage, meta.page, setSearchParams]);
 
   useEffect(() => {
     return sessionStore.subscribe(() => {
@@ -511,6 +556,16 @@ export function ShipmentsPage() {
               Anterior
             </Button>
             <span className="helper">Pagina {meta.page} / {Math.max(1, meta.last_page || 1)}</span>
+            <label htmlFor="shipments-per-page">Por pagina</label>
+            <select
+              id="shipments-per-page"
+              value={perPage}
+              onChange={(event) => setPerPage(Number(event.target.value))}
+            >
+              {[10, 25, 50].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
             <Button
               type="button"
               variant="outline"
