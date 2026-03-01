@@ -44,12 +44,15 @@ import {
   DriverRouteMeResponse,
   PodSummary,
   TrackingEventSummary,
+  ShipmentsImportResult,
+  ShipmentImportJob,
 } from '../core/api/types';
 import { sessionStore } from '../core/auth/sessionStore';
 import { mockApi } from '../mocks/mockApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const USE_MOCK = !API_BASE_URL;
+const normalizedApiBase = (API_BASE_URL ?? '').trim();
+const USE_MOCK = !normalizedApiBase || normalizedApiBase === 'undefined' || normalizedApiBase === 'null';
 let refreshPromise: Promise<string | null> | null = null;
 
 function buildAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
@@ -565,18 +568,16 @@ export const apiClient = {
     window.URL.revokeObjectURL(url);
   },
 
-  async importShipmentsCsv(file: File, options: { dryRun?: boolean } = {}): Promise<{
-    dry_run: boolean;
-    created_count: number;
-    skipped_count: number;
-    error_count: number;
-    rows: Array<{ row: number; reference?: string; status: string; errors?: string[] }>;
-  }> {
+  async importShipmentsCsv(
+    file: File,
+    options: { dryRun?: boolean; async?: boolean } = {}
+  ): Promise<ShipmentsImportResult | { job_dispatched: boolean; import_id: string; queued_at: string }> {
     if (USE_MOCK) return mockApi.importShipmentsCsv(file, options);
     const form = new FormData();
     form.append('file', file);
     const params = new URLSearchParams();
     if (options.dryRun) params.set('dry_run', '1');
+    if (options.async) params.set('async', '1');
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/shipments/import${suffix}`, {
       method: 'POST',
@@ -603,6 +604,21 @@ export const apiClient = {
     anchor.click();
     anchor.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  async getShipmentImportStatus(importId: string): Promise<ShipmentImportJob> {
+    if (USE_MOCK) return mockApi.getShipmentImportStatus(importId) as Promise<ShipmentImportJob>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/imports/${importId}`);
+    return parseData<ShipmentImportJob>(response);
+  },
+
+  async getShipmentImports(filters: { page?: number; perPage?: number } = {}): Promise<PaginatedResult<ShipmentImportJob>> {
+    if (USE_MOCK) return paginateLocal(await mockApi.getShipmentImports(filters), filters.page ?? 1, filters.perPage ?? 20);
+    const params = new URLSearchParams();
+    params.set('page', String(filters.page ?? 1));
+    params.set('per_page', String(filters.perPage ?? 20));
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/imports?${params.toString()}`);
+    return parsePaginatedData<ShipmentImportJob>(response);
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {

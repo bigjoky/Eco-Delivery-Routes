@@ -272,6 +272,34 @@ export type QualityThresholdAlertTopScope = {
   alerts_count: number;
 };
 
+export type ShipmentsImportResult = {
+  dry_run: boolean;
+  created_count: number;
+  skipped_count: number;
+  error_count: number;
+  rows: Array<{ row: number; reference?: string; status: string; errors?: string[] }>;
+  warnings?: string[];
+  unknown_columns?: string[];
+  import_id?: string;
+};
+
+export type ShipmentImportJob = {
+  id: string;
+  actor_user_id?: string | null;
+  status: string;
+  created_count: number;
+  error_count: number;
+  skipped_count: number;
+  warnings?: string[] | null;
+  unknown_columns?: string[] | null;
+  error_message?: string | null;
+  file_path: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type QualityRouteBreakdown = {
   scope_type: 'route';
   scope_id: string;

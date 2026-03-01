@@ -59,6 +59,10 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.import');
         Route::post('shipments/import', [ShipmentController::class, 'importCsv'])
             ->middleware('can:shipments.import');
+        Route::get('shipments/imports', [ShipmentController::class, 'importIndex'])
+            ->middleware('can:shipments.import');
+        Route::get('shipments/imports/{id}', [ShipmentController::class, 'importStatus'])
+            ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
         Route::post('shipments/{id}/deliver', [ShipmentController::class, 'markDelivered']);

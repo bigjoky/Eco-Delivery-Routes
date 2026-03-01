@@ -21,6 +21,7 @@
 - Si se envia `dry_run=1`, no se insertan filas y se devuelve el preview con errores.
 - Endpoint plantilla: `GET /api/v1/shipments/template.csv`.
 - Importacion async: `POST /api/v1/shipments/import?async=1` (encola el proceso).
+- Requiere cola activa: configurar `QUEUE_CONNECTION=database` y ejecutar `php artisan queue:work`.
 
 ## Ejemplo
 ```

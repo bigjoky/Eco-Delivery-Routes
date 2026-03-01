@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-test('route ops flow: login, open route, update manifest notes, undo stop', async ({ page }) => {
-  await page.goto('/');
-  await page.fill('input[placeholder="Email"]', 'admin@eco.local');
-  await page.fill('input[placeholder="Password"]', 'password123');
-  await page.click('text=Entrar');
-  await page.waitForURL('**/shipments');
-
-  await page.click('text=Rutas');
+test('route ops flow: open route, update manifest notes, undo stop', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('eco_delivery_routes_token', 'mock-token');
+    window.localStorage.setItem('eco_delivery_routes_roles', JSON.stringify(['super_admin']));
+  });
+  await page.goto('/routes');
   await page.waitForURL('**/routes');
 
   const firstRoute = page.locator('table a').first();

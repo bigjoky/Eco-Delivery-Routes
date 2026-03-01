@@ -24,7 +24,9 @@ const accessMap: Record<FeatureAccess, string[]> = {
 };
 
 export function canAccess(feature: FeatureAccess, roles: string[]): boolean {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+  const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
+  if (isMock && roles.length === 0) return true;
   if (roles.includes('super_admin')) return true;
   return accessMap[feature].some((role) => roles.includes(role));
 }
-

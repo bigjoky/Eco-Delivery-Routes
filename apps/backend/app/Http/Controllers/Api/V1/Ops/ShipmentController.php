@@ -356,17 +356,28 @@ class ShipmentController extends Controller
             $targetDir = 'imports/shipments';
             $filename = (string) Str::uuid() . '.csv';
             $path = $file->storeAs($targetDir, $filename);
+            $importId = (string) Str::uuid();
+
+            DB::table('shipments_import_jobs')->insert([
+                'id' => $importId,
+                'actor_user_id' => $actor->id,
+                'status' => 'queued',
+                'file_path' => $path,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
             $this->auditLogWriter->write($actor->id, 'shipments.import.queued', [
+                'import_id' => $importId,
                 'path' => $path,
             ]);
 
-            \App\Jobs\ImportShipmentsCsvJob::dispatch($path, $actor->id);
+            \App\Jobs\ImportShipmentsCsvJob::dispatch($importId, $path, $actor->id);
 
             return response()->json([
                 'data' => [
                     'job_dispatched' => true,
-                    'job_id' => $filename,
+                    'import_id' => $importId,
                     'queued_at' => now()->toDateTimeString(),
                 ],
             ], 202);
@@ -378,14 +389,73 @@ class ShipmentController extends Controller
             return response()->json(['error' => ['message' => $exception->getMessage()]], 422);
         }
 
+        $importId = (string) Str::uuid();
+        DB::table('shipments_import_jobs')->insert([
+            'id' => $importId,
+            'actor_user_id' => $actor->id,
+            'status' => $dryRun ? 'completed' : 'completed',
+            'created_count' => $result['created_count'] ?? 0,
+            'error_count' => $result['error_count'] ?? 0,
+            'skipped_count' => $result['skipped_count'] ?? 0,
+            'warnings' => json_encode($result['warnings'] ?? [], JSON_THROW_ON_ERROR),
+            'unknown_columns' => json_encode($result['unknown_columns'] ?? [], JSON_THROW_ON_ERROR),
+            'file_path' => 'direct_upload',
+            'started_at' => now(),
+            'completed_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $this->auditLogWriter->write($actor->id, 'shipments.imported', [
+            'import_id' => $importId,
             'dry_run' => $dryRun,
             'created_count' => $result['created_count'] ?? 0,
             'error_count' => $result['error_count'] ?? 0,
             'warnings' => $result['warnings'] ?? [],
         ]);
 
-        return response()->json(['data' => $result]);
+        return response()->json(['data' => array_merge($result, ['import_id' => $importId])]);
+    }
+
+    public function importStatus(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.import')) {
+            return $this->forbidden();
+        }
+
+        $row = DB::table('shipments_import_jobs')->where('id', $id)->first();
+        if (!$row) {
+            return $this->notFound('Import job not found.');
+        }
+
+        return response()->json(['data' => $row]);
+    }
+
+    public function importIndex(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.import')) {
+            return $this->forbidden();
+        }
+
+        $perPage = max(1, min((int) $request->query('per_page', 20), 100));
+        $page = max(1, (int) $request->query('page', 1));
+        $query = DB::table('shipments_import_jobs')->orderByDesc('created_at');
+        $total = (clone $query)->count();
+        $rows = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
+
+        return response()->json([
+            'data' => $rows,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $perPage > 0 ? (int) ceil($total / $perPage) : 0,
+            ],
+        ]);
     }
 
     private function baseQueryForActor(User $actor)

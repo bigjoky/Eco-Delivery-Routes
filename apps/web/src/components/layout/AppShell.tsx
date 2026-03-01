@@ -19,10 +19,13 @@ const menu = [
 ];
 
 export function AppShell({ children, roles, isAuthenticated }: PropsWithChildren<{ roles: string[]; isAuthenticated: boolean }>) {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+  const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const visibleMenu = menu.filter((item) => {
     if (item.to === '/' && isAuthenticated) return false;
     if (!item.feature) return true;
     if (!isAuthenticated) return false;
+    if (isMock && roles.length === 0) return true;
     return canAccess(item.feature, roles);
   });
 

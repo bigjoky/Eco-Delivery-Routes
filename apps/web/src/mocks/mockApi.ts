@@ -760,7 +760,14 @@ export const mockApi = {
     return;
   },
 
-  async importShipmentsCsv(_: File, options: { dryRun?: boolean } = {}) {
+  async importShipmentsCsv(_: File, options: { dryRun?: boolean; async?: boolean } = {}) {
+    if (options.async) {
+      return {
+        job_dispatched: true,
+        import_id: 'imp-1',
+        queued_at: '2026-03-01T12:00:00Z',
+      };
+    }
     return {
       dry_run: !!options.dryRun,
       created_count: options.dryRun ? 0 : 2,
@@ -771,11 +778,54 @@ export const mockApi = {
         { row: 3, reference: 'SHP-AGP-0012', status: 'ok' },
         { row: 4, reference: 'SHP-AGP-0001', status: 'error', errors: ['reference ya existe'] },
       ],
+      warnings: [],
+      unknown_columns: [],
+      import_id: 'imp-1',
     };
   },
 
   async downloadShipmentsTemplate() {
     return;
+  },
+
+  async getShipmentImportStatus(importId: string) {
+    return {
+      id: importId,
+      actor_user_id: 'u-1',
+      status: 'completed',
+      created_count: 2,
+      error_count: 1,
+      skipped_count: 1,
+      warnings: [],
+      unknown_columns: [],
+      error_message: null,
+      file_path: 'imports/shipments/mock.csv',
+      started_at: '2026-03-01T12:00:00Z',
+      completed_at: '2026-03-01T12:02:00Z',
+      created_at: '2026-03-01T12:00:00Z',
+      updated_at: '2026-03-01T12:02:00Z',
+    };
+  },
+
+  async getShipmentImports(_: { page?: number; perPage?: number } = {}) {
+    return [
+      {
+        id: 'imp-1',
+        actor_user_id: 'u-1',
+        status: 'completed',
+        created_count: 2,
+        error_count: 1,
+        skipped_count: 1,
+        warnings: [],
+        unknown_columns: [],
+        error_message: null,
+        file_path: 'imports/shipments/mock.csv',
+        started_at: '2026-03-01T12:00:00Z',
+        completed_at: '2026-03-01T12:02:00Z',
+        created_at: '2026-03-01T12:00:00Z',
+        updated_at: '2026-03-01T12:02:00Z',
+      },
+    ];
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}) {

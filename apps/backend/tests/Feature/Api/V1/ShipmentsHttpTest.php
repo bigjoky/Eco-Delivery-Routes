@@ -290,6 +290,15 @@ class ShipmentsHttpTest extends TestCase
 
         $response->assertStatus(202);
         $response->assertJsonPath('data.job_dispatched', true);
+        $importId = $response->json('data.import_id');
+        $this->assertNotEmpty($importId);
+
+        $statusResponse = $this->get('/api/v1/shipments/imports/' . $importId);
+        $statusResponse->assertOk();
+        $statusResponse->assertJsonPath('data.id', $importId);
+
+        $listResponse = $this->get('/api/v1/shipments/imports');
+        $listResponse->assertOk();
     }
 
     private function createUserWithRole(string $roleCode): User
