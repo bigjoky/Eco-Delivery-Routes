@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { HubSummary, PaginationMeta, ShipmentSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
@@ -39,6 +40,7 @@ export function ShipmentsPage() {
     'delivered_at',
     'hub_id',
   ]);
+  const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
   const [importResult, setImportResult] = useState<null | {
@@ -50,6 +52,7 @@ export function ShipmentsPage() {
   }>(null);
   const [importError, setImportError] = useState('');
   const [importing, setImporting] = useState(false);
+  const [roles, setRoles] = useState(sessionStore.getRoles());
 
   const reload = (page: number, nextStatus: string = status) =>
     apiClient.getShipments({
@@ -67,6 +70,19 @@ export function ShipmentsPage() {
   useEffect(() => {
     reload(1);
   }, [status, query, scheduledFrom, scheduledTo]);
+
+  useEffect(() => {
+    return sessionStore.subscribe(() => {
+      setRoles(sessionStore.getRoles());
+    });
+  }, []);
+
+  const canExport = roles.some((role) => (
+    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator' || role === 'accountant'
+  ));
+  const canImport = roles.some((role) => (
+    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator'
+  ));
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {
@@ -140,6 +156,32 @@ export function ShipmentsPage() {
     ));
   };
 
+  const summarizeImportErrors = (rows: Array<{ status: string; errors?: string[] }>) => {
+    const summary: Record<string, number> = {};
+    rows.forEach((row) => {
+      if (row.status !== 'error' || !row.errors?.length) return;
+      row.errors.forEach((error) => {
+        summary[error] = (summary[error] ?? 0) + 1;
+      });
+    });
+    return summary;
+  };
+
+  const downloadImportTemplate = () => {
+    const header = 'hub_code,reference,consignee_name,address_line,scheduled_at,service_type';
+    const sample = 'AGP-HUB-01,SHP-AGP-0009,Cliente Demo,Calle Larios 12,2026-03-05T08:30:00Z,delivery';
+    const content = `${header}\n${sample}\n`;
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'shipments_import_template.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const runImport = async () => {
     if (!importFile) {
       setImportError('Selecciona un CSV para importar.');
@@ -147,10 +189,12 @@ export function ShipmentsPage() {
     }
     setImportError('');
     setImportResult(null);
+    setImportSummary(null);
     setImporting(true);
     try {
       const result = await apiClient.importShipmentsCsv(importFile, { dryRun: importDryRun });
       setImportResult(result);
+      setImportSummary(summarizeImportErrors(result.rows));
     } catch (exception) {
       setImportError(exception instanceof Error ? exception.message : 'No se pudo importar');
     } finally {
@@ -273,27 +317,35 @@ export function ShipmentsPage() {
               value={scheduledTo}
               onChange={(event) => setScheduledTo(event.target.value)}
             />
-            <Button type="button" variant="outline" onClick={exportCsv}>
-              Export CSV
-            </Button>
-            <Button type="button" variant="outline" onClick={exportPdf}>
-              Export PDF
-            </Button>
+            {canExport ? (
+              <>
+                <Button type="button" variant="outline" onClick={exportCsv}>
+                  Export CSV
+                </Button>
+                <Button type="button" variant="outline" onClick={exportPdf}>
+                  Export PDF
+                </Button>
+              </>
+            ) : null}
           </div>
-          <div className="inline-actions">
-            <span className="helper">Columnas export</span>
-            {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
-              <label key={column}>
-                <input
-                  type="checkbox"
-                  checked={exportColumns.includes(column)}
-                  onChange={() => toggleExportColumn(column)}
-                />
-                {column}
-              </label>
-            ))}
-          </div>
-          {exportError ? <div className="helper">{exportError}</div> : null}
+          {canExport ? (
+            <>
+              <div className="inline-actions">
+                <span className="helper">Columnas export</span>
+                {['reference', 'status', 'consignee_name', 'address_line', 'scheduled_at', 'delivered_at', 'hub_id'].map((column) => (
+                  <label key={column}>
+                    <input
+                      type="checkbox"
+                      checked={exportColumns.includes(column)}
+                      onChange={() => toggleExportColumn(column)}
+                    />
+                    {column}
+                  </label>
+                ))}
+              </div>
+              {exportError ? <div className="helper">{exportError}</div> : null}
+            </>
+          ) : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
@@ -310,72 +362,83 @@ export function ShipmentsPage() {
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="page-title">Importar CSV</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="inline-actions">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-            />
-            <label>
+      {canImport ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="page-title">Importar CSV</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="inline-actions">
               <input
-                type="checkbox"
-                checked={importDryRun}
-                onChange={(event) => setImportDryRun(event.target.checked)}
+                type="file"
+                accept=".csv"
+                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
               />
-              Dry run
-            </label>
-            <Button type="button" onClick={runImport} disabled={importing}>
-              {importing ? 'Importando...' : 'Importar'}
-            </Button>
-          </div>
-          {importError ? <div className="helper">{importError}</div> : null}
-          {importResult ? (
-            <div className="kpi-grid">
-              <div>
-                <div className="helper">Dry run</div>
-                <div>{importResult.dry_run ? 'si' : 'no'}</div>
-              </div>
-              <div>
-                <div className="helper">Creados</div>
-                <div>{importResult.created_count}</div>
-              </div>
-              <div>
-                <div className="helper">Errores</div>
-                <div>{importResult.error_count}</div>
-              </div>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={importDryRun}
+                  onChange={(event) => setImportDryRun(event.target.checked)}
+                />
+                Dry run
+              </label>
+              <Button type="button" onClick={runImport} disabled={importing}>
+                {importing ? 'Importando...' : 'Importar'}
+              </Button>
+              <Button type="button" variant="outline" onClick={downloadImportTemplate}>
+                Descargar plantilla
+              </Button>
             </div>
-          ) : null}
-          {importResult?.rows?.length ? (
-            <TableWrapper>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fila</TableHead>
-                    <TableHead>Referencia</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Errores</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {importResult.rows.map((row) => (
-                    <TableRow key={`${row.row}-${row.reference ?? ''}`}>
-                      <TableCell>{row.row}</TableCell>
-                      <TableCell>{row.reference ?? '-'}</TableCell>
-                      <TableCell>{row.status}</TableCell>
-                      <TableCell>{row.errors?.join(', ') ?? '-'}</TableCell>
+            {importError ? <div className="helper">{importError}</div> : null}
+            {importResult ? (
+              <div className="kpi-grid">
+                <div>
+                  <div className="helper">Dry run</div>
+                  <div>{importResult.dry_run ? 'si' : 'no'}</div>
+                </div>
+                <div>
+                  <div className="helper">Creados</div>
+                  <div>{importResult.created_count}</div>
+                </div>
+                <div>
+                  <div className="helper">Errores</div>
+                  <div>{importResult.error_count}</div>
+                </div>
+                {importSummary ? Object.entries(importSummary).map(([reason, count]) => (
+                  <div key={reason}>
+                    <div className="helper">{reason}</div>
+                    <div>{count}</div>
+                  </div>
+                )) : null}
+              </div>
+            ) : null}
+            {importResult?.rows?.length ? (
+              <TableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fila</TableHead>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Errores</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableWrapper>
-          ) : null}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {importResult.rows.map((row) => (
+                      <TableRow key={`${row.row}-${row.reference ?? ''}`}>
+                        <TableCell>{row.row}</TableCell>
+                        <TableCell>{row.reference ?? '-'}</TableCell>
+                        <TableCell>{row.status}</TableCell>
+                        <TableCell>{row.errors?.join(', ') ?? '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableWrapper>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

@@ -24,7 +24,7 @@ class RbacSeeder extends Seeder
             'auth.login', 'auth.logout', 'auth.refresh',
             'users.read', 'users.create', 'users.update', 'users.suspend',
             'roles.read', 'roles.assign', 'audit.read',
-            'shipments.read', 'shipments.write',
+            'shipments.read', 'shipments.write', 'shipments.export', 'shipments.import',
             'routes.read', 'routes.write',
             'pickups.read', 'pickups.write',
             'tracking.write', 'pods.write', 'incidents.read', 'incidents.write',
@@ -66,16 +66,16 @@ class RbacSeeder extends Seeder
 
         $rolePermissionMap = [
             'operations_manager' => [
-                'shipments.read', 'shipments.write', 'routes.read', 'routes.write',
+                'shipments.read', 'shipments.write', 'shipments.export', 'shipments.import', 'routes.read', 'routes.write',
                 'pickups.read', 'pickups.write', 'tracking.write', 'pods.write', 'incidents.read', 'incidents.write',
                 'quality.read', 'quality.read.dashboard', 'quality.export', 'tariffs.read', 'tariffs.write', 'users.read', 'roles.read',
             ],
             'traffic_operator' => [
-                'shipments.read', 'shipments.write', 'routes.read', 'routes.write',
+                'shipments.read', 'shipments.write', 'shipments.export', 'shipments.import', 'routes.read', 'routes.write',
                 'pickups.read', 'pickups.write', 'tracking.write', 'incidents.read', 'incidents.write', 'quality.read', 'quality.read.dashboard', 'tariffs.read',
             ],
             'warehouse_operator' => [
-                'shipments.read', 'shipments.write', 'routes.read',
+                'shipments.read', 'shipments.write', 'shipments.import', 'routes.read',
                 'tracking.write', 'incidents.read', 'incidents.write',
             ],
             'accountant' => [
@@ -84,6 +84,7 @@ class RbacSeeder extends Seeder
                 'settlements.read', 'settlements.write', 'settlements.approve', 'settlements.export', 'settlements.pay',
                 'advances.read', 'advances.write',
                 'users.read', 'roles.read',
+                'shipments.export',
             ],
             'driver' => [
                 'routes.read', 'shipments.read', 'pickups.read', 'pickups.write', 'tracking.write', 'pods.write', 'incidents.read', 'incidents.write',

@@ -16,8 +16,8 @@ test('shipments flow: list, export buttons, open detail', async ({ page }) => {
   await page.waitForURL('**/shipments/**');
 
   await expect(page.getByText('Detalle envio')).toBeVisible();
-  await expect(page.getByText('Tracking')).toBeVisible();
-  await expect(page.getByText('POD')).toBeVisible();
-  await expect(page.getByText('Incidencias')).toBeVisible();
-  await expect(page.getByText('Paradas')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tracking' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'POD' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Incidencias' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Paradas' })).toBeVisible();
 });
