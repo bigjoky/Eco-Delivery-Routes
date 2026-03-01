@@ -1393,6 +1393,23 @@ paths:
       responses:
         '200': { description: OK }
         '404': { description: Ruta no encontrada }
+    patch:
+      tags: [Routes]
+      summary: Actualizar notas del manifiesto de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteManifestRequest'
+      responses:
+        '200': { description: Actualizado }
+        '404': { description: Ruta no encontrada }
 
   /routes/{id}/manifest/export.csv:
     get:
@@ -2156,6 +2173,10 @@ components:
         subcontractor_id: { type: string, format: uuid, nullable: true }
         vehicle_id: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+    UpdateRouteManifestRequest:
+      type: object
+      properties:
+        manifest_notes: { type: string, nullable: true }
     CreateRouteStopRequest:
       type: object
       required: [sequence, stop_type]

@@ -47,7 +47,12 @@ export function LoginPage() {
     <section className="page-grid two">
       <Card>
         <CardHeader>
-          <CardTitle className="page-title">Acceso Backoffice</CardTitle>
+          <CardTitle className="page-title">
+            <span className="brand">
+              <img src="/logo.svg" alt="Eco Delivery Routes" className="brand-logo" />
+              <span>Acceso Backoffice</span>
+            </span>
+          </CardTitle>
           <CardDescription>Autenticacion sobre API /v1 con token Bearer.</CardDescription>
         </CardHeader>
         <CardContent>

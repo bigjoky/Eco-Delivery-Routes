@@ -586,6 +586,49 @@ class RouteController extends Controller
         return response()->json(['data' => $payload]);
     }
 
+    public function updateManifest(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'manifest_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $notes = $payload['manifest_notes'] ?? null;
+        if (is_string($notes) && trim($notes) === '') {
+            $notes = null;
+        }
+
+        DB::table('routes')
+            ->where('id', $id)
+            ->update([
+                'manifest_notes' => $notes,
+                'updated_at' => now(),
+            ]);
+
+        $this->writeRouteAudit($actor, $id, 'route.manifest.updated', [
+            'manifest_notes' => $notes,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'route_id' => $id,
+                'manifest_notes' => $notes,
+            ],
+        ]);
+    }
+
     public function manifestExportCsv(Request $request, string $id): Response|JsonResponse
     {
         /** @var User $actor */
@@ -786,6 +829,7 @@ class RouteController extends Controller
                 'routes.code',
                 'routes.route_date',
                 'routes.status',
+                'routes.manifest_notes',
                 'drivers.code as driver_code',
                 'vehicles.code as vehicle_code'
             )

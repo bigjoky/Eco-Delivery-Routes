@@ -2,6 +2,85 @@ import SharedCore
 import SwiftUI
 import Foundation
 
+private struct RouteManifestAPIResponse: Decodable {
+    let data: RouteManifestPayload
+}
+
+private struct RouteManifestPayload: Decodable {
+    let route: RouteManifestRoute
+    let totals: RouteManifestTotalsPayload
+    let stops: [RouteManifestStop]
+    let generatedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case route
+        case totals
+        case stops
+        case generatedAt = "generated_at"
+    }
+}
+
+private struct RouteManifestRoute: Decodable {
+    let id: String
+    let code: String
+    let routeDate: String
+    let status: String
+    let driverCode: String?
+    let vehicleCode: String?
+    let manifestNotes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case code
+        case routeDate = "route_date"
+        case status
+        case driverCode = "driver_code"
+        case vehicleCode = "vehicle_code"
+        case manifestNotes = "manifest_notes"
+    }
+}
+
+private struct RouteManifestTotalsPayload: Decodable {
+    let stops: Int
+    let deliveries: Int
+    let pickups: Int
+    let completed: Int
+}
+
+private struct RouteManifestStop: Decodable {
+    let id: String
+    let sequence: Int
+    let stopType: String
+    let reference: String?
+    let entityId: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sequence
+        case stopType = "stop_type"
+        case reference
+        case entityId = "entity_id"
+        case status
+    }
+}
+
+private struct RouteManifestRow: Identifiable {
+    let id: String
+    let sequence: Int
+    let stopType: String
+    let reference: String
+    let status: String
+}
+
+private struct RouteManifestTotals {
+    let stops: Int
+    let deliveries: Int
+    let pickups: Int
+    let completed: Int
+    let manifestNotes: String?
+}
+
 struct ContentView: View {
     private enum Section: String, CaseIterable, Identifiable {
         case operations = "Operativa"
@@ -73,6 +152,13 @@ struct ContentView: View {
     @State private var email: String = "admin@eco.local"
     @State private var password: String = "password123"
     @State private var loginMessage: String = "No autenticado"
+    @State private var manifestRouteId: String = ""
+    @State private var manifestRouteCode: String = "-"
+    @State private var manifestRouteDate: String = "-"
+    @State private var manifestTotals: RouteManifestTotals = RouteManifestTotals(stops: 0, deliveries: 0, pickups: 0, completed: 0, manifestNotes: nil)
+    @State private var manifestRows: [RouteManifestRow] = []
+    @State private var manifestLoading: Bool = false
+    @State private var manifestError: String?
 
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
@@ -123,6 +209,10 @@ struct ContentView: View {
 
     private var loginView: some View {
         VStack(spacing: 12) {
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 72)
             Text("Warehouse / Traffic Login")
                 .font(.headline)
             TextField("Email", text: $email)
@@ -187,6 +277,43 @@ struct ContentView: View {
                 Text(operationalMessage).font(.caption)
                 Button("Recargar manifiesto") {
                     Task { await loadRoute() }
+                }
+                Divider()
+                Text("Manifest API (ruta por ID)")
+                    .font(.headline)
+                TextField("Route ID", text: $manifestRouteId)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Button(manifestLoading ? "Cargando..." : "Cargar manifest") {
+                    Task { await loadManifestById() }
+                }
+                .disabled(manifestLoading || manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if let manifestError {
+                    Text(manifestError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Text("\(manifestRouteCode) | \(manifestRouteDate)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Stops: \(manifestTotals.stops) · Deliveries: \(manifestTotals.deliveries) · Pickups: \(manifestTotals.pickups) · Completed: \(manifestTotals.completed)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let notes = manifestTotals.manifestNotes, !notes.isEmpty {
+                    Text("Notas: \(notes)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !manifestRows.isEmpty {
+                    List(manifestRows.prefix(6)) { row in
+                        VStack(alignment: .leading) {
+                            Text("#\(row.sequence) \(row.stopType) \(row.reference)")
+                                .font(.caption)
+                            Text(row.status)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxHeight: 180)
                 }
                 Spacer()
             }
@@ -613,6 +740,7 @@ struct ContentView: View {
         await loadQualityThreshold()
         await loadQualityThresholdAlerts()
         await loadRoute()
+        await loadManifestById()
         await loadRouteQuality()
         await loadAdvances()
         await loadTariffs()
@@ -627,6 +755,61 @@ struct ContentView: View {
         )
         routeStops = payload?.stops ?? []
         selectedStopId = routeStops.first?.id
+        if manifestRouteId.isEmpty, let routeId = payload?.route?.id {
+            manifestRouteId = routeId
+        }
+    }
+
+    private func loadManifestById() async {
+        let trimmedRouteId = manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRouteId.isEmpty else { return }
+        guard let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] else {
+            manifestError = "API_BASE_URL no configurado"
+            return
+        }
+        guard let url = URL(string: "\(baseURL)/routes/\(trimmedRouteId)/manifest") else {
+            manifestError = "URL invalida"
+            return
+        }
+
+        manifestLoading = true
+        manifestError = nil
+        defer { manifestLoading = false }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = authSession.token?.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                manifestError = "Error HTTP al cargar manifest"
+                return
+            }
+            let decoded = try JSONDecoder().decode(RouteManifestAPIResponse.self, from: data).data
+            manifestRouteCode = decoded.route.code
+            manifestRouteDate = decoded.route.routeDate
+            manifestTotals = RouteManifestTotals(
+                stops: decoded.totals.stops,
+                deliveries: decoded.totals.deliveries,
+                pickups: decoded.totals.pickups,
+                completed: decoded.totals.completed,
+                manifestNotes: decoded.route.manifestNotes
+            )
+            manifestRows = decoded.stops.map {
+                RouteManifestRow(
+                    id: $0.id,
+                    sequence: $0.sequence,
+                    stopType: $0.stopType,
+                    reference: $0.reference ?? $0.entityId,
+                    status: $0.status
+                )
+            }
+        } catch {
+            manifestError = "No se pudo cargar manifest"
+        }
     }
 
     private func loadRouteQuality() async {
