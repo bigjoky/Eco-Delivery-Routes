@@ -49,6 +49,9 @@ export type ShipmentSummary = {
   reference: string;
   status: string;
   consignee_name?: string | null;
+  address_line?: string | null;
+  scheduled_at?: string | null;
+  hub_id?: string | null;
 };
 
 export type PickupSummary = {
@@ -141,7 +144,9 @@ export type TrackingEventSummary = {
   trackable_type: 'shipment' | 'pickup';
   trackable_id: string;
   event_code: string;
-  scan_code: string;
+  status_to?: string | null;
+  scan_code?: string | null;
+  source?: string | null;
   occurred_at: string;
 };
 
@@ -149,7 +154,20 @@ export type PodSummary = {
   id: string;
   evidenceable_type: 'shipment' | 'pickup';
   evidenceable_id: string;
-  signature_name: string;
+  signature_name?: string | null;
+  photo_url?: string | null;
+  captured_at?: string | null;
+};
+
+export type ShipmentDetail = {
+  shipment: ShipmentSummary & {
+    route_id?: string | null;
+    assigned_driver_id?: string | null;
+    subcontractor_id?: string | null;
+    delivered_at?: string | null;
+  };
+  tracking_events: TrackingEventSummary[];
+  pods: PodSummary[];
 };
 
 export type QualitySnapshot = {

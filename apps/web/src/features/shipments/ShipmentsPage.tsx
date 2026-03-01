@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { PaginationMeta, ShipmentSummary } from '../../core/api/types';
+import { HubSummary, PaginationMeta, ShipmentSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
@@ -17,19 +18,121 @@ export function ShipmentsPage() {
   const [items, setItems] = useState<ShipmentSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
   const [status, setStatus] = useState('');
+  const [query, setQuery] = useState('');
+  const [scheduledFrom, setScheduledFrom] = useState('');
+  const [scheduledTo, setScheduledTo] = useState('');
+  const [hubs, setHubs] = useState<HubSummary[]>([]);
+  const [createHubId, setCreateHubId] = useState('');
+  const [createReference, setCreateReference] = useState('');
+  const [createConsignee, setCreateConsignee] = useState('');
+  const [createAddress, setCreateAddress] = useState('');
+  const [createScheduledAt, setCreateScheduledAt] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const reload = (page: number, nextStatus: string = status) =>
-    apiClient.getShipments({ page, perPage: meta.per_page, status: nextStatus || undefined }).then((result) => {
+    apiClient.getShipments({
+      page,
+      perPage: meta.per_page,
+      status: nextStatus || undefined,
+      q: query || undefined,
+      scheduledFrom: scheduledFrom || undefined,
+      scheduledTo: scheduledTo || undefined,
+    }).then((result) => {
       setItems(result.data);
       setMeta(result.meta);
     });
 
   useEffect(() => {
     reload(1);
-  }, [status]);
+  }, [status, query, scheduledFrom, scheduledTo]);
+
+  useEffect(() => {
+    apiClient.getHubs({ onlyActive: true }).then((rows) => {
+      setHubs(rows);
+      if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
+    }).catch(() => setHubs([]));
+  }, []);
+
+  const createShipment = async () => {
+    if (!createHubId || !createReference) {
+      setCreateError('Hub y referencia son obligatorios.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await apiClient.createShipment({
+        hub_id: createHubId,
+        reference: createReference,
+        consignee_name: createConsignee || null,
+        address_line: createAddress || null,
+        scheduled_at: createScheduledAt || null,
+      });
+      setCreateReference('');
+      setCreateConsignee('');
+      setCreateAddress('');
+      setCreateScheduledAt('');
+      await reload(1);
+    } catch (exception) {
+      setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear el envio');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <section className="page-grid">
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Crear Envio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="inline-actions">
+            <label htmlFor="create-shipment-hub">Hub</label>
+            <select id="create-shipment-hub" value={createHubId} onChange={(event) => setCreateHubId(event.target.value)}>
+              <option value="">Selecciona hub</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+              ))}
+            </select>
+            <label htmlFor="create-shipment-ref">Referencia</label>
+            <input
+              id="create-shipment-ref"
+              value={createReference}
+              onChange={(event) => setCreateReference(event.target.value)}
+              placeholder="SHP-AGP-0001"
+            />
+            <label htmlFor="create-shipment-consignee">Destinatario</label>
+            <input
+              id="create-shipment-consignee"
+              value={createConsignee}
+              onChange={(event) => setCreateConsignee(event.target.value)}
+              placeholder="Nombre cliente"
+            />
+          </div>
+          <div className="inline-actions">
+            <label htmlFor="create-shipment-address">Direccion</label>
+            <input
+              id="create-shipment-address"
+              value={createAddress}
+              onChange={(event) => setCreateAddress(event.target.value)}
+              placeholder="Calle, numero"
+            />
+            <label htmlFor="create-shipment-scheduled">Programado</label>
+            <input
+              id="create-shipment-scheduled"
+              type="datetime-local"
+              value={createScheduledAt}
+              onChange={(event) => setCreateScheduledAt(event.target.value)}
+            />
+            <Button type="button" onClick={createShipment} disabled={creating}>
+              {creating ? 'Creando...' : 'Crear envio'}
+            </Button>
+          </div>
+          {createError ? <div className="helper">{createError}</div> : null}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Envios</CardTitle>
@@ -42,20 +145,31 @@ export function ShipmentsPage() {
                   <TableHead>Referencia</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Destinatario</TableHead>
+                  <TableHead>Direccion</TableHead>
+                  <TableHead>Programado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell>{item.reference}</TableCell>
+                    <TableCell><Link to={`/shipments/${item.id}`}>{item.reference}</Link></TableCell>
                     <TableCell><Badge variant={shipmentVariant(item.status)}>{item.status}</Badge></TableCell>
                     <TableCell>{item.consignee_name ?? '-'}</TableCell>
+                    <TableCell>{item.address_line ?? '-'}</TableCell>
+                    <TableCell>{item.scheduled_at ?? '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableWrapper>
           <div className="inline-actions">
+            <label htmlFor="shipment-query">Buscar</label>
+            <input
+              id="shipment-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Referencia, ID o destinatario"
+            />
             <label htmlFor="shipment-status">Estado</label>
             <select
               id="shipment-status"
@@ -68,6 +182,20 @@ export function ShipmentsPage() {
               <option value="delivered">delivered</option>
               <option value="incident">incident</option>
             </select>
+            <label htmlFor="shipment-date-from">Desde</label>
+            <input
+              id="shipment-date-from"
+              type="date"
+              value={scheduledFrom}
+              onChange={(event) => setScheduledFrom(event.target.value)}
+            />
+            <label htmlFor="shipment-date-to">Hasta</label>
+            <input
+              id="shipment-date-to"
+              type="date"
+              value={scheduledTo}
+              onChange={(event) => setScheduledTo(event.target.value)}
+            />
           </div>
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>

@@ -625,13 +625,104 @@ export const mockApi = {
     ];
   },
 
-  async getShipments(filters: { status?: string } = {}) {
-    const rows = [
-      { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo' },
-      { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro' },
+  async getShipments(filters: {
+    status?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
+  } = {}) {
+    let rows = [
+      { id: 's-1', reference: 'SHP-AGP-0001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1' },
+      { id: 's-2', reference: 'SHP-AGP-0002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-1' },
     ];
-    if (!filters.status) return rows;
-    return rows.filter((row) => row.status === filters.status);
+    if (filters.status) {
+      rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      rows = rows.filter((row) =>
+        row.reference.toLowerCase().includes(q) ||
+        row.id.toLowerCase().includes(q) ||
+        (row.consignee_name ?? '').toLowerCase().includes(q)
+      );
+    }
+    if (filters.scheduledFrom) {
+      rows = rows.filter((row) => row.scheduled_at >= `${filters.scheduledFrom}T00:00:00Z`);
+    }
+    if (filters.scheduledTo) {
+      rows = rows.filter((row) => row.scheduled_at <= `${filters.scheduledTo}T23:59:59Z`);
+    }
+    return rows;
+  },
+
+  async createShipment(payload: {
+    hub_id: string;
+    reference: string;
+    consignee_name?: string | null;
+    address_line?: string | null;
+    scheduled_at?: string | null;
+  }) {
+    return {
+      id: `s-${Math.floor(Math.random() * 10000)}`,
+      reference: payload.reference,
+      status: 'created',
+      consignee_name: payload.consignee_name ?? null,
+      address_line: payload.address_line ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
+      hub_id: payload.hub_id,
+    };
+  },
+
+  async getShipmentDetail(id: string) {
+    return {
+      shipment: {
+        id,
+        reference: id === 's-2' ? 'SHP-AGP-0002' : 'SHP-AGP-0001',
+        status: id === 's-2' ? 'delivered' : 'out_for_delivery',
+        consignee_name: id === 's-2' ? 'Cliente Centro' : 'Cliente Demo',
+        address_line: id === 's-2' ? 'Calle 2' : 'Calle 1',
+        scheduled_at: '2026-03-01T08:00:00Z',
+        hub_id: 'hub-1',
+        route_id: null,
+        assigned_driver_id: null,
+        subcontractor_id: null,
+        delivered_at: id === 's-2' ? '2026-03-01T10:15:00Z' : null,
+      },
+      tracking_events: [
+        {
+          id: 'evt-1',
+          trackable_type: 'shipment',
+          trackable_id: id,
+          event_code: 'CREATED',
+          status_to: 'created',
+          scan_code: null,
+          source: 'web',
+          occurred_at: '2026-03-01T06:15:00Z',
+        },
+        {
+          id: 'evt-2',
+          trackable_type: 'shipment',
+          trackable_id: id,
+          event_code: 'OUT_FOR_DELIVERY',
+          status_to: 'out_for_delivery',
+          scan_code: 'SCAN-OUT-001',
+          source: 'warehouse',
+          occurred_at: '2026-03-01T08:30:00Z',
+        },
+      ],
+      pods: id === 's-2'
+        ? [
+          {
+            id: 'pod-1',
+            evidenceable_type: 'shipment',
+            evidenceable_id: id,
+            signature_name: 'Maria G.',
+            photo_url: null,
+            captured_at: '2026-03-01T10:10:00Z',
+          },
+        ]
+        : [],
+    };
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}) {

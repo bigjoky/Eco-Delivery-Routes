@@ -37,6 +37,7 @@ import {
   DriverSummary,
   VehicleSummary,
   ShipmentSummary,
+  ShipmentDetail,
   PickupSummary,
   TariffSummary,
   UserSummary,
@@ -447,6 +448,9 @@ export const apiClient = {
     sort?: string;
     dir?: 'asc' | 'desc';
     status?: string;
+    q?: string;
+    scheduledFrom?: string;
+    scheduledTo?: string;
   } = {}): Promise<PaginatedResult<ShipmentSummary>> {
     const page = filters.page ?? 1;
     const perPage = filters.perPage ?? 10;
@@ -460,8 +464,37 @@ export const apiClient = {
     if (filters.sort) params.set('sort', filters.sort);
     if (filters.dir) params.set('dir', filters.dir);
     if (filters.status) params.set('status', filters.status);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.scheduledFrom) params.set('scheduled_from', filters.scheduledFrom);
+    if (filters.scheduledTo) params.set('scheduled_to', filters.scheduledTo);
     const response = await authorizedFetch(`${API_BASE_URL}/shipments?${params.toString()}`);
     return parsePaginatedData<ShipmentSummary>(response);
+  },
+
+  async createShipment(payload: {
+    hub_id: string;
+    reference: string;
+    consignee_name?: string | null;
+    address_line?: string | null;
+    scheduled_at?: string | null;
+  }): Promise<ShipmentSummary> {
+    if (USE_MOCK) return mockApi.createShipment(payload) as Promise<ShipmentSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create shipment');
+    return json.data as ShipmentSummary;
+  },
+
+  async getShipmentDetail(id: string): Promise<ShipmentDetail> {
+    if (USE_MOCK) return mockApi.getShipmentDetail(id) as Promise<ShipmentDetail>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/${id}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot load shipment');
+    return json.data as ShipmentDetail;
   },
 
   async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {

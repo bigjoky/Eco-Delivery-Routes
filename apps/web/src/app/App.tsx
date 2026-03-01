@@ -16,6 +16,7 @@ import { SettlementDetailPage } from '../features/settlements/SettlementDetailPa
 import { SettlementsPage } from '../features/settlements/SettlementsPage';
 import { SettlementPreviewPage } from '../features/settlements/SettlementPreviewPage';
 import { ShipmentsPage } from '../features/shipments/ShipmentsPage';
+import { ShipmentDetailPage } from '../features/shipments/ShipmentDetailPage';
 import { TariffsPage } from '../features/tariffs/TariffsPage';
 import { UsersPage } from '../features/users/UsersPage';
 import { UserDetailPage } from '../features/users/UserDetailPage';
@@ -38,6 +39,10 @@ export function App() {
         <Route
           path="/shipments"
           element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentsPage /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/shipments/:id"
+          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentDetailPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/routes"

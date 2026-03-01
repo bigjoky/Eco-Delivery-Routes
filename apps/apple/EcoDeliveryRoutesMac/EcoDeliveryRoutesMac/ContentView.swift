@@ -1,6 +1,7 @@
 import SharedCore
 import SwiftUI
 import Foundation
+import AppKit
 
 private struct RouteManifestAPIResponse: Decodable {
     let data: RouteManifestPayload
@@ -287,6 +288,14 @@ struct ContentView: View {
                     Task { await loadManifestById() }
                 }
                 .disabled(manifestLoading || manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Export CSV") {
+                    Task { await exportManifest(format: "csv") }
+                }
+                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Export PDF") {
+                    Task { await exportManifest(format: "pdf") }
+                }
+                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 if let manifestError {
                     Text(manifestError)
                         .font(.caption)
@@ -809,6 +818,49 @@ struct ContentView: View {
             }
         } catch {
             manifestError = "No se pudo cargar manifest"
+        }
+    }
+
+    private func exportManifest(format: String) async {
+        let trimmedRouteId = manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRouteId.isEmpty else { return }
+        guard let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] else {
+            manifestError = "API_BASE_URL no configurado"
+            return
+        }
+        guard let url = URL(string: "\(baseURL)/routes/\(trimmedRouteId)/manifest/export.\(format)") else {
+            manifestError = "URL invalida"
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = authSession.token?.token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                manifestError = "Error HTTP al exportar manifest"
+                return
+            }
+
+            await MainActor.run {
+                let panel = NSSavePanel()
+                panel.nameFieldStringValue = "route_manifest_\(trimmedRouteId).\(format)"
+                panel.canCreateDirectories = true
+                panel.begin { response in
+                    guard response == .OK, let target = panel.url else { return }
+                    do {
+                        try data.write(to: target)
+                    } catch {
+                        manifestError = "No se pudo guardar el archivo"
+                    }
+                }
+            }
+        } catch {
+            manifestError = "No se pudo exportar manifest"
         }
     }
 
