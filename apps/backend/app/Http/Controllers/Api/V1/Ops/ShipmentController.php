@@ -150,6 +150,15 @@ class ShipmentController extends Controller
             'reference' => ['required', 'string', 'max:60'],
             'consignee_name' => ['nullable', 'string', 'max:120'],
             'address_line' => ['nullable', 'string', 'max:220'],
+            'address_street' => ['nullable', 'string', 'max:180'],
+            'address_number' => ['nullable', 'string', 'max:40'],
+            'postal_code' => ['nullable', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
+            'city' => ['nullable', 'string', 'max:80'],
+            'province' => ['nullable', 'string', 'max:80'],
+            'country' => ['nullable', 'string', 'max:80'],
+            'address_notes' => ['nullable', 'string', 'max:220'],
+            'consignee_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+            'consignee_email' => ['nullable', 'email', 'max:120'],
             'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
         ]);
 
@@ -164,12 +173,23 @@ class ShipmentController extends Controller
         }
 
         $id = (string) Str::uuid();
+        $addressLine = $payload['address_line'] ?? $this->composeAddressLine($payload);
+
         DB::table('shipments')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
             'reference' => $payload['reference'],
             'consignee_name' => $payload['consignee_name'] ?? null,
-            'address_line' => $payload['address_line'] ?? null,
+            'address_line' => $addressLine,
+            'address_street' => $payload['address_street'] ?? null,
+            'address_number' => $payload['address_number'] ?? null,
+            'postal_code' => $payload['postal_code'] ?? null,
+            'city' => $payload['city'] ?? null,
+            'province' => $payload['province'] ?? null,
+            'country' => $payload['country'] ?? null,
+            'address_notes' => $payload['address_notes'] ?? null,
+            'consignee_phone' => $payload['consignee_phone'] ?? null,
+            'consignee_email' => $payload['consignee_email'] ?? null,
             'scheduled_at' => $payload['scheduled_at'] ?? null,
             'status' => 'created',
             'created_at' => now(),
@@ -518,6 +538,37 @@ class ShipmentController extends Controller
     {
         $escaped = str_replace('"', '""', $value);
         return '"' . $escaped . '"';
+    }
+
+    private function composeAddressLine(array $payload): ?string
+    {
+        $street = trim((string) ($payload['address_street'] ?? ''));
+        $number = trim((string) ($payload['address_number'] ?? ''));
+        $postal = trim((string) ($payload['postal_code'] ?? ''));
+        $city = trim((string) ($payload['city'] ?? ''));
+        $province = trim((string) ($payload['province'] ?? ''));
+        $country = trim((string) ($payload['country'] ?? ''));
+
+        $parts = [];
+        if ($street !== '') {
+            $parts[] = $number !== '' ? $street . ' ' . $number : $street;
+        }
+        $locality = trim($postal . ' ' . $city);
+        if ($locality !== '') {
+            $parts[] = $locality;
+        }
+        if ($province !== '') {
+            $parts[] = $province;
+        }
+        if ($country !== '') {
+            $parts[] = $country;
+        }
+
+        if (empty($parts)) {
+            return null;
+        }
+
+        return implode(', ', $parts);
     }
 
     public function markDelivered(Request $request, string $id): JsonResponse

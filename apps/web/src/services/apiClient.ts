@@ -481,6 +481,15 @@ export const apiClient = {
     reference: string;
     consignee_name?: string | null;
     address_line?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+    consignee_phone?: string | null;
+    consignee_email?: string | null;
     scheduled_at?: string | null;
   }): Promise<ShipmentSummary> {
     if (USE_MOCK) return mockApi.createShipment(payload) as Promise<ShipmentSummary>;

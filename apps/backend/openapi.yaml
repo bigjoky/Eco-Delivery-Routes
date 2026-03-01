@@ -2317,6 +2317,15 @@ components:
         reference: { type: string }
         consignee_name: { type: string }
         address_line: { type: string }
+        address_street: { type: string }
+        address_number: { type: string }
+        postal_code: { type: string }
+        city: { type: string }
+        province: { type: string }
+        country: { type: string }
+        address_notes: { type: string }
+        consignee_phone: { type: string }
+        consignee_email: { type: string, format: email }
         scheduled_at: { type: string, format: date-time }
     ShipmentDetailResponse:
       type: object
@@ -2337,6 +2346,15 @@ components:
                 status: { type: string }
                 consignee_name: { type: string, nullable: true }
                 address_line: { type: string, nullable: true }
+                address_street: { type: string, nullable: true }
+                address_number: { type: string, nullable: true }
+                postal_code: { type: string, nullable: true }
+                city: { type: string, nullable: true }
+                province: { type: string, nullable: true }
+                country: { type: string, nullable: true }
+                address_notes: { type: string, nullable: true }
+                consignee_phone: { type: string, nullable: true }
+                consignee_email: { type: string, format: email, nullable: true }
                 scheduled_at: { type: string, format: date-time, nullable: true }
                 delivered_at: { type: string, format: date-time, nullable: true }
                 created_at: { type: string, format: date-time }

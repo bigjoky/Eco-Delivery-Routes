@@ -142,10 +142,27 @@ export function ShipmentsPage() {
   const [createHubCode, setCreateHubCode] = useState('XXX');
   const [createReference, setCreateReference] = useState('');
   const [createConsignee, setCreateConsignee] = useState('');
-  const [createAddress, setCreateAddress] = useState('');
+  const [createStreet, setCreateStreet] = useState('');
+  const [createNumber, setCreateNumber] = useState('');
+  const [createPostalCode, setCreatePostalCode] = useState('');
+  const [createCity, setCreateCity] = useState('');
+  const [createProvince, setCreateProvince] = useState('');
+  const [createCountry, setCreateCountry] = useState('ES');
+  const [createAddressNotes, setCreateAddressNotes] = useState('');
+  const [createPhone, setCreatePhone] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
   const [createScheduledAt, setCreateScheduledAt] = useState('');
   const [createError, setCreateError] = useState('');
-  const [createFieldErrors, setCreateFieldErrors] = useState<{ hub?: string; reference?: string; scheduledAt?: string }>({});
+  const [createFieldErrors, setCreateFieldErrors] = useState<{
+    hub?: string;
+    reference?: string;
+    scheduledAt?: string;
+    street?: string;
+    city?: string;
+    postalCode?: string;
+    phone?: string;
+    email?: string;
+  }>({});
   const [creating, setCreating] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exportColumns, setExportColumns] = useState<string[]>([
@@ -167,6 +184,15 @@ export function ShipmentsPage() {
     'hub_id',
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
+  const recentAddressesStorageKey = 'eco_delivery_routes_recent_addresses';
+  const [recentAddresses, setRecentAddresses] = useState<Array<{
+    street: string;
+    number: string;
+    postal_code: string;
+    city: string;
+    province: string;
+    country: string;
+  }>>([]);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
@@ -283,6 +309,20 @@ export function ShipmentsPage() {
   }, [exportColumns]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recentAddressesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        setRecentAddresses(parsed.filter((item) => item && typeof item === 'object').slice(0, 10));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     if (!canImport || !importJobId) return;
     let active = true;
     const poll = async () => {
@@ -337,14 +377,39 @@ export function ShipmentsPage() {
   }, [createHubId, hubs]);
 
   const createShipment = async () => {
-    const nextErrors: { hub?: string; reference?: string; scheduledAt?: string } = {};
+    const nextErrors: {
+      hub?: string;
+      reference?: string;
+      scheduledAt?: string;
+      street?: string;
+      city?: string;
+      postalCode?: string;
+      phone?: string;
+      email?: string;
+    } = {};
     const reference = createReference.trim();
     const referencePattern = new RegExp(`^SHP-${createHubCode}-\\\\d{4}$`);
+    const hasAddressFields = [createStreet, createNumber, createPostalCode, createCity, createProvince, createCountry].some(
+      (value) => value.trim() !== ''
+    );
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
     if (!reference) nextErrors.reference = 'La referencia es obligatoria.';
     if (reference && reference.length < 5) nextErrors.reference = 'La referencia debe tener al menos 5 caracteres.';
     if (reference && !referencePattern.test(reference)) {
       nextErrors.reference = 'Formato esperado: SHP-XXX-0000';
+    }
+    if (hasAddressFields) {
+      if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
+      if (!createCity.trim()) nextErrors.city = 'La ciudad es obligatoria.';
+    }
+    if (createPostalCode && !/^[0-9A-Za-z -]{4,10}$/.test(createPostalCode.trim())) {
+      nextErrors.postalCode = 'Codigo postal invalido.';
+    }
+    if (createPhone && !/^[+0-9 -]{7,20}$/.test(createPhone.trim())) {
+      nextErrors.phone = 'Telefono invalido.';
+    }
+    if (createEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(createEmail.trim())) {
+      nextErrors.email = 'Email invalido.';
     }
     if (createScheduledAt) {
       const parsed = Date.parse(createScheduledAt);
@@ -366,18 +431,49 @@ export function ShipmentsPage() {
     setCreating(true);
     setCreateError('');
     try {
+      const addressLine = [createStreet, createNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const locality = [createPostalCode, createCity].filter((value) => value.trim() !== '').join(' ').trim();
+      const composedAddress = [addressLine, locality, createProvince, createCountry]
+        .map((value) => value.trim())
+        .filter((value) => value !== '')
+        .join(', ');
       await apiClient.createShipment({
         hub_id: createHubId,
         reference,
         consignee_name: createConsignee || null,
-        address_line: createAddress || null,
+        address_line: composedAddress || null,
+        address_street: createStreet || null,
+        address_number: createNumber || null,
+        postal_code: createPostalCode || null,
+        city: createCity || null,
+        province: createProvince || null,
+        country: createCountry || null,
+        address_notes: createAddressNotes || null,
+        consignee_phone: createPhone || null,
+        consignee_email: createEmail || null,
         scheduled_at: createScheduledAt || null,
       });
       setCreateReference('');
       setCreateConsignee('');
-      setCreateAddress('');
+      setCreateStreet('');
+      setCreateNumber('');
+      setCreatePostalCode('');
+      setCreateCity('');
+      setCreateProvince('');
+      setCreateCountry('ES');
+      setCreateAddressNotes('');
+      setCreatePhone('');
+      setCreateEmail('');
       setCreateScheduledAt('');
       setCreateFieldErrors({});
+      saveRecentAddress({
+        street: createStreet,
+        number: createNumber,
+        postal_code: createPostalCode,
+        city: createCity,
+        province: createProvince,
+        country: createCountry,
+      });
       await reload(1);
     } catch (exception) {
       if (exception instanceof Error && exception.message.includes('Referencia ya existe')) {
@@ -499,6 +595,52 @@ export function ShipmentsPage() {
     return formatDate(date);
   })();
 
+  const saveRecentAddress = (entry: {
+    street: string;
+    number: string;
+    postal_code: string;
+    city: string;
+    province: string;
+    country: string;
+  }) => {
+    const normalized = {
+      street: entry.street.trim(),
+      number: entry.number.trim(),
+      postal_code: entry.postal_code.trim(),
+      city: entry.city.trim(),
+      province: entry.province.trim(),
+      country: entry.country.trim(),
+    };
+    if (!normalized.street && !normalized.city && !normalized.postal_code) return;
+    const next = [
+      normalized,
+      ...recentAddresses.filter(
+        (item) =>
+          item.street !== normalized.street ||
+          item.number !== normalized.number ||
+          item.postal_code !== normalized.postal_code ||
+          item.city !== normalized.city ||
+          item.province !== normalized.province ||
+          item.country !== normalized.country
+      ),
+    ].slice(0, 10);
+    setRecentAddresses(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(recentAddressesStorageKey, JSON.stringify(next));
+    }
+  };
+
+  const applyRecentAddress = (index: number) => {
+    const entry = recentAddresses[index];
+    if (!entry) return;
+    setCreateStreet(entry.street);
+    setCreateNumber(entry.number);
+    setCreatePostalCode(entry.postal_code);
+    setCreateCity(entry.city);
+    setCreateProvince(entry.province);
+    setCreateCountry(entry.country);
+  };
+
   const toggleExportColumn = (column: string) => {
     setExportColumns((current) => (
       current.includes(column)
@@ -602,13 +744,89 @@ export function ShipmentsPage() {
             />
           </div>
           <div className="inline-actions">
-            <label htmlFor="create-shipment-address">Direccion</label>
+            <label htmlFor="create-shipment-recent">Direcciones recientes</label>
+            <select
+              id="create-shipment-recent"
+              onChange={(event) => {
+                if (!event.target.value) return;
+                applyRecentAddress(Number(event.target.value));
+              }}
+            >
+              <option value="">Selecciona una direccion</option>
+              {recentAddresses.map((entry, index) => (
+                <option key={`${entry.street}-${entry.postal_code}-${index}`} value={index}>
+                  {entry.street} {entry.number} · {entry.postal_code} {entry.city}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="create-shipment-street">Calle</label>
             <input
-              id="create-shipment-address"
-              value={createAddress}
-              onChange={(event) => setCreateAddress(event.target.value)}
-              placeholder="Calle, numero"
+              id="create-shipment-street"
+              value={createStreet}
+              onChange={(event) => setCreateStreet(event.target.value)}
+              placeholder="Calle y via"
             />
+            {createFieldErrors.street ? <div className="helper">{createFieldErrors.street}</div> : null}
+            <label htmlFor="create-shipment-number">Numero</label>
+            <input
+              id="create-shipment-number"
+              value={createNumber}
+              onChange={(event) => setCreateNumber(event.target.value)}
+              placeholder="Portal, piso"
+            />
+            <label htmlFor="create-shipment-postal">Codigo postal</label>
+            <input
+              id="create-shipment-postal"
+              value={createPostalCode}
+              onChange={(event) => setCreatePostalCode(event.target.value)}
+              placeholder="29001"
+            />
+            {createFieldErrors.postalCode ? <div className="helper">{createFieldErrors.postalCode}</div> : null}
+            <label htmlFor="create-shipment-city">Ciudad</label>
+            <input
+              id="create-shipment-city"
+              value={createCity}
+              onChange={(event) => setCreateCity(event.target.value)}
+              placeholder="Malaga"
+            />
+            {createFieldErrors.city ? <div className="helper">{createFieldErrors.city}</div> : null}
+            <label htmlFor="create-shipment-province">Provincia</label>
+            <input
+              id="create-shipment-province"
+              value={createProvince}
+              onChange={(event) => setCreateProvince(event.target.value)}
+              placeholder="Malaga"
+            />
+            <label htmlFor="create-shipment-country">Pais</label>
+            <input
+              id="create-shipment-country"
+              value={createCountry}
+              onChange={(event) => setCreateCountry(event.target.value)}
+              placeholder="ES"
+            />
+            <label htmlFor="create-shipment-notes">Notas direccion</label>
+            <input
+              id="create-shipment-notes"
+              value={createAddressNotes}
+              onChange={(event) => setCreateAddressNotes(event.target.value)}
+              placeholder="Puerta, horario, contacto"
+            />
+            <label htmlFor="create-shipment-phone">Telefono</label>
+            <input
+              id="create-shipment-phone"
+              value={createPhone}
+              onChange={(event) => setCreatePhone(event.target.value)}
+              placeholder="+34 950 111 222"
+            />
+            {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
+            <label htmlFor="create-shipment-email">Email</label>
+            <input
+              id="create-shipment-email"
+              value={createEmail}
+              onChange={(event) => setCreateEmail(event.target.value)}
+              placeholder="cliente@eco.local"
+            />
+            {createFieldErrors.email ? <div className="helper">{createFieldErrors.email}</div> : null}
             <label htmlFor="create-shipment-scheduled">Programado</label>
             <input
               id="create-shipment-scheduled"

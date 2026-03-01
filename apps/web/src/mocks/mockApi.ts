@@ -664,6 +664,15 @@ export const mockApi = {
     reference: string;
     consignee_name?: string | null;
     address_line?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+    consignee_phone?: string | null;
+    consignee_email?: string | null;
     scheduled_at?: string | null;
   }) {
     return {
@@ -672,6 +681,15 @@ export const mockApi = {
       status: 'created',
       consignee_name: payload.consignee_name ?? null,
       address_line: payload.address_line ?? null,
+      address_street: payload.address_street ?? null,
+      address_number: payload.address_number ?? null,
+      postal_code: payload.postal_code ?? null,
+      city: payload.city ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? null,
+      address_notes: payload.address_notes ?? null,
+      consignee_phone: payload.consignee_phone ?? null,
+      consignee_email: payload.consignee_email ?? null,
       scheduled_at: payload.scheduled_at ?? null,
       hub_id: payload.hub_id,
     };
@@ -685,6 +703,15 @@ export const mockApi = {
         status: id === 's-2' ? 'delivered' : 'out_for_delivery',
         consignee_name: id === 's-2' ? 'Cliente Centro' : 'Cliente Demo',
         address_line: id === 's-2' ? 'Calle 2' : 'Calle 1',
+        address_street: id === 's-2' ? 'Calle 2' : 'Calle 1',
+        address_number: id === 's-2' ? '20' : '10',
+        postal_code: '29001',
+        city: 'Malaga',
+        province: 'Malaga',
+        country: 'ES',
+        address_notes: 'Portal azul',
+        consignee_phone: '+34950111222',
+        consignee_email: 'cliente@eco.local',
         scheduled_at: '2026-03-01T08:00:00Z',
         hub_id: 'hub-1',
         route_id: null,
