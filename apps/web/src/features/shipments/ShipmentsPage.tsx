@@ -47,6 +47,15 @@ export function ShipmentsPage() {
     'delivered_at',
     'hub_id',
   ]);
+  const defaultExportColumns = [
+    'reference',
+    'status',
+    'consignee_name',
+    'address_line',
+    'scheduled_at',
+    'delivered_at',
+    'hub_id',
+  ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -342,6 +351,10 @@ export function ShipmentsPage() {
     setSearchParams(new URLSearchParams(), { replace: true });
   };
 
+  const resetExportColumns = () => {
+    setExportColumns(defaultExportColumns);
+  };
+
   const toggleExportColumn = (column: string) => {
     setExportColumns((current) => (
       current.includes(column)
@@ -476,19 +489,31 @@ export function ShipmentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>
-                    <button type="button" className="btn btn-outline" onClick={() => setSort('reference')}>
+                    <button
+                      type="button"
+                      className={`btn btn-outline ${sortField === 'reference' ? 'btn-sort-active' : ''}`}
+                      onClick={() => setSort('reference')}
+                    >
                       Referencia {sortIndicator('reference')}
                     </button>
                   </TableHead>
                   <TableHead>
-                    <button type="button" className="btn btn-outline" onClick={() => setSort('status')}>
+                    <button
+                      type="button"
+                      className={`btn btn-outline ${sortField === 'status' ? 'btn-sort-active' : ''}`}
+                      onClick={() => setSort('status')}
+                    >
                       Estado {sortIndicator('status')}
                     </button>
                   </TableHead>
                   <TableHead>Destinatario</TableHead>
                   <TableHead>Direccion</TableHead>
                   <TableHead>
-                    <button type="button" className="btn btn-outline" onClick={() => setSort('scheduled_at')}>
+                    <button
+                      type="button"
+                      className={`btn btn-outline ${sortField === 'scheduled_at' ? 'btn-sort-active' : ''}`}
+                      onClick={() => setSort('scheduled_at')}
+                    >
                       Programado {sortIndicator('scheduled_at')}
                     </button>
                   </TableHead>
@@ -588,6 +613,9 @@ export function ShipmentsPage() {
                 {column}
               </label>
             ))}
+            <Button type="button" variant="outline" onClick={resetExportColumns} disabled={!canExport}>
+              Reset columnas
+            </Button>
           </div>
           {exportError ? <div className="helper">{exportError}</div> : null}
           <div className="inline-actions">

@@ -171,6 +171,11 @@ a {
   background: white;
 }
 
+.btn-outline.btn-sort-active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .btn-destructive {
   background: var(--danger);
   color: white;
