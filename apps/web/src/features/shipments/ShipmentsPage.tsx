@@ -16,6 +16,16 @@ function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 
   return 'default';
 }
 
+function shipmentStatusHelp(status: string): string {
+  const help: Record<string, string> = {
+    created: 'Creado en sistema, pendiente de procesamiento.',
+    out_for_delivery: 'En reparto, asignado a ruta.',
+    delivered: 'Entregado con POD.',
+    incident: 'Con incidencia activa.',
+  };
+  return help[status] ?? status;
+}
+
 function serviceTypeLabel(value?: string | null) {
   if (!value) return '-';
   const labels: Record<string, string> = {
@@ -1459,7 +1469,11 @@ export function ShipmentsPage() {
                       </div>
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
                     </TableCell>
-                    <TableCell><Badge variant={shipmentVariant(item.status)}>{item.status}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant={shipmentVariant(item.status)} title={shipmentStatusHelp(item.status)}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell title={item.service_type ?? ''}>
                       {serviceTypeLabel(item.service_type)}
                     </TableCell>
