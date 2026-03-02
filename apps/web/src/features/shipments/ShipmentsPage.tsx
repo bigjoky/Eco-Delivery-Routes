@@ -16,6 +16,20 @@ function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 
   return 'default';
 }
 
+function serviceTypeLabel(value?: string | null) {
+  if (!value) return '-';
+  const labels: Record<string, string> = {
+    express_1030: 'Express 10:30',
+    express_1400: 'Express 14:00',
+    express_1900: 'Express 19:00',
+    economy_parcel: 'Economy Parcel',
+    business_parcel: 'Business Parcel',
+    thermo_parcel: 'Thermo Parcel',
+    delivery: 'Delivery',
+  };
+  return labels[value] ?? value;
+}
+
 type ShipmentFiltersProps = {
   query: string;
   setQuery: (value: string) => void;
@@ -196,6 +210,7 @@ export function ShipmentsPage() {
     'reference',
     'external_reference',
     'status',
+    'service_type',
     'consignee_name',
     'address_street',
     'address_number',
@@ -205,12 +220,13 @@ export function ShipmentsPage() {
     'country',
     'scheduled_at',
     'delivered_at',
-    'hub_id',
+    'hub_code',
   ]);
   const defaultExportColumns = [
     'reference',
     'external_reference',
     'status',
+    'service_type',
     'consignee_name',
     'address_street',
     'address_number',
@@ -220,7 +236,7 @@ export function ShipmentsPage() {
     'country',
     'scheduled_at',
     'delivered_at',
-    'hub_id',
+    'hub_code',
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
@@ -1444,7 +1460,9 @@ export function ShipmentsPage() {
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
                     </TableCell>
                     <TableCell><Badge variant={shipmentVariant(item.status)}>{item.status}</Badge></TableCell>
-                    <TableCell>{item.service_type ?? '-'}</TableCell>
+                    <TableCell title={item.service_type ?? ''}>
+                      {serviceTypeLabel(item.service_type)}
+                    </TableCell>
                     <TableCell>{item.consignee_name ?? '-'}</TableCell>
                     <TableCell>{item.address_line ?? '-'}</TableCell>
                     <TableCell>{item.scheduled_at ?? '-'}</TableCell>
@@ -1497,21 +1515,22 @@ export function ShipmentsPage() {
           />
           <div className="inline-actions">
             <span className="helper">Columnas export</span>
-            {[
-              'reference',
-              'external_reference',
-              'status',
-              'consignee_name',
-              'address_street',
-              'address_number',
-              'postal_code',
-              'city',
-              'province',
-              'country',
-              'scheduled_at',
-              'delivered_at',
-              'hub_id',
-            ].map((column) => (
+          {[
+            'reference',
+            'external_reference',
+            'status',
+            'service_type',
+            'consignee_name',
+            'address_street',
+            'address_number',
+            'postal_code',
+            'city',
+            'province',
+            'country',
+            'scheduled_at',
+            'delivered_at',
+            'hub_code',
+          ].map((column) => (
               <label key={column}>
                 <input
                   type="checkbox"

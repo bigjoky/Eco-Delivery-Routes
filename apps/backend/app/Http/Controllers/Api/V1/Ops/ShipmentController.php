@@ -296,6 +296,7 @@ class ShipmentController extends Controller
             'scheduled_at',
             'delivered_at',
             'hub_id',
+            'hub_code',
             'route_id',
             'assigned_driver_id',
             'subcontractor_id',
@@ -374,6 +375,7 @@ class ShipmentController extends Controller
             'scheduled_at' => 'Scheduled',
             'delivered_at' => 'Delivered',
             'hub_id' => 'Hub',
+            'hub_code' => 'Hub Code',
         ];
         $requestedColumns = $request->query('columns');
         if (is_string($requestedColumns) && $requestedColumns !== '') {
@@ -582,28 +584,28 @@ class ShipmentController extends Controller
         $scheduledTo = $request->query('scheduled_to');
 
         if (is_string($status) && $status !== '') {
-            $query->where('status', $status);
+            $query->where('shipments.status', $status);
         }
 
         if (is_string($hubId) && $hubId !== '') {
-            $query->where('hub_id', $hubId);
+            $query->where('shipments.hub_id', $hubId);
         }
 
         if (is_string($search) && $search !== '') {
             $like = '%' . str_replace('%', '\\%', $search) . '%';
             $query->where(function ($inner) use ($like): void {
-                $inner->where('reference', 'like', $like)
-                    ->orWhere('external_reference', 'like', $like)
-                    ->orWhere('id', 'like', $like)
-                    ->orWhere('consignee_name', 'like', $like);
+                $inner->where('shipments.reference', 'like', $like)
+                    ->orWhere('shipments.external_reference', 'like', $like)
+                    ->orWhere('shipments.id', 'like', $like)
+                    ->orWhere('shipments.consignee_name', 'like', $like);
             });
         }
 
         if (is_string($scheduledFrom) && $scheduledFrom !== '') {
-            $query->whereDate('scheduled_at', '>=', $scheduledFrom);
+            $query->whereDate('shipments.scheduled_at', '>=', $scheduledFrom);
         }
         if (is_string($scheduledTo) && $scheduledTo !== '') {
-            $query->whereDate('scheduled_at', '<=', $scheduledTo);
+            $query->whereDate('shipments.scheduled_at', '<=', $scheduledTo);
         }
     }
 
