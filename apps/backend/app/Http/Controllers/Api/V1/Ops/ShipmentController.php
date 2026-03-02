@@ -374,7 +374,7 @@ class ShipmentController extends Controller
             'consignee_email' => 'Email',
             'scheduled_at' => 'Scheduled',
             'delivered_at' => 'Delivered',
-            'hub_id' => 'Hub',
+            'hub_id' => 'Hub ID',
             'hub_code' => 'Hub Code',
         ];
         $requestedColumns = $request->query('columns');

@@ -14,6 +14,30 @@ function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 
   return 'default';
 }
 
+function shipmentStatusHelp(status: string): string {
+  const help: Record<string, string> = {
+    created: 'Creado en sistema, pendiente de procesamiento.',
+    out_for_delivery: 'En reparto, asignado a ruta.',
+    delivered: 'Entregado con POD.',
+    incident: 'Con incidencia activa.',
+  };
+  return help[status] ?? status;
+}
+
+function serviceTypeLabel(value?: string | null) {
+  if (!value) return '-';
+  const labels: Record<string, string> = {
+    express_1030: 'Express 10:30',
+    express_1400: 'Express 14:00',
+    express_1900: 'Express 19:00',
+    economy_parcel: 'Economy Parcel',
+    business_parcel: 'Business Parcel',
+    thermo_parcel: 'Thermo Parcel',
+    delivery: 'Delivery',
+  };
+  return labels[value] ?? value;
+}
+
 export function ShipmentDetailPage() {
   const { id } = useParams();
   const [detail, setDetail] = useState<ShipmentDetail | null>(null);
@@ -80,7 +104,13 @@ export function ShipmentDetailPage() {
               </div>
               <div>
                 <div className="helper">Estado</div>
-                <Badge variant={shipmentVariant(shipment.status)}>{shipment.status}</Badge>
+                <Badge variant={shipmentVariant(shipment.status)} title={shipmentStatusHelp(shipment.status)}>
+                  {shipment.status}
+                </Badge>
+              </div>
+              <div>
+                <div className="helper">Servicio</div>
+                <div title={shipment.service_type ?? ''}>{serviceTypeLabel(shipment.service_type)}</div>
               </div>
               <div>
                 <div className="helper">Destinatario</div>
