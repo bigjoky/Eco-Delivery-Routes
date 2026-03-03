@@ -16,6 +16,10 @@ function categoryVariant(category: IncidentSummary['category']): 'warning' | 'de
   return 'outline';
 }
 
+function incidentStatusHelp(resolvedAt?: string | null): string {
+  return resolvedAt ? 'Incidencia resuelta y cerrada.' : 'Incidencia abierta pendiente de acción.';
+}
+
 export function IncidentsPage() {
   const [items, setItems] = useState<IncidentSummary[]>([]);
   const [catalog, setCatalog] = useState<IncidentCatalogItem[]>([]);
@@ -321,8 +325,14 @@ export function IncidentsPage() {
                     <TableCell>{item.incidentable_id}</TableCell>
                     <TableCell>{item.shipment_reference ?? '-'}</TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
-                    <TableCell><Badge variant={categoryVariant(item.category)}>{item.category}</Badge></TableCell>
-                    <TableCell>{item.resolved_at ? 'resuelta' : 'abierta'}</TableCell>
+                    <TableCell>
+                      <Badge variant={categoryVariant(item.category)} title={`Categoria: ${item.category}`}>
+                        {item.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell title={incidentStatusHelp(item.resolved_at)}>
+                      {item.resolved_at ? 'resuelta' : 'abierta'}
+                    </TableCell>
                     <TableCell>
                       {item.resolved_at ? (
                         <span>-</span>
