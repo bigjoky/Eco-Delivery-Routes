@@ -485,6 +485,16 @@ export const apiClient = {
     return json.data as HubSummary;
   },
 
+  async deleteHub(id: string): Promise<{ id: string; deleted: boolean }> {
+    if (USE_MOCK) return mockApi.deleteHub(id) as Promise<{ id: string; deleted: boolean }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs/${id}`, {
+      method: 'DELETE',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete hub');
+    return json.data as { id: string; deleted: boolean };
+  },
+
   async getDepots(filters: { hubId?: string } = {}): Promise<DepotSummary[]> {
     if (USE_MOCK) return mockApi.getDepots(filters) as Promise<DepotSummary[]>;
     const params = new URLSearchParams();
@@ -529,6 +539,16 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update depot');
     return json.data as DepotSummary;
+  },
+
+  async deleteDepot(id: string): Promise<{ id: string; deleted: boolean }> {
+    if (USE_MOCK) return mockApi.deleteDepot(id) as Promise<{ id: string; deleted: boolean }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/depots/${id}`, {
+      method: 'DELETE',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete depot');
+    return json.data as { id: string; deleted: boolean };
   },
 
   async getPoints(filters: { hubId?: string; depotId?: string } = {}): Promise<PointSummary[]> {
@@ -577,6 +597,16 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update point');
     return json.data as PointSummary;
+  },
+
+  async deletePoint(id: string): Promise<{ id: string; deleted: boolean }> {
+    if (USE_MOCK) return mockApi.deletePoint(id) as Promise<{ id: string; deleted: boolean }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/points/${id}`, {
+      method: 'DELETE',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete point');
+    return json.data as { id: string; deleted: boolean };
   },
 
   async getShipments(filters: {

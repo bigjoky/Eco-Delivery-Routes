@@ -57,6 +57,15 @@ class PointController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        if (!$this->isDepotConsistentWithHub($payload['hub_id'], $payload['depot_id'] ?? null)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Depot does not belong to selected hub.',
+                ],
+            ], 422);
+        }
+
         $id = (string) Str::uuid();
         $code = $payload['code'] ?? (string) $this->sequenceService->next('points');
         DB::table('points')->insert([
@@ -93,6 +102,8 @@ class PointController extends Controller
         }
 
         $payload = $request->validate([
+            'hub_id' => ['sometimes', 'uuid', 'exists:hubs,id'],
+            'depot_id' => ['sometimes', 'nullable', 'uuid', 'exists:depots,id'],
             'code' => ['sometimes', 'string', 'max:40', 'unique:points,code,' . $id . ',id'],
             'name' => ['sometimes', 'string', 'max:120'],
             'address_line' => ['sometimes', 'nullable', 'string', 'max:220'],
@@ -100,11 +111,55 @@ class PointController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
+        $nextHubId = (string) ($payload['hub_id'] ?? $row->hub_id);
+        $nextDepotId = array_key_exists('depot_id', $payload) ? $payload['depot_id'] : $row->depot_id;
+        if (!$this->isDepotConsistentWithHub($nextHubId, is_string($nextDepotId) ? $nextDepotId : null)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Depot does not belong to selected hub.',
+                ],
+            ], 422);
+        }
+
         DB::table('points')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
         ]);
 
         return response()->json(['data' => DB::table('points')->where('id', $id)->first()]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('points.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('points')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Point not found.'],
+            ], 404);
+        }
+
+        DB::table('points')->where('id', $id)->delete();
+
+        return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
+    }
+
+    private function isDepotConsistentWithHub(string $hubId, ?string $depotId): bool
+    {
+        if (!$depotId) {
+            return true;
+        }
+
+        $depotHubId = DB::table('depots')->where('id', $depotId)->value('hub_id');
+
+        return is_string($depotHubId) && $depotHubId === $hubId;
     }
 }
