@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,10 @@ use Illuminate\Support\Str;
 
 class VehicleController extends Controller
 {
+    public function __construct(private readonly AuditLogWriter $auditLogWriter)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -38,8 +43,18 @@ class VehicleController extends Controller
                 'vehicles.subcontractor_id',
                 'vehicles.home_hub_id',
                 'vehicles.assigned_driver_id',
+                'vehicles.updated_at',
                 'subcontractors.legal_name as subcontractor_name',
-                'drivers.code as assigned_driver_code'
+                'drivers.code as assigned_driver_code',
+                DB::raw("(
+                    select users.name
+                    from audit_logs
+                    left join users on users.id = audit_logs.actor_user_id
+                    where audit_logs.event in ('vehicles.created', 'vehicles.updated')
+                      and json_extract(audit_logs.metadata, '$.vehicle_id') = vehicles.id
+                    order by audit_logs.id desc
+                    limit 1
+                ) as last_editor_name")
             )
             ->orderBy('vehicles.plate_number');
 
@@ -90,6 +105,10 @@ class VehicleController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'vehicles.created', [
+            'vehicle_id' => $id,
+            'plate_number' => $payload['plate_number'],
+        ]);
 
         return response()->json([
             'data' => DB::table('vehicles')->where('id', $id)->first(),
@@ -127,6 +146,10 @@ class VehicleController extends Controller
         DB::table('vehicles')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'vehicles.updated', [
+            'vehicle_id' => $id,
+            'changes' => array_keys($payload),
         ]);
 
         return response()->json([

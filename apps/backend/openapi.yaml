@@ -554,10 +554,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [legal_name]
+              required: [legal_name, tax_id]
               properties:
                 legal_name: { type: string, maxLength: 180 }
-                tax_id: { type: string, nullable: true, maxLength: 60 }
+                tax_id: { type: string, maxLength: 60 }
                 status: { type: string, enum: [active, inactive, suspended] }
                 payment_terms: { type: string, maxLength: 80 }
       responses:
@@ -615,9 +615,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code, name]
+              required: [name, dni]
               properties:
-                code: { type: string, maxLength: 60 }
+                code: { type: string, maxLength: 60, nullable: true }
+                dni: { type: string, maxLength: 40 }
                 name: { type: string, maxLength: 120 }
                 status: { type: string, enum: [active, inactive, suspended] }
                 employment_type: { type: string, enum: [employee, subcontractor] }
@@ -645,6 +646,7 @@ paths:
               type: object
               properties:
                 name: { type: string, maxLength: 120 }
+                dni: { type: string, maxLength: 40 }
                 status: { type: string, enum: [active, inactive, suspended] }
                 employment_type: { type: string, enum: [employee, subcontractor] }
                 user_id: { type: string, format: uuid, nullable: true }
@@ -681,10 +683,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [code]
+              required: [plate_number]
               properties:
-                code: { type: string, maxLength: 60 }
-                plate_number: { type: string, maxLength: 20, nullable: true }
+                code: { type: string, maxLength: 60, nullable: true }
+                plate_number: { type: string, maxLength: 20 }
                 vehicle_type: { type: string, maxLength: 40 }
                 capacity_kg: { type: integer, minimum: 1, nullable: true }
                 status: { type: string, enum: [active, inactive, maintenance] }

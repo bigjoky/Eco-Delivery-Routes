@@ -587,6 +587,8 @@ export type SubcontractorSummary = {
   tax_id?: string | null;
   status: string;
   payment_terms?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 };
 
 export type DriverSummary = {
@@ -600,6 +602,8 @@ export type DriverSummary = {
   subcontractor_id?: string | null;
   subcontractor_name?: string | null;
   home_hub_id?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 };
 
 export type VehicleSummary = {
@@ -614,6 +618,8 @@ export type VehicleSummary = {
   home_hub_id?: string | null;
   assigned_driver_id?: string | null;
   assigned_driver_code?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 };
 
 export type LoginResponse = {

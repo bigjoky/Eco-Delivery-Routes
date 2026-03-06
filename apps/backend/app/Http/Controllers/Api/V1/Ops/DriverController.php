@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,10 @@ use Illuminate\Support\Str;
 
 class DriverController extends Controller
 {
+    public function __construct(private readonly AuditLogWriter $auditLogWriter)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -37,7 +42,17 @@ class DriverController extends Controller
                 'drivers.user_id',
                 'drivers.subcontractor_id',
                 'drivers.home_hub_id',
-                'subcontractors.legal_name as subcontractor_name'
+                'drivers.updated_at',
+                'subcontractors.legal_name as subcontractor_name',
+                DB::raw("(
+                    select users.name
+                    from audit_logs
+                    left join users on users.id = audit_logs.actor_user_id
+                    where audit_logs.event in ('drivers.created', 'drivers.updated')
+                      and json_extract(audit_logs.metadata, '$.driver_id') = drivers.id
+                    order by audit_logs.id desc
+                    limit 1
+                ) as last_editor_name")
             )
             ->orderBy('drivers.code');
 
@@ -88,6 +103,10 @@ class DriverController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'drivers.created', [
+            'driver_id' => $id,
+            'dni' => $payload['dni'],
+        ]);
 
         return response()->json([
             'data' => DB::table('drivers')->where('id', $id)->first(),
@@ -125,6 +144,10 @@ class DriverController extends Controller
         DB::table('drivers')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'drivers.updated', [
+            'driver_id' => $id,
+            'changes' => array_keys($payload),
         ]);
 
         return response()->json([
