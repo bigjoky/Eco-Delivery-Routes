@@ -196,6 +196,30 @@ class RouteController extends Controller
         return response()->json(['data' => $this->fetchRouteWithAssignments($id)]);
     }
 
+    public function assignmentPreview(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.read')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
+            'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
+        ]);
+
+        $assessment = $this->assessAssignmentConsistency($payload);
+        return response()->json([
+            'data' => [
+                'valid' => count($assessment['errors']) === 0,
+                'conflicts' => $assessment['errors'],
+                'recommended_subcontractor_id' => $assessment['recommended_subcontractor_id'],
+            ],
+        ]);
+    }
+
     private function fetchRouteWithAssignments(string $id): ?object
     {
         return DB::table('routes')
@@ -215,6 +239,20 @@ class RouteController extends Controller
      */
     private function assertAssignmentConsistency(array $payload): void
     {
+        $assessment = $this->assessAssignmentConsistency($payload);
+        if ($assessment['errors'] !== []) {
+            /** @var array{field:string,message:string} $first */
+            $first = $assessment['errors'][0];
+            $this->throwValidationError($first['message'], $first['field']);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{errors:array<int,array{field:string,message:string}>,recommended_subcontractor_id:string|null}
+     */
+    private function assessAssignmentConsistency(array $payload): array
+    {
         $driver = null;
         $vehicle = null;
         if (!empty($payload['driver_id'])) {
@@ -229,18 +267,28 @@ class RouteController extends Controller
         }
 
         $subcontractorId = $payload['subcontractor_id'] ?? null;
+        $recommendedSubcontractorId = $subcontractorId
+            ?: ($driver->subcontractor_id ?? null)
+            ?: ($vehicle->subcontractor_id ?? null);
+
+        $errors = [];
         if ($subcontractorId && $driver && $driver->subcontractor_id && $driver->subcontractor_id !== $subcontractorId) {
-            $this->throwValidationError('Driver does not belong to selected subcontractor.', 'driver_id');
+            $errors[] = ['field' => 'driver_id', 'message' => 'Driver does not belong to selected subcontractor.'];
         }
         if ($subcontractorId && $vehicle && $vehicle->subcontractor_id && $vehicle->subcontractor_id !== $subcontractorId) {
-            $this->throwValidationError('Vehicle does not belong to selected subcontractor.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle does not belong to selected subcontractor.'];
         }
         if ($driver && $vehicle && $driver->subcontractor_id && $vehicle->subcontractor_id && $driver->subcontractor_id !== $vehicle->subcontractor_id) {
-            $this->throwValidationError('Vehicle subcontractor must match driver subcontractor.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle subcontractor must match driver subcontractor.'];
         }
         if ($driver && $vehicle && $vehicle->assigned_driver_id && $vehicle->assigned_driver_id !== $driver->id) {
-            $this->throwValidationError('Vehicle is assigned to a different driver.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle is assigned to a different driver.'];
         }
+
+        return [
+            'errors' => $errors,
+            'recommended_subcontractor_id' => $recommendedSubcontractorId,
+        ];
     }
 
     public function stops(Request $request, string $id): JsonResponse

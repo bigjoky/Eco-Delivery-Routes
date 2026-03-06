@@ -14,6 +14,7 @@ let mockIncidents = [
     category: 'absent' as const,
     notes: 'Cliente no localizado',
     resolved_at: null as string | null,
+    created_at: '2026-03-06T07:30:00Z',
   },
 ];
 let mockShipments = [
@@ -1127,6 +1128,36 @@ export const mockApi = {
     };
   },
 
+  async previewRouteAssignment(payload: {
+    subcontractor_id?: string | null;
+    driver_id?: string | null;
+    vehicle_id?: string | null;
+  }) {
+    const conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }> = [];
+    const driver = payload.driver_id ? mockDrivers.find((item) => item.id === payload.driver_id) : null;
+    const vehicle = payload.vehicle_id ? mockVehicles.find((item) => item.id === payload.vehicle_id) : null;
+    const subcontractorId = payload.subcontractor_id ?? null;
+
+    if (subcontractorId && driver?.subcontractor_id && driver.subcontractor_id !== subcontractorId) {
+      conflicts.push({ field: 'driver_id', message: 'Driver does not belong to selected subcontractor.' });
+    }
+    if (subcontractorId && vehicle?.subcontractor_id && vehicle.subcontractor_id !== subcontractorId) {
+      conflicts.push({ field: 'vehicle_id', message: 'Vehicle does not belong to selected subcontractor.' });
+    }
+    if (driver?.subcontractor_id && vehicle?.subcontractor_id && driver.subcontractor_id !== vehicle.subcontractor_id) {
+      conflicts.push({ field: 'vehicle_id', message: 'Vehicle subcontractor must match driver subcontractor.' });
+    }
+    if (driver && vehicle?.assigned_driver_id && vehicle.assigned_driver_id !== driver.id) {
+      conflicts.push({ field: 'vehicle_id', message: 'Vehicle is assigned to a different driver.' });
+    }
+
+    return {
+      valid: conflicts.length === 0,
+      conflicts,
+      recommended_subcontractor_id: subcontractorId ?? driver?.subcontractor_id ?? vehicle?.subcontractor_id ?? null,
+    };
+  },
+
   async getRouteStops(routeId: string) {
     return mockRouteStops
       .filter((row) => row.route_id === routeId)
@@ -1896,13 +1927,39 @@ export const mockApi = {
     q?: string;
     category?: 'failed' | 'absent' | 'retry' | 'general';
     catalogCode?: string;
+    priority?: 'high' | 'medium' | 'low';
+    slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
     resolved?: 'open' | 'resolved';
   } = {}) {
+    const now = new Date();
+    const addIncidentMeta = (item: typeof mockIncidents[number]) => {
+      const priority = item.category === 'failed' ? 'high' : item.category === 'general' ? 'low' : 'medium';
+      const slaHours = priority === 'high' ? 4 : priority === 'medium' ? 8 : 24;
+      const dueAt = new Date(new Date(item.created_at ?? now.toISOString()).getTime() + slaHours * 3600 * 1000);
+      let slaStatus: 'on_track' | 'at_risk' | 'breached' | 'resolved' = 'on_track';
+      if (item.resolved_at) {
+        slaStatus = 'resolved';
+      } else if (dueAt.getTime() < now.getTime()) {
+        slaStatus = 'breached';
+      } else if (dueAt.getTime() - now.getTime() <= 60 * 60 * 1000) {
+        slaStatus = 'at_risk';
+      }
+      return {
+        ...item,
+        priority,
+        sla_due_at: dueAt.toISOString(),
+        sla_status: slaStatus,
+      };
+    };
+
     return mockIncidents
+      .map(addIncidentMeta)
       .filter((item) => (filters.incidentableType ? item.incidentable_type === filters.incidentableType : true))
       .filter((item) => (filters.incidentableId ? item.incidentable_id === filters.incidentableId : true))
       .filter((item) => (filters.category ? item.category === filters.category : true))
       .filter((item) => (filters.catalogCode ? item.catalog_code === filters.catalogCode : true))
+      .filter((item) => (filters.priority ? item.priority === filters.priority : true))
+      .filter((item) => (filters.slaStatus ? item.sla_status === filters.slaStatus : true))
       .filter((item) => {
         if (!filters.q) return true;
         const q = filters.q.toLowerCase();
@@ -1920,6 +1977,31 @@ export const mockApi = {
       });
   },
 
+  async getIncidentsBoard(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+  } = {}) {
+    const rows = await this.getIncidents({
+      incidentableType: filters.incidentableType,
+      category: filters.category,
+    });
+    const openRows = rows.filter((item) => !item.resolved_at);
+    return {
+      total_open: openRows.length,
+      total_resolved: rows.filter((item) => !!item.resolved_at).length,
+      by_priority: {
+        high: openRows.filter((item) => item.priority === 'high').length,
+        medium: openRows.filter((item) => item.priority === 'medium').length,
+        low: openRows.filter((item) => item.priority === 'low').length,
+      },
+      by_sla_status: {
+        on_track: openRows.filter((item) => item.sla_status === 'on_track').length,
+        at_risk: openRows.filter((item) => item.sla_status === 'at_risk').length,
+        breached: openRows.filter((item) => item.sla_status === 'breached').length,
+      },
+    };
+  },
+
   async createIncident(payload: {
     incidentable_type: 'shipment' | 'pickup';
     incidentable_id: string;
@@ -1932,6 +2014,7 @@ export const mockApi = {
       ...payload,
       shipment_reference: payload.incidentable_type === 'shipment' ? 'SHP-AGP-NEW' : null,
       resolved_at: null,
+      created_at: nowIso(),
     };
     mockIncidents = [item, ...mockIncidents];
     return item;

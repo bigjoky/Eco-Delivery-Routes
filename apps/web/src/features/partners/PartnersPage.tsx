@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -11,6 +11,8 @@ export function PartnersPage() {
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [partnersQuery, setPartnersQuery] = useState('');
+  const [partnersSort, setPartnersSort] = useState<'name' | 'updated_desc' | 'updated_asc' | 'editor'>('updated_desc');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -74,6 +76,26 @@ export function PartnersPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const normalizedQuery = partnersQuery.trim().toLowerCase();
+  const sortBy = <T extends { updated_at?: string | null; last_editor_name?: string | null }>(rows: T[], label: (row: T) => string) => {
+    const mapped = normalizedQuery
+      ? rows.filter((row) => (
+        label(row).toLowerCase().includes(normalizedQuery) ||
+        (row.last_editor_name ?? '').toLowerCase().includes(normalizedQuery)
+      ))
+      : rows;
+    return mapped.slice().sort((a, b) => {
+      if (partnersSort === 'name') return label(a).localeCompare(label(b), 'es');
+      if (partnersSort === 'editor') return (a.last_editor_name ?? '').localeCompare((b.last_editor_name ?? ''), 'es');
+      const aTs = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bTs = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return partnersSort === 'updated_asc' ? aTs - bTs : bTs - aTs;
+    });
+  };
+  const filteredSubcontractors = useMemo(() => sortBy(subcontractors, (row) => row.legal_name), [subcontractors, partnersSort, normalizedQuery]);
+  const filteredDrivers = useMemo(() => sortBy(drivers, (row) => `${row.code} ${row.name}`), [drivers, partnersSort, normalizedQuery]);
+  const filteredVehicles = useMemo(() => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`), [vehicles, partnersSort, normalizedQuery]);
 
   const onCreateSubcontractor = async (event: FormEvent) => {
     event.preventDefault();
@@ -300,6 +322,15 @@ export function PartnersPage() {
               <Button type="submit">Crear vehiculo</Button>
             </form>
           </div>
+          <div className="inline-actions">
+            <Input value={partnersQuery} onChange={(e) => setPartnersQuery(e.target.value)} placeholder="Buscar por nombre/codigo/editor" />
+            <Select value={partnersSort} onChange={(e) => setPartnersSort(e.target.value as 'name' | 'updated_desc' | 'updated_asc' | 'editor')}>
+              <option value="updated_desc">Ultima edicion (reciente)</option>
+              <option value="updated_asc">Ultima edicion (antigua)</option>
+              <option value="editor">Editor</option>
+              <option value="name">Nombre/codigo</option>
+            </Select>
+          </div>
 
           <h3>Subcontratas</h3>
           <TableWrapper>
@@ -314,7 +345,7 @@ export function PartnersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {subcontractors.map((subcontractor) => (
+                {filteredSubcontractors.map((subcontractor) => (
                   <TableRow key={subcontractor.id}>
                     <TableCell>{subcontractor.legal_name}</TableCell>
                     <TableCell>{subcontractor.tax_id ?? '-'}</TableCell>
@@ -359,7 +390,7 @@ export function PartnersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {drivers.map((driver) => (
+                {filteredDrivers.map((driver) => (
                   <TableRow key={driver.id}>
                     <TableCell>{driver.code}</TableCell>
                     <TableCell>{driver.dni ?? '-'}</TableCell>
@@ -411,7 +442,7 @@ export function PartnersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vehicles.map((vehicle) => (
+                {filteredVehicles.map((vehicle) => (
                   <TableRow key={vehicle.id}>
                     <TableCell>{vehicle.code}</TableCell>
                     <TableCell>{vehicle.plate_number ?? '-'}</TableCell>

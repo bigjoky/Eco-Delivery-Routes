@@ -90,18 +90,33 @@ class IncidentController extends Controller
             }
         }
 
+        $allRows = $query->get([
+                'incidents.*',
+                'shipments.reference as shipment_reference',
+            ]);
+        $rows = $allRows->map(function ($row) {
+            $meta = $this->incidentSlaMeta($row);
+            $row->priority = $meta['priority'];
+            $row->sla_due_at = $meta['sla_due_at'];
+            $row->sla_status = $meta['sla_status'];
+            return $row;
+        });
+
+        $priority = $request->query('priority');
+        if (is_string($priority) && in_array($priority, ['high', 'medium', 'low'], true)) {
+            $rows = $rows->filter(fn ($row) => $row->priority === $priority)->values();
+        }
+        $slaStatus = $request->query('sla_status');
+        if (is_string($slaStatus) && in_array($slaStatus, ['on_track', 'at_risk', 'breached', 'resolved'], true)) {
+            $rows = $rows->filter(fn ($row) => $row->sla_status === $slaStatus)->values();
+        }
+
         $perPage = (int) $request->query('per_page', 20);
         $perPage = max(1, min($perPage, 100));
         $page = (int) $request->query('page', 1);
         $page = max(1, $page);
-
-        $total = (clone $query)->count();
-        $items = $query
-            ->forPage($page, $perPage)
-            ->get([
-                'incidents.*',
-                'shipments.reference as shipment_reference',
-            ]);
+        $total = $rows->count();
+        $items = $rows->slice(($page - 1) * $perPage, $perPage)->values()->all();
 
         return response()->json([
             'data' => $items,
@@ -110,6 +125,52 @@ class IncidentController extends Controller
                 'per_page' => $perPage,
                 'total' => $total,
                 'last_page' => (int) ceil($total / $perPage),
+            ],
+        ]);
+    }
+
+    public function board(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.read')) {
+            return $this->forbidden();
+        }
+
+        $query = DB::table('incidents');
+        $incidentableType = $request->query('incidentable_type');
+        if (is_string($incidentableType) && in_array($incidentableType, ['shipment', 'pickup'], true)) {
+            $query->where('incidentable_type', $incidentableType);
+        }
+        $category = $request->query('category');
+        if (is_string($category) && in_array($category, ['failed', 'absent', 'retry', 'general'], true)) {
+            $query->where('category', $category);
+        }
+
+        $rows = $query->get(['id', 'category', 'created_at', 'resolved_at']);
+        $openRows = $rows->filter(fn ($row) => $row->resolved_at === null);
+        $priorityRows = $openRows->map(function ($row) {
+            $meta = $this->incidentSlaMeta($row);
+            return [
+                'priority' => $meta['priority'],
+                'sla_status' => $meta['sla_status'],
+            ];
+        });
+
+        return response()->json([
+            'data' => [
+                'total_open' => $openRows->count(),
+                'total_resolved' => $rows->count() - $openRows->count(),
+                'by_priority' => [
+                    'high' => $priorityRows->where('priority', 'high')->count(),
+                    'medium' => $priorityRows->where('priority', 'medium')->count(),
+                    'low' => $priorityRows->where('priority', 'low')->count(),
+                ],
+                'by_sla_status' => [
+                    'on_track' => $priorityRows->where('sla_status', 'on_track')->count(),
+                    'at_risk' => $priorityRows->where('sla_status', 'at_risk')->count(),
+                    'breached' => $priorityRows->where('sla_status', 'breached')->count(),
+                ],
             ],
         ]);
     }
@@ -231,5 +292,39 @@ class IncidentController extends Controller
         return response()->json([
             'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
         ], 403);
+    }
+
+    /**
+     * @return array{priority:string,sla_due_at:string,sla_status:string}
+     */
+    private function incidentSlaMeta(object $row): array
+    {
+        $priority = match ((string) ($row->category ?? 'general')) {
+            'failed' => 'high',
+            'absent', 'retry' => 'medium',
+            default => 'low',
+        };
+        $slaHours = match ($priority) {
+            'high' => 4,
+            'medium' => 8,
+            default => 24,
+        };
+        $createdAt = strtotime((string) $row->created_at) ?: time();
+        $dueAt = $createdAt + ($slaHours * 3600);
+        $now = time();
+        $slaStatus = 'on_track';
+        if (!empty($row->resolved_at)) {
+            $slaStatus = 'resolved';
+        } elseif ($dueAt < $now) {
+            $slaStatus = 'breached';
+        } elseif (($dueAt - $now) <= 3600) {
+            $slaStatus = 'at_risk';
+        }
+
+        return [
+            'priority' => $priority,
+            'sla_due_at' => date(DATE_ATOM, $dueAt),
+            'sla_status' => $slaStatus,
+        ];
     }
 }
