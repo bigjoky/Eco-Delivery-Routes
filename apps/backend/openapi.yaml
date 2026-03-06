@@ -1639,6 +1639,23 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /routes/assignment/preview:
+    get:
+      tags: [Routes]
+      summary: Previsualizar conflictos de asignacion ruta (subcontrata/conductor/vehiculo)
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: driver_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: vehicle_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
   /routes/{id}:
     patch:
       tags: [Routes]
@@ -1919,6 +1936,12 @@ paths:
           name: catalog_code
           schema: { type: string }
         - in: query
+          name: priority
+          schema: { type: string, enum: [high, medium, low] }
+        - in: query
+          name: sla_status
+          schema: { type: string, enum: [on_track, at_risk, breached, resolved] }
+        - in: query
           name: incidentable_id
           schema: { type: string, format: uuid }
         - in: query
@@ -1952,6 +1975,20 @@ paths:
       responses:
         '200': { description: OK }
 
+  /incidents/board:
+    get:
+      tags: [Incidents]
+      summary: Dashboard resumido de incidencias por prioridad y estado SLA
+      parameters:
+        - in: query
+          name: incidentable_type
+          schema: { type: string, enum: [shipment, pickup] }
+        - in: query
+          name: category
+          schema: { type: string, enum: [failed, absent, retry, general] }
+      responses:
+        '200': { description: OK }
+
   /incidents/{id}/resolve:
     patch:
       tags: [Incidents]
@@ -1969,6 +2006,29 @@ paths:
               type: object
               properties:
                 notes: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /incidents/{id}/override-sla:
+    patch:
+      tags: [Incidents]
+      summary: Override manual de prioridad/SLA en incidencia (auditado)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                priority: { type: string, enum: [high, medium, low] }
+                sla_due_at: { type: string, format: date-time }
+                reason: { type: string, maxLength: 220 }
       responses:
         '200': { description: OK }
 

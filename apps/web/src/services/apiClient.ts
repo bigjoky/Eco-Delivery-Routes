@@ -4,6 +4,7 @@ import {
   CurrentUserProfile,
   HubSummary,
   IncidentCatalogItem,
+  IncidentsBoardSummary,
   IncidentSummary,
   LoginResponse,
   PaginatedResult,
@@ -21,6 +22,7 @@ import {
   RoleDetail,
   RoleSummary,
   RouteBulkAddStopsResult,
+  RouteAssignmentPreview,
   RouteManifest,
   RouteStopSummary,
   RouteSummary,
@@ -784,6 +786,23 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route');
     return json.data as RouteSummary;
+  },
+
+  async previewRouteAssignment(payload: {
+    subcontractor_id?: string | null;
+    driver_id?: string | null;
+    vehicle_id?: string | null;
+  }): Promise<RouteAssignmentPreview> {
+    if (USE_MOCK) return mockApi.previewRouteAssignment(payload) as Promise<RouteAssignmentPreview>;
+    const params = new URLSearchParams();
+    if (payload.subcontractor_id) params.set('subcontractor_id', payload.subcontractor_id);
+    if (payload.driver_id) params.set('driver_id', payload.driver_id);
+    if (payload.vehicle_id) params.set('vehicle_id', payload.vehicle_id);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/assignment/preview${suffix}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot preview route assignment');
+    return json.data as RouteAssignmentPreview;
   },
 
   async getRouteStops(routeId: string): Promise<RouteStopSummary[]> {
@@ -1619,6 +1638,8 @@ export const apiClient = {
     q?: string;
     category?: 'failed' | 'absent' | 'retry' | 'general';
     catalogCode?: string;
+    priority?: 'high' | 'medium' | 'low';
+    slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
     resolved?: 'open' | 'resolved';
     page?: number;
     perPage?: number;
@@ -1634,6 +1655,8 @@ export const apiClient = {
     if (filters.q) params.set('q', filters.q);
     if (filters.category) params.set('category', filters.category);
     if (filters.catalogCode) params.set('catalog_code', filters.catalogCode);
+    if (filters.priority) params.set('priority', filters.priority);
+    if (filters.slaStatus) params.set('sla_status', filters.slaStatus);
     if (filters.resolved) params.set('resolved', filters.resolved);
     params.set('page', String(page));
     params.set('per_page', String(perPage));
@@ -1641,6 +1664,23 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parsePaginatedData<IncidentSummary>(response);
+  },
+
+  async getIncidentsBoard(filters: {
+    incidentableType?: 'shipment' | 'pickup';
+    category?: 'failed' | 'absent' | 'retry' | 'general';
+  } = {}): Promise<IncidentsBoardSummary> {
+    if (USE_MOCK) return mockApi.getIncidentsBoard(filters) as Promise<IncidentsBoardSummary>;
+    const params = new URLSearchParams();
+    if (filters.incidentableType) params.set('incidentable_type', filters.incidentableType);
+    if (filters.category) params.set('category', filters.category);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE_URL}/incidents/board${suffix}`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot load incidents board');
+    return json.data as IncidentsBoardSummary;
   },
 
   async createIncident(payload: {
@@ -1676,6 +1716,25 @@ export const apiClient = {
       body: JSON.stringify({ notes }),
     });
     const data = await response.json();
+    return data.data as IncidentSummary;
+  },
+
+  async overrideIncidentSla(id: string, payload: {
+    priority?: 'high' | 'medium' | 'low';
+    sla_due_at?: string;
+    reason: string;
+  }): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.overrideIncidentSla(id, payload) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}/override-sla`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot override incident SLA');
     return data.data as IncidentSummary;
   },
 

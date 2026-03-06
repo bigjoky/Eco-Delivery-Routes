@@ -196,6 +196,30 @@ class RouteController extends Controller
         return response()->json(['data' => $this->fetchRouteWithAssignments($id)]);
     }
 
+    public function assignmentPreview(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.read')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
+            'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
+            'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
+        ]);
+        $assessment = $this->assessAssignmentConsistency($payload);
+
+        return response()->json([
+            'data' => [
+                'valid' => count($assessment['errors']) === 0,
+                'conflicts' => $assessment['errors'],
+                'recommended_subcontractor_id' => $assessment['recommended_subcontractor_id'],
+            ],
+        ]);
+    }
+
     private function fetchRouteWithAssignments(string $id): ?object
     {
         return DB::table('routes')
@@ -215,6 +239,20 @@ class RouteController extends Controller
      */
     private function assertAssignmentConsistency(array $payload): void
     {
+        $assessment = $this->assessAssignmentConsistency($payload);
+        if ($assessment['errors'] !== []) {
+            /** @var array{field:string,message:string} $first */
+            $first = $assessment['errors'][0];
+            $this->throwValidationError($first['message'], $first['field']);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{errors:array<int,array{field:string,message:string}>,recommended_subcontractor_id:string|null}
+     */
+    private function assessAssignmentConsistency(array $payload): array
+    {
         $driver = null;
         $vehicle = null;
         if (!empty($payload['driver_id'])) {
@@ -229,18 +267,28 @@ class RouteController extends Controller
         }
 
         $subcontractorId = $payload['subcontractor_id'] ?? null;
+        $recommendedSubcontractorId = $subcontractorId
+            ?: ($driver->subcontractor_id ?? null)
+            ?: ($vehicle->subcontractor_id ?? null);
+
+        $errors = [];
         if ($subcontractorId && $driver && $driver->subcontractor_id && $driver->subcontractor_id !== $subcontractorId) {
-            $this->throwValidationError('Driver does not belong to selected subcontractor.', 'driver_id');
+            $errors[] = ['field' => 'driver_id', 'message' => 'Driver does not belong to selected subcontractor.'];
         }
         if ($subcontractorId && $vehicle && $vehicle->subcontractor_id && $vehicle->subcontractor_id !== $subcontractorId) {
-            $this->throwValidationError('Vehicle does not belong to selected subcontractor.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle does not belong to selected subcontractor.'];
         }
         if ($driver && $vehicle && $driver->subcontractor_id && $vehicle->subcontractor_id && $driver->subcontractor_id !== $vehicle->subcontractor_id) {
-            $this->throwValidationError('Vehicle subcontractor must match driver subcontractor.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle subcontractor must match driver subcontractor.'];
         }
         if ($driver && $vehicle && $vehicle->assigned_driver_id && $vehicle->assigned_driver_id !== $driver->id) {
-            $this->throwValidationError('Vehicle is assigned to a different driver.', 'vehicle_id');
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle is assigned to a different driver.'];
         }
+
+        return [
+            'errors' => $errors,
+            'recommended_subcontractor_id' => $recommendedSubcontractorId,
+        ];
     }
 
     public function stops(Request $request, string $id): JsonResponse
@@ -296,6 +344,9 @@ class RouteController extends Controller
         ]);
         $this->assertStopPayloadConsistency($payload);
         $this->assertUniqueStopSequence($id, (int) $payload['sequence']);
+        $this->assertStopNotDuplicatedInRoute($id, $payload);
+        $this->assertStopTemporalWindowConsistency((string) $route->route_date, $payload);
+        $this->assertRouteVehicleCapacityForStop($id, $payload);
 
         $stopId = (string) Str::uuid();
         DB::table('route_stops')->insert([
@@ -523,6 +574,8 @@ class RouteController extends Controller
         $newShipmentIds = array_values(array_diff($shipmentIds, $existingShipmentIds));
         $newPickupIds = array_values(array_diff($pickupIds, $existingPickupIds));
         $skippedCount = (count($shipmentIds) - count($newShipmentIds)) + (count($pickupIds) - count($newPickupIds));
+        $this->assertBulkStopTemporalWindowConsistency((string) $route->route_date, $newShipmentIds, $newPickupIds);
+        $this->assertRouteVehicleCapacityForBulkStops($id, $newShipmentIds);
 
         $createdCount = 0;
         DB::transaction(function () use ($id, $payload, $newShipmentIds, $newPickupIds, &$createdCount): void {
@@ -763,6 +816,149 @@ class RouteController extends Controller
 
         if ($query->exists()) {
             $this->throwValidationError('Sequence already exists for this route.', 'sequence');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertStopNotDuplicatedInRoute(string $routeId, array $payload): void
+    {
+        if (!empty($payload['shipment_id'])) {
+            $exists = DB::table('route_stops')
+                ->where('route_id', $routeId)
+                ->where('shipment_id', $payload['shipment_id'])
+                ->exists();
+            if ($exists) {
+                $this->throwValidationError('Shipment already exists in this route.', 'shipment_id');
+            }
+            return;
+        }
+
+        if (!empty($payload['pickup_id'])) {
+            $exists = DB::table('route_stops')
+                ->where('route_id', $routeId)
+                ->where('pickup_id', $payload['pickup_id'])
+                ->exists();
+            if ($exists) {
+                $this->throwValidationError('Pickup already exists in this route.', 'pickup_id');
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertStopTemporalWindowConsistency(string $routeDate, array $payload): void
+    {
+        $baseDateTs = strtotime($routeDate . ' 00:00:00');
+        if (!$baseDateTs) {
+            return;
+        }
+
+        if (!empty($payload['shipment_id'])) {
+            $scheduledAt = DB::table('shipments')->where('id', $payload['shipment_id'])->value('scheduled_at');
+            if ($scheduledAt) {
+                $scheduledTs = strtotime((string) $scheduledAt);
+                if ($scheduledTs && abs($scheduledTs - $baseDateTs) > (2 * 86400)) {
+                    $this->throwValidationError('Shipment scheduled date is outside route operational window (+/-2 days).', 'shipment_id');
+                }
+            }
+        }
+
+        if (!empty($payload['pickup_id'])) {
+            $scheduledAt = DB::table('pickups')->where('id', $payload['pickup_id'])->value('scheduled_at');
+            if ($scheduledAt) {
+                $scheduledTs = strtotime((string) $scheduledAt);
+                if ($scheduledTs && abs($scheduledTs - $baseDateTs) > (2 * 86400)) {
+                    $this->throwValidationError('Pickup scheduled date is outside route operational window (+/-2 days).', 'pickup_id');
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<int, string> $shipmentIds
+     * @param array<int, string> $pickupIds
+     */
+    private function assertBulkStopTemporalWindowConsistency(string $routeDate, array $shipmentIds, array $pickupIds): void
+    {
+        $baseDateTs = strtotime($routeDate . ' 00:00:00');
+        if (!$baseDateTs) {
+            return;
+        }
+
+        if ($shipmentIds !== []) {
+            $rows = DB::table('shipments')->whereIn('id', $shipmentIds)->get(['id', 'scheduled_at']);
+            foreach ($rows as $row) {
+                if (!$row->scheduled_at) continue;
+                $scheduledTs = strtotime((string) $row->scheduled_at);
+                if ($scheduledTs && abs($scheduledTs - $baseDateTs) > (2 * 86400)) {
+                    $this->throwValidationError('One or more shipments are outside route operational window (+/-2 days).', 'shipment_ids');
+                }
+            }
+        }
+
+        if ($pickupIds !== []) {
+            $rows = DB::table('pickups')->whereIn('id', $pickupIds)->get(['id', 'scheduled_at']);
+            foreach ($rows as $row) {
+                if (!$row->scheduled_at) continue;
+                $scheduledTs = strtotime((string) $row->scheduled_at);
+                if ($scheduledTs && abs($scheduledTs - $baseDateTs) > (2 * 86400)) {
+                    $this->throwValidationError('One or more pickups are outside route operational window (+/-2 days).', 'pickup_ids');
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function assertRouteVehicleCapacityForStop(string $routeId, array $payload): void
+    {
+        if (empty($payload['shipment_id'])) {
+            return;
+        }
+        $this->assertRouteVehicleCapacityForBulkStops($routeId, [(string) $payload['shipment_id']]);
+    }
+
+    /**
+     * @param array<int, string> $additionalShipmentIds
+     */
+    private function assertRouteVehicleCapacityForBulkStops(string $routeId, array $additionalShipmentIds): void
+    {
+        if ($additionalShipmentIds === []) {
+            return;
+        }
+        $route = DB::table('routes')->where('id', $routeId)->first(['vehicle_id']);
+        if (!$route || !$route->vehicle_id) {
+            return;
+        }
+        $capacityKg = DB::table('vehicles')->where('id', $route->vehicle_id)->value('capacity_kg');
+        if (!$capacityKg) {
+            return;
+        }
+
+        $existingShipmentIds = DB::table('route_stops')
+            ->where('route_id', $routeId)
+            ->whereNotNull('shipment_id')
+            ->pluck('shipment_id')
+            ->all();
+        $allShipmentIds = array_values(array_unique(array_merge($existingShipmentIds, $additionalShipmentIds)));
+        if ($allShipmentIds === []) {
+            return;
+        }
+
+        $totalWeightGrams = (int) DB::table('parcels')
+            ->whereIn('shipment_id', $allShipmentIds)
+            ->sum('weight_grams');
+        if ($totalWeightGrams <= 0) {
+            return;
+        }
+
+        $capacityGrams = ((int) $capacityKg) * 1000;
+        if ($totalWeightGrams > $capacityGrams) {
+            $this->throwValidationError('Route payload exceeds assigned vehicle capacity.', 'shipment_ids');
         }
     }
 

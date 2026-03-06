@@ -157,6 +157,12 @@ export type RouteBulkAddStopsResult = {
   stops: RouteStopSummary[];
 };
 
+export type RouteAssignmentPreview = {
+  valid: boolean;
+  conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }>;
+  recommended_subcontractor_id?: string | null;
+};
+
 export type DriverRouteMeResponse = {
   driver?: {
     id: string;
@@ -418,6 +424,9 @@ export type IncidentSummary = {
   shipment_reference?: string | null;
   catalog_code: string;
   category: 'failed' | 'absent' | 'retry' | 'general';
+  priority?: 'high' | 'medium' | 'low';
+  sla_due_at?: string | null;
+  sla_status?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
   notes?: string | null;
   resolved_at?: string | null;
 };
@@ -427,6 +436,23 @@ export type IncidentCatalogItem = {
   name: string;
   category: 'failed' | 'absent' | 'retry' | 'general';
   applies_to: 'shipment' | 'pickup' | 'both';
+  priority?: 'high' | 'medium' | 'low';
+  sla_minutes?: number;
+};
+
+export type IncidentsBoardSummary = {
+  total_open: number;
+  total_resolved: number;
+  by_priority: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  by_sla_status: {
+    on_track: number;
+    at_risk: number;
+    breached: number;
+  };
 };
 
 export type TariffSummary = {

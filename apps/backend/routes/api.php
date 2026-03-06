@@ -82,6 +82,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('points/{id}', [PointController::class, 'update']);
 
         Route::get('routes', [RouteController::class, 'index']);
+        Route::get('routes/assignment/preview', [RouteController::class, 'assignmentPreview']);
         Route::post('routes', [RouteController::class, 'store']);
         Route::patch('routes/{id}', [RouteController::class, 'update']);
         Route::get('routes/{id}/stops', [RouteController::class, 'stops']);
@@ -111,9 +112,11 @@ Route::prefix('v1')->group(function () {
         Route::patch('advances/{id}', [AdvanceController::class, 'update']);
         Route::post('advances/{id}/approve', [AdvanceController::class, 'approve']);
         Route::get('incidents/catalog', [IncidentController::class, 'catalog']);
+        Route::get('incidents/board', [IncidentController::class, 'board']);
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
         Route::patch('incidents/{id}/resolve', [IncidentController::class, 'resolve']);
+        Route::patch('incidents/{id}/override-sla', [IncidentController::class, 'overrideSla']);
 
         Route::get('kpis/quality', [QualityController::class, 'index']);
         Route::get('kpis/quality/top-routes-under-threshold', [QualityController::class, 'topRoutesUnderThreshold']);

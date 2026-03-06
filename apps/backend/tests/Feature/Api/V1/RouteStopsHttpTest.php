@@ -461,6 +461,110 @@ class RouteStopsHttpTest extends TestCase
         $manifest->assertJsonPath('data.route.manifest_notes', 'Notas operativas de carga');
     }
 
+    public function test_cannot_add_duplicate_shipment_stop_in_same_route(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-DUP-ENTITY',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-DUP-ENTITY-1',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+        ])->assertStatus(201);
+
+        $duplicate = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 2,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+        ]);
+
+        $duplicate->assertStatus(422);
+        $duplicate->assertJsonValidationErrors(['shipment_id']);
+    }
+
+    public function test_cannot_add_stop_when_route_vehicle_capacity_is_exceeded(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $vehicleId = (string) Str::uuid();
+        DB::table('vehicles')->insert([
+            'id' => $vehicleId,
+            'code' => 'VEH-CAP-001',
+            'plate_number' => 'CAP1001',
+            'vehicle_type' => 'van',
+            'capacity_kg' => 1,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'vehicle_id' => $vehicleId,
+            'code' => 'R-STOPS-CAP',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-CAP-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('parcels')->insert([
+            'id' => (string) Str::uuid(),
+            'shipment_id' => $shipmentId,
+            'barcode' => 'BAR-CAP-001',
+            'weight_grams' => 1500,
+            'status' => 'created',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['shipment_ids']);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

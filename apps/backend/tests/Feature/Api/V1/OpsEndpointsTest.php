@@ -51,6 +51,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('settlements/{id}'", $contents);
         $this->assertStringContainsString("Route::get('shipments'", $contents);
         $this->assertStringContainsString("Route::get('routes'", $contents);
+        $this->assertStringContainsString("Route::get('routes/assignment/preview'", $contents);
         $this->assertStringContainsString("Route::patch('routes/{id}'", $contents);
         $this->assertStringContainsString("Route::post('routes/{id}/stops'", $contents);
         $this->assertStringContainsString("Route::post('routes/{id}/stops/bulk-add'", $contents);
@@ -63,7 +64,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('routes/{id}/manifest/export.pdf'", $contents);
         $this->assertStringContainsString("Route::post('tracking-events'", $contents);
         $this->assertStringContainsString("Route::get('incidents/catalog'", $contents);
+        $this->assertStringContainsString("Route::get('incidents/board'", $contents);
         $this->assertStringContainsString("Route::get('incidents'", $contents);
+        $this->assertStringContainsString("Route::patch('incidents/{id}/override-sla'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/top-routes-under-threshold'", $contents);
         $this->assertStringContainsString("Route::get('kpis/quality/risk-summary'", $contents);
@@ -137,6 +140,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/audit-logs/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/hubs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/routes/assignment/preview:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/bulk-add:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/reorder:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/{stopId}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
@@ -149,6 +153,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/advances/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/advances/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/advances/{id}/approve:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/incidents/board:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/incidents/{id}/override-sla:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/top-routes-under-threshold:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/risk-summary:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/kpis/quality/routes/{routeId}/breakdown:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

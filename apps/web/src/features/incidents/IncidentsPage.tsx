@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { IncidentCatalogItem, IncidentSummary } from '../../core/api/types';
+import { IncidentCatalogItem, IncidentsBoardSummary, IncidentSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { useSearchParams } from 'react-router-dom';
 
@@ -32,8 +32,11 @@ export function IncidentsPage() {
   const [listTypeFilter, setListTypeFilter] = useState<'shipment' | 'pickup' | ''>('');
   const [listCategoryFilter, setListCategoryFilter] = useState<'failed' | 'absent' | 'retry' | 'general' | ''>('');
   const [listCatalogFilter, setListCatalogFilter] = useState('');
+  const [listPriorityFilter, setListPriorityFilter] = useState<'high' | 'medium' | 'low' | ''>('');
+  const [listSlaFilter, setListSlaFilter] = useState<'on_track' | 'at_risk' | 'breached' | 'resolved' | ''>('');
   const [listIncidentableId, setListIncidentableId] = useState('');
   const [listSearch, setListSearch] = useState('');
+  const [board, setBoard] = useState<IncidentsBoardSummary | null>(null);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
@@ -57,6 +60,8 @@ export function IncidentsPage() {
     incidentableType: listTypeFilter || undefined,
     category: listCategoryFilter || undefined,
     catalogCode: listCatalogFilter || undefined,
+    priority: listPriorityFilter || undefined,
+    slaStatus: listSlaFilter || undefined,
     incidentableId: listIncidentableId || undefined,
     q: listSearch || undefined,
     page,
@@ -64,6 +69,14 @@ export function IncidentsPage() {
   }).then((result) => {
     setItems(result.data);
     setLastPage(result.meta.last_page || 1);
+    return apiClient.getIncidentsBoard({
+      incidentableType: listTypeFilter || undefined,
+      category: listCategoryFilter || undefined,
+    });
+  }).then((summary) => {
+    setBoard(summary);
+  }).catch(() => {
+    setBoard(null);
   });
 
   useEffect(() => {
@@ -76,7 +89,7 @@ export function IncidentsPage() {
         setCategory(entries[0].category);
       }
     });
-  }, [resolvedFilter, page, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, listSearch]);
+  }, [resolvedFilter, page, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, listSearch]);
 
   useEffect(() => {
     if (initializedFromParams.current) return;
@@ -84,6 +97,8 @@ export function IncidentsPage() {
     const typeParam = searchParams.get('type') ?? '';
     const categoryParam = searchParams.get('category') ?? '';
     const catalogParam = searchParams.get('catalog') ?? '';
+    const priorityParam = searchParams.get('priority') ?? '';
+    const slaParam = searchParams.get('sla') ?? '';
     const incidentableParam = searchParams.get('incidentable_id') ?? '';
     const searchParam = searchParams.get('q') ?? '';
     const pageParam = Number(searchParams.get('page') ?? '1');
@@ -94,6 +109,8 @@ export function IncidentsPage() {
     if (typeParam === 'shipment' || typeParam === 'pickup') setListTypeFilter(typeParam);
     if (categoryParam) setListCategoryFilter(categoryParam as 'failed' | 'absent' | 'retry' | 'general' | '');
     if (catalogParam) setListCatalogFilter(catalogParam);
+    if (priorityParam) setListPriorityFilter(priorityParam as 'high' | 'medium' | 'low' | '');
+    if (slaParam) setListSlaFilter(slaParam as 'on_track' | 'at_risk' | 'breached' | 'resolved' | '');
     if (incidentableParam) setListIncidentableId(incidentableParam);
     if (searchParam) setListSearch(searchParam);
     if (!Number.isNaN(pageParam) && pageParam > 0) setPage(pageParam);
@@ -108,11 +125,13 @@ export function IncidentsPage() {
     if (listTypeFilter) params.set('type', listTypeFilter);
     if (listCategoryFilter) params.set('category', listCategoryFilter);
     if (listCatalogFilter) params.set('catalog', listCatalogFilter);
+    if (listPriorityFilter) params.set('priority', listPriorityFilter);
+    if (listSlaFilter) params.set('sla', listSlaFilter);
     if (listIncidentableId) params.set('incidentable_id', listIncidentableId);
     if (listSearch) params.set('q', listSearch);
     params.set('page', String(page));
     setSearchParams(params, { replace: true });
-  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, page, setSearchParams]);
+  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, page, setSearchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -124,6 +143,8 @@ export function IncidentsPage() {
         type: string;
         category: string;
         catalog: string;
+        priority: string;
+        sla: string;
         incidentableId: string;
         q: string;
       }>;
@@ -131,6 +152,8 @@ export function IncidentsPage() {
       if (parsed.type && !listTypeFilter) setListTypeFilter(parsed.type as 'shipment' | 'pickup' | '');
       if (parsed.category && !listCategoryFilter) setListCategoryFilter(parsed.category as 'failed' | 'absent' | 'retry' | 'general' | '');
       if (parsed.catalog && !listCatalogFilter) setListCatalogFilter(parsed.catalog);
+      if (parsed.priority && !listPriorityFilter) setListPriorityFilter(parsed.priority as 'high' | 'medium' | 'low' | '');
+      if (parsed.sla && !listSlaFilter) setListSlaFilter(parsed.sla as 'on_track' | 'at_risk' | 'breached' | 'resolved' | '');
       if (parsed.incidentableId && !listIncidentableId) setListIncidentableId(parsed.incidentableId);
       if (parsed.q && !listSearch) setListSearch(parsed.q);
     } catch {
@@ -145,11 +168,13 @@ export function IncidentsPage() {
       type: listTypeFilter,
       category: listCategoryFilter,
       catalog: listCatalogFilter,
+      priority: listPriorityFilter,
+      sla: listSlaFilter,
       incidentableId: listIncidentableId,
       q: listSearch,
     };
     window.localStorage.setItem(incidentsFilterStorageKey, JSON.stringify(payload));
-  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listIncidentableId, listSearch]);
+  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, listSearch]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
@@ -180,6 +205,23 @@ export function IncidentsPage() {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
     } finally {
       setResolvingId(null);
+    }
+  };
+
+  const onOverrideSla = async (item: IncidentSummary) => {
+    const reason = window.prompt(`Motivo de override para ${item.id}`);
+    if (!reason || reason.trim() === '') return;
+    const priorityInput = window.prompt('Nueva prioridad (high/medium/low). Deja vacio para mantener.', item.priority ?? '');
+    const dueInput = window.prompt('Nuevo SLA due_at en ISO (opcional).', item.sla_due_at ?? '');
+    try {
+      await apiClient.overrideIncidentSla(item.id, {
+        priority: priorityInput === 'high' || priorityInput === 'medium' || priorityInput === 'low' ? priorityInput : undefined,
+        sla_due_at: dueInput && dueInput.trim() !== '' ? dueInput : undefined,
+        reason: reason.trim(),
+      });
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo ajustar SLA');
     }
   };
 
@@ -258,6 +300,18 @@ export function IncidentsPage() {
               <div className="kpi-label">Resueltas</div>
               <div className="kpi-value">{incidentSummary.resolved}</div>
             </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Alta prioridad</div>
+              <div className="kpi-value">{board?.by_priority.high ?? 0}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">SLA en riesgo</div>
+              <div className="kpi-value">{board?.by_sla_status.at_risk ?? 0}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">SLA vencido</div>
+              <div className="kpi-value">{board?.by_sla_status.breached ?? 0}</div>
+            </div>
           </div>
           {resolveError ? <div className="helper error">{resolveError}</div> : null}
           <div className="form-row">
@@ -297,6 +351,25 @@ export function IncidentsPage() {
               </Select>
             </div>
             <div>
+              <label>Prioridad</label>
+              <Select value={listPriorityFilter} onChange={(e) => { setListPriorityFilter(e.target.value as 'high' | 'medium' | 'low' | ''); setPage(1); }}>
+                <option value="">prioridad</option>
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+              </Select>
+            </div>
+            <div>
+              <label>SLA</label>
+              <Select value={listSlaFilter} onChange={(e) => { setListSlaFilter(e.target.value as 'on_track' | 'at_risk' | 'breached' | 'resolved' | ''); setPage(1); }}>
+                <option value="">sla</option>
+                <option value="on_track">on_track</option>
+                <option value="at_risk">at_risk</option>
+                <option value="breached">breached</option>
+                <option value="resolved">resolved</option>
+              </Select>
+            </div>
+            <div>
               <label>Referencia objetivo</label>
               <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
             </div>
@@ -314,6 +387,8 @@ export function IncidentsPage() {
                   <TableHead>Ref. envio</TableHead>
                   <TableHead>Catalogo</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Prioridad</TableHead>
+                  <TableHead>SLA</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Accion</TableHead>
                 </TableRow>
@@ -330,6 +405,8 @@ export function IncidentsPage() {
                         {item.category}
                       </Badge>
                     </TableCell>
+                    <TableCell>{item.priority ?? '-'}</TableCell>
+                    <TableCell>{item.sla_status ?? '-'}</TableCell>
                     <TableCell title={incidentStatusHelp(item.resolved_at)}>
                       {item.resolved_at ? 'resuelta' : 'abierta'}
                     </TableCell>
@@ -337,21 +414,47 @@ export function IncidentsPage() {
                       {item.resolved_at ? (
                         <span>-</span>
                       ) : (
-                        <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
-                          {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
-                        </Button>
+                        <div className="inline-actions">
+                          <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
+                            {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => onOverrideSla(item)}>
+                            Ajustar SLA
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>Sin incidencias para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={9}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="page-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(180px, 1fr))' }}>
+            {[
+              ['on_track', 'On Track'],
+              ['at_risk', 'At Risk'],
+              ['breached', 'Breached'],
+              ['resolved', 'Resolved'],
+            ].map(([status, label]) => (
+              <Card key={status}>
+                <CardHeader>
+                  <CardTitle>{label}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {items.filter((item) => (item.sla_status ?? (item.resolved_at ? 'resolved' : 'on_track')) === status).slice(0, 6).map((item) => (
+                    <div key={item.id} className="helper">
+                      {item.id} · {item.catalog_code} · {item.priority ?? '-'}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           <div className="inline-actions">
             <Button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
               Anterior

@@ -48,6 +48,15 @@ class IncidentHttpTest extends TestCase
         $openList->assertJsonPath('meta.total', 1);
         $openList->assertJsonPath('data.0.id', $id);
         $openList->assertJsonPath('data.0.resolved_at', null);
+        $this->assertContains($openList->json('data.0.priority'), ['high', 'medium', 'low']);
+        $this->assertContains($openList->json('data.0.sla_status'), ['on_track', 'at_risk', 'breached']);
+
+        $override = $this->patchJson('/api/v1/incidents/' . $id . '/override-sla', [
+            'priority' => 'high',
+            'reason' => 'Escalado operativo',
+        ]);
+        $override->assertOk();
+        $override->assertJsonPath('data.priority', 'high');
 
         $resolved = $this->patchJson('/api/v1/incidents/' . $id . '/resolve', [
             'notes' => 'resolved from test',
@@ -59,6 +68,18 @@ class IncidentHttpTest extends TestCase
         $resolvedList->assertOk();
         $resolvedList->assertJsonPath('meta.total', 1);
         $resolvedList->assertJsonPath('data.0.id', $id);
+        $resolvedList->assertJsonPath('data.0.sla_status', 'resolved');
+
+        $board = $this->getJson('/api/v1/incidents/board?incidentable_type=shipment');
+        $board->assertOk();
+        $board->assertJsonStructure([
+            'data' => [
+                'total_open',
+                'total_resolved',
+                'by_priority' => ['high', 'medium', 'low'],
+                'by_sla_status' => ['on_track', 'at_risk', 'breached'],
+            ],
+        ]);
     }
 
     private function authenticateAsAdmin(): void
