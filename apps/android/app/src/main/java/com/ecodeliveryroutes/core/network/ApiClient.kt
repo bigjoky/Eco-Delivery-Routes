@@ -25,6 +25,12 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 
 class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() }) {
+    private val addressSuggestionsCache = mutableMapOf<String, Pair<Long, List<AddressSuggestion>>>()
+
+    companion object {
+        private const val ADDRESS_SUGGESTIONS_TTL_MS = 5 * 60 * 1000L
+    }
+
     suspend fun login(email: String, password: String): String = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext "mock-token"
 
@@ -193,6 +199,22 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
     ): List<AddressSuggestion> = withContext(Dispatchers.IO) {
         if (q.isBlank()) return@withContext emptyList()
         if (baseUrl == null) return@withContext emptyList()
+        val cacheKey = listOf(
+            q.trim().lowercase(),
+            kind.trim().lowercase(),
+            city?.trim()?.lowercase() ?: "",
+            postalCode?.trim()?.lowercase() ?: "",
+            limit.coerceIn(1, 25).toString()
+        ).joinToString("|")
+        val now = System.currentTimeMillis()
+        val cached = addressSuggestionsCache[cacheKey]
+        if (cached != null && cached.first > now) {
+            return@withContext cached.second
+        }
+        if (cached != null && cached.first <= now) {
+            addressSuggestionsCache.remove(cacheKey)
+        }
+
         runCatching {
             fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
             val query = buildList {
@@ -218,7 +240,9 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                     addressNotes = item.optString("address_notes").ifBlank { null }
                 )
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList()).also { rows ->
+            addressSuggestionsCache[cacheKey] = (now + ADDRESS_SUGGESTIONS_TTL_MS) to rows
+        }
     }
 
     suspend fun registerIncident(
