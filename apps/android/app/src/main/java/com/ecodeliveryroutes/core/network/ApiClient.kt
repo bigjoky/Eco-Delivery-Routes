@@ -147,22 +147,35 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         senderDocumentId: String,
         senderPhone: String,
         scheduledAt: String? = null,
-        serviceType: String = "express_1030"
+        serviceType: String = "express_1030",
+        addressStreet: String? = null,
+        addressNumber: String? = null,
+        postalCode: String? = null,
+        city: String? = null,
+        country: String? = null,
+        senderAddressLine: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext true
         runCatching {
+            val payload = JSONObject()
+                .put("hub_id", hubId)
+                .put("consignee_name", consigneeName)
+                .put("consignee_document_id", consigneeDocumentId)
+                .put("consignee_phone", consigneePhone)
+                .put("sender_name", senderName)
+                .put("sender_document_id", senderDocumentId)
+                .put("sender_phone", senderPhone)
+                .put("scheduled_at", scheduledAt ?: java.time.LocalDate.now().toString())
+                .put("service_type", serviceType)
+            if (!addressStreet.isNullOrBlank()) payload.put("address_street", addressStreet)
+            if (!addressNumber.isNullOrBlank()) payload.put("address_number", addressNumber)
+            if (!postalCode.isNullOrBlank()) payload.put("postal_code", postalCode)
+            if (!city.isNullOrBlank()) payload.put("city", city)
+            if (!country.isNullOrBlank()) payload.put("country", country)
+            if (!senderAddressLine.isNullOrBlank()) payload.put("sender_address_line", senderAddressLine)
             authedPost(
                 "$baseUrl/shipments",
-                JSONObject()
-                    .put("hub_id", hubId)
-                    .put("consignee_name", consigneeName)
-                    .put("consignee_document_id", consigneeDocumentId)
-                    .put("consignee_phone", consigneePhone)
-                    .put("sender_name", senderName)
-                    .put("sender_document_id", senderDocumentId)
-                    .put("sender_phone", senderPhone)
-                    .put("scheduled_at", scheduledAt ?: java.time.LocalDate.now().toString())
-                    .put("service_type", serviceType)
+                payload
             )
             true
         }.getOrDefault(false)

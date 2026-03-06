@@ -16,6 +16,7 @@ import {
   isValidPhone,
   isValidPostalCode,
 } from './shipmentFormValidation';
+import { buildAddressSuggestions } from './addressAutocomplete';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
   if (status === 'delivered') return 'success';
@@ -621,34 +622,6 @@ export function ShipmentsPage() {
     setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
   };
 
-  const normalizeAddressSuggestions = (rows: Array<{
-    address_street?: string | null;
-    address_number?: string | null;
-    postal_code?: string | null;
-    city?: string | null;
-    province?: string | null;
-    country?: string | null;
-    address_notes?: string | null;
-  }>) => {
-    const dedupe = new Set<string>();
-    const unique: typeof rows = [];
-    rows.forEach((row) => {
-      const key = [
-        row.address_street ?? '',
-        row.address_number ?? '',
-        row.postal_code ?? '',
-        row.city ?? '',
-        row.province ?? '',
-        row.country ?? '',
-      ].join('|');
-      if (!key.replace(/\|/g, '').trim()) return;
-      if (dedupe.has(key)) return;
-      dedupe.add(key);
-      unique.push(row);
-    });
-    return unique.slice(0, 5);
-  };
-
   const lookupRecipientContact = async (criteria: { phone?: string; document?: string }) => {
     const phone = criteria.phone?.trim() ?? '';
     const document = criteria.document?.trim() ?? '';
@@ -659,7 +632,13 @@ export function ShipmentsPage() {
     setConsigneeLookupError('');
     setConsigneeLookupLoading(true);
     try {
-      const matches = await apiClient.getContacts({ phone: phone || undefined, q: document || undefined, documentId: document || undefined });
+      const matches = await apiClient.getContacts({
+        phone: phone || undefined,
+        q: document || undefined,
+        documentId: document || undefined,
+        kind: 'recipient',
+        limit: 20,
+      });
       if (!matches.length) {
         setConsigneeLookupError('No se encontro destinatario con esos datos.');
       } else {
@@ -706,7 +685,13 @@ export function ShipmentsPage() {
     setSenderLookupError('');
     setSenderLookupLoading(true);
     try {
-      const matches = await apiClient.getContacts({ phone: phone || undefined, q: document || undefined, documentId: document || undefined });
+      const matches = await apiClient.getContacts({
+        phone: phone || undefined,
+        q: document || undefined,
+        documentId: document || undefined,
+        kind: 'sender',
+        limit: 20,
+      });
       if (!matches.length) {
         setSenderLookupError('No se encontro remitente con esos datos.');
       } else {
@@ -750,8 +735,14 @@ export function ShipmentsPage() {
       return;
     }
     try {
-      const rows = await apiClient.getContacts({ q });
-      setRecipientAddressSuggestions(normalizeAddressSuggestions(rows));
+      const rows = await apiClient.getContacts({ q, kind: 'recipient', limit: 25 });
+      setRecipientAddressSuggestions(buildAddressSuggestions(rows, {
+        street: createStreet,
+        postalCode: createPostalCode,
+        city: createCity,
+        phone: createPhone,
+        documentId: createConsigneeDocumentId,
+      }));
     } catch {
       setRecipientAddressSuggestions([]);
     }
@@ -764,8 +755,14 @@ export function ShipmentsPage() {
       return;
     }
     try {
-      const rows = await apiClient.getContacts({ q });
-      setSenderAddressSuggestions(normalizeAddressSuggestions(rows));
+      const rows = await apiClient.getContacts({ q, kind: 'sender', limit: 25 });
+      setSenderAddressSuggestions(buildAddressSuggestions(rows, {
+        street: createSenderStreet,
+        postalCode: createSenderPostalCode,
+        city: createSenderCity,
+        phone: createSenderPhone,
+        documentId: createSenderDocumentId,
+      }));
     } catch {
       setSenderAddressSuggestions([]);
     }

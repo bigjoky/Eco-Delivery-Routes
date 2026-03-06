@@ -954,7 +954,14 @@ export const mockApi = {
     return rows;
   },
 
-  async getContacts(filters: { phone?: string; email?: string; documentId?: string; q?: string } = {}) {
+  async getContacts(filters: {
+    phone?: string;
+    email?: string;
+    documentId?: string;
+    kind?: 'sender' | 'recipient';
+    limit?: number;
+    q?: string;
+  } = {}) {
     const rows = [
       {
         id: 'c-1',
@@ -987,19 +994,23 @@ export const mockApi = {
         kind: 'sender',
       },
     ];
+    let filtered = rows;
+    if (filters.kind) {
+      filtered = filtered.filter((row) => row.kind === filters.kind);
+    }
     if (filters.phone) {
-      return rows.filter((row) => (row.phone ?? '').includes(filters.phone ?? ''));
+      filtered = filtered.filter((row) => (row.phone ?? '').includes(filters.phone ?? ''));
     }
     if (filters.email) {
-      return rows.filter((row) => (row.email ?? '').includes(filters.email ?? ''));
+      filtered = filtered.filter((row) => (row.email ?? '').includes(filters.email ?? ''));
     }
     if (filters.documentId) {
       const value = filters.documentId.toLowerCase();
-      return rows.filter((row) => (row.document_id ?? '').toLowerCase().includes(value));
+      filtered = filtered.filter((row) => (row.document_id ?? '').toLowerCase().includes(value));
     }
     if (filters.q) {
       const q = filters.q.toLowerCase();
-      return rows.filter((row) =>
+      filtered = filtered.filter((row) =>
         (row.display_name ?? '').toLowerCase().includes(q) ||
         (row.phone ?? '').toLowerCase().includes(q) ||
         (row.document_id ?? '').toLowerCase().includes(q) ||
@@ -1007,7 +1018,8 @@ export const mockApi = {
         (row.city ?? '').toLowerCase().includes(q)
       );
     }
-    return rows;
+    const limit = Math.max(1, Math.min(filters.limit ?? 50, 100));
+    return filtered.slice(0, limit);
   },
 
   async createShipment(payload: {
