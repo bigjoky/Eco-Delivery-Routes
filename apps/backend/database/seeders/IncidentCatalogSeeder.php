@@ -23,10 +23,10 @@ class IncidentCatalogSeeder extends Seeder
         ]);
 
         $items = [
-            ['code' => 'ABSENT_HOME', 'name' => 'Destinatario ausente', 'category' => 'absent', 'applies_to' => 'shipment'],
-            ['code' => 'RETRY_WINDOW', 'name' => 'Reintento por franja horaria', 'category' => 'retry', 'applies_to' => 'shipment'],
-            ['code' => 'FAILED_ADDRESS', 'name' => 'Direccion invalida', 'category' => 'failed', 'applies_to' => 'shipment'],
-            ['code' => 'PICKUP_CLIENT_NOT_READY', 'name' => 'Cliente no preparado para recogida', 'category' => 'general', 'applies_to' => 'pickup'],
+            ['code' => 'ABSENT_HOME', 'name' => 'Destinatario ausente', 'category' => 'absent', 'applies_to' => 'shipment', 'priority' => 'medium', 'sla_minutes' => 480],
+            ['code' => 'RETRY_WINDOW', 'name' => 'Reintento por franja horaria', 'category' => 'retry', 'applies_to' => 'shipment', 'priority' => 'medium', 'sla_minutes' => 480],
+            ['code' => 'FAILED_ADDRESS', 'name' => 'Direccion invalida', 'category' => 'failed', 'applies_to' => 'shipment', 'priority' => 'high', 'sla_minutes' => 240],
+            ['code' => 'PICKUP_CLIENT_NOT_READY', 'name' => 'Cliente no preparado para recogida', 'category' => 'general', 'applies_to' => 'pickup', 'priority' => 'low', 'sla_minutes' => 1440],
         ];
 
         foreach ($items as $item) {
@@ -36,6 +36,8 @@ class IncidentCatalogSeeder extends Seeder
                 'code' => $item['code'],
                 'name' => $item['name'],
                 'category' => $item['category'],
+                'priority' => $item['priority'],
+                'sla_minutes' => $item['sla_minutes'],
                 'applies_to' => $item['applies_to'],
                 'is_active' => true,
                 'created_at' => now(),

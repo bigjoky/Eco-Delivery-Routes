@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
         Route::patch('incidents/{id}/resolve', [IncidentController::class, 'resolve']);
+        Route::patch('incidents/{id}/override-sla', [IncidentController::class, 'overrideSla']);
 
         Route::get('kpis/quality', [QualityController::class, 'index']);
         Route::get('kpis/quality/top-routes-under-threshold', [QualityController::class, 'topRoutesUnderThreshold']);
