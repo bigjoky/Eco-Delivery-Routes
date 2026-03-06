@@ -160,6 +160,7 @@ export type RouteBulkAddStopsResult = {
 export type RouteAssignmentPreview = {
   valid: boolean;
   conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }>;
+  warnings?: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }>;
   recommended_subcontractor_id?: string | null;
 };
 

@@ -792,12 +792,16 @@ export const apiClient = {
     subcontractor_id?: string | null;
     driver_id?: string | null;
     vehicle_id?: string | null;
+    route_id?: string | null;
+    route_date?: string | null;
   }): Promise<RouteAssignmentPreview> {
     if (USE_MOCK) return mockApi.previewRouteAssignment(payload) as Promise<RouteAssignmentPreview>;
     const params = new URLSearchParams();
     if (payload.subcontractor_id) params.set('subcontractor_id', payload.subcontractor_id);
     if (payload.driver_id) params.set('driver_id', payload.driver_id);
     if (payload.vehicle_id) params.set('vehicle_id', payload.vehicle_id);
+    if (payload.route_id) params.set('route_id', payload.route_id);
+    if (payload.route_date) params.set('route_date', payload.route_date);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/routes/assignment/preview${suffix}`);
     const json = await response.json();

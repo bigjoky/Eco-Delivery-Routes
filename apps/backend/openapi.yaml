@@ -1684,6 +1684,12 @@ paths:
       summary: Previsualizar conflictos de asignacion ruta (subcontrata/conductor/vehiculo)
       parameters:
         - in: query
+          name: route_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: route_date
+          schema: { type: string, format: date }
+        - in: query
           name: subcontractor_id
           schema: { type: string, format: uuid }
         - in: query
@@ -1693,7 +1699,32 @@ paths:
           name: vehicle_id
           schema: { type: string, format: uuid }
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      valid: { type: boolean }
+                      recommended_subcontractor_id: { type: string, format: uuid, nullable: true }
+                      conflicts:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field: { type: string, enum: [driver_id, subcontractor_id, vehicle_id] }
+                            message: { type: string }
+                      warnings:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field: { type: string, enum: [driver_id, subcontractor_id, vehicle_id] }
+                            message: { type: string }
 
   /routes/{id}:
     patch:
