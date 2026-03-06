@@ -5,7 +5,8 @@ data class HubSummary(
     val code: String,
     val name: String,
     val city: String?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val deletedAt: String? = null
 )
 
 data class DepotSummary(
@@ -14,7 +15,8 @@ data class DepotSummary(
     val code: String,
     val name: String,
     val city: String?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val deletedAt: String? = null
 )
 
 data class PointSummary(
@@ -24,5 +26,6 @@ data class PointSummary(
     val code: String,
     val name: String,
     val city: String?,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val deletedAt: String? = null
 )

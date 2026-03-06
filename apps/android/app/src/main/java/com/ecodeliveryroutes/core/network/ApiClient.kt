@@ -269,15 +269,15 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }
     }
 
-    suspend fun hubs(onlyActive: Boolean = true): List<HubSummary> = withContext(Dispatchers.IO) {
+    suspend fun hubs(onlyActive: Boolean = true, includeDeleted: Boolean = false): List<HubSummary> = withContext(Dispatchers.IO) {
         if (baseUrl == null) {
             return@withContext listOf(
-                HubSummary("hub-1", "AGP-HUB-01", "Hub Malaga Centro", "Malaga", true),
-                HubSummary("hub-2", "SEV-HUB-01", "Hub Sevilla Norte", "Sevilla", true)
+                HubSummary("hub-1", "AGP-HUB-01", "Hub Malaga Centro", "Malaga", true, null),
+                HubSummary("hub-2", "SEV-HUB-01", "Hub Sevilla Norte", "Sevilla", true, null)
             )
         }
         runCatching {
-            val suffix = if (onlyActive) "?only_active=1" else "?only_active=0"
+            val suffix = "?only_active=${if (onlyActive) "1" else "0"}&include_deleted=${if (includeDeleted) "1" else "0"}"
             val payload = authedGet("$baseUrl/hubs$suffix")
             val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
             (0 until rows.length()).map { index ->
@@ -287,16 +287,20 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                     code = item.optString("code"),
                     name = item.optString("name"),
                     city = item.optString("city").ifBlank { null },
-                    isActive = item.optBoolean("is_active", true)
+                    isActive = item.optBoolean("is_active", true),
+                    deletedAt = item.optString("deleted_at").ifBlank { null }
                 )
             }
         }.getOrDefault(emptyList())
     }
 
-    suspend fun depots(hubId: String? = null): List<DepotSummary> = withContext(Dispatchers.IO) {
+    suspend fun depots(hubId: String? = null, includeDeleted: Boolean = false): List<DepotSummary> = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext emptyList()
         runCatching {
-            val suffix = if (!hubId.isNullOrBlank()) "?hub_id=$hubId" else ""
+            val suffix = buildList {
+                if (!hubId.isNullOrBlank()) add("hub_id=$hubId")
+                add("include_deleted=${if (includeDeleted) "1" else "0"}")
+            }.joinToString("&", prefix = "?")
             val payload = authedGet("$baseUrl/depots$suffix")
             val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
             (0 until rows.length()).map { index ->
@@ -307,18 +311,20 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                     code = item.optString("code"),
                     name = item.optString("name"),
                     city = item.optString("city").ifBlank { null },
-                    isActive = item.optBoolean("is_active", true)
+                    isActive = item.optBoolean("is_active", true),
+                    deletedAt = item.optString("deleted_at").ifBlank { null }
                 )
             }
         }.getOrDefault(emptyList())
     }
 
-    suspend fun points(hubId: String? = null, depotId: String? = null): List<PointSummary> = withContext(Dispatchers.IO) {
+    suspend fun points(hubId: String? = null, depotId: String? = null, includeDeleted: Boolean = false): List<PointSummary> = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext emptyList()
         runCatching {
             val query = buildList {
                 if (!hubId.isNullOrBlank()) add("hub_id=$hubId")
                 if (!depotId.isNullOrBlank()) add("depot_id=$depotId")
+                add("include_deleted=${if (includeDeleted) "1" else "0"}")
             }.joinToString("&")
             val suffix = if (query.isNotBlank()) "?$query" else ""
             val payload = authedGet("$baseUrl/points$suffix")
@@ -332,10 +338,35 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                     code = item.optString("code"),
                     name = item.optString("name"),
                     city = item.optString("city").ifBlank { null },
-                    isActive = item.optBoolean("is_active", true)
+                    isActive = item.optBoolean("is_active", true),
+                    deletedAt = item.optString("deleted_at").ifBlank { null }
                 )
             }
         }.getOrDefault(emptyList())
+    }
+
+    suspend fun restoreHub(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedPost("$baseUrl/hubs/$id/restore", JSONObject())
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun restoreDepot(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedPost("$baseUrl/depots/$id/restore", JSONObject())
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun restorePoint(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedPost("$baseUrl/points/$id/restore", JSONObject())
+            true
+        }.getOrDefault(false)
     }
 
     private fun authedGet(url: String): String {

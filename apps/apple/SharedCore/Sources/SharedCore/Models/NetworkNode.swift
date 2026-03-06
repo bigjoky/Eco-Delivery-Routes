@@ -6,6 +6,7 @@ public struct HubSummary: Codable, Identifiable {
     public let name: String
     public let city: String?
     public let isActive: Bool
+    public let deletedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -13,6 +14,7 @@ public struct HubSummary: Codable, Identifiable {
         case name
         case city
         case isActive = "is_active"
+        case deletedAt = "deleted_at"
     }
 }
 
@@ -24,6 +26,7 @@ public struct DepotSummary: Codable, Identifiable {
     public let addressLine: String?
     public let city: String?
     public let isActive: Bool
+    public let deletedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -33,6 +36,7 @@ public struct DepotSummary: Codable, Identifiable {
         case addressLine = "address_line"
         case city
         case isActive = "is_active"
+        case deletedAt = "deleted_at"
     }
 }
 
@@ -45,6 +49,7 @@ public struct PointSummary: Codable, Identifiable {
     public let addressLine: String?
     public let city: String?
     public let isActive: Bool
+    public let deletedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -55,5 +60,6 @@ public struct PointSummary: Codable, Identifiable {
         case addressLine = "address_line"
         case city
         case isActive = "is_active"
+        case deletedAt = "deleted_at"
     }
 }

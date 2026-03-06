@@ -37,15 +37,32 @@ public protocol APIClientProtocol {
         routeDate: String?
     ) async throws -> RouteAssignmentPreview
     func routeAssignmentPublishPolicy() async throws -> RouteAssignmentPublishPolicy
-    func hubs(onlyActive: Bool) async throws -> [HubSummary]
-    func depots(hubId: String?) async throws -> [DepotSummary]
-    func points(hubId: String?, depotId: String?) async throws -> [PointSummary]
+    func hubs(onlyActive: Bool, includeDeleted: Bool) async throws -> [HubSummary]
+    func depots(hubId: String?, includeDeleted: Bool) async throws -> [DepotSummary]
+    func points(hubId: String?, depotId: String?, includeDeleted: Bool) async throws -> [PointSummary]
+    func restoreHub(id: String) async throws -> HubSummary
+    func restoreDepot(id: String) async throws -> DepotSummary
+    func restorePoint(id: String) async throws -> PointSummary
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownPdf(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func downloadShipmentsTemplate() async throws -> Data
     func importShipmentsCsv(fileUrl: URL, dryRun: Bool) async throws -> ShipmentsImportResult
+}
+
+public extension APIClientProtocol {
+    func hubs(onlyActive: Bool) async throws -> [HubSummary] {
+        try await hubs(onlyActive: onlyActive, includeDeleted: false)
+    }
+
+    func depots(hubId: String?) async throws -> [DepotSummary] {
+        try await depots(hubId: hubId, includeDeleted: false)
+    }
+
+    func points(hubId: String?, depotId: String?) async throws -> [PointSummary] {
+        try await points(hubId: hubId, depotId: depotId, includeDeleted: false)
+    }
 }
 
 public final class APIClient: APIClientProtocol {
@@ -531,43 +548,71 @@ public final class APIClient: APIClientProtocol {
         return try JSONDecoder().decode(DataObjectEnvelope<RouteAssignmentPublishPolicy>.self, from: data).data
     }
 
-    public func hubs(onlyActive: Bool) async throws -> [HubSummary] {
-        guard let baseURL else { return try await mock.hubs(onlyActive: onlyActive) }
+    public func hubs(onlyActive: Bool, includeDeleted: Bool = false) async throws -> [HubSummary] {
+        guard let baseURL else { return try await mock.hubs(onlyActive: onlyActive, includeDeleted: includeDeleted) }
 
         let url = withQueryItems(
             baseURL.appending(path: "hubs"),
-            queryItems: [URLQueryItem(name: "only_active", value: onlyActive ? "1" : "0")]
+            queryItems: [
+                URLQueryItem(name: "only_active", value: onlyActive ? "1" : "0"),
+                URLQueryItem(name: "include_deleted", value: includeDeleted ? "1" : "0"),
+            ]
         )
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataArrayEnvelope<HubSummary>.self, from: data).data
     }
 
-    public func depots(hubId: String?) async throws -> [DepotSummary] {
-        guard let baseURL else { return try await mock.depots(hubId: hubId) }
+    public func depots(hubId: String?, includeDeleted: Bool = false) async throws -> [DepotSummary] {
+        guard let baseURL else { return try await mock.depots(hubId: hubId, includeDeleted: includeDeleted) }
 
         let url = withQueryItems(
             baseURL.appending(path: "depots"),
-            queryItems: [URLQueryItem(name: "hub_id", value: hubId)]
+            queryItems: [
+                URLQueryItem(name: "hub_id", value: hubId),
+                URLQueryItem(name: "include_deleted", value: includeDeleted ? "1" : "0"),
+            ]
         )
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataArrayEnvelope<DepotSummary>.self, from: data).data
     }
 
-    public func points(hubId: String?, depotId: String?) async throws -> [PointSummary] {
-        guard let baseURL else { return try await mock.points(hubId: hubId, depotId: depotId) }
+    public func points(hubId: String?, depotId: String?, includeDeleted: Bool = false) async throws -> [PointSummary] {
+        guard let baseURL else { return try await mock.points(hubId: hubId, depotId: depotId, includeDeleted: includeDeleted) }
 
         let url = withQueryItems(
             baseURL.appending(path: "points"),
             queryItems: [
                 URLQueryItem(name: "hub_id", value: hubId),
                 URLQueryItem(name: "depot_id", value: depotId),
+                URLQueryItem(name: "include_deleted", value: includeDeleted ? "1" : "0"),
             ]
         )
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataArrayEnvelope<PointSummary>.self, from: data).data
+    }
+
+    public func restoreHub(id: String) async throws -> HubSummary {
+        guard let baseURL else { return try await mock.restoreHub(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "hubs/\(id)/restore"), method: "POST")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<HubSummary>.self, from: data).data
+    }
+
+    public func restoreDepot(id: String) async throws -> DepotSummary {
+        guard let baseURL else { return try await mock.restoreDepot(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "depots/\(id)/restore"), method: "POST")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<DepotSummary>.self, from: data).data
+    }
+
+    public func restorePoint(id: String) async throws -> PointSummary {
+        guard let baseURL else { return try await mock.restorePoint(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "points/\(id)/restore"), method: "POST")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<PointSummary>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {
