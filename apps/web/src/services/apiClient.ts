@@ -42,6 +42,7 @@ import {
   DriverSummary,
   VehicleSummary,
   ContactSummary,
+  AddressSuggestion,
   ShipmentSummary,
   ShipmentDetail,
   PickupSummary,
@@ -692,6 +693,25 @@ export const apiClient = {
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
     return parseData<ContactSummary>(response);
+  },
+
+  async getAddressSuggestions(filters: {
+    q?: string;
+    kind?: 'sender' | 'recipient';
+    city?: string;
+    postalCode?: string;
+    limit?: number;
+  } = {}): Promise<AddressSuggestion[]> {
+    if (USE_MOCK) return mockApi.getAddressSuggestions(filters) as Promise<AddressSuggestion[]>;
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.kind) params.set('kind', filters.kind);
+    if (filters.city) params.set('city', filters.city);
+    if (filters.postalCode) params.set('postal_code', filters.postalCode);
+    if (typeof filters.limit === 'number' && filters.limit > 0) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/addresses/suggest${suffix}`);
+    return parseData<AddressSuggestion>(response);
   },
 
   async createShipment(payload: {
