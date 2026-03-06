@@ -15,6 +15,17 @@ public protocol APIClientProtocol {
     func registerScan(trackableType: String, trackableId: String, scanCode: String) async throws
     func registerPod(evidenceType: String, evidenceId: String, signatureName: String) async throws
     func createPickup(reference: String, pickupType: String, hubId: String) async throws
+    func createShipment(
+        hubId: String,
+        consigneeName: String,
+        consigneeDocumentId: String,
+        consigneePhone: String,
+        senderName: String,
+        senderDocumentId: String,
+        senderPhone: String,
+        scheduledAt: String?,
+        serviceType: String
+    ) async throws
     func registerIncident(
         incidentableType: String,
         incidentableId: String,
@@ -280,6 +291,48 @@ public final class APIClient: APIClientProtocol {
             "hub_id": hubId,
             "reference": reference,
             "pickup_type": pickupType
+        ])
+
+        _ = try await execute(request)
+    }
+
+    public func createShipment(
+        hubId: String,
+        consigneeName: String,
+        consigneeDocumentId: String,
+        consigneePhone: String,
+        senderName: String,
+        senderDocumentId: String,
+        senderPhone: String,
+        scheduledAt: String?,
+        serviceType: String
+    ) async throws {
+        guard let baseURL else {
+            return try await mock.createShipment(
+                hubId: hubId,
+                consigneeName: consigneeName,
+                consigneeDocumentId: consigneeDocumentId,
+                consigneePhone: consigneePhone,
+                senderName: senderName,
+                senderDocumentId: senderDocumentId,
+                senderPhone: senderPhone,
+                scheduledAt: scheduledAt,
+                serviceType: serviceType
+            )
+        }
+
+        var request = authorizedRequest(url: baseURL.appending(path: "shipments"), method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "hub_id": hubId,
+            "consignee_name": consigneeName,
+            "consignee_document_id": consigneeDocumentId,
+            "consignee_phone": consigneePhone,
+            "sender_name": senderName,
+            "sender_document_id": senderDocumentId,
+            "sender_phone": senderPhone,
+            "scheduled_at": scheduledAt ?? currentISODateOnly(),
+            "service_type": serviceType,
         ])
 
         _ = try await execute(request)
@@ -771,6 +824,10 @@ public final class APIClient: APIClientProtocol {
         }
         components.queryItems = filtered.isEmpty ? nil : filtered
         return components.url ?? url
+    }
+
+    private func currentISODateOnly() -> String {
+        String(Date().ISO8601Format().prefix(10))
     }
 
     private func multipartBody(fileUrl: URL, fieldName: String, boundary: String) throws -> Data {

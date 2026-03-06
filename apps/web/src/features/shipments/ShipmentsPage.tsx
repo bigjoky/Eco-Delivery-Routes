@@ -266,6 +266,7 @@ export function ShipmentsPage() {
     'hub_code',
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
+  const wizardStorageKey = 'eco_delivery_routes_shipments_wizard_state';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
   const [consigneeLookupDocument, setConsigneeLookupDocument] = useState('');
   const [consigneeLookupError, setConsigneeLookupError] = useState('');
@@ -556,6 +557,70 @@ export function ShipmentsPage() {
     return formatDate(date);
   })();
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(wizardStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{ enabled: boolean; step: number }>;
+      if (typeof parsed.enabled === 'boolean') setWizardMode(parsed.enabled);
+      if (parsed.step === 1 || parsed.step === 2 || parsed.step === 3 || parsed.step === 4) {
+        setWizardStep(parsed.step);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      wizardStorageKey,
+      JSON.stringify({ enabled: wizardMode, step: wizardStep })
+    );
+  }, [wizardMode, wizardStep]);
+
+  const validateWizardStep = (step: 1 | 2 | 3 | 4): string | null => {
+    if (step === 1) {
+      if (!createHubId.trim()) return 'Selecciona hub en Paso 1.';
+      if (!createScheduledAt.trim()) return 'Define fecha programada en Paso 1.';
+      return null;
+    }
+    if (step === 2 && createOperation === 'shipment') {
+      if (!createConsigneeDocumentId.trim()) return 'Documento destinatario obligatorio (Paso 2).';
+      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+        return createConsigneeDocType === 'CIF'
+          ? 'Razon social destinatario obligatoria (Paso 2).'
+          : 'Nombre y apellidos destinatario obligatorios (Paso 2).';
+      }
+      if (!createPhone.trim()) return 'Telefono destinatario obligatorio (Paso 2).';
+      return null;
+    }
+    if (step === 3) {
+      if (!createSenderDocumentId.trim()) return 'Documento remitente obligatorio (Paso 3).';
+      if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
+        return createSenderDocType === 'CIF'
+          ? 'Razon social remitente obligatoria (Paso 3).'
+          : 'Nombre y apellidos remitente obligatorios (Paso 3).';
+      }
+      if (!createSenderPhone.trim()) return 'Telefono remitente obligatorio (Paso 3).';
+      return null;
+    }
+    return null;
+  };
+
+  const goPrevWizardStep = () => setWizardStep((value) => Math.max(1, value - 1) as 1 | 2 | 3 | 4);
+
+  const goNextWizardStep = () => {
+    const blockingError = validateWizardStep(wizardStep);
+    if (blockingError) {
+      setCreateError(blockingError);
+      return;
+    }
+    setCreateError('');
+    setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
+  };
+
   const normalizeAddressSuggestions = (rows: Array<{
     address_street?: string | null;
     address_number?: string | null;
@@ -707,6 +772,10 @@ export function ShipmentsPage() {
   };
 
   const createShipment = async () => {
+    if (wizardMode && wizardStep !== 4) {
+      setCreateError('Completa el asistente hasta el Paso 4 para crear.');
+      return;
+    }
     const nextErrors: {
       hub?: string;
       scheduledAt?: string;
@@ -1250,10 +1319,10 @@ export function ShipmentsPage() {
             />
             {wizardMode ? (
               <>
-                <Button type="button" variant="outline" onClick={() => setWizardStep((value) => Math.max(1, value - 1) as 1 | 2 | 3 | 4)}>
+                <Button type="button" variant="outline" onClick={goPrevWizardStep}>
                   Paso anterior
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4)}>
+                <Button type="button" variant="outline" onClick={goNextWizardStep}>
                   Siguiente paso
                 </Button>
                 <span className="helper">Paso {wizardStep}/4</span>
@@ -1268,6 +1337,7 @@ export function ShipmentsPage() {
                 : 'Paso 4: revisa y crea envío/recogida.'}
             </div>
           ) : null}
+          {!wizardMode || wizardStep === 1 ? (
           <div className="form-row">
             <div>
               <label htmlFor="create-shipment-hub">Hub</label>
@@ -1349,59 +1419,68 @@ export function ShipmentsPage() {
               {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
             </div>
           </div>
+          ) : null}
 
-          <div className="page-grid two">
-            <Card>
-              <CardHeader>
-                <CardTitle>Destinatario</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="helper">
-                  {createConsigneeDocType === 'CIF'
-                    ? (createConsignee || 'Sin destinatario')
-                    : ([createConsigneeFirstName, createConsigneeLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin destinatario')}
-                </div>
-                <div className="helper">{createPhone || '-'}</div>
-                <div className="helper">{createStreet || ''} {createNumber || ''} {createCity || ''}</div>
-                <div className="inline-actions">
-                  <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
-                    Editar destinatario
-                  </Button>
-                  <Button type="button" variant="outline" onClick={clearRecipient}>
-                    Limpiar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Remitente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="helper">
-                  {createSenderDocType === 'CIF'
-                    ? (createSenderLegalName || 'Sin remitente')
-                    : ([createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin remitente')}
-                </div>
-                <div className="helper">{createSenderPhone || '-'}</div>
-                <div className="helper">{createSenderStreet || ''} {createSenderNumber || ''} {createSenderCity || ''}</div>
-                <div className="inline-actions">
-                  <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
-                    Editar remitente
-                  </Button>
-                  <Button type="button" variant="outline" onClick={clearSender}>
-                    Limpiar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {(!wizardMode || wizardStep === 2 || wizardStep === 3 || wizardStep === 4) ? (
+            <div className="page-grid two">
+              {!wizardMode || wizardStep === 2 || wizardStep === 4 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Destinatario</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="helper">
+                      {createConsigneeDocType === 'CIF'
+                        ? (createConsignee || 'Sin destinatario')
+                        : ([createConsigneeFirstName, createConsigneeLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin destinatario')}
+                    </div>
+                    <div className="helper">{createPhone || '-'}</div>
+                    <div className="helper">{createStreet || ''} {createNumber || ''} {createCity || ''}</div>
+                    <div className="inline-actions">
+                      <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
+                        Editar destinatario
+                      </Button>
+                      <Button type="button" variant="outline" onClick={clearRecipient}>
+                        Limpiar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+              {!wizardMode || wizardStep === 3 || wizardStep === 4 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Remitente</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="helper">
+                      {createSenderDocType === 'CIF'
+                        ? (createSenderLegalName || 'Sin remitente')
+                        : ([createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin remitente')}
+                    </div>
+                    <div className="helper">{createSenderPhone || '-'}</div>
+                    <div className="helper">{createSenderStreet || ''} {createSenderNumber || ''} {createSenderCity || ''}</div>
+                    <div className="inline-actions">
+                      <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
+                        Editar remitente
+                      </Button>
+                      <Button type="button" variant="outline" onClick={clearSender}>
+                        Limpiar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+          ) : null}
 
+          {!wizardMode || wizardStep === 4 ? (
           <div className="inline-actions">
             <Button type="button" onClick={createShipment} disabled={creating}>
               {creating ? 'Creando...' : createOperation === 'shipment' ? 'Crear envio' : 'Crear recogida'}
             </Button>
           </div>
+          ) : null}
           {createError ? <div className="helper">{createError}</div> : null}
         </CardContent>
       </Card>

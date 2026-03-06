@@ -9,11 +9,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ecodeliveryroutes.core.network.ApiProvider
+import kotlinx.coroutines.launch
 
 @Composable
 fun ShipmentDraftScreen() {
+    val scope = rememberCoroutineScope()
+    val hubId = remember { mutableStateOf("00000000-0000-0000-0000-000000000001") }
+    val serviceType = remember { mutableStateOf("express_1030") }
     val recipientDocType = remember { mutableStateOf("DNI") }
     val recipientDocument = remember { mutableStateOf("") }
     val recipientLegalName = remember { mutableStateOf("") }
@@ -32,6 +38,18 @@ fun ShipmentDraftScreen() {
 
     Column(modifier = Modifier.padding(16.dp)) {
         Text("Nuevo envio (beta)")
+        OutlinedTextField(
+            value = hubId.value,
+            onValueChange = { hubId.value = it },
+            label = { Text("Hub ID") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = serviceType.value,
+            onValueChange = { serviceType.value = it },
+            label = { Text("Service type") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Text("Destinatario")
         OutlinedTextField(
@@ -122,7 +140,7 @@ fun ShipmentDraftScreen() {
         )
 
         Button(onClick = {
-            message.value = validateDraft(
+            val validation = validateDraft(
                 recipientDocType = recipientDocType.value,
                 recipientDocument = recipientDocument.value,
                 recipientLegalName = recipientLegalName.value,
@@ -136,8 +154,27 @@ fun ShipmentDraftScreen() {
                 senderLastName = senderLastName.value,
                 senderPhone = senderPhone.value
             )
+            if (validation != "Borrador valido.") {
+                message.value = validation
+                return@Button
+            }
+            val recipientName = if (recipientDocType.value == "CIF") recipientLegalName.value else "${recipientFirstName.value} ${recipientLastName.value}".trim()
+            val senderName = if (senderDocType.value == "CIF") senderLegalName.value else "${senderFirstName.value} ${senderLastName.value}".trim()
+            scope.launch {
+                val created = ApiProvider.client.createShipment(
+                    hubId = hubId.value.trim(),
+                    consigneeName = recipientName,
+                    consigneeDocumentId = recipientDocument.value.trim(),
+                    consigneePhone = recipientPhone.value.trim(),
+                    senderName = senderName,
+                    senderDocumentId = senderDocument.value.trim(),
+                    senderPhone = senderPhone.value.trim(),
+                    serviceType = serviceType.value.trim().ifEmpty { "express_1030" }
+                )
+                message.value = if (created) "Envio creado." else "No se pudo crear el envio."
+            }
         }) {
-            Text("Validar borrador")
+            Text("Crear envio")
         }
         Text(message.value)
     }

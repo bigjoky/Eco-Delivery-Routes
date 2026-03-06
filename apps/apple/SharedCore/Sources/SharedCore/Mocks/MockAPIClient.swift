@@ -288,6 +288,30 @@ public final class MockAPIClient {
         _ = (reference, pickupType, hubId)
     }
 
+    public func createShipment(
+        hubId: String,
+        consigneeName: String,
+        consigneeDocumentId: String,
+        consigneePhone: String,
+        senderName: String,
+        senderDocumentId: String,
+        senderPhone: String,
+        scheduledAt: String?,
+        serviceType: String
+    ) async throws {
+        _ = (
+            hubId,
+            consigneeName,
+            consigneeDocumentId,
+            consigneePhone,
+            senderName,
+            senderDocumentId,
+            senderPhone,
+            scheduledAt,
+            serviceType
+        )
+    }
+
     public func registerIncident(
         incidentableType: String,
         incidentableId: String,
