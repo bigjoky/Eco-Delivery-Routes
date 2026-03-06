@@ -74,6 +74,7 @@ class NetworkNodesHttpTest extends TestCase
         $deleted
             ->assertOk()
             ->assertJsonPath('data.deleted', true);
+        $this->assertNotNull(DB::table('hubs')->where('id', $hubId)->value('deleted_at'));
 
         $events = DB::table('audit_logs')
             ->whereIn('event', ['hubs.created', 'hubs.deleted'])
@@ -114,11 +115,13 @@ class NetworkNodesHttpTest extends TestCase
         $pointDeleted
             ->assertOk()
             ->assertJsonPath('data.deleted', true);
+        $this->assertNotNull(DB::table('points')->where('id', $pointId)->value('deleted_at'));
 
         $depotDeleted = $this->deleteJson('/api/v1/depots/' . $depotId);
         $depotDeleted
             ->assertOk()
             ->assertJsonPath('data.deleted', true);
+        $this->assertNotNull(DB::table('depots')->where('id', $depotId)->value('deleted_at'));
 
         $events = DB::table('audit_logs')
             ->whereIn('event', ['depots.created', 'depots.deleted', 'points.created', 'points.deleted'])

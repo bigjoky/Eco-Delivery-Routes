@@ -31,6 +31,9 @@ class PointController extends Controller
         $hubId = $request->query('hub_id');
         $depotId = $request->query('depot_id');
         $query = DB::table('points')->orderBy('code');
+        if (!$request->boolean('include_deleted', false)) {
+            $query->whereNull('deleted_at');
+        }
         if (is_string($hubId) && $hubId !== '') {
             $query->where('hub_id', $hubId);
         }
@@ -61,6 +64,15 @@ class PointController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        if (!DB::table('hubs')->where('id', $payload['hub_id'])->whereNull('deleted_at')->exists()) {
+            return response()->json([
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Hub not found.',
+                ],
+            ], 422);
+        }
+
         if (!$this->isDepotConsistentWithHub($payload['hub_id'], $payload['depot_id'] ?? null)) {
             return response()->json([
                 'error' => [
@@ -83,6 +95,7 @@ class PointController extends Controller
             'is_active' => $payload['is_active'] ?? true,
             'created_at' => now(),
             'updated_at' => now(),
+            'deleted_at' => null,
         ]);
         $this->auditLogWriter->write($actor->id, 'points.created', [
             'point_id' => $id,
@@ -104,7 +117,7 @@ class PointController extends Controller
             ], 403);
         }
 
-        $row = DB::table('points')->where('id', $id)->first();
+        $row = DB::table('points')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Point not found.'],
@@ -123,6 +136,14 @@ class PointController extends Controller
 
         $nextHubId = (string) ($payload['hub_id'] ?? $row->hub_id);
         $nextDepotId = array_key_exists('depot_id', $payload) ? $payload['depot_id'] : $row->depot_id;
+        if (!DB::table('hubs')->where('id', $nextHubId)->whereNull('deleted_at')->exists()) {
+            return response()->json([
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Hub not found.',
+                ],
+            ], 422);
+        }
         if (!$this->isDepotConsistentWithHub($nextHubId, is_string($nextDepotId) ? $nextDepotId : null)) {
             return response()->json([
                 'error' => [
@@ -141,7 +162,7 @@ class PointController extends Controller
             'changes' => array_keys($payload),
         ]);
 
-        return response()->json(['data' => DB::table('points')->where('id', $id)->first()]);
+        return response()->json(['data' => DB::table('points')->where('id', $id)->whereNull('deleted_at')->first()]);
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -154,14 +175,17 @@ class PointController extends Controller
             ], 403);
         }
 
-        $row = DB::table('points')->where('id', $id)->first();
+        $row = DB::table('points')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Point not found.'],
             ], 404);
         }
 
-        DB::table('points')->where('id', $id)->delete();
+        DB::table('points')->where('id', $id)->update([
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
         $this->auditLogWriter->write($actor->id, 'points.deleted', [
             'point_id' => $id,
         ]);
@@ -175,7 +199,7 @@ class PointController extends Controller
             return true;
         }
 
-        $depotHubId = DB::table('depots')->where('id', $depotId)->value('hub_id');
+        $depotHubId = DB::table('depots')->where('id', $depotId)->whereNull('deleted_at')->value('hub_id');
 
         return is_string($depotHubId) && $depotHubId === $hubId;
     }

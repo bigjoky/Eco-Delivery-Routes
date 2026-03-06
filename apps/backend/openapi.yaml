@@ -372,6 +372,9 @@ paths:
         - in: query
           name: only_active
           schema: { type: boolean, default: true }
+        - in: query
+          name: include_deleted
+          schema: { type: boolean, default: false }
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1531,6 +1534,9 @@ paths:
         - in: query
           name: hub_id
           schema: { type: string, format: uuid }
+        - in: query
+          name: include_deleted
+          schema: { type: boolean, default: false }
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1605,6 +1611,9 @@ paths:
         - in: query
           name: depot_id
           schema: { type: string, format: uuid }
+        - in: query
+          name: include_deleted
+          schema: { type: boolean, default: false }
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
