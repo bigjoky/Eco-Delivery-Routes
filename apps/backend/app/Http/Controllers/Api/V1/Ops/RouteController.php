@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class RouteController extends Controller
 {
@@ -344,6 +345,9 @@ class RouteController extends Controller
         ]);
         $this->assertStopPayloadConsistency($payload);
         $this->assertUniqueStopSequence($id, (int) $payload['sequence']);
+        $this->assertStopNotDuplicatedInRoute($route, $payload);
+        $this->assertStopTemporalWindowConsistency($route, $payload);
+        $this->assertRouteVehicleCapacityForStop($route, $payload);
 
         $stopId = (string) Str::uuid();
         DB::table('route_stops')->insert([
@@ -571,6 +575,9 @@ class RouteController extends Controller
         $newShipmentIds = array_values(array_diff($shipmentIds, $existingShipmentIds));
         $newPickupIds = array_values(array_diff($pickupIds, $existingPickupIds));
         $skippedCount = (count($shipmentIds) - count($newShipmentIds)) + (count($pickupIds) - count($newPickupIds));
+
+        $this->assertBulkStopTemporalWindowConsistency($route, $newShipmentIds, $newPickupIds);
+        $this->assertRouteVehicleCapacityForBulkStops($route, $newShipmentIds);
 
         $createdCount = 0;
         DB::transaction(function () use ($id, $payload, $newShipmentIds, $newPickupIds, &$createdCount): void {
@@ -812,6 +819,114 @@ class RouteController extends Controller
         if ($query->exists()) {
             $this->throwValidationError('Sequence already exists for this route.', 'sequence');
         }
+    }
+
+    private function assertStopNotDuplicatedInRoute(object $route, array $payload): void
+    {
+        if (!empty($payload['shipment_id'])) {
+            $exists = DB::table('route_stops')
+                ->where('route_id', $route->id)
+                ->where('shipment_id', $payload['shipment_id'])
+                ->exists();
+            if ($exists) {
+                $this->throwValidationError('Shipment is already assigned to this route.', 'shipment_id');
+            }
+        }
+        if (!empty($payload['pickup_id'])) {
+            $exists = DB::table('route_stops')
+                ->where('route_id', $route->id)
+                ->where('pickup_id', $payload['pickup_id'])
+                ->exists();
+            if ($exists) {
+                $this->throwValidationError('Pickup is already assigned to this route.', 'pickup_id');
+            }
+        }
+    }
+
+    private function assertStopTemporalWindowConsistency(object $route, array $payload): void
+    {
+        if (!empty($payload['shipment_id'])) {
+            $scheduledAt = DB::table('shipments')->where('id', $payload['shipment_id'])->value('scheduled_at');
+            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
+                $this->throwValidationError('Shipment time window is outside the allowed route window (+/- 2 days).', 'shipment_id');
+            }
+        }
+
+        if (!empty($payload['pickup_id'])) {
+            $scheduledAt = DB::table('pickups')->where('id', $payload['pickup_id'])->value('scheduled_at');
+            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
+                $this->throwValidationError('Pickup time window is outside the allowed route window (+/- 2 days).', 'pickup_id');
+            }
+        }
+    }
+
+    private function assertBulkStopTemporalWindowConsistency(object $route, array $shipmentIds, array $pickupIds): void
+    {
+        foreach ($shipmentIds as $shipmentId) {
+            $scheduledAt = DB::table('shipments')->where('id', $shipmentId)->value('scheduled_at');
+            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
+                $this->throwValidationError('At least one shipment is outside the allowed route window (+/- 2 days).', 'shipment_ids');
+            }
+        }
+        foreach ($pickupIds as $pickupId) {
+            $scheduledAt = DB::table('pickups')->where('id', $pickupId)->value('scheduled_at');
+            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
+                $this->throwValidationError('At least one pickup is outside the allowed route window (+/- 2 days).', 'pickup_ids');
+            }
+        }
+    }
+
+    private function assertRouteVehicleCapacityForStop(object $route, array $payload): void
+    {
+        if (empty($route->vehicle_id) || empty($payload['shipment_id'])) {
+            return;
+        }
+        $this->assertRouteVehicleCapacityForBulkStops($route, [(string) $payload['shipment_id']]);
+    }
+
+    private function assertRouteVehicleCapacityForBulkStops(object $route, array $shipmentIds): void
+    {
+        if (empty($route->vehicle_id) || $shipmentIds === []) {
+            return;
+        }
+
+        $capacityKg = DB::table('vehicles')->where('id', $route->vehicle_id)->value('capacity_kg');
+        if (!$capacityKg) {
+            return;
+        }
+
+        $assignedShipmentIds = DB::table('route_stops')
+            ->where('route_id', $route->id)
+            ->whereNotNull('shipment_id')
+            ->pluck('shipment_id')
+            ->all();
+
+        $currentWeightGrams = 0;
+        if ($assignedShipmentIds !== []) {
+            $currentWeightGrams = (int) DB::table('parcels')
+                ->whereIn('shipment_id', $assignedShipmentIds)
+                ->sum('weight_grams');
+        }
+
+        $newWeightGrams = (int) DB::table('parcels')
+            ->whereIn('shipment_id', $shipmentIds)
+            ->sum('weight_grams');
+
+        $totalKg = ($currentWeightGrams + $newWeightGrams) / 1000;
+        if ($totalKg > ((float) $capacityKg + 0.0001)) {
+            $this->throwValidationError('Route vehicle capacity exceeded by stop assignment.', 'shipment_ids');
+        }
+    }
+
+    private function isWithinTwoDays(string $routeDate, string $scheduledAt): bool
+    {
+        $routeTs = strtotime(substr($routeDate, 0, 10));
+        $scheduledTs = strtotime(substr($scheduledAt, 0, 10));
+        if ($routeTs === false || $scheduledTs === false) {
+            return true;
+        }
+        $diffDays = abs((int) floor(($routeTs - $scheduledTs) / 86400));
+        return $diffDays <= 2;
     }
 
     private function throwValidationError(string $message, string $field): void

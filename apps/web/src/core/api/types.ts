@@ -451,6 +451,23 @@ export type IncidentCatalogItem = {
   name: string;
   category: 'failed' | 'absent' | 'retry' | 'general';
   applies_to: 'shipment' | 'pickup' | 'both';
+  priority?: 'high' | 'medium' | 'low';
+  sla_minutes?: number;
+};
+
+export type IncidentsBoardSummary = {
+  total_open: number;
+  total_resolved: number;
+  by_priority: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  by_sla_status: {
+    on_track: number;
+    at_risk: number;
+    breached: number;
+  };
 };
 
 export type TariffSummary = {

@@ -1719,6 +1719,25 @@ export const apiClient = {
     return data.data as IncidentSummary;
   },
 
+  async overrideIncidentSla(id: string, payload: {
+    priority?: 'high' | 'medium' | 'low';
+    sla_due_at?: string;
+    reason: string;
+  }): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.overrideIncidentSla(id, payload) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}/override-sla`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot override incident SLA');
+    return data.data as IncidentSummary;
+  },
+
   async getIncidentCatalog(): Promise<IncidentCatalogItem[]> {
     if (USE_MOCK) return mockApi.getIncidentCatalog() as Promise<IncidentCatalogItem[]>;
 
