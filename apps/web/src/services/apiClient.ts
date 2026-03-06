@@ -677,6 +677,8 @@ export const apiClient = {
     phone?: string;
     email?: string;
     documentId?: string;
+    kind?: 'sender' | 'recipient';
+    limit?: number;
     q?: string;
   } = {}): Promise<ContactSummary[]> {
     if (USE_MOCK) return mockApi.getContacts(filters) as Promise<ContactSummary[]>;
@@ -684,6 +686,8 @@ export const apiClient = {
     if (filters.phone) params.set('phone', filters.phone);
     if (filters.email) params.set('email', filters.email);
     if (filters.documentId) params.set('document_id', filters.documentId);
+    if (filters.kind) params.set('kind', filters.kind);
+    if (typeof filters.limit === 'number' && filters.limit > 0) params.set('limit', String(filters.limit));
     if (filters.q) params.set('q', filters.q);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
