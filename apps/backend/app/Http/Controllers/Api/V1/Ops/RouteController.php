@@ -180,6 +180,8 @@ class RouteController extends Controller
             'driver_id' => array_key_exists('driver_id', $payload) ? $payload['driver_id'] : $route->driver_id,
             'subcontractor_id' => array_key_exists('subcontractor_id', $payload) ? $payload['subcontractor_id'] : $route->subcontractor_id,
             'vehicle_id' => array_key_exists('vehicle_id', $payload) ? $payload['vehicle_id'] : $route->vehicle_id,
+            'route_id' => $route->id,
+            'route_date' => $route->route_date,
         ];
         $this->assertAssignmentConsistency($merged);
 
@@ -209,6 +211,8 @@ class RouteController extends Controller
             'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
             'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
             'vehicle_id' => ['nullable', 'uuid', 'exists:vehicles,id'],
+            'route_id' => ['nullable', 'uuid', 'exists:routes,id'],
+            'route_date' => ['nullable', 'date'],
         ]);
 
         $assessment = $this->assessAssignmentConsistency($payload);
@@ -216,6 +220,7 @@ class RouteController extends Controller
             'data' => [
                 'valid' => count($assessment['errors']) === 0,
                 'conflicts' => $assessment['errors'],
+                'warnings' => $assessment['warnings'],
                 'recommended_subcontractor_id' => $assessment['recommended_subcontractor_id'],
             ],
         ]);
@@ -250,7 +255,7 @@ class RouteController extends Controller
 
     /**
      * @param array<string, mixed> $payload
-     * @return array{errors:array<int,array{field:string,message:string}>,recommended_subcontractor_id:string|null}
+     * @return array{errors:array<int,array{field:string,message:string}>,warnings:array<int,array{field:string,message:string}>,recommended_subcontractor_id:string|null}
      */
     private function assessAssignmentConsistency(array $payload): array
     {
@@ -259,12 +264,18 @@ class RouteController extends Controller
         if (!empty($payload['driver_id'])) {
             $driver = DB::table('drivers')
                 ->where('id', $payload['driver_id'])
-                ->first(['id', 'subcontractor_id']);
+                ->first(['id', 'subcontractor_id', 'status']);
         }
         if (!empty($payload['vehicle_id'])) {
             $vehicle = DB::table('vehicles')
                 ->where('id', $payload['vehicle_id'])
-                ->first(['id', 'subcontractor_id', 'assigned_driver_id']);
+                ->first(['id', 'subcontractor_id', 'assigned_driver_id', 'status', 'capacity_kg']);
+        }
+
+        $routeId = $payload['route_id'] ?? null;
+        $routeDate = $payload['route_date'] ?? null;
+        if (is_string($routeId) && $routeId !== '' && !$routeDate) {
+            $routeDate = DB::table('routes')->where('id', $routeId)->value('route_date');
         }
 
         $subcontractorId = $payload['subcontractor_id'] ?? null;
@@ -273,6 +284,7 @@ class RouteController extends Controller
             ?: ($vehicle->subcontractor_id ?? null);
 
         $errors = [];
+        $warnings = [];
         if ($subcontractorId && $driver && $driver->subcontractor_id && $driver->subcontractor_id !== $subcontractorId) {
             $errors[] = ['field' => 'driver_id', 'message' => 'Driver does not belong to selected subcontractor.'];
         }
@@ -285,9 +297,107 @@ class RouteController extends Controller
         if ($driver && $vehicle && $vehicle->assigned_driver_id && $vehicle->assigned_driver_id !== $driver->id) {
             $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle is assigned to a different driver.'];
         }
+        if ($driver && in_array($driver->status, ['inactive', 'suspended'], true)) {
+            $errors[] = ['field' => 'driver_id', 'message' => 'Driver is not active.'];
+        }
+        if ($vehicle && in_array($vehicle->status, ['inactive', 'maintenance'], true)) {
+            $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle is not operational (inactive/maintenance).'];
+        }
+
+        if (is_string($routeDate) && $routeDate !== '') {
+            if ($driver) {
+                $driverBusy = DB::table('routes')
+                    ->where('driver_id', $driver->id)
+                    ->whereDate('route_date', $routeDate)
+                    ->whereIn('status', ['planned', 'in_progress'])
+                    ->when($routeId, fn ($q) => $q->where('id', '!=', $routeId))
+                    ->exists();
+                if ($driverBusy) {
+                    $errors[] = ['field' => 'driver_id', 'message' => 'Driver already assigned to another active route on the same date.'];
+                }
+            }
+            if ($vehicle) {
+                $vehicleBusy = DB::table('routes')
+                    ->where('vehicle_id', $vehicle->id)
+                    ->whereDate('route_date', $routeDate)
+                    ->whereIn('status', ['planned', 'in_progress'])
+                    ->when($routeId, fn ($q) => $q->where('id', '!=', $routeId))
+                    ->exists();
+                if ($vehicleBusy) {
+                    $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle already assigned to another active route on the same date.'];
+                }
+            }
+        }
+
+        if ($routeId && $routeDate) {
+            $windowRows = DB::table('route_stops')
+                ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
+                ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+                ->where('route_stops.route_id', $routeId)
+                ->get([
+                    'shipments.scheduled_at as shipment_scheduled_at',
+                    'pickups.scheduled_at as pickup_scheduled_at',
+                ]);
+            $windowIssue = false;
+            foreach ($windowRows as $windowRow) {
+                if ($windowRow->shipment_scheduled_at && !$this->isWithinTwoDays((string) $routeDate, (string) $windowRow->shipment_scheduled_at)) {
+                    $windowIssue = true;
+                    break;
+                }
+                if ($windowRow->pickup_scheduled_at && !$this->isWithinTwoDays((string) $routeDate, (string) $windowRow->pickup_scheduled_at)) {
+                    $windowIssue = true;
+                    break;
+                }
+            }
+            if ($windowIssue) {
+                $errors[] = ['field' => 'subcontractor_id', 'message' => 'Route contains stops outside allowed time window (+/- 2 days).'];
+            }
+        }
+
+        if ($routeId && $vehicle && $vehicle->capacity_kg) {
+            $assignedShipmentIds = DB::table('route_stops')
+                ->where('route_id', $routeId)
+                ->whereNotNull('shipment_id')
+                ->pluck('shipment_id')
+                ->all();
+            if ($assignedShipmentIds !== []) {
+                $weightGrams = (int) DB::table('parcels')
+                    ->whereIn('shipment_id', $assignedShipmentIds)
+                    ->sum('weight_grams');
+                $weightKg = $weightGrams / 1000;
+                if ($weightKg > ((float) $vehicle->capacity_kg + 0.0001)) {
+                    $errors[] = ['field' => 'vehicle_id', 'message' => 'Vehicle capacity is insufficient for current route load.'];
+                }
+            }
+        }
+
+        if ($driver) {
+            $driverQuality = DB::table('quality_snapshots')
+                ->where('scope_type', 'driver')
+                ->where('scope_id', $driver->id)
+                ->orderByDesc('period_end')
+                ->value('service_quality_score');
+            if (is_numeric($driverQuality) && (float) $driverQuality < 95.0) {
+                $warnings[] = ['field' => 'driver_id', 'message' => 'Driver quality score is below 95%.'];
+            }
+        }
+        if ($recommendedSubcontractorId) {
+            $subcontractorQuality = DB::table('quality_snapshots')
+                ->where('scope_type', 'subcontractor')
+                ->where('scope_id', $recommendedSubcontractorId)
+                ->orderByDesc('period_end')
+                ->value('service_quality_score');
+            if (is_numeric($subcontractorQuality) && (float) $subcontractorQuality < 95.0) {
+                $warnings[] = ['field' => 'subcontractor_id', 'message' => 'Subcontractor quality score is below 95%.'];
+            }
+        }
+        if ($vehicle && !$vehicle->capacity_kg) {
+            $warnings[] = ['field' => 'vehicle_id', 'message' => 'Vehicle has no configured capacity_kg.'];
+        }
 
         return [
             'errors' => $errors,
+            'warnings' => $warnings,
             'recommended_subcontractor_id' => $recommendedSubcontractorId,
         ];
     }

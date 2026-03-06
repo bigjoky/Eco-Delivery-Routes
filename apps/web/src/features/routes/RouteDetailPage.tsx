@@ -30,6 +30,7 @@ export function RouteDetailPage() {
   const [vehicleId, setVehicleId] = useState('');
   const [routeStatus, setRouteStatus] = useState('planned');
   const [assignmentConflicts, setAssignmentConflicts] = useState<string[]>([]);
+  const [assignmentWarnings, setAssignmentWarnings] = useState<string[]>([]);
   const [recommendedSubcontractorId, setRecommendedSubcontractorId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -127,8 +128,11 @@ export function RouteDetailPage() {
       subcontractor_id: subcontractorId || null,
       driver_id: driverId || null,
       vehicle_id: vehicleId || null,
+      route_id: id,
+      route_date: route?.route_date ?? null,
     });
     setAssignmentConflicts(preview.conflicts.map((item) => item.message));
+    setAssignmentWarnings((preview.warnings ?? []).map((item) => item.message));
     setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
     if (!preview.valid) {
       setError('Corrige las inconsistencias de asignacion antes de guardar.');
@@ -173,6 +177,7 @@ export function RouteDetailPage() {
   useEffect(() => {
     if (!driverId && !vehicleId && !subcontractorId) {
       setAssignmentConflicts([]);
+      setAssignmentWarnings([]);
       setRecommendedSubcontractorId(null);
       return;
     }
@@ -180,16 +185,20 @@ export function RouteDetailPage() {
       subcontractor_id: subcontractorId || null,
       driver_id: driverId || null,
       vehicle_id: vehicleId || null,
+      route_id: id,
+      route_date: route?.route_date ?? null,
     })
       .then((preview) => {
         setAssignmentConflicts(preview.conflicts.map((item) => item.message));
+        setAssignmentWarnings((preview.warnings ?? []).map((item) => item.message));
         setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
       })
       .catch(() => {
         setAssignmentConflicts([]);
+        setAssignmentWarnings([]);
         setRecommendedSubcontractorId(null);
       });
-  }, [subcontractorId, driverId, vehicleId]);
+  }, [id, subcontractorId, driverId, vehicleId, route?.route_date]);
 
   const createStop = async () => {
     const stopEntityId = stopType === 'DELIVERY' ? selectedShipmentId : selectedPickupId;
@@ -497,6 +506,7 @@ export function RouteDetailPage() {
             {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
           </div>
           {assignmentConflicts.length > 0 ? <div className="helper error">{assignmentConflicts.join(' ')}</div> : null}
+          {assignmentWarnings.length > 0 ? <div className="helper">{assignmentWarnings.join(' ')}</div> : null}
           {recommendedSubcontractorId && !subcontractorId ? (
             <div className="helper">Sugerencia: subcontrata recomendada {recommendedSubcontractorId}</div>
           ) : null}

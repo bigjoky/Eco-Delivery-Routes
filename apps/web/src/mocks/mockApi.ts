@@ -1132,11 +1132,16 @@ export const mockApi = {
     subcontractor_id?: string | null;
     driver_id?: string | null;
     vehicle_id?: string | null;
+    route_id?: string | null;
+    route_date?: string | null;
   }) {
     const conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }> = [];
+    const warnings: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }> = [];
     const driver = payload.driver_id ? mockDrivers.find((item) => item.id === payload.driver_id) : null;
     const vehicle = payload.vehicle_id ? mockVehicles.find((item) => item.id === payload.vehicle_id) : null;
     const subcontractorId = payload.subcontractor_id ?? null;
+    const routeDate = payload.route_date ?? null;
+    const routeId = payload.route_id ?? null;
 
     if (subcontractorId && driver?.subcontractor_id && driver.subcontractor_id !== subcontractorId) {
       conflicts.push({ field: 'driver_id', message: 'Driver does not belong to selected subcontractor.' });
@@ -1150,10 +1155,44 @@ export const mockApi = {
     if (driver && vehicle?.assigned_driver_id && vehicle.assigned_driver_id !== driver.id) {
       conflicts.push({ field: 'vehicle_id', message: 'Vehicle is assigned to a different driver.' });
     }
+    if (driver && (driver.status === 'inactive' || driver.status === 'suspended')) {
+      conflicts.push({ field: 'driver_id', message: 'Driver is not active.' });
+    }
+    if (vehicle && (vehicle.status === 'inactive' || vehicle.status === 'maintenance')) {
+      conflicts.push({ field: 'vehicle_id', message: 'Vehicle is not operational (inactive/maintenance).' });
+    }
+    if (routeDate) {
+      if (driver) {
+        const driverBusy = mockRoutes.some((route) => (
+          route.id !== routeId &&
+          route.driver_id === driver.id &&
+          route.route_date === routeDate &&
+          (route.status === 'planned' || route.status === 'in_progress')
+        ));
+        if (driverBusy) {
+          conflicts.push({ field: 'driver_id', message: 'Driver already assigned to another active route on the same date.' });
+        }
+      }
+      if (vehicle) {
+        const vehicleBusy = mockRoutes.some((route) => (
+          route.id !== routeId &&
+          route.vehicle_id === vehicle.id &&
+          route.route_date === routeDate &&
+          (route.status === 'planned' || route.status === 'in_progress')
+        ));
+        if (vehicleBusy) {
+          conflicts.push({ field: 'vehicle_id', message: 'Vehicle already assigned to another active route on the same date.' });
+        }
+      }
+    }
+    if (vehicle && !vehicle.capacity_kg) {
+      warnings.push({ field: 'vehicle_id', message: 'Vehicle has no configured capacity_kg.' });
+    }
 
     return {
       valid: conflicts.length === 0,
       conflicts,
+      warnings,
       recommended_subcontractor_id: subcontractorId ?? driver?.subcontractor_id ?? vehicle?.subcontractor_id ?? null,
     };
   },

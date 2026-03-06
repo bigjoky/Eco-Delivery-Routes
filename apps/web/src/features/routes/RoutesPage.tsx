@@ -41,6 +41,7 @@ export function RoutesPage() {
   const [createVehicleId, setCreateVehicleId] = useState('');
   const [createError, setCreateError] = useState('');
   const [createPreviewConflicts, setCreatePreviewConflicts] = useState<string[]>([]);
+  const [createPreviewWarnings, setCreatePreviewWarnings] = useState<string[]>([]);
   const [createRecommendedSubcontractorId, setCreateRecommendedSubcontractorId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -199,8 +200,10 @@ export function RoutesPage() {
         subcontractor_id: createSubcontractorId || null,
         driver_id: createDriverId || null,
         vehicle_id: createVehicleId || null,
+        route_date: createRouteDate || null,
       });
       setCreatePreviewConflicts(preview.conflicts.map((item) => item.message));
+      setCreatePreviewWarnings((preview.warnings ?? []).map((item) => item.message));
       setCreateRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
       if (!preview.valid) {
         setCreateError('Corrige las inconsistencias de asignacion antes de crear la ruta.');
@@ -234,6 +237,7 @@ export function RoutesPage() {
   useEffect(() => {
     if (!createDriverId && !createVehicleId && !createSubcontractorId) {
       setCreatePreviewConflicts([]);
+      setCreatePreviewWarnings([]);
       setCreateRecommendedSubcontractorId(null);
       return;
     }
@@ -241,16 +245,19 @@ export function RoutesPage() {
       subcontractor_id: createSubcontractorId || null,
       driver_id: createDriverId || null,
       vehicle_id: createVehicleId || null,
+      route_date: createRouteDate || null,
     })
       .then((preview) => {
         setCreatePreviewConflicts(preview.conflicts.map((item) => item.message));
+        setCreatePreviewWarnings((preview.warnings ?? []).map((item) => item.message));
         setCreateRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
       })
       .catch(() => {
         setCreatePreviewConflicts([]);
+        setCreatePreviewWarnings([]);
         setCreateRecommendedSubcontractorId(null);
       });
-  }, [createSubcontractorId, createDriverId, createVehicleId]);
+  }, [createSubcontractorId, createDriverId, createVehicleId, createRouteDate]);
 
   const setQuickRange = (range: 'today' | 'tomorrow' | 'next7' | 'clear') => {
     if (range === 'clear') {
@@ -358,6 +365,9 @@ export function RoutesPage() {
           </div>
           {createPreviewConflicts.length > 0 ? (
             <div className="helper error">{createPreviewConflicts.join(' ')}</div>
+          ) : null}
+          {createPreviewWarnings.length > 0 ? (
+            <div className="helper">{createPreviewWarnings.join(' ')}</div>
           ) : null}
           {createRecommendedSubcontractorId && !createSubcontractorId ? (
             <div className="helper">Sugerencia: seleccionar subcontrata vinculada automaticamente ({createRecommendedSubcontractorId}).</div>

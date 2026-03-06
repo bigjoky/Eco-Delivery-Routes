@@ -285,6 +285,116 @@ class RouteVehicleAssignmentHttpTest extends TestCase
         $this->assertNotEmpty($response->json('data.conflicts'));
     }
 
+    public function test_assignment_preview_detects_driver_busy_same_date(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $subcontractorId = (string) Str::uuid();
+        DB::table('subcontractors')->insert([
+            'id' => $subcontractorId,
+            'legal_name' => 'Busy Driver SL',
+            'tax_id' => 'B55555555',
+            'status' => 'active',
+            'payment_terms' => 'monthly',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $driverId = (string) Str::uuid();
+        DB::table('drivers')->insert([
+            'id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'employment_type' => 'subcontractor',
+            'code' => 'DRV-BUSY-001',
+            'name' => 'Driver Busy',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('routes')->insert([
+            'id' => (string) Str::uuid(),
+            'hub_id' => $hubId,
+            'code' => 'R-BUSY-001',
+            'route_date' => '2026-03-06',
+            'status' => 'planned',
+            'driver_id' => $driverId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/routes/assignment/preview?' . http_build_query([
+            'driver_id' => $driverId,
+            'route_date' => '2026-03-06',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.valid', false);
+        $this->assertStringContainsString(
+            'Driver already assigned to another active route on the same date.',
+            implode(' ', array_column($response->json('data.conflicts') ?? [], 'message'))
+        );
+    }
+
+    public function test_assignment_preview_returns_warning_for_low_quality_driver(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $subcontractorId = (string) Str::uuid();
+        DB::table('subcontractors')->insert([
+            'id' => $subcontractorId,
+            'legal_name' => 'Quality Low SL',
+            'tax_id' => 'B66666666',
+            'status' => 'active',
+            'payment_terms' => 'monthly',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $driverId = (string) Str::uuid();
+        DB::table('drivers')->insert([
+            'id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'employment_type' => 'subcontractor',
+            'code' => 'DRV-QLT-001',
+            'name' => 'Driver Low Quality',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'driver',
+            'scope_id' => $driverId,
+            'period_start' => '2026-03-01',
+            'period_end' => '2026-03-31',
+            'service_quality_score' => 90.0,
+            'assigned_with_attempt' => 10,
+            'delivered_completed' => 8,
+            'pickups_completed' => 1,
+            'failed_count' => 1,
+            'absent_count' => 0,
+            'retry_count' => 1,
+            'calculated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/routes/assignment/preview?' . http_build_query([
+            'driver_id' => $driverId,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'Driver quality score is below 95%.',
+            implode(' ', array_column($response->json('data.warnings') ?? [], 'message'))
+        );
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([
