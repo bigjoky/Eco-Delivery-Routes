@@ -1526,6 +1526,21 @@ paths:
         '404': { description: Hub no encontrado }
         '409': { description: Hub con recursos vinculados }
 
+  /hubs/{id}/restore:
+    post:
+      tags: [Hubs]
+      summary: Restaurar hub archivado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Restaurado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Hub no encontrado }
+        '409': { description: Hub ya activo }
+
   /depots:
     get:
       tags: [Depots]
@@ -1599,6 +1614,21 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Depot no encontrado }
         '409': { description: Depot con puntos vinculados }
+
+  /depots/{id}/restore:
+    post:
+      tags: [Depots]
+      summary: Restaurar depot archivado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Restaurado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Depot no encontrado }
+        '409': { description: Depot ya activo o hub padre archivado }
 
   /points:
     get:
@@ -1679,6 +1709,21 @@ paths:
         '200': { description: Eliminado }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Punto no encontrado }
+
+  /points/{id}/restore:
+    post:
+      tags: [Points]
+      summary: Restaurar punto archivado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Restaurado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Punto no encontrado }
+        '409': { description: Punto ya activo o padres archivados }
 
   /routes:
     get:

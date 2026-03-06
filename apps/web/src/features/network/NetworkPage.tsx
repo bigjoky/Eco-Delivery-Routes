@@ -17,6 +17,7 @@ export function NetworkPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [hubFilter, setHubFilter] = useState('');
+  const [includeDeleted, setIncludeDeleted] = useState(false);
 
   const [hubName, setHubName] = useState('');
   const [hubCity, setHubCity] = useState('');
@@ -51,9 +52,9 @@ export function NetworkPage() {
     setError('');
     try {
       const [hubRows, depotRows, pointRows] = await Promise.all([
-        apiClient.getHubs({ onlyActive: false }),
-        apiClient.getDepots(),
-        apiClient.getPoints(),
+        apiClient.getHubs({ onlyActive: false, includeDeleted }),
+        apiClient.getDepots({ includeDeleted }),
+        apiClient.getPoints({ includeDeleted }),
       ]);
       setHubs(hubRows);
       setDepots(depotRows);
@@ -69,7 +70,7 @@ export function NetworkPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [includeDeleted]);
 
   useEffect(() => {
     if (!pointHubId) {
@@ -225,6 +226,18 @@ export function NetworkPage() {
     }
   };
 
+  const restoreHub = async (item: HubSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.restoreHub(item.id);
+      setMessage('Hub restaurado.');
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'No se pudo restaurar hub.');
+    }
+  };
+
   const removeDepot = async (item: DepotSummary) => {
     if (!window.confirm(`Eliminar depot ${item.code}?`)) return;
     setError('');
@@ -235,6 +248,18 @@ export function NetworkPage() {
       await load();
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : 'No se pudo eliminar depot.');
+    }
+  };
+
+  const restoreDepot = async (item: DepotSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.restoreDepot(item.id);
+      setMessage('Depot restaurado.');
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'No se pudo restaurar depot.');
     }
   };
 
@@ -251,9 +276,22 @@ export function NetworkPage() {
     }
   };
 
+  const restorePoint = async (item: PointSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.restorePoint(item.id);
+      setMessage('Punto restaurado.');
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'No se pudo restaurar punto.');
+    }
+  };
+
   const hubCode = new Map(hubs.map((item) => [item.id, item.code]));
   const depotCode = new Map(depots.map((item) => [item.id, item.code]));
   const filteredHubs = useMemo(() => hubs.filter((item) => {
+    if (!includeDeleted && item.deleted_at) return false;
     if (statusFilter === 'active' && !item.is_active) return false;
     if (statusFilter === 'inactive' && item.is_active) return false;
     if (normalizedQuery) {
@@ -261,8 +299,9 @@ export function NetworkPage() {
       if (!haystack.includes(normalizedQuery)) return false;
     }
     return true;
-  }), [hubs, statusFilter, normalizedQuery]);
+  }), [hubs, statusFilter, normalizedQuery, includeDeleted]);
   const filteredDepots = useMemo(() => depots.filter((item) => {
+    if (!includeDeleted && item.deleted_at) return false;
     if (statusFilter === 'active' && !item.is_active) return false;
     if (statusFilter === 'inactive' && item.is_active) return false;
     if (hubFilter && item.hub_id !== hubFilter) return false;
@@ -271,8 +310,9 @@ export function NetworkPage() {
       if (!haystack.includes(normalizedQuery)) return false;
     }
     return true;
-  }), [depots, statusFilter, hubFilter, normalizedQuery]);
+  }), [depots, statusFilter, hubFilter, normalizedQuery, includeDeleted]);
   const filteredPoints = useMemo(() => points.filter((item) => {
+    if (!includeDeleted && item.deleted_at) return false;
     if (statusFilter === 'active' && !item.is_active) return false;
     if (statusFilter === 'inactive' && item.is_active) return false;
     if (hubFilter && item.hub_id !== hubFilter) return false;
@@ -281,7 +321,7 @@ export function NetworkPage() {
       if (!haystack.includes(normalizedQuery)) return false;
     }
     return true;
-  }), [points, statusFilter, hubFilter, normalizedQuery]);
+  }), [points, statusFilter, hubFilter, normalizedQuery, includeDeleted]);
 
   return (
     <div className="page-grid">
@@ -324,6 +364,17 @@ export function NetworkPage() {
               <Select id="network-hub-filter" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
                 <option value="">Todos</option>
                 {hubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="network-include-deleted">Archivados</label>
+              <Select
+                id="network-include-deleted"
+                value={includeDeleted ? '1' : '0'}
+                onChange={(event) => setIncludeDeleted(event.target.value === '1')}
+              >
+                <option value="0">Ocultar archivados</option>
+                <option value="1">Mostrar archivados</option>
               </Select>
             </div>
           </div>
@@ -433,14 +484,20 @@ export function NetworkPage() {
                 {filteredHubs.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.code}</TableCell>
-                    <TableCell>{editingHubId === item.id ? <Input value={editingHubName} onChange={(event) => setEditingHubName(event.target.value)} /> : item.name}</TableCell>
+                    <TableCell>{editingHubId === item.id ? <Input value={editingHubName} onChange={(event) => setEditingHubName(event.target.value)} /> : `${item.name}${item.deleted_at ? ' (Archivado)' : ''}`}</TableCell>
                     <TableCell>{editingHubId === item.id ? <Input value={editingHubCity} onChange={(event) => setEditingHubCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
                       <div className="inline-actions">
-                        {editingHubId === item.id
-                          ? <Button type="button" className="btn btn-outline" onClick={saveHub}>Guardar</Button>
-                          : <Button type="button" className="btn btn-outline" onClick={() => startEditHub(item)}>Editar</Button>}
-                        <Button type="button" className="btn btn-outline" onClick={() => removeHub(item)}>Eliminar</Button>
+                        {item.deleted_at
+                          ? <Button type="button" className="btn btn-outline" onClick={() => restoreHub(item)}>Restaurar</Button>
+                          : (
+                            <>
+                              {editingHubId === item.id
+                                ? <Button type="button" className="btn btn-outline" onClick={saveHub}>Guardar</Button>
+                                : <Button type="button" className="btn btn-outline" onClick={() => startEditHub(item)}>Editar</Button>}
+                              <Button type="button" className="btn btn-outline" onClick={() => removeHub(item)}>Archivar</Button>
+                            </>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -472,14 +529,20 @@ export function NetworkPage() {
                   <TableRow key={item.id}>
                     <TableCell>{item.code}</TableCell>
                     <TableCell>{hubCode.get(item.hub_id) ?? item.hub_id}</TableCell>
-                    <TableCell>{editingDepotId === item.id ? <Input value={editingDepotName} onChange={(event) => setEditingDepotName(event.target.value)} /> : item.name}</TableCell>
+                    <TableCell>{editingDepotId === item.id ? <Input value={editingDepotName} onChange={(event) => setEditingDepotName(event.target.value)} /> : `${item.name}${item.deleted_at ? ' (Archivado)' : ''}`}</TableCell>
                     <TableCell>{editingDepotId === item.id ? <Input value={editingDepotCity} onChange={(event) => setEditingDepotCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
                       <div className="inline-actions">
-                        {editingDepotId === item.id
-                          ? <Button type="button" className="btn btn-outline" onClick={saveDepot}>Guardar</Button>
-                          : <Button type="button" className="btn btn-outline" onClick={() => startEditDepot(item)}>Editar</Button>}
-                        <Button type="button" className="btn btn-outline" onClick={() => removeDepot(item)}>Eliminar</Button>
+                        {item.deleted_at
+                          ? <Button type="button" className="btn btn-outline" onClick={() => restoreDepot(item)}>Restaurar</Button>
+                          : (
+                            <>
+                              {editingDepotId === item.id
+                                ? <Button type="button" className="btn btn-outline" onClick={saveDepot}>Guardar</Button>
+                                : <Button type="button" className="btn btn-outline" onClick={() => startEditDepot(item)}>Editar</Button>}
+                              <Button type="button" className="btn btn-outline" onClick={() => removeDepot(item)}>Archivar</Button>
+                            </>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -513,14 +576,20 @@ export function NetworkPage() {
                     <TableCell>{item.code}</TableCell>
                     <TableCell>{hubCode.get(item.hub_id) ?? item.hub_id}</TableCell>
                     <TableCell>{item.depot_id ? (depotCode.get(item.depot_id) ?? item.depot_id) : '-'}</TableCell>
-                    <TableCell>{editingPointId === item.id ? <Input value={editingPointName} onChange={(event) => setEditingPointName(event.target.value)} /> : item.name}</TableCell>
+                    <TableCell>{editingPointId === item.id ? <Input value={editingPointName} onChange={(event) => setEditingPointName(event.target.value)} /> : `${item.name}${item.deleted_at ? ' (Archivado)' : ''}`}</TableCell>
                     <TableCell>{editingPointId === item.id ? <Input value={editingPointCity} onChange={(event) => setEditingPointCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
                       <div className="inline-actions">
-                        {editingPointId === item.id
-                          ? <Button type="button" className="btn btn-outline" onClick={savePoint}>Guardar</Button>
-                          : <Button type="button" className="btn btn-outline" onClick={() => startEditPoint(item)}>Editar</Button>}
-                        <Button type="button" className="btn btn-outline" onClick={() => removePoint(item)}>Eliminar</Button>
+                        {item.deleted_at
+                          ? <Button type="button" className="btn btn-outline" onClick={() => restorePoint(item)}>Restaurar</Button>
+                          : (
+                            <>
+                              {editingPointId === item.id
+                                ? <Button type="button" className="btn btn-outline" onClick={savePoint}>Guardar</Button>
+                                : <Button type="button" className="btn btn-outline" onClick={() => startEditPoint(item)}>Editar</Button>}
+                              <Button type="button" className="btn btn-outline" onClick={() => removePoint(item)}>Archivar</Button>
+                            </>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>

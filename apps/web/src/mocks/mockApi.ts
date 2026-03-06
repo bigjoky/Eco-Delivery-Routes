@@ -240,9 +240,10 @@ let mockHubs: Array<{
   name: string;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 }> = [
-  { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true },
-  { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true },
+  { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true, deleted_at: null },
+  { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true, deleted_at: null },
 ];
 let hubSeq = 2;
 let mockDepots: Array<{
@@ -253,8 +254,9 @@ let mockDepots: Array<{
   address_line?: string | null;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 }> = [
-  { id: 'dep-1', hub_id: 'hub-1', code: 'DPT-AGP-0001', name: 'Depot Malaga Centro', address_line: 'Av. Andalucia 10', city: 'Malaga', is_active: true },
+  { id: 'dep-1', hub_id: 'hub-1', code: 'DPT-AGP-0001', name: 'Depot Malaga Centro', address_line: 'Av. Andalucia 10', city: 'Malaga', is_active: true, deleted_at: null },
 ];
 let depotSeq = 1;
 let mockPoints: Array<{
@@ -266,8 +268,9 @@ let mockPoints: Array<{
   address_line?: string | null;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 }> = [
-  { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', is_active: true },
+  { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', is_active: true, deleted_at: null },
 ];
 let pointSeq = 1;
 
@@ -685,9 +688,15 @@ export const mockApi = {
     return this.getRoleById(roleId);
   },
 
-  async getHubs(filters: { onlyActive?: boolean } = {}) {
-    if (filters.onlyActive === false) return [...mockHubs];
-    return mockHubs.filter((item) => item.is_active);
+  async getHubs(filters: { onlyActive?: boolean; includeDeleted?: boolean } = {}) {
+    let rows = [...mockHubs];
+    if (!filters.includeDeleted) {
+      rows = rows.filter((item) => !item.deleted_at);
+    }
+    if (filters.onlyActive !== false) {
+      rows = rows.filter((item) => item.is_active);
+    }
+    return rows;
   },
 
   async createHub(payload: {
@@ -703,6 +712,7 @@ export const mockApi = {
       name: payload.name,
       city: payload.city,
       is_active: payload.is_active ?? true,
+      deleted_at: null,
     };
     mockHubs = [row, ...mockHubs];
     return row;
@@ -729,8 +739,8 @@ export const mockApi = {
   },
 
   async deleteHub(id: string) {
-    const linkedDepots = mockDepots.some((item) => item.hub_id === id);
-    const linkedPoints = mockPoints.some((item) => item.hub_id === id);
+    const linkedDepots = mockDepots.some((item) => item.hub_id === id && !item.deleted_at);
+    const linkedPoints = mockPoints.some((item) => item.hub_id === id && !item.deleted_at);
     const linkedRoutes = mockRoutes.some((item) => item.hub_id === id);
     const linkedShipments = mockShipments.some((item) => item.hub_id === id);
     if (linkedDepots || linkedPoints || linkedRoutes || linkedShipments) {
@@ -738,13 +748,28 @@ export const mockApi = {
     }
     const index = mockHubs.findIndex((item) => item.id === id);
     if (index === -1) throw new Error('Hub not found');
-    mockHubs.splice(index, 1);
+    mockHubs[index] = {
+      ...mockHubs[index],
+      deleted_at: new Date().toISOString(),
+    };
     return { id, deleted: true };
   },
 
-  async getDepots(filters: { hubId?: string } = {}) {
-    if (!filters.hubId) return [...mockDepots];
-    return mockDepots.filter((item) => item.hub_id === filters.hubId);
+  async restoreHub(id: string) {
+    const index = mockHubs.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Hub not found');
+    if (!mockHubs[index].deleted_at) throw new Error('Hub is already active.');
+    mockHubs[index] = { ...mockHubs[index], deleted_at: null };
+    return mockHubs[index];
+  },
+
+  async getDepots(filters: { hubId?: string; includeDeleted?: boolean } = {}) {
+    let rows = [...mockDepots];
+    if (!filters.includeDeleted) {
+      rows = rows.filter((item) => !item.deleted_at);
+    }
+    if (filters.hubId) rows = rows.filter((item) => item.hub_id === filters.hubId);
+    return rows;
   },
 
   async createDepot(payload: {
@@ -764,6 +789,7 @@ export const mockApi = {
       address_line: payload.address_line ?? null,
       city: payload.city ?? null,
       is_active: payload.is_active ?? true,
+      deleted_at: null,
     };
     mockDepots = [row, ...mockDepots];
     return row;
@@ -792,18 +818,32 @@ export const mockApi = {
   },
 
   async deleteDepot(id: string) {
-    const linkedPoints = mockPoints.some((item) => item.depot_id === id);
+    const linkedPoints = mockPoints.some((item) => item.depot_id === id && !item.deleted_at);
     if (linkedPoints) {
       throw new Error('Depot has linked points and cannot be deleted.');
     }
     const index = mockDepots.findIndex((item) => item.id === id);
     if (index === -1) throw new Error('Depot not found');
-    mockDepots.splice(index, 1);
+    mockDepots[index] = {
+      ...mockDepots[index],
+      deleted_at: new Date().toISOString(),
+    };
     return { id, deleted: true };
   },
 
-  async getPoints(filters: { hubId?: string; depotId?: string } = {}) {
+  async restoreDepot(id: string) {
+    const index = mockDepots.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Depot not found');
+    if (!mockDepots[index].deleted_at) throw new Error('Depot is already active.');
+    const hub = mockHubs.find((item) => item.id === mockDepots[index].hub_id);
+    if (!hub || hub.deleted_at) throw new Error('Cannot restore depot while parent hub is archived.');
+    mockDepots[index] = { ...mockDepots[index], deleted_at: null };
+    return mockDepots[index];
+  },
+
+  async getPoints(filters: { hubId?: string; depotId?: string; includeDeleted?: boolean } = {}) {
     return mockPoints.filter((item) => {
+      if (!filters.includeDeleted && item.deleted_at) return false;
       if (filters.hubId && item.hub_id !== filters.hubId) return false;
       if (filters.depotId && item.depot_id !== filters.depotId) return false;
       return true;
@@ -829,6 +869,7 @@ export const mockApi = {
       address_line: payload.address_line ?? null,
       city: payload.city ?? null,
       is_active: payload.is_active ?? true,
+      deleted_at: null,
     };
     mockPoints = [row, ...mockPoints];
     return row;
@@ -859,8 +900,27 @@ export const mockApi = {
   async deletePoint(id: string) {
     const index = mockPoints.findIndex((item) => item.id === id);
     if (index === -1) throw new Error('Point not found');
-    mockPoints.splice(index, 1);
+    mockPoints[index] = {
+      ...mockPoints[index],
+      deleted_at: new Date().toISOString(),
+    };
     return { id, deleted: true };
+  },
+
+  async restorePoint(id: string) {
+    const index = mockPoints.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Point not found');
+    if (!mockPoints[index].deleted_at) throw new Error('Point is already active.');
+    const hub = mockHubs.find((item) => item.id === mockPoints[index].hub_id);
+    if (!hub || hub.deleted_at) throw new Error('Cannot restore point while parent hub is archived.');
+    if (mockPoints[index].depot_id) {
+      const depot = mockDepots.find((item) => item.id === mockPoints[index].depot_id);
+      if (!depot || depot.deleted_at || depot.hub_id !== mockPoints[index].hub_id) {
+        throw new Error('Cannot restore point while parent depot is archived or inconsistent.');
+      }
+    }
+    mockPoints[index] = { ...mockPoints[index], deleted_at: null };
+    return mockPoints[index];
   },
 
   async getShipments(filters: {

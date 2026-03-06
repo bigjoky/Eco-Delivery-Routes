@@ -114,6 +114,7 @@ export type HubSummary = {
   name: string;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 };
 
 export type DepotSummary = {
@@ -124,6 +125,7 @@ export type DepotSummary = {
   address_line?: string | null;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 };
 
 export type PointSummary = {
@@ -135,6 +137,7 @@ export type PointSummary = {
   address_line?: string | null;
   city?: string | null;
   is_active: boolean;
+  deleted_at?: string | null;
 };
 
 export type RouteStopSummary = {

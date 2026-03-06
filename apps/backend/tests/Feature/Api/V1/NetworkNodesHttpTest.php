@@ -133,6 +133,59 @@ class NetworkNodesHttpTest extends TestCase
         $this->assertContains('points.deleted', $events);
     }
 
+    public function test_network_nodes_can_be_restored_with_parent_dependencies(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubCreate = $this->postJson('/api/v1/hubs', [
+            'name' => 'Hub Restore Test',
+            'city' => 'Malaga',
+        ]);
+        $hubCreate->assertStatus(201);
+        $hubId = (string) $hubCreate->json('data.id');
+
+        $depotCreate = $this->postJson('/api/v1/depots', [
+            'hub_id' => $hubId,
+            'name' => 'Depot Restore Test',
+        ]);
+        $depotCreate->assertStatus(201);
+        $depotId = (string) $depotCreate->json('data.id');
+
+        $pointCreate = $this->postJson('/api/v1/points', [
+            'hub_id' => $hubId,
+            'depot_id' => $depotId,
+            'name' => 'Point Restore Test',
+        ]);
+        $pointCreate->assertStatus(201);
+        $pointId = (string) $pointCreate->json('data.id');
+
+        $this->deleteJson('/api/v1/points/' . $pointId)->assertOk();
+        $this->deleteJson('/api/v1/depots/' . $depotId)->assertOk();
+        $this->deleteJson('/api/v1/hubs/' . $hubId)->assertOk();
+
+        $restoreDepotWhileHubArchived = $this->postJson('/api/v1/depots/' . $depotId . '/restore');
+        $restoreDepotWhileHubArchived
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'RESOURCE_CONFLICT');
+
+        $this->postJson('/api/v1/hubs/' . $hubId . '/restore')->assertOk();
+        $this->postJson('/api/v1/depots/' . $depotId . '/restore')->assertOk();
+        $this->postJson('/api/v1/points/' . $pointId . '/restore')->assertOk();
+
+        $this->assertNull(DB::table('hubs')->where('id', $hubId)->value('deleted_at'));
+        $this->assertNull(DB::table('depots')->where('id', $depotId)->value('deleted_at'));
+        $this->assertNull(DB::table('points')->where('id', $pointId)->value('deleted_at'));
+
+        $events = DB::table('audit_logs')
+            ->whereIn('event', ['hubs.restored', 'depots.restored', 'points.restored'])
+            ->pluck('event')
+            ->all();
+        $this->assertContains('hubs.restored', $events);
+        $this->assertContains('depots.restored', $events);
+        $this->assertContains('points.restored', $events);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([
