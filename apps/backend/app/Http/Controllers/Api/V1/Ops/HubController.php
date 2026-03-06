@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use Illuminate\Support\Str;
 
 class HubController extends Controller
 {
-    public function __construct(private readonly SequenceService $sequenceService) {}
+    public function __construct(
+        private readonly SequenceService $sequenceService,
+        private readonly AuditLogWriter $auditLogWriter
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -64,6 +68,10 @@ class HubController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'hubs.created', [
+            'hub_id' => $id,
+            'hub_code' => $code,
+        ]);
 
         return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()], 201);
     }
@@ -95,6 +103,10 @@ class HubController extends Controller
         DB::table('hubs')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'hubs.updated', [
+            'hub_id' => $id,
+            'changes' => array_keys($payload),
         ]);
 
         return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()]);
@@ -143,6 +155,9 @@ class HubController extends Controller
         }
 
         DB::table('hubs')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'hubs.deleted', [
+            'hub_id' => $id,
+        ]);
 
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }

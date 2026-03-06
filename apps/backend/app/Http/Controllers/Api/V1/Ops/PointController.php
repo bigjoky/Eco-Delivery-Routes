@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use Illuminate\Support\Str;
 
 class PointController extends Controller
 {
-    public function __construct(private readonly SequenceService $sequenceService) {}
+    public function __construct(
+        private readonly SequenceService $sequenceService,
+        private readonly AuditLogWriter $auditLogWriter
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -80,6 +84,12 @@ class PointController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'points.created', [
+            'point_id' => $id,
+            'hub_id' => $payload['hub_id'],
+            'depot_id' => $payload['depot_id'] ?? null,
+            'point_code' => $code,
+        ]);
 
         return response()->json(['data' => DB::table('points')->where('id', $id)->first()], 201);
     }
@@ -126,6 +136,10 @@ class PointController extends Controller
             ...$payload,
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'points.updated', [
+            'point_id' => $id,
+            'changes' => array_keys($payload),
+        ]);
 
         return response()->json(['data' => DB::table('points')->where('id', $id)->first()]);
     }
@@ -148,6 +162,9 @@ class PointController extends Controller
         }
 
         DB::table('points')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'points.deleted', [
+            'point_id' => $id,
+        ]);
 
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }

@@ -14,6 +14,9 @@ export function NetworkPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [hubFilter, setHubFilter] = useState('');
 
   const [hubName, setHubName] = useState('');
   const [hubCity, setHubCity] = useState('');
@@ -41,6 +44,7 @@ export function NetworkPage() {
 
   const activeHubs = useMemo(() => hubs.filter((item) => item.is_active), [hubs]);
   const depotsForPointHub = useMemo(() => depots.filter((item) => item.hub_id === pointHubId), [depots, pointHubId]);
+  const normalizedQuery = query.trim().toLowerCase();
 
   const load = async () => {
     setLoading(true);
@@ -249,6 +253,35 @@ export function NetworkPage() {
 
   const hubCode = new Map(hubs.map((item) => [item.id, item.code]));
   const depotCode = new Map(depots.map((item) => [item.id, item.code]));
+  const filteredHubs = useMemo(() => hubs.filter((item) => {
+    if (statusFilter === 'active' && !item.is_active) return false;
+    if (statusFilter === 'inactive' && item.is_active) return false;
+    if (normalizedQuery) {
+      const haystack = `${item.code} ${item.name} ${item.city ?? ''}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+    return true;
+  }), [hubs, statusFilter, normalizedQuery]);
+  const filteredDepots = useMemo(() => depots.filter((item) => {
+    if (statusFilter === 'active' && !item.is_active) return false;
+    if (statusFilter === 'inactive' && item.is_active) return false;
+    if (hubFilter && item.hub_id !== hubFilter) return false;
+    if (normalizedQuery) {
+      const haystack = `${item.code} ${item.name} ${item.city ?? ''}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+    return true;
+  }), [depots, statusFilter, hubFilter, normalizedQuery]);
+  const filteredPoints = useMemo(() => points.filter((item) => {
+    if (statusFilter === 'active' && !item.is_active) return false;
+    if (statusFilter === 'inactive' && item.is_active) return false;
+    if (hubFilter && item.hub_id !== hubFilter) return false;
+    if (normalizedQuery) {
+      const haystack = `${item.code} ${item.name} ${item.city ?? ''}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+    return true;
+  }), [points, statusFilter, hubFilter, normalizedQuery]);
 
   return (
     <div className="page-grid">
@@ -262,6 +295,40 @@ export function NetworkPage() {
       </div>
       {message ? <div className="helper">{message}</div> : null}
       {error ? <div className="helper">{error}</div> : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros de red operativa</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="form-row">
+            <div>
+              <label htmlFor="network-query">Buscar</label>
+              <Input
+                id="network-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="codigo, nombre o ciudad"
+              />
+            </div>
+            <div>
+              <label htmlFor="network-status">Estado</label>
+              <Select id="network-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
+                <option value="all">Todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+              </Select>
+            </div>
+            <div>
+              <label htmlFor="network-hub-filter">Hub</label>
+              <Select id="network-hub-filter" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
+                <option value="">Todos</option>
+                {hubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -363,7 +430,7 @@ export function NetworkPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {hubs.map((item) => (
+                {filteredHubs.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.code}</TableCell>
                     <TableCell>{editingHubId === item.id ? <Input value={editingHubName} onChange={(event) => setEditingHubName(event.target.value)} /> : item.name}</TableCell>
@@ -401,7 +468,7 @@ export function NetworkPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {depots.map((item) => (
+                {filteredDepots.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.code}</TableCell>
                     <TableCell>{hubCode.get(item.hub_id) ?? item.hub_id}</TableCell>
@@ -441,7 +508,7 @@ export function NetworkPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {points.map((item) => (
+                {filteredPoints.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.code}</TableCell>
                     <TableCell>{hubCode.get(item.hub_id) ?? item.hub_id}</TableCell>

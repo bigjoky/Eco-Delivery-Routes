@@ -74,6 +74,13 @@ class NetworkNodesHttpTest extends TestCase
         $deleted
             ->assertOk()
             ->assertJsonPath('data.deleted', true);
+
+        $events = DB::table('audit_logs')
+            ->whereIn('event', ['hubs.created', 'hubs.deleted'])
+            ->pluck('event')
+            ->all();
+        $this->assertContains('hubs.created', $events);
+        $this->assertContains('hubs.deleted', $events);
     }
 
     public function test_depot_delete_is_blocked_with_points_and_point_can_be_deleted(): void
@@ -112,6 +119,15 @@ class NetworkNodesHttpTest extends TestCase
         $depotDeleted
             ->assertOk()
             ->assertJsonPath('data.deleted', true);
+
+        $events = DB::table('audit_logs')
+            ->whereIn('event', ['depots.created', 'depots.deleted', 'points.created', 'points.deleted'])
+            ->pluck('event')
+            ->all();
+        $this->assertContains('depots.created', $events);
+        $this->assertContains('depots.deleted', $events);
+        $this->assertContains('points.created', $events);
+        $this->assertContains('points.deleted', $events);
     }
 
     private function createUserWithRole(string $roleCode): User

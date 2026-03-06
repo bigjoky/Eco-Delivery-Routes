@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
-import { AuditLogEntry, HubSummary, IncidentCatalogItem, PaginationMeta, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 
@@ -163,7 +163,10 @@ export function ShipmentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
+  const [hubDepots, setHubDepots] = useState<DepotSummary[]>([]);
+  const [hubPoints, setHubPoints] = useState<PointSummary[]>([]);
   const [createHubId, setCreateHubId] = useState('');
+  const [createPointId, setCreatePointId] = useState('');
   const [createExternalReference, setCreateExternalReference] = useState('');
   const [createConsignee, setCreateConsignee] = useState('');
   const [createConsigneeDocumentId, setCreateConsigneeDocumentId] = useState('');
@@ -449,6 +452,49 @@ export function ShipmentsPage() {
       if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
     }).catch(() => setHubs([]));
   }, []);
+
+  useEffect(() => {
+    if (!createHubId) {
+      setHubDepots([]);
+      setHubPoints([]);
+      setCreatePointId('');
+      return;
+    }
+    Promise.all([
+      apiClient.getDepots({ hubId: createHubId }),
+      apiClient.getPoints({ hubId: createHubId }),
+    ]).then(([depots, points]) => {
+      setHubDepots(depots);
+      setHubPoints(points);
+      if (!points.some((item) => item.id === createPointId)) {
+        setCreatePointId('');
+      }
+    }).catch(() => {
+      setHubDepots([]);
+      setHubPoints([]);
+      setCreatePointId('');
+    });
+  }, [createHubId, createPointId]);
+
+  useEffect(() => {
+    if (!createPointId) return;
+    const selectedPoint = hubPoints.find((item) => item.id === createPointId);
+    if (!selectedPoint) return;
+    if (!createStreet.trim() && selectedPoint.address_line) {
+      setCreateStreet(selectedPoint.address_line);
+      setCreateNumber('');
+    }
+    if (!createCity.trim() && selectedPoint.city) {
+      setCreateCity(selectedPoint.city);
+    }
+    if (!createAddressNotes.trim()) {
+      const depot = selectedPoint.depot_id ? hubDepots.find((item) => item.id === selectedPoint.depot_id) : null;
+      const networkHint = depot
+        ? `Punto: ${selectedPoint.code} (${depot.code})`
+        : `Punto: ${selectedPoint.code}`;
+      setCreateAddressNotes(networkHint);
+    }
+  }, [createPointId, hubPoints, hubDepots]);
 
   useEffect(() => {
     apiClient.getIncidentCatalog().then((entries) => {
@@ -976,6 +1022,24 @@ export function ShipmentsPage() {
                 ))}
               </select>
               {createFieldErrors.hub ? <div className="helper">{createFieldErrors.hub}</div> : null}
+            </div>
+            <div>
+              <label htmlFor="create-shipment-point">Punto operativo (opcional)</label>
+              <select
+                id="create-shipment-point"
+                value={createPointId}
+                onChange={(event) => setCreatePointId(event.target.value)}
+              >
+                <option value="">Sin punto</option>
+                {hubPoints.map((point) => {
+                  const depotCode = point.depot_id ? (hubDepots.find((item) => item.id === point.depot_id)?.code ?? point.depot_id) : null;
+                  return (
+                    <option key={point.id} value={point.id}>
+                      {point.code} - {point.name}{depotCode ? ` (${depotCode})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div>
               <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
