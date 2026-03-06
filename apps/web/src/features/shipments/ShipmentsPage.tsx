@@ -267,6 +267,9 @@ export function ShipmentsPage() {
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
   const [consigneeLookupError, setConsigneeLookupError] = useState('');
   const [consigneeLookupLoading, setConsigneeLookupLoading] = useState(false);
+  const [senderLookupPhone, setSenderLookupPhone] = useState('');
+  const [senderLookupError, setSenderLookupError] = useState('');
+  const [senderLookupLoading, setSenderLookupLoading] = useState(false);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
@@ -1387,6 +1390,68 @@ export function ShipmentsPage() {
           </Button>
         }
       >
+        <div className="form-row">
+          <label htmlFor="create-sender-lookup">Buscar por movil</label>
+          <input
+            id="create-sender-lookup"
+            value={senderLookupPhone}
+            onChange={(event) => setSenderLookupPhone(event.target.value)}
+            placeholder="+34 600 000 000"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={senderLookupLoading}
+            onClick={async () => {
+              const phone = senderLookupPhone.trim();
+              if (!phone) {
+                setSenderLookupError('Introduce un movil para buscar.');
+                return;
+              }
+              setSenderLookupError('');
+              setSenderLookupLoading(true);
+              try {
+                const matches = await apiClient.getContacts({ phone });
+                if (!matches.length) {
+                  setSenderLookupError('No se encontro remitente con ese movil.');
+                } else {
+                  const contact = matches[0];
+                  const docId = (contact.document_id ?? '').trim();
+                  const inferredDocType = inferDocumentType(docId, createSenderDocType);
+                  setCreateSenderDocType(inferredDocType);
+                  setCreateSenderDocumentId(docId);
+                  if (inferredDocType === 'CIF') {
+                    setCreateSenderLegalName(contact.display_name ?? '');
+                    setCreateSenderFirstName('');
+                    setCreateSenderLastName('');
+                  } else {
+                    const fullName = (contact.display_name ?? '').trim();
+                    const parts = fullName.split(' ').filter(Boolean);
+                    setCreateSenderFirstName(parts.shift() ?? '');
+                    setCreateSenderLastName(parts.join(' '));
+                    setCreateSenderLegalName('');
+                  }
+                  setCreateSenderPhone(contact.phone ?? '');
+                  setCreateSenderEmail(contact.email ?? '');
+                  setCreateSenderStreet(contact.address_street ?? '');
+                  setCreateSenderNumber(contact.address_number ?? '');
+                  setCreateSenderPostalCode(contact.postal_code ?? '');
+                  setCreateSenderCity(contact.city ?? '');
+                  setCreateSenderProvince(contact.province ?? '');
+                  setCreateSenderCountry(contact.country ?? 'ES');
+                  setCreateSenderAddressNotes(contact.address_notes ?? '');
+                }
+              } catch (error) {
+                setSenderLookupError(error instanceof Error ? error.message : 'No se pudo buscar el contacto');
+              } finally {
+                setSenderLookupLoading(false);
+              }
+            }}
+          >
+            {senderLookupLoading ? 'Buscando...' : 'Buscar'}
+          </Button>
+          {senderLookupError ? <div className="helper">{senderLookupError}</div> : null}
+        </div>
         <div className="form-row">
           <label htmlFor="create-sender-doc-type">Tipo documento</label>
           <select
