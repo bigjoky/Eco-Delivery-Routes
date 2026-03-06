@@ -23,6 +23,7 @@ class ContactController extends Controller
         $query = DB::table('contacts');
         $phone = $request->query('phone');
         $email = $request->query('email');
+        $documentId = $request->query('document_id');
         $q = $request->query('q');
 
         if (is_string($phone) && $phone !== '') {
@@ -30,6 +31,9 @@ class ContactController extends Controller
         }
         if (is_string($email) && $email !== '') {
             $query->where('email', 'like', '%' . str_replace('%', '\\%', $email) . '%');
+        }
+        if (is_string($documentId) && $documentId !== '') {
+            $query->where('document_id', 'like', '%' . str_replace('%', '\\%', $documentId) . '%');
         }
         if (is_string($q) && $q !== '') {
             $like = '%' . str_replace('%', '\\%', $q) . '%';

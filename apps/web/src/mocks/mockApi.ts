@@ -954,7 +954,7 @@ export const mockApi = {
     return rows;
   },
 
-  async getContacts(filters: { phone?: string; email?: string; q?: string } = {}) {
+  async getContacts(filters: { phone?: string; email?: string; documentId?: string; q?: string } = {}) {
     const rows = [
       {
         id: 'c-1',
@@ -963,7 +963,11 @@ export const mockApi = {
         phone: '+34950111222',
         email: 'cliente@eco.local',
         address_line: 'Calle 1, 29001 Malaga',
+        address_street: 'Calle 1',
+        address_number: '12',
+        postal_code: '29001',
         city: 'Malaga',
+        province: 'Malaga',
         country: 'ES',
         kind: 'recipient',
       },
@@ -974,7 +978,11 @@ export const mockApi = {
         phone: '+34950111333',
         email: 'remitente@eco.local',
         address_line: 'Calle 2, 29002 Malaga',
+        address_street: 'Calle 2',
+        address_number: '21',
+        postal_code: '29002',
         city: 'Malaga',
+        province: 'Malaga',
         country: 'ES',
         kind: 'sender',
       },
@@ -985,11 +993,18 @@ export const mockApi = {
     if (filters.email) {
       return rows.filter((row) => (row.email ?? '').includes(filters.email ?? ''));
     }
+    if (filters.documentId) {
+      const value = filters.documentId.toLowerCase();
+      return rows.filter((row) => (row.document_id ?? '').toLowerCase().includes(value));
+    }
     if (filters.q) {
       const q = filters.q.toLowerCase();
       return rows.filter((row) =>
         (row.display_name ?? '').toLowerCase().includes(q) ||
-        (row.phone ?? '').toLowerCase().includes(q)
+        (row.phone ?? '').toLowerCase().includes(q) ||
+        (row.document_id ?? '').toLowerCase().includes(q) ||
+        (row.address_street ?? '').toLowerCase().includes(q) ||
+        (row.city ?? '').toLowerCase().includes(q)
       );
     }
     return rows;

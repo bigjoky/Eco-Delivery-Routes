@@ -26,6 +26,7 @@ import java.time.format.DateTimeParseException
 fun DriverRouteScreen(
     onOpenRouteQuality: (String) -> Unit = {},
     onOpenNetworkNodes: () -> Unit = {},
+    onOpenShipmentDraft: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -108,6 +109,7 @@ fun DriverRouteScreen(
         if (canAccessNetwork.value) {
             Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
         }
+        Button(onClick = onOpenShipmentDraft) { Text("Nuevo envio (beta)") }
         Text("Parada activa: ${selectedStop?.reference ?: "-"}")
         stops.value.forEach { stop ->
             Button(onClick = { selectedStopId.value = stop.id }) {
