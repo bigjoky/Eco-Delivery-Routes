@@ -276,6 +276,8 @@ export function ShipmentsPage() {
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkHubId, setBulkHubId] = useState('');
   const [bulkScheduledAt, setBulkScheduledAt] = useState('');
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkApplyToFiltered, setBulkApplyToFiltered] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [bulkError, setBulkError] = useState('');
   const [bulkMessage, setBulkMessage] = useState('');
@@ -751,25 +753,39 @@ export function ShipmentsPage() {
   const applyBulkUpdate = async () => {
     setBulkError('');
     setBulkMessage('');
-    if (selectedShipmentIds.length === 0) {
-      setBulkError('Selecciona al menos un envio.');
+    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
+      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
       return;
     }
     if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
       setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
       return;
     }
+    if (!bulkReason.trim()) {
+      setBulkError('Indica un motivo para auditoria.');
+      return;
+    }
     setBulkUpdating(true);
     try {
       const response = await apiClient.bulkUpdateShipments({
-        shipment_ids: selectedShipmentIds,
+        shipment_ids: bulkApplyToFiltered ? [] : selectedShipmentIds,
+        apply_to_filtered: bulkApplyToFiltered,
+        ...(bulkApplyToFiltered ? {
+          filter_status: status || undefined,
+          filter_hub_id: hubFilter || undefined,
+          filter_q: query || undefined,
+          filter_scheduled_from: scheduledFrom || undefined,
+          filter_scheduled_to: scheduledTo || undefined,
+        } : {}),
         ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
         ...(bulkHubId ? { hub_id: bulkHubId } : {}),
         ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+        reason: bulkReason.trim(),
       });
       setBulkMessage(`Actualizados ${response.meta.updated_count} envios.`);
       await reload(meta.page || 1);
       setSelectedShipmentIds([]);
+      setBulkReason('');
     } catch (exception) {
       setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar la actualizacion masiva');
     } finally {
@@ -1481,6 +1497,15 @@ export function ShipmentsPage() {
           </div>
           <div className="inline-actions">
             <span className="helper">Seleccionados: {selectedShipmentIds.length}</span>
+            <label htmlFor="bulk-filtered">
+              <input
+                id="bulk-filtered"
+                type="checkbox"
+                checked={bulkApplyToFiltered}
+                onChange={(event) => setBulkApplyToFiltered(event.target.checked)}
+              />
+              {' '}Aplicar a filtrados
+            </label>
             <label htmlFor="bulk-status">Estado</label>
             <select id="bulk-status" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value)}>
               <option value="">Sin cambio</option>
@@ -1498,6 +1523,13 @@ export function ShipmentsPage() {
             </select>
             <label htmlFor="bulk-scheduled">Fecha</label>
             <input id="bulk-scheduled" type="date" value={bulkScheduledAt} onChange={(event) => setBulkScheduledAt(event.target.value)} />
+            <label htmlFor="bulk-reason">Motivo</label>
+            <input
+              id="bulk-reason"
+              value={bulkReason}
+              onChange={(event) => setBulkReason(event.target.value)}
+              placeholder="Ej: Replanificacion operativa"
+            />
             <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
               {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
             </Button>

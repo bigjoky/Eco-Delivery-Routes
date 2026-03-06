@@ -87,6 +87,7 @@ let mockSubcontractors: Array<{
 let mockDrivers: Array<{
   id: string;
   code: string;
+  dni?: string | null;
   name: string;
   status: 'active' | 'inactive' | 'suspended';
   employment_type: 'employee' | 'subcontractor';
@@ -97,6 +98,7 @@ let mockDrivers: Array<{
   {
     id: 'drv-1',
     code: 'DRV-AGP-001',
+    dni: '12345678Z',
     name: 'Driver Demo',
     status: 'active',
     employment_type: 'subcontractor',
@@ -776,22 +778,47 @@ export const mockApi = {
 
   async bulkUpdateShipments(payload: {
     shipment_ids: string[];
+    apply_to_filtered?: boolean;
+    filter_status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    filter_hub_id?: string;
+    filter_q?: string;
+    filter_scheduled_from?: string;
+    filter_scheduled_to?: string;
     status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
     hub_id?: string;
     scheduled_at?: string;
+    reason: string;
   }) {
+    let targetIds = payload.shipment_ids;
+    if (payload.apply_to_filtered) {
+      let filtered = [...mockShipments];
+      if (payload.filter_status) filtered = filtered.filter((row) => row.status === payload.filter_status);
+      if (payload.filter_hub_id) filtered = filtered.filter((row) => row.hub_id === payload.filter_hub_id);
+      if (payload.filter_q) {
+        const q = payload.filter_q.toLowerCase();
+        filtered = filtered.filter((row) => (
+          row.reference.toLowerCase().includes(q) ||
+          (row.external_reference ?? '').toLowerCase().includes(q) ||
+          row.id.toLowerCase().includes(q) ||
+          (row.consignee_name ?? '').toLowerCase().includes(q)
+        ));
+      }
+      if (payload.filter_scheduled_from) filtered = filtered.filter((row) => (row.scheduled_at ?? '') >= `${payload.filter_scheduled_from}T00:00:00`);
+      if (payload.filter_scheduled_to) filtered = filtered.filter((row) => (row.scheduled_at ?? '') <= `${payload.filter_scheduled_to}T23:59:59`);
+      targetIds = filtered.map((row) => row.id);
+    }
     const updates = {
       ...(payload.status ? { status: payload.status } : {}),
       ...(payload.hub_id ? { hub_id: payload.hub_id } : {}),
       ...(payload.scheduled_at ? { scheduled_at: payload.scheduled_at } : {}),
     };
     const updated = mockShipments.map((row) => (
-      payload.shipment_ids.includes(row.id) ? { ...row, ...updates } : row
+      targetIds.includes(row.id) ? { ...row, ...updates } : row
     ));
     mockShipments = updated;
     return {
-      data: updated.filter((row) => payload.shipment_ids.includes(row.id)),
-      meta: { updated_count: payload.shipment_ids.length },
+      data: updated.filter((row) => targetIds.includes(row.id)),
+      meta: { updated_count: targetIds.length },
     };
   },
 
@@ -2209,14 +2236,14 @@ export const mockApi = {
 
   async createSubcontractor(payload: {
     legal_name: string;
-    tax_id?: string;
+    tax_id: string;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
   }) {
     const created = {
       id: `sc-${subcontractorSeq++}`,
       legal_name: payload.legal_name,
-      tax_id: payload.tax_id ?? null,
+      tax_id: payload.tax_id,
       status: payload.status ?? 'active',
       payment_terms: payload.payment_terms ?? 'monthly',
     };
@@ -2255,6 +2282,7 @@ export const mockApi = {
 
   async createDriver(payload: {
     code: string;
+    dni: string;
     name: string;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
@@ -2265,6 +2293,7 @@ export const mockApi = {
     const created = {
       id: `drv-${driverSeq++}`,
       code: payload.code,
+      dni: payload.dni,
       name: payload.name,
       status: payload.status ?? 'active',
       employment_type: payload.employment_type ?? 'subcontractor',
@@ -2278,6 +2307,7 @@ export const mockApi = {
 
   async updateDriver(id: string, payload: {
     name?: string;
+    dni?: string;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string | null;

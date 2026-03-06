@@ -546,9 +546,16 @@ export const apiClient = {
 
   async bulkUpdateShipments(payload: {
     shipment_ids: string[];
+    apply_to_filtered?: boolean;
+    filter_status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    filter_hub_id?: string;
+    filter_q?: string;
+    filter_scheduled_from?: string;
+    filter_scheduled_to?: string;
     status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
     hub_id?: string;
     scheduled_at?: string;
+    reason: string;
   }): Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }> {
     if (USE_MOCK) return mockApi.bulkUpdateShipments(payload) as Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }>;
     const response = await authorizedFetch(`${API_BASE_URL}/shipments/bulk-update`, {
@@ -2151,7 +2158,7 @@ export const apiClient = {
 
   async createSubcontractor(payload: {
     legal_name: string;
-    tax_id?: string;
+    tax_id: string;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
   }): Promise<SubcontractorSummary> {
@@ -2200,6 +2207,7 @@ export const apiClient = {
 
   async createDriver(payload: {
     code: string;
+    dni: string;
     name: string;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
@@ -2220,6 +2228,7 @@ export const apiClient = {
 
   async updateDriver(id: string, payload: {
     name?: string;
+    dni?: string;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string | null;

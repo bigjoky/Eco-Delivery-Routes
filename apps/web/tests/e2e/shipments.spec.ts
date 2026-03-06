@@ -28,3 +28,20 @@ test('shipments flow: list, export buttons, open detail', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Incidencias' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Paradas' })).toBeVisible();
 });
+
+test('shipments flow: bulk update with reason and filtered scope', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('input[placeholder="Email"]', 'admin@eco.local');
+  await page.fill('input[placeholder="Password"]', 'password123');
+  await page.click('text=Entrar');
+  await expect(page.getByRole('heading', { name: 'Envios', exact: true })).toBeVisible({ timeout: 60000 });
+
+  await page.selectOption('#shipment-status', 'created');
+  await page.fill('#shipment-query', 'SHP');
+  await page.check('#bulk-filtered');
+  await page.selectOption('#bulk-status', 'incident');
+  await page.fill('#bulk-reason', 'Prueba e2e masivo');
+  await page.click('text=Aplicar masivo');
+
+  await expect(page.getByText(/Actualizados \d+ envios\./)).toBeVisible();
+});

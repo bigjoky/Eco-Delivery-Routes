@@ -2685,17 +2685,26 @@ components:
         completed_at: { type: string, format: date-time, nullable: true }
     BulkUpdateShipmentsRequest:
       type: object
-      required: [shipment_ids]
+      required: [reason]
       properties:
         shipment_ids:
           type: array
           minItems: 1
           items: { type: string, format: uuid }
+        apply_to_filtered: { type: boolean, default: false }
+        filter_status:
+          type: string
+          enum: [created, out_for_delivery, delivered, incident]
+        filter_hub_id: { type: string, format: uuid }
+        filter_q: { type: string, maxLength: 120 }
+        filter_scheduled_from: { type: string, format: date }
+        filter_scheduled_to: { type: string, format: date }
         status:
           type: string
           enum: [created, out_for_delivery, delivered, incident]
         hub_id: { type: string, format: uuid }
         scheduled_at: { type: string, format: date-time }
+        reason: { type: string, maxLength: 220 }
     CreatePickupRequest:
       type: object
       required: [hub_id, reference, pickup_type]

@@ -194,6 +194,7 @@ class ShipmentsHttpTest extends TestCase
             'status' => 'out_for_delivery',
             'hub_id' => $secondaryHubId,
             'scheduled_at' => '2026-03-10 08:00:00',
+            'reason' => 'Replanificacion operativa',
         ]);
 
         $response->assertOk();
@@ -206,6 +207,52 @@ class ShipmentsHttpTest extends TestCase
             $this->assertSame($secondaryHubId, $row->hub_id);
             $this->assertSame('2026-03-10 08:00:00', $row->scheduled_at);
         }
+    }
+
+    public function test_can_bulk_update_shipments_by_filtered_scope(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-FILTER-001',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Filtro 1',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-OTHER-001',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Filtro 2',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/shipments/bulk-update', [
+            'apply_to_filtered' => true,
+            'filter_q' => 'FILTER-001',
+            'status' => 'incident',
+            'reason' => 'Bloqueo por incidencia masiva',
+        ]);
+        $response->assertOk();
+        $response->assertJsonPath('meta.updated_count', 1);
+        $response->assertJsonPath('data.0.reference', 'SHP-FILTER-001');
+        $response->assertJsonPath('data.0.status', 'incident');
+
+        $this->assertSame('incident', DB::table('shipments')->where('id', $shipmentA)->value('status'));
+        $this->assertSame('created', DB::table('shipments')->where('id', $shipmentB)->value('status'));
     }
 
     public function test_rejects_scheduled_at_outside_allowed_window(): void
