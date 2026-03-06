@@ -40,6 +40,15 @@ function serviceTypeLabel(value?: string | null) {
   return labels[value] ?? value;
 }
 
+function inferDocumentType(documentId: string, fallback: 'DNI' | 'NIE' | 'PASSPORT' | 'CIF'): 'DNI' | 'NIE' | 'PASSPORT' | 'CIF' {
+  const normalized = documentId.trim().toUpperCase();
+  if (!normalized) return fallback;
+  if (/^[XYZ][0-9]{7}[A-Z]$/.test(normalized)) return 'NIE';
+  if (/^[0-9]{8}[A-Z]$/.test(normalized)) return 'DNI';
+  if (/^[A-HJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(normalized)) return 'CIF';
+  return fallback;
+}
+
 type ShipmentFiltersProps = {
   query: string;
   setQuery: (value: string) => void;
@@ -198,13 +207,16 @@ export function ShipmentsPage() {
   const [createSenderEmail, setCreateSenderEmail] = useState('');
   const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
-  const [createScheduledAt, setCreateScheduledAt] = useState('');
+  const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
   const [senderModalOpen, setSenderModalOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createFieldErrors, setCreateFieldErrors] = useState<{
     hub?: string;
     scheduledAt?: string;
+    recipientDocument?: string;
+    recipientName?: string;
+    recipientPhone?: string;
     street?: string;
     city?: string;
     postalCode?: string;
@@ -523,6 +535,9 @@ export function ShipmentsPage() {
     const nextErrors: {
       hub?: string;
       scheduledAt?: string;
+      recipientDocument?: string;
+      recipientName?: string;
+      recipientPhone?: string;
       street?: string;
       city?: string;
       postalCode?: string;
@@ -538,6 +553,22 @@ export function ShipmentsPage() {
       (value) => value.trim() !== ''
     );
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
+    if (!createScheduledAt.trim()) {
+      nextErrors.scheduledAt = 'La fecha programada es obligatoria.';
+    }
+    if (createOperation === 'shipment') {
+      if (!createConsigneeDocumentId.trim()) {
+        nextErrors.recipientDocument = 'Documento destinatario obligatorio.';
+      }
+      if (createConsigneeDocType === 'CIF') {
+        if (!createConsignee.trim()) nextErrors.recipientName = 'Razon social destinatario obligatoria.';
+      } else if (!createConsigneeFirstName.trim() || !createConsigneeLastName.trim()) {
+        nextErrors.recipientName = 'Nombre y apellidos destinatario obligatorios.';
+      }
+      if (!createPhone.trim()) {
+        nextErrors.recipientPhone = 'Telefono destinatario obligatorio.';
+      }
+    }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad es obligatoria.';
@@ -678,7 +709,7 @@ export function ShipmentsPage() {
       setCreateSenderAddressNotes('');
       setCreateSenderPhone('');
       setCreateSenderEmail('');
-      setCreateScheduledAt('');
+      setCreateScheduledAt(new Date().toISOString().slice(0, 10));
       setCreateOperation('shipment');
       setCreateServiceType('express_1030');
       setCreateFieldErrors({});
@@ -1186,10 +1217,10 @@ export function ShipmentsPage() {
                 } else {
                   const contact = matches[0];
                   const docId = (contact.document_id ?? '').trim();
-                  const isCif = /^[A-Za-z]/.test(docId);
-                  setCreateConsigneeDocType(isCif ? 'CIF' : 'DNI');
+                  const inferredDocType = inferDocumentType(docId, createConsigneeDocType);
+                  setCreateConsigneeDocType(inferredDocType);
                   setCreateConsigneeDocumentId(docId);
-                  if (isCif) {
+                  if (inferredDocType === 'CIF') {
                     setCreateConsignee(contact.display_name ?? '');
                     setCreateConsigneeFirstName('');
                     setCreateConsigneeLastName('');
@@ -1236,9 +1267,14 @@ export function ShipmentsPage() {
           <input
             id="create-shipment-consignee-document"
             value={createConsigneeDocumentId}
-            onChange={(event) => setCreateConsigneeDocumentId(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setCreateConsigneeDocumentId(value);
+              setCreateConsigneeDocType(inferDocumentType(value, createConsigneeDocType));
+            }}
             placeholder="DNI/CIF"
           />
+          {createFieldErrors.recipientDocument ? <div className="helper">{createFieldErrors.recipientDocument}</div> : null}
           {createConsigneeDocType === 'CIF' ? (
             <>
               <label htmlFor="create-shipment-consignee-legal-name">Razon social</label>
@@ -1267,6 +1303,7 @@ export function ShipmentsPage() {
               />
             </>
           )}
+          {createFieldErrors.recipientName ? <div className="helper">{createFieldErrors.recipientName}</div> : null}
           <label htmlFor="create-shipment-phone">Telefono</label>
           <input
             id="create-shipment-phone"
@@ -1274,6 +1311,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreatePhone(event.target.value)}
             placeholder="+34 950 111 222"
           />
+          {createFieldErrors.recipientPhone ? <div className="helper">{createFieldErrors.recipientPhone}</div> : null}
           {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
           <label htmlFor="create-shipment-email">Email</label>
           <input
