@@ -396,15 +396,16 @@ public final class MockAPIClient {
         )
     }
 
-    public func hubs(onlyActive: Bool) async throws -> [HubSummary] {
+    public func hubs(onlyActive: Bool, includeDeleted: Bool = false) async throws -> [HubSummary] {
         let rows = [
-            HubSummary(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro", city: "Malaga", isActive: true),
-            HubSummary(id: "hub-2", code: "SEV-HUB-01", name: "Hub Sevilla Norte", city: "Sevilla", isActive: true),
+            HubSummary(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro", city: "Malaga", isActive: true, deletedAt: nil),
+            HubSummary(id: "hub-2", code: "SEV-HUB-01", name: "Hub Sevilla Norte", city: "Sevilla", isActive: true, deletedAt: nil),
         ]
-        return onlyActive ? rows.filter { $0.isActive } : rows
+        let filteredByDelete = includeDeleted ? rows : rows.filter { $0.deletedAt == nil }
+        return onlyActive ? filteredByDelete.filter { $0.isActive } : filteredByDelete
     }
 
-    public func depots(hubId: String?) async throws -> [DepotSummary] {
+    public func depots(hubId: String?, includeDeleted: Bool = false) async throws -> [DepotSummary] {
         let rows = [
             DepotSummary(
                 id: "dep-1",
@@ -413,14 +414,16 @@ public final class MockAPIClient {
                 name: "Depot Malaga Centro",
                 addressLine: "Av. Andalucia 10",
                 city: "Malaga",
-                isActive: true
+                isActive: true,
+                deletedAt: nil
             ),
         ]
-        guard let hubId, !hubId.isEmpty else { return rows }
-        return rows.filter { $0.hubId == hubId }
+        let filteredByDelete = includeDeleted ? rows : rows.filter { $0.deletedAt == nil }
+        guard let hubId, !hubId.isEmpty else { return filteredByDelete }
+        return filteredByDelete.filter { $0.hubId == hubId }
     }
 
-    public func points(hubId: String?, depotId: String?) async throws -> [PointSummary] {
+    public func points(hubId: String?, depotId: String?, includeDeleted: Bool = false) async throws -> [PointSummary] {
         let rows = [
             PointSummary(
                 id: "pt-1",
@@ -430,14 +433,31 @@ public final class MockAPIClient {
                 name: "Punto Centro 1",
                 addressLine: "Calle Larios 5",
                 city: "Malaga",
-                isActive: true
+                isActive: true,
+                deletedAt: nil
             ),
         ]
-        return rows.filter { row in
+        let filteredByDelete = includeDeleted ? rows : rows.filter { $0.deletedAt == nil }
+        return filteredByDelete.filter { row in
             let hubMatch = hubId == nil || hubId?.isEmpty == true || row.hubId == hubId
             let depotMatch = depotId == nil || depotId?.isEmpty == true || row.depotId == depotId
             return hubMatch && depotMatch
         }
+    }
+
+    public func restoreHub(id: String) async throws -> HubSummary {
+        _ = id
+        return HubSummary(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro", city: "Malaga", isActive: true, deletedAt: nil)
+    }
+
+    public func restoreDepot(id: String) async throws -> DepotSummary {
+        _ = id
+        return DepotSummary(id: "dep-1", hubId: "hub-1", code: "DPT-AGP-0001", name: "Depot Malaga Centro", addressLine: "Av. Andalucia 10", city: "Malaga", isActive: true, deletedAt: nil)
+    }
+
+    public func restorePoint(id: String) async throws -> PointSummary {
+        _ = id
+        return PointSummary(id: "pt-1", hubId: "hub-1", depotId: "dep-1", code: "PNT-AGP-0001", name: "Punto Centro 1", addressLine: "Calle Larios 5", city: "Malaga", isActive: true, deletedAt: nil)
     }
 
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
