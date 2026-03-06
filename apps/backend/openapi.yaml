@@ -1725,6 +1725,36 @@ paths:
                           properties:
                             field: { type: string, enum: [driver_id, subcontractor_id, vehicle_id] }
                             message: { type: string }
+                            code: { type: string, example: LOW_DRIVER_QUALITY }
+
+  /routes/assignment/publish-policy:
+    get:
+      tags: [Routes]
+      summary: Obtener policy de bloqueo por warnings críticos al publicar ruta
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Routes]
+      summary: Actualizar policy de bloqueo por warnings críticos al publicar ruta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enforce_on_publish, critical_warning_codes, bypass_role_codes]
+              properties:
+                enforce_on_publish: { type: boolean }
+                critical_warning_codes:
+                  type: array
+                  items: { type: string }
+                bypass_role_codes:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /routes/{id}:
     patch:

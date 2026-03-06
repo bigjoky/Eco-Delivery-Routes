@@ -393,6 +393,179 @@ class RouteVehicleAssignmentHttpTest extends TestCase
             'Driver quality score is below 95%.',
             implode(' ', array_column($response->json('data.warnings') ?? [], 'message'))
         );
+        $this->assertStringContainsString(
+            'LOW_DRIVER_QUALITY',
+            implode(' ', array_column($response->json('data.warnings') ?? [], 'code'))
+        );
+    }
+
+    public function test_operations_manager_cannot_publish_route_when_critical_warning_policy_matches(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $subcontractorId = (string) Str::uuid();
+        DB::table('subcontractors')->insert([
+            'id' => $subcontractorId,
+            'legal_name' => 'Publish Guard SL',
+            'tax_id' => 'B77777777',
+            'status' => 'active',
+            'payment_terms' => 'monthly',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $driverId = (string) Str::uuid();
+        DB::table('drivers')->insert([
+            'id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'employment_type' => 'subcontractor',
+            'code' => 'DRV-PUB-001',
+            'name' => 'Driver Publish',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'driver',
+            'scope_id' => $driverId,
+            'period_start' => '2026-03-01',
+            'period_end' => '2026-03-31',
+            'service_quality_score' => 90.0,
+            'assigned_with_attempt' => 10,
+            'delivered_completed' => 8,
+            'pickups_completed' => 1,
+            'failed_count' => 1,
+            'absent_count' => 0,
+            'retry_count' => 1,
+            'calculated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('route_assignment_policies')->where('id', 1)->update([
+            'enforce_on_publish' => true,
+            'critical_warning_codes' => json_encode(['LOW_DRIVER_QUALITY']),
+            'bypass_role_codes' => json_encode(['super_admin']),
+            'updated_at' => now(),
+        ]);
+
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-PUB-GUARD-001',
+            'route_date' => '2026-03-06',
+            'status' => 'planned',
+            'driver_id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->patchJson("/api/v1/routes/{$routeId}", [
+            'status' => 'in_progress',
+        ]);
+        $response->assertStatus(422);
+        $this->assertStringContainsString('Route publish blocked by critical warning policy', (string) $response->json('error.message'));
+    }
+
+    public function test_super_admin_can_publish_route_with_critical_warning_when_bypass_role_matches(): void
+    {
+        $admin = $this->createUserWithRole('super_admin');
+        $this->actingAs($admin, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $subcontractorId = (string) Str::uuid();
+        DB::table('subcontractors')->insert([
+            'id' => $subcontractorId,
+            'legal_name' => 'Publish Bypass SL',
+            'tax_id' => 'B88888888',
+            'status' => 'active',
+            'payment_terms' => 'monthly',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $driverId = (string) Str::uuid();
+        DB::table('drivers')->insert([
+            'id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'employment_type' => 'subcontractor',
+            'code' => 'DRV-PUB-002',
+            'name' => 'Driver Publish Bypass',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('quality_snapshots')->insert([
+            'id' => (string) Str::uuid(),
+            'scope_type' => 'driver',
+            'scope_id' => $driverId,
+            'period_start' => '2026-03-01',
+            'period_end' => '2026-03-31',
+            'service_quality_score' => 90.0,
+            'assigned_with_attempt' => 10,
+            'delivered_completed' => 8,
+            'pickups_completed' => 1,
+            'failed_count' => 1,
+            'absent_count' => 0,
+            'retry_count' => 1,
+            'calculated_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('route_assignment_policies')->where('id', 1)->update([
+            'enforce_on_publish' => true,
+            'critical_warning_codes' => json_encode(['LOW_DRIVER_QUALITY']),
+            'bypass_role_codes' => json_encode(['super_admin']),
+            'updated_at' => now(),
+        ]);
+
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-PUB-BYPASS-001',
+            'route_date' => '2026-03-06',
+            'status' => 'planned',
+            'driver_id' => $driverId,
+            'subcontractor_id' => $subcontractorId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->patchJson("/api/v1/routes/{$routeId}", [
+            'status' => 'in_progress',
+        ]);
+        $response->assertOk();
+        $response->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_operations_manager_can_read_and_update_assignment_publish_policy(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $get = $this->getJson('/api/v1/routes/assignment/publish-policy');
+        $get->assertOk();
+        $get->assertJsonPath('data.enforce_on_publish', true);
+
+        $update = $this->putJson('/api/v1/routes/assignment/publish-policy', [
+            'enforce_on_publish' => true,
+            'critical_warning_codes' => ['LOW_DRIVER_QUALITY', 'MISSING_VEHICLE_CAPACITY'],
+            'bypass_role_codes' => ['super_admin', 'operations_manager'],
+        ]);
+        $update->assertOk();
+        $this->assertSame(
+            ['LOW_DRIVER_QUALITY', 'MISSING_VEHICLE_CAPACITY'],
+            $update->json('data.critical_warning_codes')
+        );
+        $this->assertSame(
+            ['super_admin', 'operations_manager'],
+            $update->json('data.bypass_role_codes')
+        );
     }
 
     private function createUserWithRole(string $roleCode): User

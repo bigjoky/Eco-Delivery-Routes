@@ -370,6 +370,32 @@ public final class MockAPIClient {
         ].prefix(max(1, min(limit ?? 5, 100))))
     }
 
+    public func routeAssignmentPreview(
+        subcontractorId: String?,
+        driverId: String?,
+        vehicleId: String?,
+        routeId: String?,
+        routeDate: String?
+    ) async throws -> RouteAssignmentPreview {
+        _ = (subcontractorId, driverId, vehicleId, routeId, routeDate)
+        return RouteAssignmentPreview(
+            valid: true,
+            conflicts: [],
+            warnings: [
+                RouteAssignmentMessage(field: "driver_id", message: "Driver quality score is below 95%.", code: "LOW_DRIVER_QUALITY")
+            ],
+            recommendedSubcontractorId: subcontractorId
+        )
+    }
+
+    public func routeAssignmentPublishPolicy() async throws -> RouteAssignmentPublishPolicy {
+        RouteAssignmentPublishPolicy(
+            enforceOnPublish: true,
+            criticalWarningCodes: ["LOW_DRIVER_QUALITY", "LOW_SUBCONTRACTOR_QUALITY"],
+            bypassRoleCodes: ["super_admin"]
+        )
+    }
+
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
         _ = (periodStart, periodEnd)
         return QualityRouteBreakdown(

@@ -23,6 +23,7 @@ import {
   RoleSummary,
   RouteBulkAddStopsResult,
   RouteAssignmentPreview,
+  RouteAssignmentPublishPolicy,
   RouteManifest,
   RouteStopSummary,
   RouteSummary,
@@ -807,6 +808,26 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot preview route assignment');
     return json.data as RouteAssignmentPreview;
+  },
+
+  async getRouteAssignmentPublishPolicy(): Promise<RouteAssignmentPublishPolicy> {
+    if (USE_MOCK) return mockApi.getRouteAssignmentPublishPolicy() as Promise<RouteAssignmentPublishPolicy>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/assignment/publish-policy`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot fetch route assignment publish policy');
+    return json.data as RouteAssignmentPublishPolicy;
+  },
+
+  async updateRouteAssignmentPublishPolicy(payload: RouteAssignmentPublishPolicy): Promise<RouteAssignmentPublishPolicy> {
+    if (USE_MOCK) return mockApi.updateRouteAssignmentPublishPolicy(payload) as Promise<RouteAssignmentPublishPolicy>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/assignment/publish-policy`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update route assignment publish policy');
+    return json.data as RouteAssignmentPublishPolicy;
   },
 
   async getRouteStops(routeId: string): Promise<RouteStopSummary[]> {

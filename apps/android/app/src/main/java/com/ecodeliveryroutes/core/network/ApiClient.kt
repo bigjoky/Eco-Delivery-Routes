@@ -4,6 +4,9 @@ import com.ecodeliveryroutes.BuildConfig
 import com.ecodeliveryroutes.core.model.QualityBreakdown
 import com.ecodeliveryroutes.core.model.QualityBreakdownComponents
 import com.ecodeliveryroutes.core.model.QualityBreakdownPeriod
+import com.ecodeliveryroutes.core.model.RouteAssignmentMessage
+import com.ecodeliveryroutes.core.model.RouteAssignmentPreview
+import com.ecodeliveryroutes.core.model.RouteAssignmentPublishPolicy
 import com.ecodeliveryroutes.core.model.QualitySnapshot
 import com.ecodeliveryroutes.core.model.RouteStop
 import com.ecodeliveryroutes.core.session.SessionStore
@@ -190,6 +193,77 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                 periods = periods
             )
         }.getOrDefault(mockQualityRouteBreakdown(routeId, granularity))
+    }
+
+    suspend fun previewRouteAssignment(
+        subcontractorId: String? = null,
+        driverId: String? = null,
+        vehicleId: String? = null,
+        routeId: String? = null,
+        routeDate: String? = null
+    ): RouteAssignmentPreview = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext RouteAssignmentPreview(
+                valid = true,
+                conflicts = emptyList(),
+                warnings = emptyList(),
+                recommendedSubcontractorId = subcontractorId
+            )
+        }
+        runCatching {
+            val query = buildList {
+                if (!subcontractorId.isNullOrBlank()) add("subcontractor_id=$subcontractorId")
+                if (!driverId.isNullOrBlank()) add("driver_id=$driverId")
+                if (!vehicleId.isNullOrBlank()) add("vehicle_id=$vehicleId")
+                if (!routeId.isNullOrBlank()) add("route_id=$routeId")
+                if (!routeDate.isNullOrBlank()) add("route_date=$routeDate")
+            }.joinToString("&")
+            val suffix = if (query.isNotBlank()) "?$query" else ""
+            val payload = authedGet("$baseUrl/routes/assignment/preview$suffix")
+            val data = JSONObject(payload).optJSONObject("data") ?: JSONObject()
+            val parseMessages = { key: String ->
+                val array = data.optJSONArray(key) ?: JSONArray()
+                (0 until array.length()).map { index ->
+                    val item = array.optJSONObject(index) ?: JSONObject()
+                    RouteAssignmentMessage(
+                        field = item.optString("field"),
+                        message = item.optString("message"),
+                        code = item.optString("code").ifBlank { null }
+                    )
+                }
+            }
+            RouteAssignmentPreview(
+                valid = data.optBoolean("valid", false),
+                conflicts = parseMessages("conflicts"),
+                warnings = parseMessages("warnings"),
+                recommendedSubcontractorId = data.optString("recommended_subcontractor_id").ifBlank { null }
+            )
+        }.getOrElse {
+            RouteAssignmentPreview(valid = false, conflicts = listOf(RouteAssignmentMessage("vehicle_id", "Cannot preview route assignment.")), warnings = emptyList())
+        }
+    }
+
+    suspend fun routeAssignmentPublishPolicy(): RouteAssignmentPublishPolicy = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext RouteAssignmentPublishPolicy(
+                enforceOnPublish = true,
+                criticalWarningCodes = listOf("LOW_DRIVER_QUALITY", "LOW_SUBCONTRACTOR_QUALITY"),
+                bypassRoleCodes = listOf("super_admin")
+            )
+        }
+        runCatching {
+            val payload = authedGet("$baseUrl/routes/assignment/publish-policy")
+            val data = JSONObject(payload).optJSONObject("data") ?: JSONObject()
+            val criticalCodesJson = data.optJSONArray("critical_warning_codes") ?: JSONArray()
+            val bypassRolesJson = data.optJSONArray("bypass_role_codes") ?: JSONArray()
+            RouteAssignmentPublishPolicy(
+                enforceOnPublish = data.optBoolean("enforce_on_publish", true),
+                criticalWarningCodes = (0 until criticalCodesJson.length()).map { criticalCodesJson.optString(it) }.filter { it.isNotBlank() },
+                bypassRoleCodes = (0 until bypassRolesJson.length()).map { bypassRolesJson.optString(it) }.filter { it.isNotBlank() }
+            )
+        }.getOrElse {
+            RouteAssignmentPublishPolicy(true, listOf("LOW_DRIVER_QUALITY", "LOW_SUBCONTRACTOR_QUALITY"), listOf("super_admin"))
+        }
     }
 
     private fun authedGet(url: String): String {

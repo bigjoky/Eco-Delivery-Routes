@@ -55,6 +55,8 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('shipments'", $contents);
         $this->assertStringContainsString("Route::get('routes'", $contents);
         $this->assertStringContainsString("Route::get('routes/assignment/preview'", $contents);
+        $this->assertStringContainsString("Route::get('routes/assignment/publish-policy'", $contents);
+        $this->assertStringContainsString("Route::put('routes/assignment/publish-policy'", $contents);
         $this->assertStringContainsString("Route::patch('routes/{id}'", $contents);
         $this->assertStringContainsString("Route::post('routes/{id}/stops'", $contents);
         $this->assertStringContainsString("Route::post('routes/{id}/stops/bulk-add'", $contents);
@@ -143,6 +145,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/hubs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/assignment/preview:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/routes/assignment/publish-policy:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/bulk-add:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/reorder:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/routes/{id}/stops/{stopId}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
