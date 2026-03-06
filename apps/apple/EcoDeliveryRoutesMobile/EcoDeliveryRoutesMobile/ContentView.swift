@@ -12,14 +12,8 @@ struct ContentView: View {
 
     @State private var routeStops: [DriverStop] = []
     @State private var selectedStopId: String?
-    @State private var routeDateFilter: String = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
-    }()
-    @State private var routeStatusFilter: String = ""
+    @AppStorage("driver_route_date_filter") private var routeDateFilter: String = ""
+    @AppStorage("driver_route_status_filter") private var routeStatusFilter: String = ""
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var scanCode: String = ""
     @State private var podSignature: String = ""
@@ -79,6 +73,9 @@ struct ContentView: View {
         .task(id: authSession.token?.token) {
             apiClient.setAuthToken(authSession.token?.token)
             guard authSession.token != nil else { return }
+            if routeDateFilter.isEmpty {
+                routeDateFilter = currentISODate()
+            }
             await loadAuthProfile()
             await loadRoute()
             await loadRouteQuality()
@@ -124,7 +121,13 @@ struct ContentView: View {
                     TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
                     TextField("Estado ruta (opcional)", text: $routeStatusFilter)
                     Button("Cargar ruta del dia") {
-                        Task { await loadRoute() }
+                        Task {
+                            guard isValidRouteDate(routeDateFilter) else {
+                                driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
+                                return
+                            }
+                            await loadRoute()
+                        }
                     }
                     ForEach(routeStops) { stop in
                         Button {
@@ -550,6 +553,10 @@ struct ContentView: View {
     }
 
     private func loadRoute() async {
+        guard isValidRouteDate(routeDateFilter) else {
+            driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
+            return
+        }
         let payload = (try? await apiClient.myRoute(
             routeDate: routeDateFilter.isEmpty ? nil : routeDateFilter,
             status: routeStatusFilter.isEmpty ? nil : routeStatusFilter
@@ -624,6 +631,23 @@ struct ContentView: View {
         if normalized.hasPrefix("RETRY") { return "retry" }
         if normalized.hasPrefix("FAILED") { return "failed" }
         return "general"
+    }
+
+    private func isValidRouteDate(_ value: String) -> Bool {
+        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value) != nil
+    }
+
+    private func currentISODate() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 }
 

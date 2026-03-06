@@ -20,6 +20,7 @@ import com.ecodeliveryroutes.core.network.ApiProvider
 import com.ecodeliveryroutes.core.session.SessionStore
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 @Composable
 fun DriverRouteScreen(
@@ -41,8 +42,14 @@ fun DriverRouteScreen(
     val message = remember { mutableStateOf("") }
     val canAccessNetwork = remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val prefs = context.getSharedPreferences("eco_driver_filters", android.content.Context.MODE_PRIVATE)
 
     LaunchedEffect(Unit) {
+        routeDateFilter.value = prefs.getString("route_date", LocalDate.now().toString()) ?: LocalDate.now().toString()
+        routeStatusFilter.value = prefs.getString("route_status", "") ?: ""
+        if (!isValidRouteDate(routeDateFilter.value)) {
+            routeDateFilter.value = LocalDate.now().toString()
+        }
         stops.value = ApiProvider.client.myRouteStops(routeDateFilter.value, routeStatusFilter.value)
         selectedStopId.value = stops.value.firstOrNull()?.id
         routeQuality.value = ApiProvider.client.qualityRouteSnapshots()
@@ -68,7 +75,15 @@ fun DriverRouteScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Button(onClick = {
+            if (!isValidRouteDate(routeDateFilter.value)) {
+                message.value = "Fecha invalida. Usa YYYY-MM-DD."
+                return@Button
+            }
             scope.launch {
+                prefs.edit()
+                    .putString("route_date", routeDateFilter.value)
+                    .putString("route_status", routeStatusFilter.value)
+                    .apply()
                 stops.value = ApiProvider.client.myRouteStops(routeDateFilter.value, routeStatusFilter.value)
                 selectedStopId.value = stops.value.firstOrNull()?.id
             }
@@ -213,5 +228,15 @@ private fun incidentCategoryForCode(code: String): String {
         normalized.startsWith("RETRY") -> "retry"
         normalized.startsWith("FAILED") -> "failed"
         else -> "general"
+    }
+}
+
+private fun isValidRouteDate(value: String): Boolean {
+    if (value.isBlank()) return true
+    return try {
+        LocalDate.parse(value)
+        true
+    } catch (_: DateTimeParseException) {
+        false
     }
 }

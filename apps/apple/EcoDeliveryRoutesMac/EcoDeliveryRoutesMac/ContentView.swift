@@ -171,6 +171,7 @@ struct ContentView: View {
     @State private var networkPointEditId: String = ""
     @State private var networkPointEditName: String = ""
     @State private var networkPointEditCity: String = ""
+    @State private var roleCodes: [String] = []
 
     @State private var scanCode: String = ""
     @State private var operationalMessage: String = "Recepcion lista"
@@ -194,6 +195,14 @@ struct ContentView: View {
     @State private var importWarnings: [String] = []
     @State private var importRunning: Bool = false
 
+    private var availableSections: [Section] {
+        let allowedNetworkRoles = Set(["super_admin", "operations_manager", "warehouse_manager", "traffic_manager"])
+        let canAccessNetwork = !Set(roleCodes).isDisjoint(with: allowedNetworkRoles)
+        return Section.allCases.filter { section in
+            section != .network || canAccessNetwork
+        }
+    }
+
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
     }
@@ -208,7 +217,7 @@ struct ContentView: View {
                 loginView
             } else {
                 NavigationSplitView {
-                    List(Section.allCases, selection: $selectedSection) { section in
+                    List(availableSections, selection: $selectedSection) { section in
                         Label(section.rawValue, systemImage: section.systemImage)
                             .tag(section)
                     }
@@ -1159,9 +1168,20 @@ struct ContentView: View {
     private func refreshAll() async {
         apiClient.setAuthToken(authSession.token?.token)
         guard authSession.token != nil else { return }
+        await loadAuthProfile()
+        if selectedSection == .network && !availableSections.contains(.network) {
+            selectedSection = .operations
+        }
         await loadQualityThreshold()
         await loadQualityThresholdAlerts()
-        await loadNetworkNodes()
+        if availableSections.contains(.network) {
+            await loadNetworkNodes()
+        } else {
+            hubs = []
+            depots = []
+            points = []
+            networkMessage = ""
+        }
         await loadRoute()
         await loadManifestById()
         await loadRouteQuality()
@@ -1169,6 +1189,15 @@ struct ContentView: View {
         await loadTariffs()
         await loadSettlements()
         await loadUsers()
+    }
+
+    private func loadAuthProfile() async {
+        do {
+            let me = try await apiClient.me()
+            roleCodes = me.roles.map(\.code)
+        } catch {
+            roleCodes = []
+        }
     }
 
     private func loadNetworkNodes() async {

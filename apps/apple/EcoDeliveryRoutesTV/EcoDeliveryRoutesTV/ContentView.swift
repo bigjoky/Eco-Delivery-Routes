@@ -17,6 +17,10 @@ struct ContentView: View {
     @State private var thresholdDeltaTopScopes: [TVThresholdAlertTopScope] = []
     @State private var thresholdDeltaWindowHours: Int = 24
     @State private var thresholdDeltaTrigger: Double = 5
+    @State private var hubsCount: Int = 0
+    @State private var depotsCount: Int = 0
+    @State private var pointsCount: Int = 0
+    @State private var archivedNodesCount: Int = 0
     @State private var lastRefreshText: String = "Sin refresco"
     @State private var statusText: String = "Conectando..."
 
@@ -61,8 +65,20 @@ struct ContentView: View {
                 }
                 VStack(alignment: .leading) {
                     Text("Alertas delta")
-                        .font(.headline)
+                    .font(.headline)
                     Text("\(thresholdDeltaAlertCount)")
+                    .font(.title)
+                }
+                VStack(alignment: .leading) {
+                    Text("Hubs/Depots/Puntos")
+                        .font(.headline)
+                    Text("\(hubsCount)/\(depotsCount)/\(pointsCount)")
+                        .font(.title)
+                }
+                VStack(alignment: .leading) {
+                    Text("Nodos archivados")
+                        .font(.headline)
+                    Text("\(archivedNodesCount)")
                         .font(.title)
                 }
             }
@@ -200,6 +216,10 @@ struct ContentView: View {
         thresholdDeltaTopScopes = payload.thresholdDeltaTopScopes
         thresholdDeltaWindowHours = payload.thresholdDeltaWindowHours
         thresholdDeltaTrigger = payload.thresholdDeltaTrigger
+        hubsCount = payload.hubsCount
+        depotsCount = payload.depotsCount
+        pointsCount = payload.pointsCount
+        archivedNodesCount = payload.archivedNodesCount
         statusText = payload.status
 
         let formatter = DateFormatter()
@@ -237,6 +257,10 @@ struct TVSnapshot {
     let thresholdDeltaTopScopes: [TVThresholdAlertTopScope]
     let thresholdDeltaWindowHours: Int
     let thresholdDeltaTrigger: Double
+    let hubsCount: Int
+    let depotsCount: Int
+    let pointsCount: Int
+    let archivedNodesCount: Int
     let status: String
 }
 
@@ -336,6 +360,10 @@ final class TVMonitorService {
             thresholdDeltaTopScopes: apiSnapshot.thresholdDeltaTopScopes,
             thresholdDeltaWindowHours: apiSnapshot.thresholdDeltaWindowHours,
             thresholdDeltaTrigger: apiSnapshot.thresholdDeltaTrigger,
+            hubsCount: apiSnapshot.hubsCount,
+            depotsCount: apiSnapshot.depotsCount,
+            pointsCount: apiSnapshot.pointsCount,
+            archivedNodesCount: apiSnapshot.archivedNodesCount,
             status: apiSnapshot.status
         )
     }
@@ -352,6 +380,10 @@ final class TVMonitorService {
         thresholdDeltaTopScopes: [TVThresholdAlertTopScope],
         thresholdDeltaWindowHours: Int,
         thresholdDeltaTrigger: Double,
+        hubsCount: Int,
+        depotsCount: Int,
+        pointsCount: Int,
+        archivedNodesCount: Int,
         status: String
     ) {
         let fallbackThreshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
@@ -371,6 +403,10 @@ final class TVMonitorService {
                 [],
                 24,
                 5,
+                2,
+                4,
+                8,
+                1,
                 "Monitor activo (solo lectura/mock)"
             )
         }
@@ -393,6 +429,10 @@ final class TVMonitorService {
                 [],
                 24,
                 5,
+                2,
+                4,
+                8,
+                1,
                 "Monitor activo (URL invalida, fallback mock)"
             )
         }
@@ -417,6 +457,10 @@ final class TVMonitorService {
                     [],
                     24,
                     5,
+                    2,
+                    4,
+                    8,
+                    1,
                     "Monitor fallback (error HTTP API calidad)"
                 )
             }
@@ -472,6 +516,10 @@ final class TVMonitorService {
                     [],
                     24,
                     5,
+                    2,
+                    4,
+                    8,
+                    1,
                     "Monitor API sin datos, fallback mock"
                 )
             }
@@ -506,6 +554,10 @@ final class TVMonitorService {
                 normalizedBaseURL: normalizedBaseURL,
                 token: token
             )
+            let networkSummary = await fetchNetworkSummaryFromAPI(
+                normalizedBaseURL: normalizedBaseURL,
+                token: token
+            )
             return (
                 mappedRoutes,
                 mappedDrivers,
@@ -518,6 +570,10 @@ final class TVMonitorService {
                 topScopes,
                 deltaAlert.windowHours,
                 deltaAlert.deltaTrigger,
+                networkSummary.hubsCount,
+                networkSummary.depotsCount,
+                networkSummary.pointsCount,
+                networkSummary.archivedNodesCount,
                 "Monitor activo (API real)"
             )
         } catch {
@@ -533,9 +589,60 @@ final class TVMonitorService {
                 [],
                 24,
                 5,
+                2,
+                4,
+                8,
+                1,
                 "Monitor fallback (error conexion API)"
             )
         }
+    }
+
+    private func fetchNetworkSummaryFromAPI(normalizedBaseURL: String, token: String?) async -> (hubsCount: Int, depotsCount: Int, pointsCount: Int, archivedNodesCount: Int) {
+        guard
+            let hubsURL = URL(string: "\(normalizedBaseURL)/hubs?only_active=0&include_deleted=1"),
+            let depotsURL = URL(string: "\(normalizedBaseURL)/depots?include_deleted=1"),
+            let pointsURL = URL(string: "\(normalizedBaseURL)/points?include_deleted=1")
+        else {
+            return (2, 4, 8, 1)
+        }
+
+        do {
+            guard
+                let hubsResult = try await authorizedGet(url: hubsURL, normalizedBaseURL: normalizedBaseURL, token: token),
+                let depotsResult = try await authorizedGet(url: depotsURL, normalizedBaseURL: normalizedBaseURL, token: hubsResult.token),
+                let pointsResult = try await authorizedGet(url: pointsURL, normalizedBaseURL: normalizedBaseURL, token: depotsResult.token)
+            else {
+                return (2, 4, 8, 1)
+            }
+
+            let hubsSummary = decodeNetworkRowsSummary(from: hubsResult.data)
+            let depotsSummary = decodeNetworkRowsSummary(from: depotsResult.data)
+            let pointsSummary = decodeNetworkRowsSummary(from: pointsResult.data)
+            return (
+                hubsSummary.total,
+                depotsSummary.total,
+                pointsSummary.total,
+                hubsSummary.archived + depotsSummary.archived + pointsSummary.archived
+            )
+        } catch {
+            return (2, 4, 8, 1)
+        }
+    }
+
+    private func decodeNetworkRowsSummary(from data: Data) -> (total: Int, archived: Int) {
+        guard
+            let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let rows = payload["data"] as? [[String: Any]]
+        else {
+            return (0, 0)
+        }
+
+        let archived = rows.reduce(0) { partial, row in
+            let deletedAt = row["deleted_at"] as? String
+            return partial + ((deletedAt?.isEmpty == false) ? 1 : 0)
+        }
+        return (rows.count, archived)
     }
 
     private func resolveAuthToken(normalizedBaseURL: String, explicitToken: String?) async -> String? {
