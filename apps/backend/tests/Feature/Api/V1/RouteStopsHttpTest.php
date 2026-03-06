@@ -565,6 +565,45 @@ class RouteStopsHttpTest extends TestCase
         $response->assertJsonValidationErrors(['shipment_ids']);
     }
 
+    public function test_express_service_requires_same_day_window_on_stop_assignment(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-EXPRESS-WINDOW',
+            'route_date' => '2026-03-10',
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-EXPRESS-WINDOW-1',
+            'status' => 'created',
+            'service_type' => 'express_1030',
+            'scheduled_at' => '2026-03-11T09:00:00Z',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentId,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['shipment_id']);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

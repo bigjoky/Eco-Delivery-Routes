@@ -192,6 +192,11 @@ let mockRoutes: Array<{
     manifest_notes: null,
   },
 ];
+let mockRouteAssignmentPublishPolicy = {
+  enforce_on_publish: true,
+  critical_warning_codes: ['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY'],
+  bypass_role_codes: ['super_admin'],
+};
 let mockRouteStops: Array<{
   id: string;
   route_id: string;
@@ -1136,7 +1141,7 @@ export const mockApi = {
     route_date?: string | null;
   }) {
     const conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }> = [];
-    const warnings: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }> = [];
+    const warnings: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string; code?: string }> = [];
     const driver = payload.driver_id ? mockDrivers.find((item) => item.id === payload.driver_id) : null;
     const vehicle = payload.vehicle_id ? mockVehicles.find((item) => item.id === payload.vehicle_id) : null;
     const subcontractorId = payload.subcontractor_id ?? null;
@@ -1186,7 +1191,13 @@ export const mockApi = {
       }
     }
     if (vehicle && !vehicle.capacity_kg) {
-      warnings.push({ field: 'vehicle_id', message: 'Vehicle has no configured capacity_kg.' });
+      warnings.push({ field: 'vehicle_id', message: 'Vehicle has no configured capacity_kg.', code: 'MISSING_VEHICLE_CAPACITY' });
+    }
+    if (driver && driver.code.endsWith('001')) {
+      warnings.push({ field: 'driver_id', message: 'Driver quality score is below 95%.', code: 'LOW_DRIVER_QUALITY' });
+    }
+    if ((subcontractorId ?? driver?.subcontractor_id) === 'sc-1') {
+      warnings.push({ field: 'subcontractor_id', message: 'Subcontractor quality score is below 95%.', code: 'LOW_SUBCONTRACTOR_QUALITY' });
     }
 
     return {
@@ -1195,6 +1206,23 @@ export const mockApi = {
       warnings,
       recommended_subcontractor_id: subcontractorId ?? driver?.subcontractor_id ?? vehicle?.subcontractor_id ?? null,
     };
+  },
+
+  async getRouteAssignmentPublishPolicy() {
+    return { ...mockRouteAssignmentPublishPolicy };
+  },
+
+  async updateRouteAssignmentPublishPolicy(payload: {
+    enforce_on_publish: boolean;
+    critical_warning_codes: string[];
+    bypass_role_codes: string[];
+  }) {
+    mockRouteAssignmentPublishPolicy = {
+      enforce_on_publish: payload.enforce_on_publish,
+      critical_warning_codes: [...payload.critical_warning_codes],
+      bypass_role_codes: [...payload.bypass_role_codes],
+    };
+    return { ...mockRouteAssignmentPublishPolicy };
   },
 
   async getRouteStops(routeId: string) {

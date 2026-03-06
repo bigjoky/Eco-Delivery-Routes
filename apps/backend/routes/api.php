@@ -83,6 +83,8 @@ Route::prefix('v1')->group(function () {
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::get('routes/assignment/preview', [RouteController::class, 'assignmentPreview']);
+        Route::get('routes/assignment/publish-policy', [RouteController::class, 'assignmentPublishPolicy']);
+        Route::put('routes/assignment/publish-policy', [RouteController::class, 'upsertAssignmentPublishPolicy']);
         Route::post('routes', [RouteController::class, 'store']);
         Route::patch('routes/{id}', [RouteController::class, 'update']);
         Route::get('routes/{id}/stops', [RouteController::class, 'stops']);

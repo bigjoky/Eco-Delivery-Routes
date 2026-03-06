@@ -183,7 +183,17 @@ class RouteController extends Controller
             'route_id' => $route->id,
             'route_date' => $route->route_date,
         ];
-        $this->assertAssignmentConsistency($merged);
+        $assessment = $this->assessAssignmentConsistency($merged);
+        if ($assessment['errors'] !== []) {
+            /** @var array{field:string,message:string} $first */
+            $first = $assessment['errors'][0];
+            $this->throwValidationError($first['message'], $first['field']);
+        }
+        $nextStatus = (string) ($payload['status'] ?? $route->status);
+        $isPublishTransition = $route->status === 'planned' && $nextStatus === 'in_progress';
+        if ($isPublishTransition) {
+            $this->assertPublishAllowedByPolicy($actor, $assessment['warnings']);
+        }
 
         if ($payload === []) {
             return response()->json(['data' => $this->fetchRouteWithAssignments($id)]);
@@ -226,6 +236,52 @@ class RouteController extends Controller
         ]);
     }
 
+    public function assignmentPublishPolicy(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.read')) {
+            return $this->forbidden();
+        }
+
+        return response()->json([
+            'data' => $this->resolvePublishPolicy(),
+        ]);
+    }
+
+    public function upsertAssignmentPublishPolicy(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'enforce_on_publish' => ['required', 'boolean'],
+            'critical_warning_codes' => ['required', 'array', 'min:1'],
+            'critical_warning_codes.*' => ['required', 'string', 'max:80'],
+            'bypass_role_codes' => ['required', 'array', 'min:1'],
+            'bypass_role_codes.*' => ['required', 'string', 'max:80'],
+        ]);
+
+        DB::table('route_assignment_policies')->updateOrInsert(
+            ['id' => 1],
+            [
+                'enforce_on_publish' => (bool) $payload['enforce_on_publish'],
+                'critical_warning_codes' => json_encode(array_values(array_unique($payload['critical_warning_codes']))),
+                'bypass_role_codes' => json_encode(array_values(array_unique($payload['bypass_role_codes']))),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'data' => $this->resolvePublishPolicy(),
+            'message' => 'Assignment publish policy updated.',
+        ]);
+    }
+
     private function fetchRouteWithAssignments(string $id): ?object
     {
         return DB::table('routes')
@@ -255,7 +311,7 @@ class RouteController extends Controller
 
     /**
      * @param array<string, mixed> $payload
-     * @return array{errors:array<int,array{field:string,message:string}>,warnings:array<int,array{field:string,message:string}>,recommended_subcontractor_id:string|null}
+     * @return array{errors:array<int,array{field:string,message:string}>,warnings:array<int,array{field:string,message:string,code?:string}>,recommended_subcontractor_id:string|null}
      */
     private function assessAssignmentConsistency(array $payload): array
     {
@@ -336,11 +392,19 @@ class RouteController extends Controller
                 ->where('route_stops.route_id', $routeId)
                 ->get([
                     'shipments.scheduled_at as shipment_scheduled_at',
+                    'shipments.service_type as shipment_service_type',
                     'pickups.scheduled_at as pickup_scheduled_at',
                 ]);
             $windowIssue = false;
             foreach ($windowRows as $windowRow) {
-                if ($windowRow->shipment_scheduled_at && !$this->isWithinTwoDays((string) $routeDate, (string) $windowRow->shipment_scheduled_at)) {
+                if (
+                    $windowRow->shipment_scheduled_at &&
+                    !$this->isWithinAllowedWindow(
+                        (string) $routeDate,
+                        (string) $windowRow->shipment_scheduled_at,
+                        $windowRow->shipment_service_type ? (string) $windowRow->shipment_service_type : null
+                    )
+                ) {
                     $windowIssue = true;
                     break;
                 }
@@ -350,7 +414,7 @@ class RouteController extends Controller
                 }
             }
             if ($windowIssue) {
-                $errors[] = ['field' => 'subcontractor_id', 'message' => 'Route contains stops outside allowed time window (+/- 2 days).'];
+                $errors[] = ['field' => 'subcontractor_id', 'message' => 'Route contains stops outside allowed service time window.'];
             }
         }
 
@@ -378,7 +442,7 @@ class RouteController extends Controller
                 ->orderByDesc('period_end')
                 ->value('service_quality_score');
             if (is_numeric($driverQuality) && (float) $driverQuality < 95.0) {
-                $warnings[] = ['field' => 'driver_id', 'message' => 'Driver quality score is below 95%.'];
+                $warnings[] = ['field' => 'driver_id', 'message' => 'Driver quality score is below 95%.', 'code' => 'LOW_DRIVER_QUALITY'];
             }
         }
         if ($recommendedSubcontractorId) {
@@ -388,11 +452,11 @@ class RouteController extends Controller
                 ->orderByDesc('period_end')
                 ->value('service_quality_score');
             if (is_numeric($subcontractorQuality) && (float) $subcontractorQuality < 95.0) {
-                $warnings[] = ['field' => 'subcontractor_id', 'message' => 'Subcontractor quality score is below 95%.'];
+                $warnings[] = ['field' => 'subcontractor_id', 'message' => 'Subcontractor quality score is below 95%.', 'code' => 'LOW_SUBCONTRACTOR_QUALITY'];
             }
         }
         if ($vehicle && !$vehicle->capacity_kg) {
-            $warnings[] = ['field' => 'vehicle_id', 'message' => 'Vehicle has no configured capacity_kg.'];
+            $warnings[] = ['field' => 'vehicle_id', 'message' => 'Vehicle has no configured capacity_kg.', 'code' => 'MISSING_VEHICLE_CAPACITY'];
         }
 
         return [
@@ -956,9 +1020,19 @@ class RouteController extends Controller
     private function assertStopTemporalWindowConsistency(object $route, array $payload): void
     {
         if (!empty($payload['shipment_id'])) {
-            $scheduledAt = DB::table('shipments')->where('id', $payload['shipment_id'])->value('scheduled_at');
-            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
-                $this->throwValidationError('Shipment time window is outside the allowed route window (+/- 2 days).', 'shipment_id');
+            $shipment = DB::table('shipments')
+                ->where('id', $payload['shipment_id'])
+                ->first(['scheduled_at', 'service_type']);
+            if (
+                $shipment &&
+                $shipment->scheduled_at &&
+                !$this->isWithinAllowedWindow(
+                    (string) $route->route_date,
+                    (string) $shipment->scheduled_at,
+                    $shipment->service_type ? (string) $shipment->service_type : null
+                )
+            ) {
+                $this->throwValidationError('Shipment time window is outside the allowed service window.', 'shipment_id');
             }
         }
 
@@ -973,9 +1047,17 @@ class RouteController extends Controller
     private function assertBulkStopTemporalWindowConsistency(object $route, array $shipmentIds, array $pickupIds): void
     {
         foreach ($shipmentIds as $shipmentId) {
-            $scheduledAt = DB::table('shipments')->where('id', $shipmentId)->value('scheduled_at');
-            if ($scheduledAt && !$this->isWithinTwoDays((string) $route->route_date, (string) $scheduledAt)) {
-                $this->throwValidationError('At least one shipment is outside the allowed route window (+/- 2 days).', 'shipment_ids');
+            $shipment = DB::table('shipments')->where('id', $shipmentId)->first(['scheduled_at', 'service_type']);
+            if (
+                $shipment &&
+                $shipment->scheduled_at &&
+                !$this->isWithinAllowedWindow(
+                    (string) $route->route_date,
+                    (string) $shipment->scheduled_at,
+                    $shipment->service_type ? (string) $shipment->service_type : null
+                )
+            ) {
+                $this->throwValidationError('At least one shipment is outside the allowed service window.', 'shipment_ids');
             }
         }
         foreach ($pickupIds as $pickupId) {
@@ -1037,6 +1119,80 @@ class RouteController extends Controller
         }
         $diffDays = abs((int) floor(($routeTs - $scheduledTs) / 86400));
         return $diffDays <= 2;
+    }
+
+    private function isWithinAllowedWindow(string $routeDate, string $scheduledAt, ?string $serviceType): bool
+    {
+        $allowedDays = $this->allowedDaysByServiceType($serviceType);
+        $routeTs = strtotime(substr($routeDate, 0, 10));
+        $scheduledTs = strtotime(substr($scheduledAt, 0, 10));
+        if ($routeTs === false || $scheduledTs === false) {
+            return true;
+        }
+        $diffDays = abs((int) floor(($routeTs - $scheduledTs) / 86400));
+        return $diffDays <= $allowedDays;
+    }
+
+    private function allowedDaysByServiceType(?string $serviceType): int
+    {
+        return match ($serviceType) {
+            'express_1030', 'express_1400', 'express_1900' => 0,
+            default => 2,
+        };
+    }
+
+    /**
+     * @param array<int,array{field:string,message:string,code?:string}> $warnings
+     */
+    private function assertPublishAllowedByPolicy(User $actor, array $warnings): void
+    {
+        $policy = $this->resolvePublishPolicy();
+        if (!$policy['enforce_on_publish']) {
+            return;
+        }
+
+        $bypassRoles = $policy['bypass_role_codes'];
+        foreach ($bypassRoles as $roleCode) {
+            if (is_string($roleCode) && $roleCode !== '' && $actor->hasRole($roleCode)) {
+                return;
+            }
+        }
+
+        $criticalCodes = array_values(array_filter($policy['critical_warning_codes'], fn ($value) => is_string($value) && $value !== ''));
+        if ($criticalCodes === []) {
+            return;
+        }
+
+        foreach ($warnings as $warning) {
+            $code = $warning['code'] ?? null;
+            if (is_string($code) && in_array($code, $criticalCodes, true)) {
+                $this->throwValidationError('Route publish blocked by critical warning policy: ' . $warning['message'], $warning['field']);
+            }
+        }
+    }
+
+    /**
+     * @return array{enforce_on_publish:bool,critical_warning_codes:array<int,string>,bypass_role_codes:array<int,string>}
+     */
+    private function resolvePublishPolicy(): array
+    {
+        $row = DB::table('route_assignment_policies')->where('id', 1)->first();
+        if (!$row) {
+            return [
+                'enforce_on_publish' => true,
+                'critical_warning_codes' => ['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY'],
+                'bypass_role_codes' => ['super_admin'],
+            ];
+        }
+
+        $criticalWarningCodes = json_decode((string) $row->critical_warning_codes, true);
+        $bypassRoleCodes = json_decode((string) $row->bypass_role_codes, true);
+
+        return [
+            'enforce_on_publish' => (bool) $row->enforce_on_publish,
+            'critical_warning_codes' => is_array($criticalWarningCodes) ? array_values(array_map('strval', $criticalWarningCodes)) : [],
+            'bypass_role_codes' => is_array($bypassRoleCodes) ? array_values(array_map('strval', $bypassRoleCodes)) : [],
+        ];
     }
 
     private function throwValidationError(string $message, string $field): void

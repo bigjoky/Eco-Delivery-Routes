@@ -44,6 +44,14 @@ export function RoutesPage() {
   const [createPreviewWarnings, setCreatePreviewWarnings] = useState<string[]>([]);
   const [createRecommendedSubcontractorId, setCreateRecommendedSubcontractorId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [estimatedShipmentsCount, setEstimatedShipmentsCount] = useState('0');
+  const [estimatedAvgWeightKg, setEstimatedAvgWeightKg] = useState('0');
+  const [publishPolicyLoading, setPublishPolicyLoading] = useState(false);
+  const [publishPolicySaving, setPublishPolicySaving] = useState(false);
+  const [publishPolicyError, setPublishPolicyError] = useState('');
+  const [publishPolicyEnforce, setPublishPolicyEnforce] = useState(true);
+  const [publishPolicyCriticalCodes, setPublishPolicyCriticalCodes] = useState<string[]>(['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY']);
+  const [publishPolicyBypassRoles, setPublishPolicyBypassRoles] = useState('super_admin');
 
   const routeSummary = useMemo(() => {
     const counts = items.reduce((acc, item) => {
@@ -165,6 +173,17 @@ export function RoutesPage() {
     apiClient.getDrivers({ status: 'active', limit: 100 }).then(setDrivers).catch(() => setDrivers([]));
     apiClient.getVehicles({ status: 'active', limit: 100 }).then(setVehicles).catch(() => setVehicles([]));
     setCreateRouteDate(new Date().toISOString().slice(0, 10));
+    setPublishPolicyLoading(true);
+    apiClient.getRouteAssignmentPublishPolicy()
+      .then((policy) => {
+        setPublishPolicyEnforce(policy.enforce_on_publish);
+        setPublishPolicyCriticalCodes(policy.critical_warning_codes);
+        setPublishPolicyBypassRoles(policy.bypass_role_codes.join(','));
+      })
+      .catch((exception) => {
+        setPublishPolicyError(exception instanceof Error ? exception.message : 'No se pudo cargar la policy de publicación');
+      })
+      .finally(() => setPublishPolicyLoading(false));
   }, []);
 
   const filteredDrivers = createSubcontractorId
@@ -174,6 +193,9 @@ export function RoutesPage() {
   const filteredVehicles = createSubcontractorId
     ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === createSubcontractorId)
     : vehicles;
+  const selectedCreateVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
+  const estimatedLoadKg = Math.max(0, Number(estimatedShipmentsCount) || 0) * Math.max(0, Number(estimatedAvgWeightKg) || 0);
+  const loadCapacityDeltaKg = (selectedCreateVehicle?.capacity_kg ?? 0) - estimatedLoadKg;
 
   const createRoute = async () => {
     const nextErrors: string[] = [];
@@ -231,6 +253,35 @@ export function RoutesPage() {
       setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear la ruta');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const toggleCriticalCode = (code: string) => {
+    setPublishPolicyCriticalCodes((current) => (
+      current.includes(code) ? current.filter((item) => item !== code) : [...current, code]
+    ));
+  };
+
+  const savePublishPolicy = async () => {
+    setPublishPolicySaving(true);
+    setPublishPolicyError('');
+    try {
+      const bypassRoles = publishPolicyBypassRoles
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value !== '');
+      const saved = await apiClient.updateRouteAssignmentPublishPolicy({
+        enforce_on_publish: publishPolicyEnforce,
+        critical_warning_codes: publishPolicyCriticalCodes,
+        bypass_role_codes: bypassRoles.length > 0 ? bypassRoles : ['super_admin'],
+      });
+      setPublishPolicyEnforce(saved.enforce_on_publish);
+      setPublishPolicyCriticalCodes(saved.critical_warning_codes);
+      setPublishPolicyBypassRoles(saved.bypass_role_codes.join(','));
+    } catch (exception) {
+      setPublishPolicyError(exception instanceof Error ? exception.message : 'No se pudo guardar la policy de publicación');
+    } finally {
+      setPublishPolicySaving(false);
     }
   };
 
@@ -373,6 +424,91 @@ export function RoutesPage() {
             <div className="helper">Sugerencia: seleccionar subcontrata vinculada automaticamente ({createRecommendedSubcontractorId}).</div>
           ) : null}
           {createError ? <div className="helper">{createError}</div> : null}
+          <div className="kpi-grid">
+            <div className="kpi-item">
+              <div className="kpi-label">Simulador carga: envíos estimados</div>
+              <input
+                type="number"
+                min={0}
+                value={estimatedShipmentsCount}
+                onChange={(event) => setEstimatedShipmentsCount(event.target.value)}
+              />
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Peso medio por envío (kg)</div>
+              <input
+                type="number"
+                min={0}
+                step="0.1"
+                value={estimatedAvgWeightKg}
+                onChange={(event) => setEstimatedAvgWeightKg(event.target.value)}
+              />
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Carga total estimada (kg)</div>
+              <div className="kpi-value">{estimatedLoadKg.toFixed(1)}</div>
+            </div>
+            <div className="kpi-item">
+              <div className="kpi-label">Delta vs capacidad vehículo</div>
+              <div className="kpi-value">{selectedCreateVehicle ? loadCapacityDeltaKg.toFixed(1) : '-'}</div>
+              <div className="helper">{selectedCreateVehicle ? `Capacidad: ${selectedCreateVehicle.capacity_kg ?? 0} kg` : 'Selecciona vehículo'}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Policy Publicación de Ruta</CardTitle>
+          <div className="page-subtitle">Bloquea paso a in_progress cuando existan warnings críticos.</div>
+        </CardHeader>
+        <CardContent>
+          {publishPolicyLoading ? <div className="helper">Cargando policy...</div> : null}
+          {publishPolicyError ? <div className="helper error">{publishPolicyError}</div> : null}
+          <div className="inline-actions">
+            <label htmlFor="publish-policy-enforce">Enforce on publish</label>
+            <input
+              id="publish-policy-enforce"
+              type="checkbox"
+              checked={publishPolicyEnforce}
+              onChange={(event) => setPublishPolicyEnforce(event.target.checked)}
+            />
+            <label htmlFor="publish-policy-bypass">Roles bypass (csv)</label>
+            <input
+              id="publish-policy-bypass"
+              value={publishPolicyBypassRoles}
+              onChange={(event) => setPublishPolicyBypassRoles(event.target.value)}
+              placeholder="super_admin,operations_manager"
+            />
+            <Button type="button" onClick={savePublishPolicy} disabled={publishPolicySaving}>
+              {publishPolicySaving ? 'Guardando...' : 'Guardar policy'}
+            </Button>
+          </div>
+          <div className="inline-actions">
+            <label>
+              <input
+                type="checkbox"
+                checked={publishPolicyCriticalCodes.includes('LOW_DRIVER_QUALITY')}
+                onChange={() => toggleCriticalCode('LOW_DRIVER_QUALITY')}
+              />
+              LOW_DRIVER_QUALITY
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={publishPolicyCriticalCodes.includes('LOW_SUBCONTRACTOR_QUALITY')}
+                onChange={() => toggleCriticalCode('LOW_SUBCONTRACTOR_QUALITY')}
+              />
+              LOW_SUBCONTRACTOR_QUALITY
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={publishPolicyCriticalCodes.includes('MISSING_VEHICLE_CAPACITY')}
+                onChange={() => toggleCriticalCode('MISSING_VEHICLE_CAPACITY')}
+              />
+              MISSING_VEHICLE_CAPACITY
+            </label>
+          </div>
         </CardContent>
       </Card>
       <Card>

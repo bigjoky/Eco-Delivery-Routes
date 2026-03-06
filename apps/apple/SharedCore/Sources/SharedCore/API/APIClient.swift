@@ -29,6 +29,14 @@ public protocol APIClientProtocol {
     func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings
     func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry]
     func qualityThresholdAlertTopScopes(dateFrom: String?, dateTo: String?, limit: Int?) async throws -> [QualityThresholdAlertTopScope]
+    func routeAssignmentPreview(
+        subcontractorId: String?,
+        driverId: String?,
+        vehicleId: String?,
+        routeId: String?,
+        routeDate: String?
+    ) async throws -> RouteAssignmentPreview
+    func routeAssignmentPublishPolicy() async throws -> RouteAssignmentPublishPolicy
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
@@ -479,6 +487,45 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataEnvelope<QualityThresholdAlertTopScope>.self, from: data).data
+    }
+
+    public func routeAssignmentPreview(
+        subcontractorId: String?,
+        driverId: String?,
+        vehicleId: String?,
+        routeId: String?,
+        routeDate: String?
+    ) async throws -> RouteAssignmentPreview {
+        guard let baseURL else {
+            return try await mock.routeAssignmentPreview(
+                subcontractorId: subcontractorId,
+                driverId: driverId,
+                vehicleId: vehicleId,
+                routeId: routeId,
+                routeDate: routeDate
+            )
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "routes/assignment/preview"),
+            queryItems: [
+                URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+                URLQueryItem(name: "driver_id", value: driverId),
+                URLQueryItem(name: "vehicle_id", value: vehicleId),
+                URLQueryItem(name: "route_id", value: routeId),
+                URLQueryItem(name: "route_date", value: routeDate),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<RouteAssignmentPreview>.self, from: data).data
+    }
+
+    public func routeAssignmentPublishPolicy() async throws -> RouteAssignmentPublishPolicy {
+        guard let baseURL else { return try await mock.routeAssignmentPublishPolicy() }
+        let request = authorizedRequest(url: baseURL.appending(path: "routes/assignment/publish-policy"), method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<RouteAssignmentPublishPolicy>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {
