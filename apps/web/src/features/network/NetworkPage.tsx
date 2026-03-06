@@ -208,6 +208,45 @@ export function NetworkPage() {
     }
   };
 
+  const removeHub = async (item: HubSummary) => {
+    if (!window.confirm(`Eliminar hub ${item.code}?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.deleteHub(item.id);
+      setMessage('Hub eliminado.');
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : 'No se pudo eliminar hub.');
+    }
+  };
+
+  const removeDepot = async (item: DepotSummary) => {
+    if (!window.confirm(`Eliminar depot ${item.code}?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.deleteDepot(item.id);
+      setMessage('Depot eliminado.');
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : 'No se pudo eliminar depot.');
+    }
+  };
+
+  const removePoint = async (item: PointSummary) => {
+    if (!window.confirm(`Eliminar punto ${item.code}?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.deletePoint(item.id);
+      setMessage('Punto eliminado.');
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : 'No se pudo eliminar punto.');
+    }
+  };
+
   const hubCode = new Map(hubs.map((item) => [item.id, item.code]));
   const depotCode = new Map(depots.map((item) => [item.id, item.code]));
 
@@ -330,9 +369,12 @@ export function NetworkPage() {
                     <TableCell>{editingHubId === item.id ? <Input value={editingHubName} onChange={(event) => setEditingHubName(event.target.value)} /> : item.name}</TableCell>
                     <TableCell>{editingHubId === item.id ? <Input value={editingHubCity} onChange={(event) => setEditingHubCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
-                      {editingHubId === item.id
-                        ? <Button type="button" className="btn btn-outline" onClick={saveHub}>Guardar</Button>
-                        : <Button type="button" className="btn btn-outline" onClick={() => startEditHub(item)}>Editar</Button>}
+                      <div className="inline-actions">
+                        {editingHubId === item.id
+                          ? <Button type="button" className="btn btn-outline" onClick={saveHub}>Guardar</Button>
+                          : <Button type="button" className="btn btn-outline" onClick={() => startEditHub(item)}>Editar</Button>}
+                        <Button type="button" className="btn btn-outline" onClick={() => removeHub(item)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -366,9 +408,12 @@ export function NetworkPage() {
                     <TableCell>{editingDepotId === item.id ? <Input value={editingDepotName} onChange={(event) => setEditingDepotName(event.target.value)} /> : item.name}</TableCell>
                     <TableCell>{editingDepotId === item.id ? <Input value={editingDepotCity} onChange={(event) => setEditingDepotCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
-                      {editingDepotId === item.id
-                        ? <Button type="button" className="btn btn-outline" onClick={saveDepot}>Guardar</Button>
-                        : <Button type="button" className="btn btn-outline" onClick={() => startEditDepot(item)}>Editar</Button>}
+                      <div className="inline-actions">
+                        {editingDepotId === item.id
+                          ? <Button type="button" className="btn btn-outline" onClick={saveDepot}>Guardar</Button>
+                          : <Button type="button" className="btn btn-outline" onClick={() => startEditDepot(item)}>Editar</Button>}
+                        <Button type="button" className="btn btn-outline" onClick={() => removeDepot(item)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -404,9 +449,12 @@ export function NetworkPage() {
                     <TableCell>{editingPointId === item.id ? <Input value={editingPointName} onChange={(event) => setEditingPointName(event.target.value)} /> : item.name}</TableCell>
                     <TableCell>{editingPointId === item.id ? <Input value={editingPointCity} onChange={(event) => setEditingPointCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
                     <TableCell>
-                      {editingPointId === item.id
-                        ? <Button type="button" className="btn btn-outline" onClick={savePoint}>Guardar</Button>
-                        : <Button type="button" className="btn btn-outline" onClick={() => startEditPoint(item)}>Editar</Button>}
+                      <div className="inline-actions">
+                        {editingPointId === item.id
+                          ? <Button type="button" className="btn btn-outline" onClick={savePoint}>Guardar</Button>
+                          : <Button type="button" className="btn btn-outline" onClick={() => startEditPoint(item)}>Editar</Button>}
+                        <Button type="button" className="btn btn-outline" onClick={() => removePoint(item)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

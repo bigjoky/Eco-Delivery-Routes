@@ -98,6 +98,7 @@ paths:
       responses:
         '201': { description: Creado }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validación de consistencia hub/depot }
 
   /users/{id}:
     get:
@@ -1508,6 +1509,19 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Hub no encontrado }
+    delete:
+      tags: [Hubs]
+      summary: Eliminar hub (si no tiene recursos vinculados)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Hub no encontrado }
+        '409': { description: Hub con recursos vinculados }
 
   /depots:
     get:
@@ -1566,6 +1580,19 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Depot no encontrado }
+    delete:
+      tags: [Depots]
+      summary: Eliminar depot (si no tiene puntos vinculados)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Depot no encontrado }
+        '409': { description: Depot con puntos vinculados }
 
   /points:
     get:
@@ -1619,6 +1646,8 @@ paths:
             schema:
               type: object
               properties:
+                hub_id: { type: string, format: uuid }
+                depot_id: { type: string, format: uuid, nullable: true }
                 code: { type: string }
                 name: { type: string }
                 address_line: { type: string }
@@ -1626,6 +1655,19 @@ paths:
                 is_active: { type: boolean }
       responses:
         '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Punto no encontrado }
+        '422': { description: Validación de consistencia hub/depot }
+    delete:
+      tags: [Points]
+      summary: Eliminar punto
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Punto no encontrado }
 

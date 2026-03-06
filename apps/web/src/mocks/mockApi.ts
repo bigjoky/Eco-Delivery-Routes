@@ -728,6 +728,20 @@ export const mockApi = {
     return next;
   },
 
+  async deleteHub(id: string) {
+    const linkedDepots = mockDepots.some((item) => item.hub_id === id);
+    const linkedPoints = mockPoints.some((item) => item.hub_id === id);
+    const linkedRoutes = mockRoutes.some((item) => item.hub_id === id);
+    const linkedShipments = mockShipments.some((item) => item.hub_id === id);
+    if (linkedDepots || linkedPoints || linkedRoutes || linkedShipments) {
+      throw new Error('Hub has linked resources and cannot be deleted.');
+    }
+    const index = mockHubs.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Hub not found');
+    mockHubs.splice(index, 1);
+    return { id, deleted: true };
+  },
+
   async getDepots(filters: { hubId?: string } = {}) {
     if (!filters.hubId) return [...mockDepots];
     return mockDepots.filter((item) => item.hub_id === filters.hubId);
@@ -775,6 +789,17 @@ export const mockApi = {
     };
     mockDepots[index] = next;
     return next;
+  },
+
+  async deleteDepot(id: string) {
+    const linkedPoints = mockPoints.some((item) => item.depot_id === id);
+    if (linkedPoints) {
+      throw new Error('Depot has linked points and cannot be deleted.');
+    }
+    const index = mockDepots.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Depot not found');
+    mockDepots.splice(index, 1);
+    return { id, deleted: true };
   },
 
   async getPoints(filters: { hubId?: string; depotId?: string } = {}) {
@@ -829,6 +854,13 @@ export const mockApi = {
     };
     mockPoints[index] = next;
     return next;
+  },
+
+  async deletePoint(id: string) {
+    const index = mockPoints.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Point not found');
+    mockPoints.splice(index, 1);
+    return { id, deleted: true };
   },
 
   async getShipments(filters: {

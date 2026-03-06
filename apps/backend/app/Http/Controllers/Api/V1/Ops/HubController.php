@@ -99,4 +99,51 @@ class HubController extends Controller
 
         return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()]);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('hubs.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('hubs')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Hub not found.'],
+            ], 404);
+        }
+
+        $linkedCounters = [
+            'depots' => DB::table('depots')->where('hub_id', $id)->count(),
+            'points' => DB::table('points')->where('hub_id', $id)->count(),
+            'routes' => DB::table('routes')->where('hub_id', $id)->count(),
+            'shipments' => DB::table('shipments')->where('hub_id', $id)->count(),
+            'pickups' => DB::table('pickups')->where('hub_id', $id)->count(),
+            'drivers' => DB::table('drivers')->where('home_hub_id', $id)->count(),
+            'vehicles' => DB::table('vehicles')->where('home_hub_id', $id)->count(),
+        ];
+        $blockedBy = collect($linkedCounters)
+            ->filter(fn (int $count): bool => $count > 0)
+            ->keys()
+            ->values()
+            ->all();
+
+        if (!empty($blockedBy)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'RESOURCE_CONFLICT',
+                    'message' => 'Hub has linked resources and cannot be deleted.',
+                    'details' => ['blocked_by' => $blockedBy],
+                ],
+            ], 409);
+        }
+
+        DB::table('hubs')->where('id', $id)->delete();
+
+        return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
+    }
 }

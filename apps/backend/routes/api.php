@@ -73,13 +73,16 @@ Route::prefix('v1')->group(function () {
         Route::get('hubs', [HubController::class, 'index']);
         Route::post('hubs', [HubController::class, 'store']);
         Route::patch('hubs/{id}', [HubController::class, 'update']);
+        Route::delete('hubs/{id}', [HubController::class, 'destroy']);
         Route::get('contacts', [ContactController::class, 'index']);
         Route::get('depots', [DepotController::class, 'index']);
         Route::post('depots', [DepotController::class, 'store']);
         Route::patch('depots/{id}', [DepotController::class, 'update']);
+        Route::delete('depots/{id}', [DepotController::class, 'destroy']);
         Route::get('points', [PointController::class, 'index']);
         Route::post('points', [PointController::class, 'store']);
         Route::patch('points/{id}', [PointController::class, 'update']);
+        Route::delete('points/{id}', [PointController::class, 'destroy']);
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::get('routes/assignment/preview', [RouteController::class, 'assignmentPreview']);

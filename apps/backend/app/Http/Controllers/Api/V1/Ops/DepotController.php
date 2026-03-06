@@ -101,4 +101,37 @@ class DepotController extends Controller
 
         return response()->json(['data' => DB::table('depots')->where('id', $id)->first()]);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('depots.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('depots')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Depot not found.'],
+            ], 404);
+        }
+
+        $linkedPoints = DB::table('points')->where('depot_id', $id)->count();
+        if ($linkedPoints > 0) {
+            return response()->json([
+                'error' => [
+                    'code' => 'RESOURCE_CONFLICT',
+                    'message' => 'Depot has linked points and cannot be deleted.',
+                    'details' => ['blocked_by' => ['points']],
+                ],
+            ], 409);
+        }
+
+        DB::table('depots')->where('id', $id)->delete();
+
+        return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
+    }
 }
