@@ -37,6 +37,9 @@ public protocol APIClientProtocol {
         routeDate: String?
     ) async throws -> RouteAssignmentPreview
     func routeAssignmentPublishPolicy() async throws -> RouteAssignmentPublishPolicy
+    func hubs(onlyActive: Bool) async throws -> [HubSummary]
+    func depots(hubId: String?) async throws -> [DepotSummary]
+    func points(hubId: String?, depotId: String?) async throws -> [PointSummary]
     func exportQualityRouteBreakdownCsv(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualityRouteBreakdownPdf(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
     func exportQualitySubcontractorBreakdownCsv(subcontractorId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws
@@ -526,6 +529,45 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: baseURL.appending(path: "routes/assignment/publish-policy"), method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataObjectEnvelope<RouteAssignmentPublishPolicy>.self, from: data).data
+    }
+
+    public func hubs(onlyActive: Bool) async throws -> [HubSummary] {
+        guard let baseURL else { return try await mock.hubs(onlyActive: onlyActive) }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "hubs"),
+            queryItems: [URLQueryItem(name: "only_active", value: onlyActive ? "1" : "0")]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataArrayEnvelope<HubSummary>.self, from: data).data
+    }
+
+    public func depots(hubId: String?) async throws -> [DepotSummary] {
+        guard let baseURL else { return try await mock.depots(hubId: hubId) }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "depots"),
+            queryItems: [URLQueryItem(name: "hub_id", value: hubId)]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataArrayEnvelope<DepotSummary>.self, from: data).data
+    }
+
+    public func points(hubId: String?, depotId: String?) async throws -> [PointSummary] {
+        guard let baseURL else { return try await mock.points(hubId: hubId, depotId: depotId) }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "points"),
+            queryItems: [
+                URLQueryItem(name: "hub_id", value: hubId),
+                URLQueryItem(name: "depot_id", value: depotId),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataArrayEnvelope<PointSummary>.self, from: data).data
     }
 
     private func authorizedRequest(url: URL, method: String) -> URLRequest {

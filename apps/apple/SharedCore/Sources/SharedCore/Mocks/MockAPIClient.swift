@@ -396,6 +396,50 @@ public final class MockAPIClient {
         )
     }
 
+    public func hubs(onlyActive: Bool) async throws -> [HubSummary] {
+        let rows = [
+            HubSummary(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro", city: "Malaga", isActive: true),
+            HubSummary(id: "hub-2", code: "SEV-HUB-01", name: "Hub Sevilla Norte", city: "Sevilla", isActive: true),
+        ]
+        return onlyActive ? rows.filter { $0.isActive } : rows
+    }
+
+    public func depots(hubId: String?) async throws -> [DepotSummary] {
+        let rows = [
+            DepotSummary(
+                id: "dep-1",
+                hubId: "hub-1",
+                code: "DPT-AGP-0001",
+                name: "Depot Malaga Centro",
+                addressLine: "Av. Andalucia 10",
+                city: "Malaga",
+                isActive: true
+            ),
+        ]
+        guard let hubId, !hubId.isEmpty else { return rows }
+        return rows.filter { $0.hubId == hubId }
+    }
+
+    public func points(hubId: String?, depotId: String?) async throws -> [PointSummary] {
+        let rows = [
+            PointSummary(
+                id: "pt-1",
+                hubId: "hub-1",
+                depotId: "dep-1",
+                code: "PNT-AGP-0001",
+                name: "Punto Centro 1",
+                addressLine: "Calle Larios 5",
+                city: "Malaga",
+                isActive: true
+            ),
+        ]
+        return rows.filter { row in
+            let hubMatch = hubId == nil || hubId?.isEmpty == true || row.hubId == hubId
+            let depotMatch = depotId == nil || depotId?.isEmpty == true || row.depotId == depotId
+            return hubMatch && depotMatch
+        }
+    }
+
     public func qualityRouteBreakdown(routeId: String, periodStart: String?, periodEnd: String?, granularity: String?) async throws -> QualityRouteBreakdown {
         _ = (periodStart, periodEnd)
         return QualityRouteBreakdown(
