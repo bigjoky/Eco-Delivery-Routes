@@ -20,9 +20,10 @@ Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
 
 ## Flujo Git recomendado
 
-- Trunk-based con ramas cortas: `feature/<modulo>-<tarea>`.
+- Trunk-based con ramas cortas: `codex/<modulo>-<tarea>`.
 - Commits atómicos con Conventional Commits.
 - PR obligatoria con checklist técnico y QA.
+- Proteccion de `main` con checks obligatorios (ver `docs/github-branch-protection.md`).
 
 ## Convenciones
 
@@ -38,3 +39,9 @@ Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
 
 - Ejecutar desde la raiz:
   - `./scripts/verify_release_envios_rutas.sh`
+
+## Checklist CI sugerido
+
+- Backend: `./vendor/bin/phpunit` en `apps/backend`.
+- Web unit: `npm test` en `apps/web`.
+- Web e2e: `npm run e2e` en `apps/web`.

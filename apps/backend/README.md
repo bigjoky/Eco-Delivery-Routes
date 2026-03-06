@@ -29,3 +29,7 @@ Estructura inicial compatible con Laravel para el módulo MVP-01.
 Con el servidor levantado (`php artisan serve`):
 
 `./scripts/smoke_auth_users_roles.sh`
+
+## Checklist CI sugerido
+
+- Tests: `./vendor/bin/phpunit`

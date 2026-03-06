@@ -7,6 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWra
 import { DriverSummary, HubSummary, PaginationMeta, RouteSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
+function routeStatusHelp(status: string): string {
+  const help: Record<string, string> = {
+    planned: 'Planificada, pendiente de inicio.',
+    in_progress: 'En curso, en reparto.',
+    completed: 'Finalizada y cerrada.',
+    cancelled: 'Cancelada por operativa.',
+  };
+  return help[status] ?? status;
+}
+
 export function RoutesPage() {
   const [items, setItems] = useState<RouteSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
@@ -440,7 +450,11 @@ export function RoutesPage() {
                       <Link to={`/routes/${item.id}`}>{item.code}</Link>
                     </TableCell>
                     <TableCell>{item.route_date}</TableCell>
-                    <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" title={routeStatusHelp(item.status)}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{item.driver_code ?? '-'}</TableCell>
                     <TableCell>{item.vehicle_code ?? '-'}</TableCell>
                     <TableCell>{item.stops_count ?? 0}</TableCell>
