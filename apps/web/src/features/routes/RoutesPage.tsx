@@ -339,6 +339,16 @@ export function RoutesPage() {
     setDateTo(toIsoDate(end));
   };
 
+  const clearFilters = () => {
+    setStatus('');
+    setQuery('');
+    setHubFilter('');
+    setSubcontractorFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setMeta((current) => ({ ...current, page: 1 }));
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -618,7 +628,8 @@ export function RoutesPage() {
             <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
             <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
             <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
-            <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
+            <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar fechas</Button>
+            <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
           </div>
           <TableWrapper>
             <Table>

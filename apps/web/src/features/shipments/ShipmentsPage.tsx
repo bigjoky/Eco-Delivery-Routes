@@ -8,6 +8,14 @@ import { Modal } from '../../components/ui/modal';
 import { AuditLogEntry, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
+import {
+  hasRequiredRecipientName,
+  hasRequiredSenderName,
+  inferDocumentType,
+  isValidEmail,
+  isValidPhone,
+  isValidPostalCode,
+} from './shipmentFormValidation';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
   if (status === 'delivered') return 'success';
@@ -198,13 +206,18 @@ export function ShipmentsPage() {
   const [createSenderEmail, setCreateSenderEmail] = useState('');
   const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
-  const [createScheduledAt, setCreateScheduledAt] = useState('');
+  const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
+  const [wizardMode, setWizardMode] = useState(false);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
   const [senderModalOpen, setSenderModalOpen] = useState(false);
   const [createError, setCreateError] = useState('');
   const [createFieldErrors, setCreateFieldErrors] = useState<{
     hub?: string;
     scheduledAt?: string;
+    recipientDocument?: string;
+    recipientName?: string;
+    recipientPhone?: string;
     street?: string;
     city?: string;
     postalCode?: string;
@@ -213,6 +226,7 @@ export function ShipmentsPage() {
     senderPhone?: string;
     senderEmail?: string;
     senderStreet?: string;
+    senderPostalCode?: string;
     senderCity?: string;
     senderDocument?: string;
     senderName?: string;
@@ -253,8 +267,31 @@ export function ShipmentsPage() {
   ];
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
+  const [consigneeLookupDocument, setConsigneeLookupDocument] = useState('');
   const [consigneeLookupError, setConsigneeLookupError] = useState('');
   const [consigneeLookupLoading, setConsigneeLookupLoading] = useState(false);
+  const [senderLookupPhone, setSenderLookupPhone] = useState('');
+  const [senderLookupDocument, setSenderLookupDocument] = useState('');
+  const [senderLookupError, setSenderLookupError] = useState('');
+  const [senderLookupLoading, setSenderLookupLoading] = useState(false);
+  const [recipientAddressSuggestions, setRecipientAddressSuggestions] = useState<Array<{
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }>>([]);
+  const [senderAddressSuggestions, setSenderAddressSuggestions] = useState<Array<{
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }>>([]);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDryRun, setImportDryRun] = useState(true);
@@ -519,10 +556,163 @@ export function ShipmentsPage() {
     return formatDate(date);
   })();
 
+  const normalizeAddressSuggestions = (rows: Array<{
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }>) => {
+    const dedupe = new Set<string>();
+    const unique: typeof rows = [];
+    rows.forEach((row) => {
+      const key = [
+        row.address_street ?? '',
+        row.address_number ?? '',
+        row.postal_code ?? '',
+        row.city ?? '',
+        row.province ?? '',
+        row.country ?? '',
+      ].join('|');
+      if (!key.replace(/\|/g, '').trim()) return;
+      if (dedupe.has(key)) return;
+      dedupe.add(key);
+      unique.push(row);
+    });
+    return unique.slice(0, 5);
+  };
+
+  const lookupRecipientContact = async (criteria: { phone?: string; document?: string }) => {
+    const phone = criteria.phone?.trim() ?? '';
+    const document = criteria.document?.trim() ?? '';
+    if (!phone && !document) {
+      setConsigneeLookupError('Introduce movil o documento para buscar.');
+      return;
+    }
+    setConsigneeLookupError('');
+    setConsigneeLookupLoading(true);
+    try {
+      const matches = await apiClient.getContacts({ phone: phone || undefined, q: document || undefined, documentId: document || undefined });
+      if (!matches.length) {
+        setConsigneeLookupError('No se encontro destinatario con esos datos.');
+      } else {
+        const contact = matches[0];
+        const docId = (contact.document_id ?? '').trim();
+        const inferredDocType = inferDocumentType(docId, createConsigneeDocType);
+        setCreateConsigneeDocType(inferredDocType);
+        setCreateConsigneeDocumentId(docId);
+        if (inferredDocType === 'CIF') {
+          setCreateConsignee(contact.display_name ?? contact.legal_name ?? '');
+          setCreateConsigneeFirstName('');
+          setCreateConsigneeLastName('');
+        } else {
+          const fullName = (contact.display_name ?? '').trim();
+          const parts = fullName.split(' ').filter(Boolean);
+          setCreateConsigneeFirstName(parts.shift() ?? '');
+          setCreateConsigneeLastName(parts.join(' '));
+          setCreateConsignee('');
+        }
+        setCreatePhone(contact.phone ?? '');
+        setCreateEmail(contact.email ?? '');
+        setCreateStreet(contact.address_street ?? '');
+        setCreateNumber(contact.address_number ?? '');
+        setCreatePostalCode(contact.postal_code ?? '');
+        setCreateCity(contact.city ?? '');
+        setCreateProvince(contact.province ?? '');
+        setCreateCountry(contact.country ?? 'ES');
+        setCreateAddressNotes(contact.address_notes ?? '');
+      }
+    } catch (error) {
+      setConsigneeLookupError(error instanceof Error ? error.message : 'No se pudo buscar el contacto');
+    } finally {
+      setConsigneeLookupLoading(false);
+    }
+  };
+
+  const lookupSenderContact = async (criteria: { phone?: string; document?: string }) => {
+    const phone = criteria.phone?.trim() ?? '';
+    const document = criteria.document?.trim() ?? '';
+    if (!phone && !document) {
+      setSenderLookupError('Introduce movil o documento para buscar.');
+      return;
+    }
+    setSenderLookupError('');
+    setSenderLookupLoading(true);
+    try {
+      const matches = await apiClient.getContacts({ phone: phone || undefined, q: document || undefined, documentId: document || undefined });
+      if (!matches.length) {
+        setSenderLookupError('No se encontro remitente con esos datos.');
+      } else {
+        const contact = matches[0];
+        const docId = (contact.document_id ?? '').trim();
+        const inferredDocType = inferDocumentType(docId, createSenderDocType);
+        setCreateSenderDocType(inferredDocType);
+        setCreateSenderDocumentId(docId);
+        if (inferredDocType === 'CIF') {
+          setCreateSenderLegalName(contact.display_name ?? contact.legal_name ?? '');
+          setCreateSenderFirstName('');
+          setCreateSenderLastName('');
+        } else {
+          const fullName = (contact.display_name ?? '').trim();
+          const parts = fullName.split(' ').filter(Boolean);
+          setCreateSenderFirstName(parts.shift() ?? '');
+          setCreateSenderLastName(parts.join(' '));
+          setCreateSenderLegalName('');
+        }
+        setCreateSenderPhone(contact.phone ?? '');
+        setCreateSenderEmail(contact.email ?? '');
+        setCreateSenderStreet(contact.address_street ?? '');
+        setCreateSenderNumber(contact.address_number ?? '');
+        setCreateSenderPostalCode(contact.postal_code ?? '');
+        setCreateSenderCity(contact.city ?? '');
+        setCreateSenderProvince(contact.province ?? '');
+        setCreateSenderCountry(contact.country ?? 'ES');
+        setCreateSenderAddressNotes(contact.address_notes ?? '');
+      }
+    } catch (error) {
+      setSenderLookupError(error instanceof Error ? error.message : 'No se pudo buscar el contacto');
+    } finally {
+      setSenderLookupLoading(false);
+    }
+  };
+
+  const suggestRecipientAddresses = async () => {
+    const q = [createStreet, createCity, createPostalCode, createPhone].join(' ').trim();
+    if (!q) {
+      setRecipientAddressSuggestions([]);
+      return;
+    }
+    try {
+      const rows = await apiClient.getContacts({ q });
+      setRecipientAddressSuggestions(normalizeAddressSuggestions(rows));
+    } catch {
+      setRecipientAddressSuggestions([]);
+    }
+  };
+
+  const suggestSenderAddresses = async () => {
+    const q = [createSenderStreet, createSenderCity, createSenderPostalCode, createSenderPhone].join(' ').trim();
+    if (!q) {
+      setSenderAddressSuggestions([]);
+      return;
+    }
+    try {
+      const rows = await apiClient.getContacts({ q });
+      setSenderAddressSuggestions(normalizeAddressSuggestions(rows));
+    } catch {
+      setSenderAddressSuggestions([]);
+    }
+  };
+
   const createShipment = async () => {
     const nextErrors: {
       hub?: string;
       scheduledAt?: string;
+      recipientDocument?: string;
+      recipientName?: string;
+      recipientPhone?: string;
       street?: string;
       city?: string;
       postalCode?: string;
@@ -530,6 +720,11 @@ export function ShipmentsPage() {
       email?: string;
       senderPhone?: string;
       senderEmail?: string;
+      senderStreet?: string;
+      senderPostalCode?: string;
+      senderCity?: string;
+      senderDocument?: string;
+      senderName?: string;
     } = {};
     const hasAddressFields = [createStreet, createNumber, createPostalCode, createCity, createProvince, createCountry].some(
       (value) => value.trim() !== ''
@@ -538,6 +733,24 @@ export function ShipmentsPage() {
       (value) => value.trim() !== ''
     );
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
+    if (!createScheduledAt.trim()) {
+      nextErrors.scheduledAt = 'La fecha programada es obligatoria.';
+    }
+    if (createOperation === 'shipment') {
+      if (!createConsigneeDocumentId.trim()) {
+        nextErrors.recipientDocument = 'Documento destinatario obligatorio.';
+      }
+      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+        if (createConsigneeDocType === 'CIF') {
+          nextErrors.recipientName = 'Razon social destinatario obligatoria.';
+        } else {
+          nextErrors.recipientName = 'Nombre y apellidos destinatario obligatorios.';
+        }
+      }
+      if (!createPhone.trim()) {
+        nextErrors.recipientPhone = 'Telefono destinatario obligatorio.';
+      }
+    }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad es obligatoria.';
@@ -546,28 +759,31 @@ export function ShipmentsPage() {
       if (!createSenderStreet.trim()) nextErrors.senderStreet = 'La calle del remitente es obligatoria.';
       if (!createSenderCity.trim()) nextErrors.senderCity = 'La ciudad del remitente es obligatoria.';
     }
-    if (createPostalCode && !/^[0-9A-Za-z -]{4,10}$/.test(createPostalCode.trim())) {
+    if (!isValidPostalCode(createCountry, createPostalCode)) {
       nextErrors.postalCode = 'Codigo postal invalido.';
     }
-    if (createPhone && !/^[+0-9 -]{7,20}$/.test(createPhone.trim())) {
+    if (!isValidPostalCode(createSenderCountry, createSenderPostalCode)) {
+      nextErrors.senderPostalCode = 'Codigo postal remitente invalido.';
+    }
+    if (!isValidPhone(createPhone)) {
       nextErrors.phone = 'Telefono invalido.';
     }
-    if (createSenderPhone && !/^[+0-9 -]{7,20}$/.test(createSenderPhone.trim())) {
+    if (!isValidPhone(createSenderPhone)) {
       nextErrors.senderPhone = 'Telefono remitente invalido.';
     }
-    if (createEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(createEmail.trim())) {
+    if (!isValidEmail(createEmail)) {
       nextErrors.email = 'Email invalido.';
     }
-    if (createSenderEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(createSenderEmail.trim())) {
+    if (!isValidEmail(createSenderEmail)) {
       nextErrors.senderEmail = 'Email remitente invalido.';
     }
     if (!createSenderDocumentId.trim()) {
       nextErrors.senderDocument = 'Documento remitente obligatorio.';
     }
-    if (createSenderDocType === 'CIF') {
-      if (!createSenderLegalName.trim()) nextErrors.senderName = 'Razon social obligatoria.';
-    } else {
-      if (!createSenderFirstName.trim() || !createSenderLastName.trim()) {
+    if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
+      if (createSenderDocType === 'CIF') {
+        nextErrors.senderName = 'Razon social obligatoria.';
+      } else {
         nextErrors.senderName = 'Nombre y apellidos obligatorios.';
       }
     }
@@ -678,7 +894,13 @@ export function ShipmentsPage() {
       setCreateSenderAddressNotes('');
       setCreateSenderPhone('');
       setCreateSenderEmail('');
-      setCreateScheduledAt('');
+      setConsigneeLookupPhone('');
+      setConsigneeLookupDocument('');
+      setSenderLookupPhone('');
+      setSenderLookupDocument('');
+      setRecipientAddressSuggestions([]);
+      setSenderAddressSuggestions([]);
+      setCreateScheduledAt(new Date().toISOString().slice(0, 10));
       setCreateOperation('shipment');
       setCreateServiceType('express_1030');
       setCreateFieldErrors({});
@@ -705,6 +927,9 @@ export function ShipmentsPage() {
     setCreateAddressNotes('');
     setCreatePhone('');
     setCreateEmail('');
+    setConsigneeLookupPhone('');
+    setConsigneeLookupDocument('');
+    setRecipientAddressSuggestions([]);
   };
 
   const clearSender = () => {
@@ -722,6 +947,9 @@ export function ShipmentsPage() {
     setCreateSenderAddressNotes('');
     setCreateSenderPhone('');
     setCreateSenderEmail('');
+    setSenderLookupPhone('');
+    setSenderLookupDocument('');
+    setSenderAddressSuggestions([]);
   };
 
   const openIncidentModal = (item: ShipmentSummary) => {
@@ -1012,6 +1240,34 @@ export function ShipmentsPage() {
           <div className="page-subtitle">Operación, contactos y programación en un flujo rápido.</div>
         </CardHeader>
         <CardContent>
+          <div className="inline-actions">
+            <label htmlFor="shipment-wizard-mode">Asistente paso a paso (beta)</label>
+            <input
+              id="shipment-wizard-mode"
+              type="checkbox"
+              checked={wizardMode}
+              onChange={(event) => setWizardMode(event.target.checked)}
+            />
+            {wizardMode ? (
+              <>
+                <Button type="button" variant="outline" onClick={() => setWizardStep((value) => Math.max(1, value - 1) as 1 | 2 | 3 | 4)}>
+                  Paso anterior
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4)}>
+                  Siguiente paso
+                </Button>
+                <span className="helper">Paso {wizardStep}/4</span>
+              </>
+            ) : null}
+          </div>
+          {wizardMode ? (
+            <div className="helper">
+              {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'
+                : wizardStep === 2 ? 'Paso 2: completa destinatario.'
+                : wizardStep === 3 ? 'Paso 3: completa remitente.'
+                : 'Paso 4: revisa y crea envío/recogida.'}
+            </div>
+          ) : null}
           <div className="form-row">
             <div>
               <label htmlFor="create-shipment-hub">Hub</label>
@@ -1167,54 +1423,18 @@ export function ShipmentsPage() {
             onChange={(event) => setConsigneeLookupPhone(event.target.value)}
             placeholder="+34 600 000 000"
           />
+          <label htmlFor="create-shipment-consignee-lookup-document">Buscar por documento</label>
+          <input
+            id="create-shipment-consignee-lookup-document"
+            value={consigneeLookupDocument}
+            onChange={(event) => setConsigneeLookupDocument(event.target.value)}
+            placeholder="DNI/NIE/CIF/Pasaporte"
+          />
           <Button
             type="button"
             variant="outline"
             disabled={consigneeLookupLoading}
-            onClick={async () => {
-              const phone = consigneeLookupPhone.trim();
-              if (!phone) {
-                setConsigneeLookupError('Introduce un movil para buscar.');
-                return;
-              }
-              setConsigneeLookupError('');
-              setConsigneeLookupLoading(true);
-              try {
-                const matches = await apiClient.getContacts({ phone });
-                if (!matches.length) {
-                  setConsigneeLookupError('No se encontro destinatario con ese movil.');
-                } else {
-                  const contact = matches[0];
-                  const docId = (contact.document_id ?? '').trim();
-                  const isCif = /^[A-Za-z]/.test(docId);
-                  setCreateConsigneeDocType(isCif ? 'CIF' : 'DNI');
-                  setCreateConsigneeDocumentId(docId);
-                  if (isCif) {
-                    setCreateConsignee(contact.display_name ?? '');
-                    setCreateConsigneeFirstName('');
-                    setCreateConsigneeLastName('');
-                  } else {
-                    const fullName = (contact.display_name ?? '').trim();
-                    const parts = fullName.split(' ').filter(Boolean);
-                    setCreateConsigneeFirstName(parts.shift() ?? '');
-                    setCreateConsigneeLastName(parts.join(' '));
-                  }
-                  setCreatePhone(contact.phone ?? '');
-                  setCreateEmail(contact.email ?? '');
-                  setCreateStreet(contact.address_street ?? '');
-                  setCreateNumber(contact.address_number ?? '');
-                  setCreatePostalCode(contact.postal_code ?? '');
-                  setCreateCity(contact.city ?? '');
-                  setCreateProvince(contact.province ?? '');
-                  setCreateCountry(contact.country ?? 'ES');
-                  setCreateAddressNotes(contact.address_notes ?? '');
-                }
-              } catch (error) {
-                setConsigneeLookupError(error instanceof Error ? error.message : 'No se pudo buscar el contacto');
-              } finally {
-                setConsigneeLookupLoading(false);
-              }
-            }}
+            onClick={() => void lookupRecipientContact({ phone: consigneeLookupPhone, document: consigneeLookupDocument })}
           >
             {consigneeLookupLoading ? 'Buscando...' : 'Buscar'}
           </Button>
@@ -1236,9 +1456,14 @@ export function ShipmentsPage() {
           <input
             id="create-shipment-consignee-document"
             value={createConsigneeDocumentId}
-            onChange={(event) => setCreateConsigneeDocumentId(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setCreateConsigneeDocumentId(value);
+              setCreateConsigneeDocType(inferDocumentType(value, createConsigneeDocType));
+            }}
             placeholder="DNI/CIF"
           />
+          {createFieldErrors.recipientDocument ? <div className="helper">{createFieldErrors.recipientDocument}</div> : null}
           {createConsigneeDocType === 'CIF' ? (
             <>
               <label htmlFor="create-shipment-consignee-legal-name">Razon social</label>
@@ -1267,6 +1492,7 @@ export function ShipmentsPage() {
               />
             </>
           )}
+          {createFieldErrors.recipientName ? <div className="helper">{createFieldErrors.recipientName}</div> : null}
           <label htmlFor="create-shipment-phone">Telefono</label>
           <input
             id="create-shipment-phone"
@@ -1274,6 +1500,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreatePhone(event.target.value)}
             placeholder="+34 950 111 222"
           />
+          {createFieldErrors.recipientPhone ? <div className="helper">{createFieldErrors.recipientPhone}</div> : null}
           {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
           <label htmlFor="create-shipment-email">Email</label>
           <input
@@ -1293,6 +1520,29 @@ export function ShipmentsPage() {
             placeholder="Calle y via"
           />
           {createFieldErrors.street ? <div className="helper">{createFieldErrors.street}</div> : null}
+          <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={() => void suggestRecipientAddresses()}>
+              Sugerir direccion
+            </Button>
+            {recipientAddressSuggestions.map((suggestion, index) => (
+              <Button
+                key={`recipient-address-${index}`}
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCreateStreet(suggestion.address_street ?? '');
+                  setCreateNumber(suggestion.address_number ?? '');
+                  setCreatePostalCode(suggestion.postal_code ?? '');
+                  setCreateCity(suggestion.city ?? '');
+                  setCreateProvince(suggestion.province ?? '');
+                  setCreateCountry(suggestion.country ?? 'ES');
+                  setCreateAddressNotes(suggestion.address_notes ?? '');
+                }}
+              >
+                {(suggestion.address_street ?? '').trim() || '-'} {(suggestion.address_number ?? '').trim()} · {(suggestion.postal_code ?? '').trim()} {(suggestion.city ?? '').trim()}
+              </Button>
+            ))}
+          </div>
           <label htmlFor="create-shipment-number">Numero</label>
           <input
             id="create-shipment-number"
@@ -1350,6 +1600,31 @@ export function ShipmentsPage() {
         }
       >
         <div className="form-row">
+          <label htmlFor="create-sender-lookup">Buscar por movil</label>
+          <input
+            id="create-sender-lookup"
+            value={senderLookupPhone}
+            onChange={(event) => setSenderLookupPhone(event.target.value)}
+            placeholder="+34 600 000 000"
+          />
+          <label htmlFor="create-sender-lookup-document">Buscar por documento</label>
+          <input
+            id="create-sender-lookup-document"
+            value={senderLookupDocument}
+            onChange={(event) => setSenderLookupDocument(event.target.value)}
+            placeholder="DNI/NIE/CIF/Pasaporte"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={senderLookupLoading}
+            onClick={() => void lookupSenderContact({ phone: senderLookupPhone, document: senderLookupDocument })}
+          >
+            {senderLookupLoading ? 'Buscando...' : 'Buscar'}
+          </Button>
+          {senderLookupError ? <div className="helper">{senderLookupError}</div> : null}
+        </div>
+        <div className="form-row">
           <label htmlFor="create-sender-doc-type">Tipo documento</label>
           <select
             id="create-sender-doc-type"
@@ -1365,7 +1640,11 @@ export function ShipmentsPage() {
           <input
             id="create-sender-document"
             value={createSenderDocumentId}
-            onChange={(event) => setCreateSenderDocumentId(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setCreateSenderDocumentId(value);
+              setCreateSenderDocType(inferDocumentType(value, createSenderDocType));
+            }}
             placeholder="DNI/CIF"
           />
           {createFieldErrors.senderDocument ? <div className="helper">{createFieldErrors.senderDocument}</div> : null}
@@ -1397,6 +1676,7 @@ export function ShipmentsPage() {
               />
             </>
           )}
+          {createFieldErrors.senderName ? <div className="helper">{createFieldErrors.senderName}</div> : null}
           <label htmlFor="create-sender-phone">Telefono</label>
           <input
             id="create-sender-phone"
@@ -1423,6 +1703,29 @@ export function ShipmentsPage() {
             placeholder="Calle y via"
           />
           {createFieldErrors.senderStreet ? <div className="helper">{createFieldErrors.senderStreet}</div> : null}
+          <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={() => void suggestSenderAddresses()}>
+              Sugerir direccion
+            </Button>
+            {senderAddressSuggestions.map((suggestion, index) => (
+              <Button
+                key={`sender-address-${index}`}
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCreateSenderStreet(suggestion.address_street ?? '');
+                  setCreateSenderNumber(suggestion.address_number ?? '');
+                  setCreateSenderPostalCode(suggestion.postal_code ?? '');
+                  setCreateSenderCity(suggestion.city ?? '');
+                  setCreateSenderProvince(suggestion.province ?? '');
+                  setCreateSenderCountry(suggestion.country ?? 'ES');
+                  setCreateSenderAddressNotes(suggestion.address_notes ?? '');
+                }}
+              >
+                {(suggestion.address_street ?? '').trim() || '-'} {(suggestion.address_number ?? '').trim()} · {(suggestion.postal_code ?? '').trim()} {(suggestion.city ?? '').trim()}
+              </Button>
+            ))}
+          </div>
           <label htmlFor="create-sender-number">Numero</label>
           <input
             id="create-sender-number"
@@ -1437,6 +1740,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderPostalCode(event.target.value)}
             placeholder="29001"
           />
+          {createFieldErrors.senderPostalCode ? <div className="helper">{createFieldErrors.senderPostalCode}</div> : null}
           <label htmlFor="create-sender-city">Ciudad</label>
           <input
             id="create-sender-city"

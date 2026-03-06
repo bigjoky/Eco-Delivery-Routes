@@ -17,10 +17,23 @@ struct ContentView: View {
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var scanCode: String = ""
     @State private var podSignature: String = ""
-    @State private var pickupReference: String = "PCK-"
-    @State private var incidentCode: String = "ABSENT_HOME"
+    @AppStorage("driver_pickup_reference") private var pickupReference: String = "PCK-"
+    @AppStorage("driver_incident_code") private var incidentCode: String = "ABSENT_HOME"
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
+    @State private var draftRecipientDocType: String = "DNI"
+    @State private var draftRecipientDocument: String = ""
+    @State private var draftRecipientFirstName: String = ""
+    @State private var draftRecipientLastName: String = ""
+    @State private var draftRecipientLegalName: String = ""
+    @State private var draftRecipientPhone: String = ""
+    @State private var draftSenderDocType: String = "DNI"
+    @State private var draftSenderDocument: String = ""
+    @State private var draftSenderFirstName: String = ""
+    @State private var draftSenderLastName: String = ""
+    @State private var draftSenderLegalName: String = ""
+    @State private var draftSenderPhone: String = ""
+    @State private var draftShipmentMessage: String = ""
     @State private var hubs: [HubSummary] = []
     @State private var depots: [DepotSummary] = []
     @State private var points: [PointSummary] = []
@@ -60,6 +73,10 @@ struct ContentView: View {
                     driverView
                         .tabItem {
                             Label("Ruta", systemImage: "map")
+                        }
+                    shipmentDraftView
+                        .tabItem {
+                            Label("Nuevo envío", systemImage: "shippingbox")
                         }
                     if canAccessNetwork {
                         networkView
@@ -212,12 +229,17 @@ struct ContentView: View {
                     Button("Registrar incidencia") {
                         Task {
                             guard let target = selectedStop else { return }
+                            let normalizedCode = incidentCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !normalizedCode.isEmpty else {
+                                driverMessage = "Codigo incidencia obligatorio."
+                                return
+                            }
                             do {
                                 try await apiClient.registerIncident(
                                     incidentableType: target.entityType,
                                     incidentableId: target.entityId,
-                                    catalogCode: incidentCode,
-                                    category: incidentCategory(for: incidentCode),
+                                    catalogCode: normalizedCode,
+                                    category: incidentCategory(for: normalizedCode),
                                     notes: incidentNotes
                                 )
                                 driverMessage = "Incidencia registrada"
@@ -535,6 +557,64 @@ struct ContentView: View {
         }
     }
 
+    private var shipmentDraftView: some View {
+        NavigationStack {
+            Form {
+                Section("Destinatario") {
+                    Picker("Tipo documento", selection: $draftRecipientDocType) {
+                        Text("DNI").tag("DNI")
+                        Text("NIE").tag("NIE")
+                        Text("PASSPORT").tag("PASSPORT")
+                        Text("CIF").tag("CIF")
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Documento", text: $draftRecipientDocument)
+                        .onChange(of: draftRecipientDocument) { _, value in
+                            draftRecipientDocType = inferDocumentType(value, fallback: draftRecipientDocType)
+                        }
+                    if draftRecipientDocType == "CIF" {
+                        TextField("Razon social", text: $draftRecipientLegalName)
+                    } else {
+                        TextField("Nombre", text: $draftRecipientFirstName)
+                        TextField("Apellidos", text: $draftRecipientLastName)
+                    }
+                    TextField("Telefono", text: $draftRecipientPhone)
+                }
+
+                Section("Remitente") {
+                    Picker("Tipo documento", selection: $draftSenderDocType) {
+                        Text("DNI").tag("DNI")
+                        Text("NIE").tag("NIE")
+                        Text("PASSPORT").tag("PASSPORT")
+                        Text("CIF").tag("CIF")
+                    }
+                    .pickerStyle(.segmented)
+                    TextField("Documento", text: $draftSenderDocument)
+                        .onChange(of: draftSenderDocument) { _, value in
+                            draftSenderDocType = inferDocumentType(value, fallback: draftSenderDocType)
+                        }
+                    if draftSenderDocType == "CIF" {
+                        TextField("Razon social", text: $draftSenderLegalName)
+                    } else {
+                        TextField("Nombre", text: $draftSenderFirstName)
+                        TextField("Apellidos", text: $draftSenderLastName)
+                    }
+                    TextField("Telefono", text: $draftSenderPhone)
+                }
+
+                Section("Validación") {
+                    Button("Validar borrador") {
+                        draftShipmentMessage = validateShipmentDraft()
+                    }
+                    Text(draftShipmentMessage.isEmpty ? "Completa campos obligatorios para continuar." : draftShipmentMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Nuevo envío (beta)")
+        }
+    }
+
     private func login() async {
         do {
             let token = try await apiClient.login(email: email, password: password)
@@ -595,9 +675,14 @@ struct ContentView: View {
     }
 
     private func createPickup(type: String) async {
+        let normalizedReference = pickupReference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedReference.count >= 4 else {
+            driverMessage = "Referencia pickup invalida."
+            return
+        }
         do {
             try await apiClient.createPickup(
-                reference: pickupReference,
+                reference: normalizedReference,
                 pickupType: type,
                 hubId: "00000000-0000-0000-0000-000000000001"
             )
@@ -648,6 +733,44 @@ struct ContentView: View {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: Date())
+    }
+
+    private func inferDocumentType(_ documentId: String, fallback: String) -> String {
+        let normalized = documentId.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if normalized.range(of: #"^[XYZ][0-9]{7}[A-Z]$"#, options: .regularExpression) != nil { return "NIE" }
+        if normalized.range(of: #"^[0-9]{8}[A-Z]$"#, options: .regularExpression) != nil { return "DNI" }
+        if normalized.range(of: #"^[A-HJNPQRSUVW][0-9]{7}[0-9A-J]$"#, options: .regularExpression) != nil { return "CIF" }
+        return fallback
+    }
+
+    private func validateShipmentDraft() -> String {
+        if draftRecipientDocument.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Documento de destinatario obligatorio."
+        }
+        if draftSenderDocument.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Documento de remitente obligatorio."
+        }
+        if draftRecipientDocType == "CIF" {
+            if draftRecipientLegalName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return "Razon social del destinatario obligatoria."
+            }
+        } else if draftRecipientFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draftRecipientLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Nombre y apellidos del destinatario obligatorios."
+        }
+        if draftSenderDocType == "CIF" {
+            if draftSenderLegalName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return "Razon social del remitente obligatoria."
+            }
+        } else if draftSenderFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draftSenderLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Nombre y apellidos del remitente obligatorios."
+        }
+        if draftRecipientPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Telefono del destinatario obligatorio."
+        }
+        if draftSenderPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Telefono del remitente obligatorio."
+        }
+        return "Borrador valido."
     }
 }
 

@@ -59,6 +59,7 @@ export function IncidentsPage() {
   const [lastPage, setLastPage] = useState(1);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState('');
+  const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
@@ -149,7 +150,7 @@ export function IncidentsPage() {
     if (listSearch) params.set('q', listSearch);
     params.set('page', String(page));
     setSearchParams(params, { replace: true });
-  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, page, setSearchParams]);
+  }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, listSearch, page, setSearchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -199,18 +200,43 @@ export function IncidentsPage() {
     [catalog, incidentableType]
   );
 
+  const clearFilters = () => {
+    setResolvedFilter('open');
+    setListTypeFilter('');
+    setListCategoryFilter('');
+    setListCatalogFilter('');
+    setListPriorityFilter('');
+    setListSlaFilter('');
+    setListIncidentableId('');
+    setListSearch('');
+    setPage(1);
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    await apiClient.createIncident({
-      incidentable_type: incidentableType,
-      incidentable_id: incidentableId,
-      catalog_code: catalogCode,
-      category,
-      notes,
-    });
-    setNotes('');
-    setPage(1);
-    await reload();
+    setCreateError('');
+    if (!incidentableId.trim()) {
+      setCreateError('Referencia objetivo obligatoria.');
+      return;
+    }
+    if (!catalogCode.trim()) {
+      setCreateError('Selecciona un motivo de catalogo.');
+      return;
+    }
+    try {
+      await apiClient.createIncident({
+        incidentable_type: incidentableType,
+        incidentable_id: incidentableId,
+        catalog_code: catalogCode,
+        category,
+        notes,
+      });
+      setNotes('');
+      setPage(1);
+      await reload();
+    } catch (exception) {
+      setCreateError(exception instanceof Error ? exception.message : 'No se pudo crear la incidencia');
+    }
   };
 
   const onResolve = async (id: string) => {
@@ -309,6 +335,7 @@ export function IncidentsPage() {
             <div className="inline-actions">
               <Button type="submit">Registrar incidencia</Button>
             </div>
+            {createError ? <div className="helper error">{createError}</div> : null}
           </form>
         </CardContent>
       </Card>
@@ -409,6 +436,20 @@ export function IncidentsPage() {
               <label>Buscar</label>
               <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
             </div>
+          </div>
+          <div className="inline-actions">
+            <Button type="button" variant={resolvedFilter === 'open' ? 'secondary' : 'outline'} onClick={() => { setResolvedFilter('open'); setPage(1); }}>
+              Abiertas
+            </Button>
+            <Button type="button" variant={listSlaFilter === 'breached' ? 'secondary' : 'outline'} onClick={() => { setListSlaFilter('breached'); setPage(1); }}>
+              SLA vencido
+            </Button>
+            <Button type="button" variant={listPriorityFilter === 'high' ? 'secondary' : 'outline'} onClick={() => { setListPriorityFilter('high'); setPage(1); }}>
+              Alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
           </div>
           <TableWrapper>
             <Table>

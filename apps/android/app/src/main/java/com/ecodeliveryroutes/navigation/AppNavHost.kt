@@ -11,6 +11,7 @@ import com.ecodeliveryroutes.features.auth.LoginScreen
 import com.ecodeliveryroutes.features.driver.DriverRouteScreen
 import com.ecodeliveryroutes.features.network.NetworkNodesScreen
 import com.ecodeliveryroutes.features.quality.RouteQualityScreen
+import com.ecodeliveryroutes.features.shipments.ShipmentDraftScreen
 
 @Composable
 fun AppNavHost() {
@@ -30,11 +31,16 @@ fun AppNavHost() {
                 navController.navigate("route_quality/$routeId")
             }, onOpenNetworkNodes = {
                 navController.navigate("network_nodes")
+            }, onOpenShipmentDraft = {
+                navController.navigate("shipment_draft")
             }, onLogout = {
                 navController.navigate("login") {
                     popUpTo("driver_route") { inclusive = true }
                 }
             })
+        }
+        composable("shipment_draft") {
+            ShipmentDraftScreen()
         }
         composable("network_nodes") {
             NetworkNodesScreen()

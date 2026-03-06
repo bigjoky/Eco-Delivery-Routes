@@ -676,12 +676,14 @@ export const apiClient = {
   async getContacts(filters: {
     phone?: string;
     email?: string;
+    documentId?: string;
     q?: string;
   } = {}): Promise<ContactSummary[]> {
     if (USE_MOCK) return mockApi.getContacts(filters) as Promise<ContactSummary[]>;
     const params = new URLSearchParams();
     if (filters.phone) params.set('phone', filters.phone);
     if (filters.email) params.set('email', filters.email);
+    if (filters.documentId) params.set('document_id', filters.documentId);
     if (filters.q) params.set('q', filters.q);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
