@@ -234,6 +234,42 @@ let mockRouteStops: Array<{
     reference: 'PCK-AGP-0001',
   },
 ];
+let mockHubs: Array<{
+  id: string;
+  code: string;
+  name: string;
+  city?: string | null;
+  is_active: boolean;
+}> = [
+  { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true },
+  { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true },
+];
+let hubSeq = 2;
+let mockDepots: Array<{
+  id: string;
+  hub_id: string;
+  code: string;
+  name: string;
+  address_line?: string | null;
+  city?: string | null;
+  is_active: boolean;
+}> = [
+  { id: 'dep-1', hub_id: 'hub-1', code: 'DPT-AGP-0001', name: 'Depot Malaga Centro', address_line: 'Av. Andalucia 10', city: 'Malaga', is_active: true },
+];
+let depotSeq = 1;
+let mockPoints: Array<{
+  id: string;
+  hub_id: string;
+  depot_id?: string | null;
+  code: string;
+  name: string;
+  address_line?: string | null;
+  city?: string | null;
+  is_active: boolean;
+}> = [
+  { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', is_active: true },
+];
+let pointSeq = 1;
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -649,11 +685,150 @@ export const mockApi = {
     return this.getRoleById(roleId);
   },
 
-  async getHubs(_: { onlyActive?: boolean } = {}) {
-    return [
-      { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true },
-      { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true },
-    ];
+  async getHubs(filters: { onlyActive?: boolean } = {}) {
+    if (filters.onlyActive === false) return [...mockHubs];
+    return mockHubs.filter((item) => item.is_active);
+  },
+
+  async createHub(payload: {
+    code?: string;
+    name: string;
+    city: string;
+    is_active?: boolean;
+  }) {
+    hubSeq += 1;
+    const row = {
+      id: `hub-${hubSeq}`,
+      code: payload.code?.trim() || `HUB-${String(hubSeq).padStart(5, '0')}`,
+      name: payload.name,
+      city: payload.city,
+      is_active: payload.is_active ?? true,
+    };
+    mockHubs = [row, ...mockHubs];
+    return row;
+  },
+
+  async updateHub(id: string, payload: {
+    code?: string;
+    name?: string;
+    city?: string;
+    is_active?: boolean;
+  }) {
+    const index = mockHubs.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Hub not found');
+    const current = mockHubs[index];
+    const next = {
+      ...current,
+      ...(payload.code !== undefined ? { code: payload.code } : {}),
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
+    };
+    mockHubs[index] = next;
+    return next;
+  },
+
+  async getDepots(filters: { hubId?: string } = {}) {
+    if (!filters.hubId) return [...mockDepots];
+    return mockDepots.filter((item) => item.hub_id === filters.hubId);
+  },
+
+  async createDepot(payload: {
+    hub_id: string;
+    code?: string;
+    name: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }) {
+    depotSeq += 1;
+    const row = {
+      id: `dep-${depotSeq}`,
+      hub_id: payload.hub_id,
+      code: payload.code?.trim() || `DPT-${String(depotSeq).padStart(5, '0')}`,
+      name: payload.name,
+      address_line: payload.address_line ?? null,
+      city: payload.city ?? null,
+      is_active: payload.is_active ?? true,
+    };
+    mockDepots = [row, ...mockDepots];
+    return row;
+  },
+
+  async updateDepot(id: string, payload: {
+    code?: string;
+    name?: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }) {
+    const index = mockDepots.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Depot not found');
+    const current = mockDepots[index];
+    const next = {
+      ...current,
+      ...(payload.code !== undefined ? { code: payload.code } : {}),
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.address_line !== undefined ? { address_line: payload.address_line } : {}),
+      ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
+    };
+    mockDepots[index] = next;
+    return next;
+  },
+
+  async getPoints(filters: { hubId?: string; depotId?: string } = {}) {
+    return mockPoints.filter((item) => {
+      if (filters.hubId && item.hub_id !== filters.hubId) return false;
+      if (filters.depotId && item.depot_id !== filters.depotId) return false;
+      return true;
+    });
+  },
+
+  async createPoint(payload: {
+    hub_id: string;
+    depot_id?: string | null;
+    code?: string;
+    name: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }) {
+    pointSeq += 1;
+    const row = {
+      id: `pt-${pointSeq}`,
+      hub_id: payload.hub_id,
+      depot_id: payload.depot_id ?? null,
+      code: payload.code?.trim() || `PNT-${String(pointSeq).padStart(5, '0')}`,
+      name: payload.name,
+      address_line: payload.address_line ?? null,
+      city: payload.city ?? null,
+      is_active: payload.is_active ?? true,
+    };
+    mockPoints = [row, ...mockPoints];
+    return row;
+  },
+
+  async updatePoint(id: string, payload: {
+    code?: string;
+    name?: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }) {
+    const index = mockPoints.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Point not found');
+    const current = mockPoints[index];
+    const next = {
+      ...current,
+      ...(payload.code !== undefined ? { code: payload.code } : {}),
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.address_line !== undefined ? { address_line: payload.address_line } : {}),
+      ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
+    };
+    mockPoints[index] = next;
+    return next;
   },
 
   async getShipments(filters: {

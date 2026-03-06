@@ -2,6 +2,7 @@ import {
   AuditLogEntry,
   AdvanceSummary,
   CurrentUserProfile,
+  DepotSummary,
   HubSummary,
   IncidentCatalogItem,
   IncidentsBoardSummary,
@@ -37,6 +38,7 @@ import {
   SettlementReconciliationTrendRow,
   SettlementRecalculatePreview,
   SubcontractorSummary,
+  PointSummary,
   DriverSummary,
   VehicleSummary,
   ContactSummary,
@@ -447,6 +449,134 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<HubSummary>(response);
+  },
+
+  async createHub(payload: {
+    code?: string;
+    name: string;
+    city: string;
+    is_active?: boolean;
+  }): Promise<HubSummary> {
+    if (USE_MOCK) return mockApi.createHub(payload) as Promise<HubSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create hub');
+    return json.data as HubSummary;
+  },
+
+  async updateHub(id: string, payload: {
+    code?: string;
+    name?: string;
+    city?: string;
+    is_active?: boolean;
+  }): Promise<HubSummary> {
+    if (USE_MOCK) return mockApi.updateHub(id, payload) as Promise<HubSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update hub');
+    return json.data as HubSummary;
+  },
+
+  async getDepots(filters: { hubId?: string } = {}): Promise<DepotSummary[]> {
+    if (USE_MOCK) return mockApi.getDepots(filters) as Promise<DepotSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/depots${suffix}`);
+    return parseData<DepotSummary>(response);
+  },
+
+  async createDepot(payload: {
+    hub_id: string;
+    code?: string;
+    name: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }): Promise<DepotSummary> {
+    if (USE_MOCK) return mockApi.createDepot(payload) as Promise<DepotSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/depots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create depot');
+    return json.data as DepotSummary;
+  },
+
+  async updateDepot(id: string, payload: {
+    code?: string;
+    name?: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }): Promise<DepotSummary> {
+    if (USE_MOCK) return mockApi.updateDepot(id, payload) as Promise<DepotSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/depots/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update depot');
+    return json.data as DepotSummary;
+  },
+
+  async getPoints(filters: { hubId?: string; depotId?: string } = {}): Promise<PointSummary[]> {
+    if (USE_MOCK) return mockApi.getPoints(filters) as Promise<PointSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.depotId) params.set('depot_id', filters.depotId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/points${suffix}`);
+    return parseData<PointSummary>(response);
+  },
+
+  async createPoint(payload: {
+    hub_id: string;
+    depot_id?: string | null;
+    code?: string;
+    name: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }): Promise<PointSummary> {
+    if (USE_MOCK) return mockApi.createPoint(payload) as Promise<PointSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/points`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create point');
+    return json.data as PointSummary;
+  },
+
+  async updatePoint(id: string, payload: {
+    code?: string;
+    name?: string;
+    address_line?: string | null;
+    city?: string | null;
+    is_active?: boolean;
+  }): Promise<PointSummary> {
+    if (USE_MOCK) return mockApi.updatePoint(id, payload) as Promise<PointSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/points/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update point');
+    return json.data as PointSummary;
   },
 
   async getShipments(filters: {
