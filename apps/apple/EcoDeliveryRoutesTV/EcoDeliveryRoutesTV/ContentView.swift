@@ -25,173 +25,185 @@ struct ContentView: View {
     @State private var statusText: String = "Conectando..."
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Eco Delivery Routes Monitor")
-                .font(.largeTitle)
-
-            Text(statusText)
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 32) {
-                VStack(alignment: .leading) {
-                    Text("Usuarios")
-                        .font(.headline)
-                    Text("\(users.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Roles")
-                        .font(.headline)
-                    Text("\(roles.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Rutas KPI")
-                        .font(.headline)
-                    Text("\(routeQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Conductores KPI")
-                        .font(.headline)
-                    Text("\(driverQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Subcontratas KPI")
-                        .font(.headline)
-                    Text("\(subcontractorQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Alertas delta")
-                    .font(.headline)
-                    Text("\(thresholdDeltaAlertCount)")
-                    .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Hubs/Depots/Puntos")
-                        .font(.headline)
-                    Text("\(hubsCount)/\(depotsCount)/\(pointsCount)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Nodos archivados")
-                        .font(.headline)
-                    Text("\(archivedNodesCount)")
-                        .font(.title)
-                }
-            }
-
-            HStack(spacing: 40) {
-                VStack(alignment: .leading) {
-                    Text("Últimos usuarios")
-                        .font(.headline)
-                    ForEach(users.prefix(5)) { user in
-                        Text(user.name)
-                    }
-                }
-                VStack(alignment: .leading) {
-                    Text("Roles disponibles")
-                        .font(.headline)
-                    ForEach(roles.prefix(5)) { role in
-                        Text(role.name)
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por ruta")
-                    .font(.headline)
-                ForEach(routeQuality.prefix(6)) { item in
-                    Text("\(item.routeCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
-                }
-            }
-
-            if let routeBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose ruta en riesgo")
-                        .font(.headline)
-                    Text("\(routeBreakdown.routeCode) · \(routeBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(routeBreakdown.assigned) · Completados: \(routeBreakdown.completed)")
-                    Text("Fallidas: \(routeBreakdown.failed) · Ausencias: \(routeBreakdown.absent) · Reintentos: \(routeBreakdown.retry)")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Eco Delivery Routes Monitor")
+                        .font(.largeTitle)
+                    Text(statusText)
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por conductor")
-                    .font(.headline)
-                ForEach(driverQuality.prefix(6)) { item in
-                    Text("\(item.driverCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
+                    metricCard(title: "Usuarios", value: "\(users.count)")
+                    metricCard(title: "Roles", value: "\(roles.count)")
+                    metricCard(title: "Rutas KPI", value: "\(routeQuality.count)")
+                    metricCard(title: "Conductores KPI", value: "\(driverQuality.count)")
+                    metricCard(title: "Subcontratas KPI", value: "\(subcontractorQuality.count)")
+                    metricCard(title: "Alertas delta", value: "\(thresholdDeltaAlertCount)")
+                    metricCard(title: "Hubs/Depots/Puntos", value: "\(hubsCount)/\(depotsCount)/\(pointsCount)")
+                    metricCard(title: "Nodos archivados", value: "\(archivedNodesCount)")
                 }
-            }
 
-            if let driverBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose conductor en riesgo")
-                        .font(.headline)
-                    Text("\(driverBreakdown.driverCode) · \(driverBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(driverBreakdown.assigned) · Completados: \(driverBreakdown.completed)")
-                    Text("Fallidas: \(driverBreakdown.failed) · Ausencias: \(driverBreakdown.absent) · Reintentos: \(driverBreakdown.retry)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por subcontrata")
-                    .font(.headline)
-                ForEach(subcontractorQuality.prefix(6)) { item in
-                    Text("\(item.subcontractorCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
-                }
-            }
-
-            if let subcontractorBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose subcontrata en riesgo")
-                        .font(.headline)
-                    Text("\(subcontractorBreakdown.subcontractorCode) · \(subcontractorBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(subcontractorBreakdown.assigned) · Completados: \(subcontractorBreakdown.completed)")
-                    Text("Fallidas: \(subcontractorBreakdown.failed) · Ausencias: \(subcontractorBreakdown.absent) · Reintentos: \(subcontractorBreakdown.retry)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Alertas KPI < \(qualityThreshold, specifier: "%.2f")%")
-                    .font(.headline)
-                ForEach(routeQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Ruta \(item.routeCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                ForEach(driverQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Conductor \(item.driverCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                ForEach(subcontractorQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Subcontrata \(item.subcontractorCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                Text("Cambios bruscos umbral: \(thresholdDeltaAlertCount) en \(thresholdDeltaWindowHours)h (trigger ±\(thresholdDeltaTrigger, specifier: "%.2f"))")
-                    .font(.caption)
-                    .foregroundStyle(thresholdDeltaAlertCount > 0 ? .red : .secondary)
-                if !thresholdDeltaTopScopes.isEmpty {
-                    ForEach(thresholdDeltaTopScopes.prefix(5)) { scope in
-                        Text("Top: \(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-") (\(scope.alertsCount))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 16) {
+                    sectionCard(title: "Últimos usuarios") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(users.prefix(5)) { user in
+                                Text(user.name)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    sectionCard(title: "Roles disponibles") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(roles.prefix(5)) { role in
+                                Text(role.name)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            }
 
-            Text(lastRefreshText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                sectionCard(title: "Calidad por ruta") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(routeQuality.prefix(6)) { item in
+                            Text("\(item.routeCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let routeBreakdown {
+                    sectionCard(title: "Desglose ruta en riesgo") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(routeBreakdown.routeCode) · \(routeBreakdown.score, specifier: "%.2f")%")
+                            Text("Asignados: \(routeBreakdown.assigned) · Completados: \(routeBreakdown.completed)")
+                            Text("Fallidas: \(routeBreakdown.failed) · Ausencias: \(routeBreakdown.absent) · Reintentos: \(routeBreakdown.retry)")
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                sectionCard(title: "Calidad por conductor") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(driverQuality.prefix(6)) { item in
+                            Text("\(item.driverCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let driverBreakdown {
+                    sectionCard(title: "Desglose conductor en riesgo") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(driverBreakdown.driverCode) · \(driverBreakdown.score, specifier: "%.2f")%")
+                            Text("Asignados: \(driverBreakdown.assigned) · Completados: \(driverBreakdown.completed)")
+                            Text("Fallidas: \(driverBreakdown.failed) · Ausencias: \(driverBreakdown.absent) · Reintentos: \(driverBreakdown.retry)")
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                sectionCard(title: "Calidad por subcontrata") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(subcontractorQuality.prefix(6)) { item in
+                            Text("\(item.subcontractorCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let subcontractorBreakdown {
+                    sectionCard(title: "Desglose subcontrata en riesgo") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(subcontractorBreakdown.subcontractorCode) · \(subcontractorBreakdown.score, specifier: "%.2f")%")
+                            Text("Asignados: \(subcontractorBreakdown.assigned) · Completados: \(subcontractorBreakdown.completed)")
+                            Text("Fallidas: \(subcontractorBreakdown.failed) · Ausencias: \(subcontractorBreakdown.absent) · Reintentos: \(subcontractorBreakdown.retry)")
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                sectionCard(title: "Alertas KPI < \(qualityThreshold.formatted(.number.precision(.fractionLength(2))))%") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(routeQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                            Text("Ruta \(item.routeCode) en alerta: \(item.score, specifier: "%.2f")%")
+                                .foregroundStyle(.red)
+                        }
+                        ForEach(driverQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                            Text("Conductor \(item.driverCode) en alerta: \(item.score, specifier: "%.2f")%")
+                                .foregroundStyle(.red)
+                        }
+                        ForEach(subcontractorQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
+                            Text("Subcontrata \(item.subcontractorCode) en alerta: \(item.score, specifier: "%.2f")%")
+                                .foregroundStyle(.red)
+                        }
+                        Text("Cambios bruscos umbral: \(thresholdDeltaAlertCount) en \(thresholdDeltaWindowHours)h (trigger ±\(thresholdDeltaTrigger, specifier: "%.2f"))")
+                            .font(.caption)
+                            .foregroundStyle(thresholdDeltaAlertCount > 0 ? .red : .secondary)
+                        if !thresholdDeltaTopScopes.isEmpty {
+                            ForEach(thresholdDeltaTopScopes.prefix(5)) { scope in
+                                Text("Top: \(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-") (\(scope.alertsCount))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Text(lastRefreshText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
         }
-        .padding()
+        .background(ecoBackground)
+        .tint(.teal)
         .task {
             await startPolling()
         }
+    }
+
+    private var ecoBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.04, green: 0.10, blue: 0.18),
+                Color(red: 0.08, green: 0.16, blue: 0.28),
+                Color(red: 0.18, green: 0.18, blue: 0.08)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private func metricCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+            Text(value)
+                .font(.title2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .ecoPanelStyle(cornerRadius: 12)
+    }
+
+    @ViewBuilder
+    private func sectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ecoPanelStyle(cornerRadius: 12)
     }
 
     private func startPolling() async {
@@ -407,7 +419,7 @@ final class TVMonitorService {
                 4,
                 8,
                 1,
-                "Monitor activo (solo lectura/mock)"
+                "Monitor sin API real (fallback mock)"
             )
         }
 
@@ -433,7 +445,7 @@ final class TVMonitorService {
                 4,
                 8,
                 1,
-                "Monitor activo (URL invalida, fallback mock)"
+                "Monitor sin API real (URL invalida, fallback mock)"
             )
         }
 
@@ -461,7 +473,7 @@ final class TVMonitorService {
                     4,
                     8,
                     1,
-                    "Monitor fallback (error HTTP API calidad)"
+                    "Monitor sin API real (error HTTP API calidad)"
                 )
             }
             let routeData = routeResult.data
@@ -520,7 +532,7 @@ final class TVMonitorService {
                     4,
                     8,
                     1,
-                    "Monitor API sin datos, fallback mock"
+                    "Monitor sin API real (API sin datos, fallback mock)"
                 )
             }
             let worstRoute = mappedRoutes.min(by: { $0.score < $1.score })
@@ -593,7 +605,7 @@ final class TVMonitorService {
                 4,
                 8,
                 1,
-                "Monitor fallback (error conexion API)"
+                "Monitor sin API real (error conexion API)"
             )
         }
     }
@@ -1094,4 +1106,18 @@ private struct QualityThresholdTopScopePayload: Decodable {
 
 private struct LoginEnvelope: Decodable {
     let token: String
+}
+
+private extension View {
+    @ViewBuilder
+    func ecoPanelStyle(cornerRadius: CGFloat = 12) -> some View {
+        if #available(tvOS 26.0, *) {
+            self
+                .glassEffect(.regular.tint(.teal.opacity(0.08)).interactive(), in: .rect(cornerRadius: cornerRadius))
+        } else {
+            self
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
 }

@@ -6,8 +6,8 @@ struct ContentView: View {
     @EnvironmentObject private var authSession: AuthSession
     let apiClient: APIClientProtocol
 
-    @State private var email: String = "admin@eco.local"
-    @State private var password: String = "password123"
+    @State private var email: String = ""
+    @State private var password: String = ""
     @State private var loginMessage: String = "No autenticado"
 
     @State private var routeStops: [DriverStop] = []
@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var scanCode: String = ""
     @State private var podSignature: String = ""
     @AppStorage("driver_pickup_reference") private var pickupReference: String = "PCK-"
+    @AppStorage("driver_pickup_hub_id") private var pickupHubId: String = ""
     @AppStorage("driver_incident_code") private var incidentCode: String = "ABSENT_HOME"
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
@@ -89,6 +90,8 @@ struct ContentView: View {
                 }
             }
         }
+        .background(ecoBackground)
+        .tint(.teal)
         .task(id: authSession.token?.token) {
             apiClient.setAuthToken(authSession.token?.token)
             guard authSession.token != nil else { return }
@@ -104,168 +107,217 @@ struct ContentView: View {
         }
     }
 
+    private var ecoBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.05, green: 0.12, blue: 0.20),
+                Color(red: 0.09, green: 0.22, blue: 0.24),
+                Color(red: 0.20, green: 0.20, blue: 0.10)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
     private var selectedStop: DriverStop? {
         routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
     }
 
     private var loginView: some View {
-        VStack(spacing: 12) {
-            Text("Driver Login")
-                .font(.headline)
+        VStack {
+            VStack(spacing: 12) {
+                Text("Driver Login")
+                    .font(.headline)
 
-            TextField("Email", text: $email)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
+                TextField("Email", text: $email)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
 
-            SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
 
-            Button("Entrar") {
-                Task { await login() }
+                Button("Entrar") {
+                    Task { await login() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(email.isEmpty || password.isEmpty)
+
+                Text(loginMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .disabled(email.isEmpty || password.isEmpty)
-
-            Text(loginMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .padding(20)
+            .frame(maxWidth: 360)
+            .ecoPanelStyle(cornerRadius: 14)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
 
     private var driverView: some View {
         NavigationStack {
-            List {
-                Section("Mi ruta") {
-                    TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
-                    TextField("Estado ruta (opcional)", text: $routeStatusFilter)
-                    Button("Cargar ruta del dia") {
-                        Task {
-                            guard isValidRouteDate(routeDateFilter) else {
-                                driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
-                                return
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    GroupBox("Mi ruta") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Estado ruta (opcional)", text: $routeStatusFilter)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Cargar ruta del dia") {
+                                Task {
+                                    guard isValidRouteDate(routeDateFilter) else {
+                                        driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
+                                        return
+                                    }
+                                    await loadRoute()
+                                }
                             }
-                            await loadRoute()
-                        }
-                    }
-                    ForEach(routeStops) { stop in
-                        Button {
-                            selectedStopId = stop.id
-                        } label: {
-                            VStack(alignment: .leading) {
-                                Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
-                                Text("\(stop.reference) · \(stop.status)")
-                                    .font(.caption)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Text("Parada activa: \(selectedStop?.reference ?? "-")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                            .buttonStyle(.borderedProminent)
 
-                Section("KPI calidad por ruta") {
-                    ForEach(routeQuality) { snapshot in
-                        VStack(alignment: .leading) {
-                            Text(snapshot.scopeLabel ?? snapshot.scopeId)
-                            Text("\(snapshot.serviceQualityScore, specifier: "%.2f")% · \(snapshot.periodStart) - \(snapshot.periodEnd)")
+                            ForEach(routeStops) { stop in
+                                Button {
+                                    selectedStopId = stop.id
+                                } label: {
+                                    VStack(alignment: .leading) {
+                                        Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
+                                        Text("\(stop.reference) · \(stop.status)")
+                                            .font(.caption)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            Text("Parada activa: \(selectedStop?.reference ?? "-")")
                                 .font(.caption)
-                            Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
-                                .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Button("Refrescar KPI") {
-                        Task { await loadRouteQuality() }
-                    }
-                }
 
-                Section("Scan") {
-                    TextField("Codigo escaneado", text: $scanCode)
-                    Button("Registrar scan") {
-                        Task {
-                            guard let target = selectedStop else { return }
-                            do {
-                                try await apiClient.registerScan(trackableType: target.entityType, trackableId: target.entityId, scanCode: scanCode)
-                                driverMessage = "Scan registrado"
-                                updateSelectedStopStatus("in_progress")
-                            } catch {
-                                driverMessage = "Error scan"
+                    GroupBox("KPI calidad por ruta") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(routeQuality) { snapshot in
+                                VStack(alignment: .leading) {
+                                    Text(snapshot.scopeLabel ?? snapshot.scopeId)
+                                    Text("\(snapshot.serviceQualityScore, specifier: "%.2f")% · \(snapshot.periodStart) - \(snapshot.periodEnd)")
+                                        .font(.caption)
+                                    Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Button("Refrescar KPI") {
+                                Task { await loadRouteQuality() }
+                            }
+                        }
+                    }
+
+                    GroupBox("Scan") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Codigo escaneado", text: $scanCode)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Registrar scan") {
+                                Task {
+                                    guard let target = selectedStop else { return }
+                                    do {
+                                        try await apiClient.registerScan(trackableType: target.entityType, trackableId: target.entityId, scanCode: scanCode)
+                                        driverMessage = "Scan registrado"
+                                        updateSelectedStopStatus("in_progress")
+                                    } catch {
+                                        driverMessage = "Error scan"
+                                    }
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    GroupBox("POD") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Nombre firma", text: $podSignature)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Registrar POD") {
+                                Task {
+                                    guard let target = selectedStop else { return }
+                                    do {
+                                        try await apiClient.registerPod(evidenceType: target.entityType, evidenceId: target.entityId, signatureName: podSignature)
+                                        driverMessage = "POD registrado"
+                                        updateSelectedStopStatus("completed")
+                                    } catch {
+                                        driverMessage = "Error POD"
+                                    }
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    GroupBox("Recogidas") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Referencia pickup", text: $pickupReference)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Hub ID pickup", text: $pickupHubId)
+                                .textFieldStyle(.roundedBorder)
+                            HStack {
+                                Button("Pickup NORMAL") {
+                                    Task { await createPickup(type: "NORMAL") }
+                                }
+                                Button("Pickup RETURN") {
+                                    Task { await createPickup(type: "RETURN") }
+                                }
+                            }
+                        }
+                    }
+
+                    GroupBox("Incidencias") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TextField("Codigo incidencia", text: $incidentCode)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Notas incidencia", text: $incidentNotes)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Registrar incidencia") {
+                                Task {
+                                    guard let target = selectedStop else { return }
+                                    let normalizedCode = incidentCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    guard !normalizedCode.isEmpty else {
+                                        driverMessage = "Codigo incidencia obligatorio."
+                                        return
+                                    }
+                                    do {
+                                        try await apiClient.registerIncident(
+                                            incidentableType: target.entityType,
+                                            incidentableId: target.entityId,
+                                            catalogCode: normalizedCode,
+                                            category: incidentCategory(for: normalizedCode),
+                                            notes: incidentNotes
+                                        )
+                                        driverMessage = "Incidencia registrada"
+                                        updateSelectedStopStatus("incident")
+                                    } catch {
+                                        driverMessage = "Error incidencia"
+                                    }
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    GroupBox("Sesion") {
+                        Button("Cerrar sesion") {
+                            Task {
+                                await apiClient.logout()
+                                authSession.updateToken(nil)
+                                apiClient.setAuthToken(nil)
+                                routeStops = []
+                                selectedStopId = nil
+                                routeQuality = []
+                                loginMessage = "No autenticado"
                             }
                         }
                     }
                 }
-
-                Section("POD") {
-                    TextField("Nombre firma", text: $podSignature)
-                    Button("Registrar POD") {
-                        Task {
-                            guard let target = selectedStop else { return }
-                            do {
-                                try await apiClient.registerPod(evidenceType: target.entityType, evidenceId: target.entityId, signatureName: podSignature)
-                                driverMessage = "POD registrado"
-                                updateSelectedStopStatus("completed")
-                            } catch {
-                                driverMessage = "Error POD"
-                            }
-                        }
-                    }
-                }
-
-                Section("Recogidas") {
-                    TextField("Referencia pickup", text: $pickupReference)
-                    HStack {
-                        Button("Pickup NORMAL") {
-                            Task { await createPickup(type: "NORMAL") }
-                        }
-                        Button("Pickup RETURN") {
-                            Task { await createPickup(type: "RETURN") }
-                        }
-                    }
-                }
-
-                Section("Incidencias") {
-                    TextField("Codigo incidencia", text: $incidentCode)
-                    TextField("Notas incidencia", text: $incidentNotes)
-                    Button("Registrar incidencia") {
-                        Task {
-                            guard let target = selectedStop else { return }
-                            let normalizedCode = incidentCode.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !normalizedCode.isEmpty else {
-                                driverMessage = "Codigo incidencia obligatorio."
-                                return
-                            }
-                            do {
-                                try await apiClient.registerIncident(
-                                    incidentableType: target.entityType,
-                                    incidentableId: target.entityId,
-                                    catalogCode: normalizedCode,
-                                    category: incidentCategory(for: normalizedCode),
-                                    notes: incidentNotes
-                                )
-                                driverMessage = "Incidencia registrada"
-                                updateSelectedStopStatus("incident")
-                            } catch {
-                                driverMessage = "Error incidencia"
-                            }
-                        }
-                    }
-                }
-
-                Section("Sesion") {
-                    Button("Cerrar sesion") {
-                        Task {
-                            await apiClient.logout()
-                            authSession.updateToken(nil)
-                            apiClient.setAuthToken(nil)
-                            routeStops = []
-                            selectedStopId = nil
-                            routeQuality = []
-                            loginMessage = "No autenticado"
-                        }
-                    }
-                }
+                .padding()
             }
             .navigationTitle("Driver App")
             .overlay(alignment: .bottom) {
@@ -710,15 +762,20 @@ struct ContentView: View {
 
     private func createPickup(type: String) async {
         let normalizedReference = pickupReference.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedHubId = pickupHubId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalizedReference.count >= 4 else {
             driverMessage = "Referencia pickup invalida."
+            return
+        }
+        guard !normalizedHubId.isEmpty else {
+            driverMessage = "Hub ID pickup obligatorio."
             return
         }
         do {
             try await apiClient.createPickup(
                 reference: normalizedReference,
                 pickupType: type,
-                hubId: "00000000-0000-0000-0000-000000000001"
+                hubId: normalizedHubId
             )
             driverMessage = "Pickup \(type) creado"
         } catch {
@@ -810,4 +867,18 @@ struct ContentView: View {
 
 #Preview {
     ContentView(apiClient: APIClient(baseURL: nil))
+}
+
+private extension View {
+    @ViewBuilder
+    func ecoPanelStyle(cornerRadius: CGFloat = 14) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(.regular.tint(.teal.opacity(0.08)).interactive(), in: .rect(cornerRadius: cornerRadius))
+        } else {
+            self
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
 }

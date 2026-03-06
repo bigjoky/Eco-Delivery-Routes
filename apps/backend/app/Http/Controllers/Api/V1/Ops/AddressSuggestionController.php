@@ -30,10 +30,19 @@ class AddressSuggestionController extends Controller
         $networkRows = $this->fromNetwork($q, $city, $limit * 2);
 
         $rows = collect(array_merge($contactRows, $networkRows))
-            ->sortBy([
-                ['priority', 'asc'],
-                ['updated_at', 'desc'],
-            ])
+            ->map(function (array $item) use ($q, $city, $postalCode): array {
+                $item['_score'] = $this->suggestionScore($item, $q, $city, $postalCode);
+                return $item;
+            })
+            ->sort(function (array $a, array $b): int {
+                if (($a['_score'] ?? 0) !== ($b['_score'] ?? 0)) {
+                    return ($b['_score'] ?? 0) <=> ($a['_score'] ?? 0);
+                }
+                if (($a['priority'] ?? 0) !== ($b['priority'] ?? 0)) {
+                    return ($a['priority'] ?? 0) <=> ($b['priority'] ?? 0);
+                }
+                return strtotime((string) ($b['updated_at'] ?? '')) <=> strtotime((string) ($a['updated_at'] ?? ''));
+            })
             ->unique(function (array $item): string {
                 return implode('|', [
                     $item['address_street'] ?? '',
@@ -45,6 +54,10 @@ class AddressSuggestionController extends Controller
                 ]);
             })
             ->take($limit)
+            ->map(function (array $item): array {
+                unset($item['_score']);
+                return $item;
+            })
             ->values()
             ->all();
 
@@ -171,5 +184,56 @@ class AddressSuggestionController extends Controller
                 'priority' => (int) $row->priority,
             ];
         })->all();
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function suggestionScore(array $item, string $q, string $city, string $postalCode): int
+    {
+        $score = ($item['source'] ?? '') === 'contact' ? 50 : 20;
+        $fields = array_filter([
+            strtolower(trim((string) ($item['address_street'] ?? ''))),
+            strtolower(trim((string) ($item['city'] ?? ''))),
+            strtolower(trim((string) ($item['postal_code'] ?? ''))),
+            strtolower(trim((string) ($item['address_notes'] ?? ''))),
+        ], static fn (string $value): bool => $value !== '');
+
+        $score += $this->scoreTextMatch($q, $fields, 45, 25, 12);
+        $score += $this->scoreTextMatch($city, [strtolower(trim((string) ($item['city'] ?? '')))], 25, 12, 6);
+        $score += $this->scoreTextMatch($postalCode, [strtolower(trim((string) ($item['postal_code'] ?? '')))], 25, 12, 6);
+        if (!empty($item['address_number'])) {
+            $score += 2;
+        }
+
+        return $score;
+    }
+
+    /**
+     * @param array<int, string> $fields
+     */
+    private function scoreTextMatch(string $term, array $fields, int $exact, int $prefix, int $contains): int
+    {
+        $needle = strtolower(trim($term));
+        if ($needle === '') {
+            return 0;
+        }
+        foreach ($fields as $field) {
+            if ($field === $needle) {
+                return $exact;
+            }
+        }
+        foreach ($fields as $field) {
+            if ($field !== '' && str_starts_with($field, $needle)) {
+                return $prefix;
+            }
+        }
+        foreach ($fields as $field) {
+            if ($field !== '' && str_contains($field, $needle)) {
+                return $contains;
+            }
+        }
+
+        return 0;
     }
 }

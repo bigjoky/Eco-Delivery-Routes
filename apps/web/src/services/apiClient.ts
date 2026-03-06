@@ -63,6 +63,8 @@ const USE_MOCK = !normalizedApiBase || normalizedApiBase === 'undefined' || norm
 let refreshPromise: Promise<string | null> | null = null;
 const addressSuggestionsCache = new Map<string, { expiresAt: number; data: AddressSuggestion[] }>();
 const ADDRESS_SUGGESTIONS_TTL_MS = 5 * 60 * 1000;
+let addressSuggestionsCacheHits = 0;
+let addressSuggestionsCacheMisses = 0;
 
 function addressSuggestionsKey(filters: {
   q?: string;
@@ -165,6 +167,18 @@ function paginateLocal<T>(items: T[], page: number, perPage: number): PaginatedR
 }
 
 export const apiClient = {
+  clearAddressSuggestionsCache(): void {
+    addressSuggestionsCache.clear();
+  },
+
+  getAddressSuggestionsCacheStats(): { hits: number; misses: number; size: number } {
+    return {
+      hits: addressSuggestionsCacheHits,
+      misses: addressSuggestionsCacheMisses,
+      size: addressSuggestionsCache.size,
+    };
+  },
+
   async login(payload: { email: string; password: string }): Promise<LoginResponse> {
     if (USE_MOCK) {
       const data = await mockApi.login(payload);
@@ -724,11 +738,13 @@ export const apiClient = {
     const now = Date.now();
     const cached = addressSuggestionsCache.get(cacheKey);
     if (cached && cached.expiresAt > now) {
+      addressSuggestionsCacheHits += 1;
       return cached.data;
     }
     if (cached && cached.expiresAt <= now) {
       addressSuggestionsCache.delete(cacheKey);
     }
+    addressSuggestionsCacheMisses += 1;
 
     if (USE_MOCK) return mockApi.getAddressSuggestions(filters) as Promise<AddressSuggestion[]>;
     const params = new URLSearchParams();
@@ -786,6 +802,7 @@ export const apiClient = {
     });
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create shipment');
+    this.clearAddressSuggestionsCache();
     return json.data as ShipmentSummary;
   },
 
@@ -986,6 +1003,7 @@ export const apiClient = {
     });
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create pickup');
+    this.clearAddressSuggestionsCache();
     return json.data as PickupSummary;
   },
 
