@@ -147,6 +147,67 @@ class ShipmentsHttpTest extends TestCase
         $responseToday->assertJsonPath('data.0.reference', 'SHP-DATE-001');
     }
 
+    public function test_can_bulk_update_shipments_status_hub_and_schedule(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $secondaryHubId = (string) Str::uuid();
+        DB::table('hubs')->insert([
+            'id' => $secondaryHubId,
+            'code' => 'AGP-HUB-BULK',
+            'name' => 'Malaga Bulk',
+            'city' => 'Malaga',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-BULK-001',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Bulk 1',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-BULK-002',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Cliente Bulk 2',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/shipments/bulk-update', [
+            'shipment_ids' => [$shipmentA, $shipmentB],
+            'status' => 'out_for_delivery',
+            'hub_id' => $secondaryHubId,
+            'scheduled_at' => '2026-03-10 08:00:00',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.updated_count', 2);
+
+        $rows = DB::table('shipments')->whereIn('id', [$shipmentA, $shipmentB])->get();
+        $this->assertCount(2, $rows);
+        foreach ($rows as $row) {
+            $this->assertSame('out_for_delivery', $row->status);
+            $this->assertSame($secondaryHubId, $row->hub_id);
+            $this->assertSame('2026-03-10 08:00:00', $row->scheduled_at);
+        }
+    }
+
     public function test_rejects_scheduled_at_outside_allowed_window(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

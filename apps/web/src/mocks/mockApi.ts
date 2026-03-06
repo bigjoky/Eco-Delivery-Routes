@@ -3,6 +3,7 @@ let podSeq = 1;
 let incidentSeq = 2;
 let userSeq = 3;
 let routeStopSeq = 3;
+let shipmentSeq = 3;
 let mockIncidents = [
   {
     id: 'i-1',
@@ -14,6 +15,10 @@ let mockIncidents = [
     notes: 'Cliente no localizado',
     resolved_at: null as string | null,
   },
+];
+let mockShipments = [
+  { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
+  { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
 ];
 const mockRoles = [
   { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
@@ -637,10 +642,7 @@ export const mockApi = {
     scheduledFrom?: string;
     scheduledTo?: string;
   } = {}) {
-    let rows = [
-      { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
-      { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
-    ];
+    let rows = [...mockShipments];
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
     }
@@ -736,9 +738,9 @@ export const mockApi = {
     scheduled_at?: string | null;
     service_type?: string | null;
   }) {
-    return {
-      id: `s-${Math.floor(Math.random() * 10000)}`,
-      reference: String(Math.floor(100000 + Math.random() * 900000)),
+    const item = {
+      id: `s-${shipmentSeq++}`,
+      reference: String(10000 + shipmentSeq),
       external_reference: payload.external_reference ?? null,
       status: 'created',
       consignee_name: payload.consignee_name ?? null,
@@ -755,19 +757,41 @@ export const mockApi = {
       consignee_email: payload.consignee_email ?? null,
       scheduled_at: payload.scheduled_at ?? null,
       hub_id: payload.hub_id,
+      hub_code: payload.hub_id === 'hub-2' ? 'SEV-HUB-01' : 'AGP-HUB-01',
+      service_type: payload.service_type ?? 'express_1030',
     };
+    mockShipments = [item, ...mockShipments];
+    return item;
   },
 
   async markShipmentDelivered(id: string) {
+    let updated: Record<string, unknown> | null = null;
+    mockShipments = mockShipments.map((row) => {
+      if (row.id !== id) return row;
+      updated = { ...row, status: 'delivered' };
+      return updated as typeof row;
+    });
+    return (updated ?? mockShipments[0]) as typeof mockShipments[number];
+  },
+
+  async bulkUpdateShipments(payload: {
+    shipment_ids: string[];
+    status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    hub_id?: string;
+    scheduled_at?: string;
+  }) {
+    const updates = {
+      ...(payload.status ? { status: payload.status } : {}),
+      ...(payload.hub_id ? { hub_id: payload.hub_id } : {}),
+      ...(payload.scheduled_at ? { scheduled_at: payload.scheduled_at } : {}),
+    };
+    const updated = mockShipments.map((row) => (
+      payload.shipment_ids.includes(row.id) ? { ...row, ...updates } : row
+    ));
+    mockShipments = updated;
     return {
-      id,
-      reference: id.toUpperCase(),
-      external_reference: null,
-      status: 'delivered',
-      consignee_name: 'Cliente Demo',
-      address_line: 'Calle 1',
-      scheduled_at: '2026-03-01T08:00:00Z',
-      hub_id: 'hub-1',
+      data: updated.filter((row) => payload.shipment_ids.includes(row.id)),
+      meta: { updated_count: payload.shipment_ids.length },
     };
   },
 

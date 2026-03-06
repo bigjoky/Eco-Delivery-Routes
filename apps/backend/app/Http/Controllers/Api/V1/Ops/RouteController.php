@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class RouteController extends Controller
 {
@@ -230,24 +230,16 @@ class RouteController extends Controller
 
         $subcontractorId = $payload['subcontractor_id'] ?? null;
         if ($subcontractorId && $driver && $driver->subcontractor_id && $driver->subcontractor_id !== $subcontractorId) {
-            throw ValidationException::withMessages([
-                'driver_id' => ['Driver does not belong to selected subcontractor.'],
-            ]);
+            $this->throwValidationError('Driver does not belong to selected subcontractor.', 'driver_id');
         }
         if ($subcontractorId && $vehicle && $vehicle->subcontractor_id && $vehicle->subcontractor_id !== $subcontractorId) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => ['Vehicle does not belong to selected subcontractor.'],
-            ]);
+            $this->throwValidationError('Vehicle does not belong to selected subcontractor.', 'vehicle_id');
         }
         if ($driver && $vehicle && $driver->subcontractor_id && $vehicle->subcontractor_id && $driver->subcontractor_id !== $vehicle->subcontractor_id) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => ['Vehicle subcontractor must match driver subcontractor.'],
-            ]);
+            $this->throwValidationError('Vehicle subcontractor must match driver subcontractor.', 'vehicle_id');
         }
         if ($driver && $vehicle && $vehicle->assigned_driver_id && $vehicle->assigned_driver_id !== $driver->id) {
-            throw ValidationException::withMessages([
-                'vehicle_id' => ['Vehicle is assigned to a different driver.'],
-            ]);
+            $this->throwValidationError('Vehicle is assigned to a different driver.', 'vehicle_id');
         }
     }
 
@@ -463,9 +455,7 @@ class RouteController extends Controller
         $sortedProvided = $providedIds;
         sort($sortedProvided);
         if ($existingIds !== $sortedProvided) {
-            throw ValidationException::withMessages([
-                'stop_ids' => ['stop_ids must include exactly all route stop ids.'],
-            ]);
+            $this->throwValidationError('stop_ids must include exactly all route stop ids.', 'stop_ids');
         }
 
         DB::transaction(function () use ($id, $providedIds): void {
@@ -751,17 +741,13 @@ class RouteController extends Controller
     {
         if ($payload['stop_type'] === 'DELIVERY') {
             if (empty($payload['shipment_id']) || !empty($payload['pickup_id'])) {
-                throw ValidationException::withMessages([
-                    'shipment_id' => ['Delivery stop requires shipment_id and must not include pickup_id.'],
-                ]);
+                $this->throwValidationError('Delivery stop requires shipment_id and must not include pickup_id.', 'shipment_id');
             }
             return;
         }
 
         if (empty($payload['pickup_id']) || !empty($payload['shipment_id'])) {
-            throw ValidationException::withMessages([
-                'pickup_id' => ['Pickup stop requires pickup_id and must not include shipment_id.'],
-            ]);
+            $this->throwValidationError('Pickup stop requires pickup_id and must not include shipment_id.', 'pickup_id');
         }
     }
 
@@ -776,10 +762,24 @@ class RouteController extends Controller
         }
 
         if ($query->exists()) {
-            throw ValidationException::withMessages([
-                'sequence' => ['Sequence already exists for this route.'],
-            ]);
+            $this->throwValidationError('Sequence already exists for this route.', 'sequence');
         }
+    }
+
+    private function throwValidationError(string $message, string $field): void
+    {
+        $errors = [
+            $field => [$message],
+        ];
+        throw new HttpResponseException(response()->json([
+            'error' => [
+                'code' => 'VALIDATION_ERROR',
+                'message' => $message,
+                'details' => $errors,
+            ],
+            'message' => $message,
+            'errors' => $errors,
+        ], 422));
     }
 
     private function fetchStopById(string $stopId): ?object

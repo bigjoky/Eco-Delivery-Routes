@@ -1390,6 +1390,21 @@ paths:
       responses:
         '200': { description: OK }
 
+  /shipments/bulk-update:
+    post:
+      tags: [Shipments]
+      summary: Actualizacion masiva de envios
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateShipmentsRequest'
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /contacts:
     get:
       tags: [Contacts]
@@ -2668,6 +2683,19 @@ components:
         status: { type: string, enum: [planned, in_progress, completed], nullable: true }
         planned_at: { type: string, format: date-time, nullable: true }
         completed_at: { type: string, format: date-time, nullable: true }
+    BulkUpdateShipmentsRequest:
+      type: object
+      required: [shipment_ids]
+      properties:
+        shipment_ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [created, out_for_delivery, delivered, incident]
+        hub_id: { type: string, format: uuid }
+        scheduled_at: { type: string, format: date-time }
     CreatePickupRequest:
       type: object
       required: [hub_id, reference, pickup_type]

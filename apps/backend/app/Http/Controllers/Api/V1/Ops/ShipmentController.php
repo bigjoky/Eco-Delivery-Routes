@@ -718,6 +718,70 @@ class ShipmentController extends Controller
         return response()->json(['data' => DB::table('shipments')->where('id', $id)->first()]);
     }
 
+    public function bulkUpdate(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'shipment_ids' => ['required', 'array', 'min:1'],
+            'shipment_ids.*' => ['required', 'uuid'],
+            'status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
+            'hub_id' => ['nullable', 'uuid', 'exists:hubs,id'],
+            'scheduled_at' => ['nullable', 'date'],
+        ]);
+
+        $updates = [];
+        if (array_key_exists('status', $payload)) {
+            $updates['status'] = $payload['status'];
+            if (($payload['status'] ?? null) === 'delivered') {
+                $updates['delivered_at'] = now();
+            }
+        }
+        if (array_key_exists('hub_id', $payload)) {
+            $updates['hub_id'] = $payload['hub_id'];
+        }
+        if (array_key_exists('scheduled_at', $payload)) {
+            $updates['scheduled_at'] = $payload['scheduled_at'];
+        }
+        if ($updates === []) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'At least one update field is required.'],
+            ], 422);
+        }
+
+        $shipmentIds = array_values(array_unique($payload['shipment_ids']));
+        $existing = DB::table('shipments')->whereIn('id', $shipmentIds)->pluck('id')->all();
+        if (count($existing) !== count($shipmentIds)) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'One or more shipment_ids do not exist.'],
+            ], 422);
+        }
+
+        DB::table('shipments')
+            ->whereIn('id', $shipmentIds)
+            ->update([
+                ...$updates,
+                'updated_at' => now(),
+            ]);
+
+        $this->auditLogWriter->write($actor->id, 'shipments.bulk_updated', [
+            'shipment_ids' => $shipmentIds,
+            'updates' => $updates,
+            'count' => count($shipmentIds),
+        ]);
+
+        return response()->json([
+            'data' => DB::table('shipments')->whereIn('id', $shipmentIds)->get()->all(),
+            'meta' => [
+                'updated_count' => count($shipmentIds),
+            ],
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([

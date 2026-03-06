@@ -544,6 +544,23 @@ export const apiClient = {
     return json.data as ShipmentSummary;
   },
 
+  async bulkUpdateShipments(payload: {
+    shipment_ids: string[];
+    status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    hub_id?: string;
+    scheduled_at?: string;
+  }): Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }> {
+    if (USE_MOCK) return mockApi.bulkUpdateShipments(payload) as Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot bulk update shipments');
+    return json as { data: ShipmentSummary[]; meta: { updated_count: number } };
+  },
+
   async getShipmentDetail(id: string): Promise<ShipmentDetail> {
     if (USE_MOCK) return mockApi.getShipmentDetail(id) as Promise<ShipmentDetail>;
     const response = await authorizedFetch(`${API_BASE_URL}/shipments/${id}`);

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { HubSummary, PaginationMeta, SettlementReconciliationSummaryRow, SettlementReconciliationTrendRow, SettlementSummary, SubcontractorSummary } from '../../core/api/types';
+import { HubSummary, PaginationMeta, SettlementPreview, SettlementReconciliationSummaryRow, SettlementReconciliationTrendRow, SettlementSummary, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 function statusVariant(status: SettlementSummary['status']): 'outline' | 'secondary' | 'success' {
@@ -28,6 +28,12 @@ export function SettlementsPage() {
   const [reconciliationSummary, setReconciliationSummary] = useState<SettlementReconciliationSummaryRow[]>([]);
   const [reconciliationTrends, setReconciliationTrends] = useState<SettlementReconciliationTrendRow[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
+  const [preview, setPreview] = useState<SettlementPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [advanceAmountEur, setAdvanceAmountEur] = useState('');
+  const [advanceReason, setAdvanceReason] = useState('');
+  const [advanceMessage, setAdvanceMessage] = useState('');
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -85,6 +91,53 @@ export function SettlementsPage() {
     await search(1);
   };
 
+  const runPreview = async () => {
+    setPreviewError('');
+    setAdvanceMessage('');
+    if (!subcontractorId || !period) {
+      setPreviewError('Selecciona subcontrata y periodo (YYYY-MM) para previsualizar.');
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const data = await apiClient.getSettlementPreview({ subcontractorId, period });
+      setPreview(data);
+    } catch (exception) {
+      setPreview(null);
+      setPreviewError(exception instanceof Error ? exception.message : 'No se pudo cargar la previsualizacion');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const createAdvance = async () => {
+    setPreviewError('');
+    setAdvanceMessage('');
+    if (!subcontractorId) {
+      setPreviewError('Selecciona subcontrata para registrar anticipo.');
+      return;
+    }
+    const amount = Math.round(Number(advanceAmountEur) * 100);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPreviewError('Importe de anticipo invalido.');
+      return;
+    }
+    try {
+      await apiClient.createAdvance({
+        subcontractor_id: subcontractorId,
+        amount_cents: amount,
+        currency: 'EUR',
+        request_date: new Date().toISOString().slice(0, 10),
+        reason: advanceReason || 'Anticipo operativo',
+      });
+      setAdvanceAmountEur('');
+      setAdvanceReason('');
+      setAdvanceMessage('Anticipo registrado correctamente.');
+    } catch (exception) {
+      setPreviewError(exception instanceof Error ? exception.message : 'No se pudo registrar el anticipo');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -131,6 +184,44 @@ export function SettlementsPage() {
             </div>
             <Button type="submit">Buscar</Button>
           </form>
+          <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={runPreview} disabled={previewLoading}>
+              {previewLoading ? 'Previsualizando...' : 'Previsualizar liquidacion'}
+            </Button>
+            <Input
+              type="number"
+              step="0.01"
+              value={advanceAmountEur}
+              onChange={(e) => setAdvanceAmountEur(e.target.value)}
+              placeholder="Anticipo EUR"
+            />
+            <Input
+              value={advanceReason}
+              onChange={(e) => setAdvanceReason(e.target.value)}
+              placeholder="Motivo anticipo"
+            />
+            <Button type="button" variant="outline" onClick={createAdvance}>
+              Registrar anticipo
+            </Button>
+          </div>
+          {previewError ? <div className="helper error">{previewError}</div> : null}
+          {advanceMessage ? <div className="helper">{advanceMessage}</div> : null}
+          {preview ? (
+            <div className="kpi-grid">
+              <div className="kpi-item">
+                <div className="kpi-label">Preview bruto</div>
+                <div className="kpi-value">{(preview.totals.gross_amount_cents / 100).toFixed(2)} EUR</div>
+              </div>
+              <div className="kpi-item">
+                <div className="kpi-label">Preview anticipos</div>
+                <div className="kpi-value">{(preview.totals.advances_amount_cents / 100).toFixed(2)} EUR</div>
+              </div>
+              <div className="kpi-item">
+                <div className="kpi-label">Preview neto</div>
+                <div className="kpi-value">{(preview.totals.net_amount_cents / 100).toFixed(2)} EUR</div>
+              </div>
+            </div>
+          ) : null}
 
           <TableWrapper>
             <Table>
