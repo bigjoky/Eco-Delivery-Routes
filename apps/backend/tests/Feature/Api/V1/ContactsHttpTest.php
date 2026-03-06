@@ -49,6 +49,41 @@ class ContactsHttpTest extends TestCase
         $this->assertCount(1, $response->json('data'));
     }
 
+    public function test_contacts_support_combined_phone_document_and_q_filters(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Empresa Atlas',
+            'document_id' => 'B55555555',
+            'phone' => '+34950111000',
+            'city' => 'Malaga',
+            'kind' => 'sender',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Atlas Similar',
+            'document_id' => 'B44444444',
+            'phone' => '+34950111999',
+            'city' => 'Malaga',
+            'kind' => 'sender',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/contacts?phone=+34950111000&document_id=B555&q=Atlas');
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.0.display_name', 'Empresa Atlas')
+            ->assertJsonPath('data.0.document_id', 'B55555555');
+        $this->assertCount(1, $response->json('data'));
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $roleId = DB::table('roles')->where('code', $roleCode)->value('id');

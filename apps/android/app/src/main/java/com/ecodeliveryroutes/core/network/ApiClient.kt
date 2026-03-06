@@ -138,6 +138,36 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrDefault(false)
     }
 
+    suspend fun createShipment(
+        hubId: String,
+        consigneeName: String,
+        consigneeDocumentId: String,
+        consigneePhone: String,
+        senderName: String,
+        senderDocumentId: String,
+        senderPhone: String,
+        scheduledAt: String? = null,
+        serviceType: String = "express_1030"
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedPost(
+                "$baseUrl/shipments",
+                JSONObject()
+                    .put("hub_id", hubId)
+                    .put("consignee_name", consigneeName)
+                    .put("consignee_document_id", consigneeDocumentId)
+                    .put("consignee_phone", consigneePhone)
+                    .put("sender_name", senderName)
+                    .put("sender_document_id", senderDocumentId)
+                    .put("sender_phone", senderPhone)
+                    .put("scheduled_at", scheduledAt ?: java.time.LocalDate.now().toString())
+                    .put("service_type", serviceType)
+            )
+            true
+        }.getOrDefault(false)
+    }
+
     suspend fun registerIncident(
         incidentableType: String,
         incidentableId: String,

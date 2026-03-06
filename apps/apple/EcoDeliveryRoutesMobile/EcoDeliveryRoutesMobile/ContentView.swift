@@ -22,6 +22,8 @@ struct ContentView: View {
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
     @State private var draftRecipientDocType: String = "DNI"
+    @State private var draftHubId: String = "00000000-0000-0000-0000-000000000001"
+    @State private var draftServiceType: String = "express_1030"
     @State private var draftRecipientDocument: String = ""
     @State private var draftRecipientFirstName: String = ""
     @State private var draftRecipientLastName: String = ""
@@ -560,6 +562,10 @@ struct ContentView: View {
     private var shipmentDraftView: some View {
         NavigationStack {
             Form {
+                Section("Operación") {
+                    TextField("Hub ID", text: $draftHubId)
+                    TextField("Service type", text: $draftServiceType)
+                }
                 Section("Destinatario") {
                     Picker("Tipo documento", selection: $draftRecipientDocType) {
                         Text("DNI").tag("DNI")
@@ -603,8 +609,36 @@ struct ContentView: View {
                 }
 
                 Section("Validación") {
-                    Button("Validar borrador") {
-                        draftShipmentMessage = validateShipmentDraft()
+                    Button("Crear envío") {
+                        Task {
+                            let validation = validateShipmentDraft()
+                            guard validation == "Borrador valido." else {
+                                draftShipmentMessage = validation
+                                return
+                            }
+                            let recipientName = draftRecipientDocType == "CIF"
+                                ? draftRecipientLegalName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                : "\(draftRecipientFirstName) \(draftRecipientLastName)".trimmingCharacters(in: .whitespacesAndNewlines)
+                            let senderName = draftSenderDocType == "CIF"
+                                ? draftSenderLegalName.trimmingCharacters(in: .whitespacesAndNewlines)
+                                : "\(draftSenderFirstName) \(draftSenderLastName)".trimmingCharacters(in: .whitespacesAndNewlines)
+                            do {
+                                try await apiClient.createShipment(
+                                    hubId: draftHubId.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    consigneeName: recipientName,
+                                    consigneeDocumentId: draftRecipientDocument.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    consigneePhone: draftRecipientPhone.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    senderName: senderName,
+                                    senderDocumentId: draftSenderDocument.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    senderPhone: draftSenderPhone.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    scheduledAt: currentISODate(),
+                                    serviceType: draftServiceType.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                                draftShipmentMessage = "Envio creado."
+                            } catch {
+                                draftShipmentMessage = "No se pudo crear el envio."
+                            }
+                        }
                     }
                     Text(draftShipmentMessage.isEmpty ? "Completa campos obligatorios para continuar." : draftShipmentMessage)
                         .font(.caption)
