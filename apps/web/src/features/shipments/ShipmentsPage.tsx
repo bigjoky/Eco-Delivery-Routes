@@ -272,6 +272,13 @@ export function ShipmentsPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [selectedShipmentIds, setSelectedShipmentIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkHubId, setBulkHubId] = useState('');
+  const [bulkScheduledAt, setBulkScheduledAt] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkMessage, setBulkMessage] = useState('');
   const [incidentCatalog, setIncidentCatalog] = useState<IncidentCatalogItem[]>([]);
   const [incidentModalOpen, setIncidentModalOpen] = useState(false);
   const [incidentTarget, setIncidentTarget] = useState<ShipmentSummary | null>(null);
@@ -419,6 +426,10 @@ export function ShipmentsPage() {
       active = false;
     };
   }, [canImport, importJobId]);
+
+  useEffect(() => {
+    setSelectedShipmentIds((current) => current.filter((id) => items.some((row) => row.id === id)));
+  }, [items]);
 
   useEffect(() => {
     if (!canImport) return;
@@ -716,6 +727,53 @@ export function ShipmentsPage() {
       setActionError(exception instanceof Error ? exception.message : 'No se pudo marcar como entregado');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const toggleShipmentSelection = (shipmentId: string) => {
+    setSelectedShipmentIds((current) => (
+      current.includes(shipmentId)
+        ? current.filter((id) => id !== shipmentId)
+        : [...current, shipmentId]
+    ));
+  };
+
+  const toggleSelectCurrentPage = () => {
+    const pageIds = items.map((row) => row.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedShipmentIds.includes(id));
+    if (allSelected) {
+      setSelectedShipmentIds((current) => current.filter((id) => !pageIds.includes(id)));
+      return;
+    }
+    setSelectedShipmentIds((current) => Array.from(new Set([...current, ...pageIds])));
+  };
+
+  const applyBulkUpdate = async () => {
+    setBulkError('');
+    setBulkMessage('');
+    if (selectedShipmentIds.length === 0) {
+      setBulkError('Selecciona al menos un envio.');
+      return;
+    }
+    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
+      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
+      return;
+    }
+    setBulkUpdating(true);
+    try {
+      const response = await apiClient.bulkUpdateShipments({
+        shipment_ids: selectedShipmentIds,
+        ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
+        ...(bulkHubId ? { hub_id: bulkHubId } : {}),
+        ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+      });
+      setBulkMessage(`Actualizados ${response.meta.updated_count} envios.`);
+      await reload(meta.page || 1);
+      setSelectedShipmentIds([]);
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar la actualizacion masiva');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -1421,11 +1479,43 @@ export function ShipmentsPage() {
               <div className="kpi-value">{shipmentSummary.incident}</div>
             </div>
           </div>
+          <div className="inline-actions">
+            <span className="helper">Seleccionados: {selectedShipmentIds.length}</span>
+            <label htmlFor="bulk-status">Estado</label>
+            <select id="bulk-status" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value)}>
+              <option value="">Sin cambio</option>
+              <option value="created">created</option>
+              <option value="out_for_delivery">out_for_delivery</option>
+              <option value="delivered">delivered</option>
+              <option value="incident">incident</option>
+            </select>
+            <label htmlFor="bulk-hub">Hub</label>
+            <select id="bulk-hub" value={bulkHubId} onChange={(event) => setBulkHubId(event.target.value)}>
+              <option value="">Sin cambio</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code}</option>
+              ))}
+            </select>
+            <label htmlFor="bulk-scheduled">Fecha</label>
+            <input id="bulk-scheduled" type="date" value={bulkScheduledAt} onChange={(event) => setBulkScheduledAt(event.target.value)} />
+            <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
+              {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
+            </Button>
+          </div>
+          {bulkError ? <div className="helper error">{bulkError}</div> : null}
+          {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}
           {actionError ? <div className="helper error">{actionError}</div> : null}
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={items.length > 0 && items.every((row) => selectedShipmentIds.includes(row.id))}
+                      onChange={toggleSelectCurrentPage}
+                    />
+                  </TableHead>
                   <TableHead>
                     <button
                       type="button"
@@ -1463,6 +1553,13 @@ export function ShipmentsPage() {
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedShipmentIds.includes(item.id)}
+                        onChange={() => toggleShipmentSelection(item.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div>
                         <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
@@ -1503,7 +1600,7 @@ export function ShipmentsPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8}>Sin envíos para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={9}>Sin envíos para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
