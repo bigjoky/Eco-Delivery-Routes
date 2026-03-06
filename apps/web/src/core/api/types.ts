@@ -116,6 +116,27 @@ export type HubSummary = {
   is_active: boolean;
 };
 
+export type DepotSummary = {
+  id: string;
+  hub_id: string;
+  code: string;
+  name: string;
+  address_line?: string | null;
+  city?: string | null;
+  is_active: boolean;
+};
+
+export type PointSummary = {
+  id: string;
+  hub_id: string;
+  depot_id?: string | null;
+  code: string;
+  name: string;
+  address_line?: string | null;
+  city?: string | null;
+  is_active: boolean;
+};
+
 export type RouteStopSummary = {
   id: string;
   route_id: string;

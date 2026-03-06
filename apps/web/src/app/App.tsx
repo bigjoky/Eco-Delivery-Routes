@@ -8,6 +8,7 @@ import { apiClient } from '../services/apiClient';
 import { AdvancesPage } from '../features/advances/AdvancesPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
+import { NetworkPage } from '../features/network/NetworkPage';
 import { PartnersPage } from '../features/partners/PartnersPage';
 import { QualityPage } from '../features/quality/QualityPage';
 import { RolesPage } from '../features/roles/RolesPage';
@@ -69,6 +70,10 @@ export function App() {
         <Route
           path="/incidents"
           element={isAuthenticated && canAccess('incidents', roles) ? <IncidentsPage /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/network"
+          element={isAuthenticated && canAccess('network', roles) ? <NetworkPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/partners"
