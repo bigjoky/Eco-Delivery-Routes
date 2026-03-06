@@ -592,6 +592,7 @@ export type SubcontractorSummary = {
 export type DriverSummary = {
   id: string;
   code: string;
+  dni?: string | null;
   name: string;
   status: string;
   employment_type: string;
