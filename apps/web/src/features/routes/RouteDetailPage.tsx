@@ -7,6 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWra
 import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
+function stopStatusHelp(status: string): string {
+  const help: Record<string, string> = {
+    planned: 'Planificada, pendiente de inicio.',
+    in_progress: 'En curso, en ejecución.',
+    completed: 'Finalizada y cerrada.',
+  };
+  return help[status] ?? status;
+}
+
 export function RouteDetailPage() {
   const { id } = useParams();
   const [stops, setStops] = useState<RouteStopSummary[]>([]);
@@ -599,7 +608,11 @@ export function RouteDetailPage() {
                     <TableCell>{stop.stop_type}</TableCell>
                     <TableCell>{stop.reference ?? stop.entity_id}</TableCell>
                     <TableCell>{stop.entity_type}</TableCell>
-                    <TableCell><Badge variant="secondary">{stop.status}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" title={stopStatusHelp(stop.status)}>
+                        {stop.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="inline-actions">
                         <Button
