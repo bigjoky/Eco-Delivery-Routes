@@ -2,6 +2,7 @@ package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
 import com.ecodeliveryroutes.core.model.AuthProfile
+import com.ecodeliveryroutes.core.model.AddressSuggestion
 import com.ecodeliveryroutes.core.model.DepotSummary
 import com.ecodeliveryroutes.core.model.HubSummary
 import com.ecodeliveryroutes.core.model.PointSummary
@@ -19,7 +20,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
+import java.nio.charset.StandardCharsets
 
 class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() }) {
     suspend fun login(email: String, password: String): String = withContext(Dispatchers.IO) {
@@ -179,6 +182,43 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
             )
             true
         }.getOrDefault(false)
+    }
+
+    suspend fun addressSuggestions(
+        q: String,
+        kind: String,
+        city: String? = null,
+        postalCode: String? = null,
+        limit: Int = 5
+    ): List<AddressSuggestion> = withContext(Dispatchers.IO) {
+        if (q.isBlank()) return@withContext emptyList()
+        if (baseUrl == null) return@withContext emptyList()
+        runCatching {
+            fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+            val query = buildList {
+                add("q=${enc(q)}")
+                add("kind=${enc(kind)}")
+                if (!city.isNullOrBlank()) add("city=${enc(city)}")
+                if (!postalCode.isNullOrBlank()) add("postal_code=${enc(postalCode)}")
+                add("limit=${limit.coerceIn(1, 25)}")
+            }.joinToString("&")
+            val payload = authedGet("$baseUrl/addresses/suggest?$query")
+            val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
+            (0 until rows.length()).map { index ->
+                val item = rows.getJSONObject(index)
+                AddressSuggestion(
+                    source = item.optString("source"),
+                    sourceId = item.optString("source_id"),
+                    addressStreet = item.optString("address_street").ifBlank { null },
+                    addressNumber = item.optString("address_number").ifBlank { null },
+                    postalCode = item.optString("postal_code").ifBlank { null },
+                    city = item.optString("city").ifBlank { null },
+                    province = item.optString("province").ifBlank { null },
+                    country = item.optString("country").ifBlank { null },
+                    addressNotes = item.optString("address_notes").ifBlank { null }
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun registerIncident(

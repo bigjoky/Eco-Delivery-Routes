@@ -1022,6 +1022,42 @@ export const mockApi = {
     return filtered.slice(0, limit);
   },
 
+  async getAddressSuggestions(filters: {
+    q?: string;
+    kind?: 'sender' | 'recipient';
+    city?: string;
+    postalCode?: string;
+    limit?: number;
+  } = {}) {
+    const contacts = await this.getContacts({
+      q: filters.q,
+      kind: filters.kind,
+      limit: filters.limit ?? 10,
+    });
+
+    let rows = contacts.map((item) => ({
+      source: 'contact' as const,
+      source_id: item.id,
+      address_street: item.address_street ?? null,
+      address_number: item.address_number ?? null,
+      postal_code: item.postal_code ?? null,
+      city: item.city ?? null,
+      province: item.province ?? null,
+      country: item.country ?? 'ES',
+      address_notes: item.address_notes ?? null,
+    }));
+
+    if (filters.city) {
+      const city = filters.city.toLowerCase();
+      rows = rows.filter((item) => (item.city ?? '').toLowerCase().includes(city));
+    }
+    if (filters.postalCode) {
+      rows = rows.filter((item) => (item.postal_code ?? '').includes(filters.postalCode ?? ''));
+    }
+    const limit = Math.max(1, Math.min(filters.limit ?? 10, 25));
+    return rows.slice(0, limit);
+  },
+
   async createShipment(payload: {
     hub_id: string;
     external_reference?: string | null;

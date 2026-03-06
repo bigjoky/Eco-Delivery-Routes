@@ -1,14 +1,4 @@
-import { ContactSummary } from '../../core/api/types';
-
-export type AddressSuggestion = {
-  address_street?: string | null;
-  address_number?: string | null;
-  postal_code?: string | null;
-  city?: string | null;
-  province?: string | null;
-  country?: string | null;
-  address_notes?: string | null;
-};
+import { AddressSuggestion, ContactSummary } from '../../core/api/types';
 
 type SuggestionContext = {
   street?: string;

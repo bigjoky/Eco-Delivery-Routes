@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Ops\AdvanceController;
+use App\Http\Controllers\Api\V1\Ops\AddressSuggestionController;
 use App\Http\Controllers\Api\V1\Ops\ContactController;
 use App\Http\Controllers\Api\V1\Ops\DepotController;
 use App\Http\Controllers\Api\V1\Ops\DriverRouteController;
@@ -76,6 +77,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('hubs/{id}', [HubController::class, 'destroy']);
         Route::post('hubs/{id}/restore', [HubController::class, 'restore']);
         Route::get('contacts', [ContactController::class, 'index']);
+        Route::get('addresses/suggest', [AddressSuggestionController::class, 'index']);
         Route::get('depots', [DepotController::class, 'index']);
         Route::post('depots', [DepotController::class, 'store']);
         Route::patch('depots/{id}', [DepotController::class, 'update']);

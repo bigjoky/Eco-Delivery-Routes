@@ -31,6 +31,7 @@ fun ShipmentDraftScreen() {
     val recipientPostalCode = remember { mutableStateOf("") }
     val recipientCity = remember { mutableStateOf("") }
     val recipientCountry = remember { mutableStateOf("ES") }
+    val recipientSuggestions = remember { mutableStateOf<List<String>>(emptyList()) }
 
     val senderDocType = remember { mutableStateOf("DNI") }
     val senderDocument = remember { mutableStateOf("") }
@@ -130,6 +131,41 @@ fun ShipmentDraftScreen() {
             label = { Text("Pais destinatario (ISO2)") },
             modifier = Modifier.fillMaxWidth()
         )
+        Button(onClick = {
+            val q = listOf(recipientStreet.value, recipientCity.value, recipientPostalCode.value).joinToString(" ").trim()
+            if (q.isBlank()) {
+                recipientSuggestions.value = emptyList()
+                return@Button
+            }
+            scope.launch {
+                val suggestions = ApiProvider.client.addressSuggestions(
+                    q = q,
+                    kind = "recipient",
+                    city = recipientCity.value.ifBlank { null },
+                    postalCode = recipientPostalCode.value.ifBlank { null },
+                    limit = 5
+                )
+                recipientSuggestions.value = suggestions.map { item ->
+                    listOf(
+                        item.addressStreet ?: "",
+                        item.addressNumber ?: "",
+                        item.postalCode ?: "",
+                        item.city ?: ""
+                    ).joinToString(" ").trim()
+                }
+                val first = suggestions.firstOrNull()
+                if (first != null) {
+                    recipientStreet.value = first.addressStreet ?: recipientStreet.value
+                    recipientNumber.value = first.addressNumber ?: recipientNumber.value
+                    recipientPostalCode.value = first.postalCode ?: recipientPostalCode.value
+                    recipientCity.value = first.city ?: recipientCity.value
+                    recipientCountry.value = first.country ?: recipientCountry.value
+                }
+            }
+        }) { Text("Sugerir direccion destinatario") }
+        recipientSuggestions.value.forEach { suggestion ->
+            Text("• $suggestion")
+        }
 
         Text("Remitente")
         OutlinedTextField(

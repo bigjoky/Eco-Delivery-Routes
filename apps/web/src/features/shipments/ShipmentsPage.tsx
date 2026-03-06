@@ -735,16 +735,35 @@ export function ShipmentsPage() {
       return;
     }
     try {
-      const rows = await apiClient.getContacts({ q, kind: 'recipient', limit: 25 });
-      setRecipientAddressSuggestions(buildAddressSuggestions(rows, {
-        street: createStreet,
-        postalCode: createPostalCode,
-        city: createCity,
-        phone: createPhone,
-        documentId: createConsigneeDocumentId,
-      }));
+      const rows = await apiClient.getAddressSuggestions({
+        q,
+        kind: 'recipient',
+        city: createCity || undefined,
+        postalCode: createPostalCode || undefined,
+        limit: 10,
+      });
+      setRecipientAddressSuggestions(rows.map((item) => ({
+        address_street: item.address_street,
+        address_number: item.address_number,
+        postal_code: item.postal_code,
+        city: item.city,
+        province: item.province,
+        country: item.country,
+        address_notes: item.address_notes,
+      })));
     } catch {
-      setRecipientAddressSuggestions([]);
+      try {
+        const rows = await apiClient.getContacts({ q, kind: 'recipient', limit: 25 });
+        setRecipientAddressSuggestions(buildAddressSuggestions(rows, {
+          street: createStreet,
+          postalCode: createPostalCode,
+          city: createCity,
+          phone: createPhone,
+          documentId: createConsigneeDocumentId,
+        }));
+      } catch {
+        setRecipientAddressSuggestions([]);
+      }
     }
   };
 
@@ -755,16 +774,35 @@ export function ShipmentsPage() {
       return;
     }
     try {
-      const rows = await apiClient.getContacts({ q, kind: 'sender', limit: 25 });
-      setSenderAddressSuggestions(buildAddressSuggestions(rows, {
-        street: createSenderStreet,
-        postalCode: createSenderPostalCode,
-        city: createSenderCity,
-        phone: createSenderPhone,
-        documentId: createSenderDocumentId,
-      }));
+      const rows = await apiClient.getAddressSuggestions({
+        q,
+        kind: 'sender',
+        city: createSenderCity || undefined,
+        postalCode: createSenderPostalCode || undefined,
+        limit: 10,
+      });
+      setSenderAddressSuggestions(rows.map((item) => ({
+        address_street: item.address_street,
+        address_number: item.address_number,
+        postal_code: item.postal_code,
+        city: item.city,
+        province: item.province,
+        country: item.country,
+        address_notes: item.address_notes,
+      })));
     } catch {
-      setSenderAddressSuggestions([]);
+      try {
+        const rows = await apiClient.getContacts({ q, kind: 'sender', limit: 25 });
+        setSenderAddressSuggestions(buildAddressSuggestions(rows, {
+          street: createSenderStreet,
+          postalCode: createSenderPostalCode,
+          city: createSenderCity,
+          phone: createSenderPhone,
+          documentId: createSenderDocumentId,
+        }));
+      } catch {
+        setSenderAddressSuggestions([]);
+      }
     }
   };
 
