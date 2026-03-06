@@ -197,4 +197,29 @@ final class SharedCoreTests: XCTestCase {
         XCTAssertEqual(breakdown.subcontractorId, "sub-1")
         XCTAssertGreaterThan(breakdown.components.assignedWithAttempt, 0)
     }
+
+    func test_network_nodes_crud_mock_contract() async throws {
+        let client = APIClient(baseURL: nil)
+
+        let hub = try await client.createHub(name: "Hub Test", city: "Malaga")
+        XCTAssertEqual(hub.name, "Hub Test")
+
+        let updatedHub = try await client.updateHub(id: hub.id, name: "Hub Test 2", city: "Sevilla")
+        XCTAssertEqual(updatedHub.name, "Hub Test 2")
+
+        let depot = try await client.createDepot(hubId: hub.id, name: "Depot Test", city: "Malaga")
+        XCTAssertEqual(depot.hubId, hub.id)
+
+        let point = try await client.createPoint(hubId: hub.id, depotId: depot.id, name: "Punto Test", city: "Malaga")
+        XCTAssertEqual(point.hubId, hub.id)
+
+        _ = try await client.updateDepot(id: depot.id, name: "Depot Test 2", city: "Sevilla")
+        _ = try await client.updatePoint(id: point.id, name: "Punto Test 2", city: "Sevilla")
+
+        try await client.archivePoint(id: point.id)
+        try await client.archiveDepot(id: depot.id)
+        try await client.archiveHub(id: hub.id)
+
+        _ = try await client.restoreHub(id: hub.id)
+    }
 }

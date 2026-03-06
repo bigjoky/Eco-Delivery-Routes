@@ -445,6 +445,30 @@ public final class MockAPIClient {
         }
     }
 
+    public func createHub(name: String, city: String) async throws -> HubSummary {
+        HubSummary(id: "hub-new", code: "HUB-NEW", name: name, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updateHub(id: String, name: String, city: String?) async throws -> HubSummary {
+        HubSummary(id: id, code: "AGP-HUB-01", name: name, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func createDepot(hubId: String, name: String, city: String?) async throws -> DepotSummary {
+        DepotSummary(id: "dep-new", hubId: hubId, code: "DPT-NEW", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updateDepot(id: String, name: String, city: String?) async throws -> DepotSummary {
+        DepotSummary(id: id, hubId: "hub-1", code: "DPT-AGP-0001", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func createPoint(hubId: String, depotId: String?, name: String, city: String?) async throws -> PointSummary {
+        PointSummary(id: "pt-new", hubId: hubId, depotId: depotId, code: "PNT-NEW", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updatePoint(id: String, name: String, city: String?) async throws -> PointSummary {
+        PointSummary(id: id, hubId: "hub-1", depotId: "dep-1", code: "PNT-AGP-0001", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
     public func archiveHub(id: String) async throws {
         _ = id
     }

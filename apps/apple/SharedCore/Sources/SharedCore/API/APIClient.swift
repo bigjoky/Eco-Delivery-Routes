@@ -40,6 +40,12 @@ public protocol APIClientProtocol {
     func hubs(onlyActive: Bool, includeDeleted: Bool) async throws -> [HubSummary]
     func depots(hubId: String?, includeDeleted: Bool) async throws -> [DepotSummary]
     func points(hubId: String?, depotId: String?, includeDeleted: Bool) async throws -> [PointSummary]
+    func createHub(name: String, city: String) async throws -> HubSummary
+    func updateHub(id: String, name: String, city: String?) async throws -> HubSummary
+    func createDepot(hubId: String, name: String, city: String?) async throws -> DepotSummary
+    func updateDepot(id: String, name: String, city: String?) async throws -> DepotSummary
+    func createPoint(hubId: String, depotId: String?, name: String, city: String?) async throws -> PointSummary
+    func updatePoint(id: String, name: String, city: String?) async throws -> PointSummary
     func archiveHub(id: String) async throws
     func archiveDepot(id: String) async throws
     func archivePoint(id: String) async throws
@@ -597,6 +603,60 @@ public final class APIClient: APIClientProtocol {
         return try JSONDecoder().decode(DataArrayEnvelope<PointSummary>.self, from: data).data
     }
 
+    public func createHub(name: String, city: String) async throws -> HubSummary {
+        guard let baseURL else { return try await mock.createHub(name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "hubs"), method: "POST")
+        let payload = ["name": name, "city": city, "is_active": true] as [String: Any]
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<HubSummary>.self, from: data).data
+    }
+
+    public func updateHub(id: String, name: String, city: String?) async throws -> HubSummary {
+        guard let baseURL else { return try await mock.updateHub(id: id, name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "hubs/\(id)"), method: "PATCH")
+        var payload: [String: Any] = ["name": name]
+        payload["city"] = city
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<HubSummary>.self, from: data).data
+    }
+
+    public func createDepot(hubId: String, name: String, city: String?) async throws -> DepotSummary {
+        guard let baseURL else { return try await mock.createDepot(hubId: hubId, name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "depots"), method: "POST")
+        var payload: [String: Any] = ["hub_id": hubId, "name": name, "is_active": true]
+        payload["city"] = city
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<DepotSummary>.self, from: data).data
+    }
+
+    public func updateDepot(id: String, name: String, city: String?) async throws -> DepotSummary {
+        guard let baseURL else { return try await mock.updateDepot(id: id, name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "depots/\(id)"), method: "PATCH")
+        var payload: [String: Any] = ["name": name]
+        payload["city"] = city
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<DepotSummary>.self, from: data).data
+    }
+
+    public func createPoint(hubId: String, depotId: String?, name: String, city: String?) async throws -> PointSummary {
+        guard let baseURL else { return try await mock.createPoint(hubId: hubId, depotId: depotId, name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "points"), method: "POST")
+        var payload: [String: Any] = ["hub_id": hubId, "name": name, "is_active": true]
+        payload["depot_id"] = depotId
+        payload["city"] = city
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<PointSummary>.self, from: data).data
+    }
+
+    public func updatePoint(id: String, name: String, city: String?) async throws -> PointSummary {
+        guard let baseURL else { return try await mock.updatePoint(id: id, name: name, city: city) }
+        let request = authorizedRequest(url: baseURL.appending(path: "points/\(id)"), method: "PATCH")
+        var payload: [String: Any] = ["name": name]
+        payload["city"] = city
+        let data = try await execute(request, body: payload)
+        return try JSONDecoder().decode(DataObjectEnvelope<PointSummary>.self, from: data).data
+    }
+
     public func archiveHub(id: String) async throws {
         guard let baseURL else { return try await mock.archiveHub(id: id) }
         let request = authorizedRequest(url: baseURL.appending(path: "hubs/\(id)"), method: "DELETE")
@@ -666,6 +726,13 @@ public final class APIClient: APIClientProtocol {
             throw APIClientError.httpStatus(http.statusCode)
         }
         return data
+    }
+
+    private func execute(_ request: URLRequest, body: [String: Any]) async throws -> Data {
+        var mutableRequest = request
+        mutableRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        mutableRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await execute(mutableRequest)
     }
 
     private func refreshToken() async throws -> Bool {
