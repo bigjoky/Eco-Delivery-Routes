@@ -47,6 +47,8 @@ fun DriverRouteScreen(
     LaunchedEffect(Unit) {
         routeDateFilter.value = prefs.getString("route_date", LocalDate.now().toString()) ?: LocalDate.now().toString()
         routeStatusFilter.value = prefs.getString("route_status", "") ?: ""
+        pickupRef.value = prefs.getString("pickup_ref", "PCK-") ?: "PCK-"
+        incidentCode.value = prefs.getString("incident_code", "ABSENT_HOME") ?: "ABSENT_HOME"
         if (!isValidRouteDate(routeDateFilter.value)) {
             routeDateFilter.value = LocalDate.now().toString()
         }
@@ -163,14 +165,30 @@ fun DriverRouteScreen(
 
         Button(onClick = {
             scope.launch {
+                val normalizedPickupRef = pickupRef.value.trim()
+                if (normalizedPickupRef.isBlank() || normalizedPickupRef.length < 4) {
+                    message.value = "Referencia pickup invalida."
+                    return@launch
+                }
                 val ok = ApiProvider.client.createPickup(pickupRef.value, "NORMAL", "00000000-0000-0000-0000-000000000001")
+                if (ok) {
+                    prefs.edit().putString("pickup_ref", normalizedPickupRef).apply()
+                }
                 message.value = if (ok) "Pickup NORMAL creado" else "Error pickup"
             }
         }) { Text("Pickup NORMAL") }
 
         Button(onClick = {
             scope.launch {
+                val normalizedPickupRef = pickupRef.value.trim()
+                if (normalizedPickupRef.isBlank() || normalizedPickupRef.length < 4) {
+                    message.value = "Referencia pickup invalida."
+                    return@launch
+                }
                 val ok = ApiProvider.client.createPickup(pickupRef.value, "RETURN", "00000000-0000-0000-0000-000000000001")
+                if (ok) {
+                    prefs.edit().putString("pickup_ref", normalizedPickupRef).apply()
+                }
                 message.value = if (ok) "Pickup RETURN creado" else "Error pickup"
             }
         }) { Text("Pickup RETURN") }
@@ -192,6 +210,10 @@ fun DriverRouteScreen(
         Button(onClick = {
             val target = selectedStop ?: return@Button
             scope.launch {
+                if (incidentCode.value.trim().isBlank()) {
+                    message.value = "Codigo incidencia obligatorio."
+                    return@launch
+                }
                 val ok = ApiProvider.client.registerIncident(
                     incidentableType = target.entityType,
                     incidentableId = target.entityId,
@@ -200,6 +222,7 @@ fun DriverRouteScreen(
                     notes = incidentNotes.value
                 )
                 if (ok) {
+                    prefs.edit().putString("incident_code", incidentCode.value.trim()).apply()
                     stops.value = stops.value.map { stop ->
                         if (stop.id == target.id) stop.copy(status = "incident") else stop
                     }

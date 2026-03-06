@@ -17,8 +17,8 @@ struct ContentView: View {
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var scanCode: String = ""
     @State private var podSignature: String = ""
-    @State private var pickupReference: String = "PCK-"
-    @State private var incidentCode: String = "ABSENT_HOME"
+    @AppStorage("driver_pickup_reference") private var pickupReference: String = "PCK-"
+    @AppStorage("driver_incident_code") private var incidentCode: String = "ABSENT_HOME"
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
     @State private var hubs: [HubSummary] = []
@@ -212,12 +212,17 @@ struct ContentView: View {
                     Button("Registrar incidencia") {
                         Task {
                             guard let target = selectedStop else { return }
+                            let normalizedCode = incidentCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !normalizedCode.isEmpty else {
+                                driverMessage = "Codigo incidencia obligatorio."
+                                return
+                            }
                             do {
                                 try await apiClient.registerIncident(
                                     incidentableType: target.entityType,
                                     incidentableId: target.entityId,
-                                    catalogCode: incidentCode,
-                                    category: incidentCategory(for: incidentCode),
+                                    catalogCode: normalizedCode,
+                                    category: incidentCategory(for: normalizedCode),
                                     notes: incidentNotes
                                 )
                                 driverMessage = "Incidencia registrada"
@@ -595,9 +600,14 @@ struct ContentView: View {
     }
 
     private func createPickup(type: String) async {
+        let normalizedReference = pickupReference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard normalizedReference.count >= 4 else {
+            driverMessage = "Referencia pickup invalida."
+            return
+        }
         do {
             try await apiClient.createPickup(
-                reference: pickupReference,
+                reference: normalizedReference,
                 pickupType: type,
                 hubId: "00000000-0000-0000-0000-000000000001"
             )

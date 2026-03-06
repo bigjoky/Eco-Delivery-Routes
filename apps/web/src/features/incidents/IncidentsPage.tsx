@@ -199,6 +199,18 @@ export function IncidentsPage() {
     [catalog, incidentableType]
   );
 
+  const clearFilters = () => {
+    setResolvedFilter('open');
+    setListTypeFilter('');
+    setListCategoryFilter('');
+    setListCatalogFilter('');
+    setListPriorityFilter('');
+    setListSlaFilter('');
+    setListIncidentableId('');
+    setListSearch('');
+    setPage(1);
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     await apiClient.createIncident({
@@ -409,6 +421,20 @@ export function IncidentsPage() {
               <label>Buscar</label>
               <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
             </div>
+          </div>
+          <div className="inline-actions">
+            <Button type="button" variant={resolvedFilter === 'open' ? 'secondary' : 'outline'} onClick={() => { setResolvedFilter('open'); setPage(1); }}>
+              Abiertas
+            </Button>
+            <Button type="button" variant={listSlaFilter === 'breached' ? 'secondary' : 'outline'} onClick={() => { setListSlaFilter('breached'); setPage(1); }}>
+              SLA vencido
+            </Button>
+            <Button type="button" variant={listPriorityFilter === 'high' ? 'secondary' : 'outline'} onClick={() => { setListPriorityFilter('high'); setPage(1); }}>
+              Alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
           </div>
           <TableWrapper>
             <Table>
