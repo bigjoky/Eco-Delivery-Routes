@@ -2230,6 +2230,17 @@ export const apiClient = {
     return json.data as SubcontractorSummary;
   },
 
+  async deleteSubcontractor(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteSubcontractor(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(json?.error?.message ?? 'Cannot delete subcontractor');
+    }
+  },
+
   async getDrivers(filters: {
     subcontractorId?: string;
     status?: string;
@@ -2286,6 +2297,17 @@ export const apiClient = {
     return json.data as DriverSummary;
   },
 
+  async deleteDriver(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteDriver(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/drivers/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(json?.error?.message ?? 'Cannot delete driver');
+    }
+  },
+
   async getVehicles(filters: {
     subcontractorId?: string;
     status?: string;
@@ -2340,6 +2362,17 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update vehicle');
     return json.data as VehicleSummary;
+  },
+
+  async deleteVehicle(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteVehicle(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicles/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(json?.error?.message ?? 'Cannot delete vehicle');
+    }
   },
 
   async getAdvances(filters: {

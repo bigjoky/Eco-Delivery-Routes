@@ -27,6 +27,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('hubs'", $contents);
         $this->assertStringContainsString("Route::get('settlements/preview'", $contents);
         $this->assertStringContainsString("Route::get('subcontractors'", $contents);
+        $this->assertStringContainsString("Route::delete('subcontractors/{id}'", $contents);
+        $this->assertStringContainsString("Route::delete('drivers/{id}'", $contents);
+        $this->assertStringContainsString("Route::delete('vehicles/{id}'", $contents);
         $this->assertStringContainsString("Route::post('settlements/finalize'", $contents);
         $this->assertStringContainsString("Route::post('settlements/{id}/approve'", $contents);
         $this->assertStringContainsString("Route::get('settlements/{id}/adjustments'", $contents);
@@ -175,6 +178,9 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("/kpis/quality/threshold/history/export.pdf:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/subcontractors:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/subcontractors/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/drivers/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/vehicles/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/finalize", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/{id}/adjustments", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("settlements/{id}/adjustments/{adjustmentId}", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

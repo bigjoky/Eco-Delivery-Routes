@@ -7,6 +7,7 @@ const menu = [
   { to: '/', label: 'Login', feature: null },
   { to: '/shipments', label: 'Envios', feature: 'shipments' },
   { to: '/routes', label: 'Rutas', feature: 'routes' },
+  { to: '/routes/board', label: 'Rutas Live', feature: 'routes' },
   { to: '/incidents', label: 'Incidencias', feature: 'incidents' },
   { to: '/partners', label: 'Partners', feature: 'partners' },
   { to: '/tariffs', label: 'Tarifas', feature: 'tariffs' },
@@ -24,6 +25,7 @@ const sections = [
     items: [
       '/shipments',
       '/routes',
+      '/routes/board',
       '/incidents',
       '/partners',
       '/tariffs',

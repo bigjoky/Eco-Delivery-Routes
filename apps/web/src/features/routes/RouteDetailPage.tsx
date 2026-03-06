@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -52,6 +52,7 @@ export function RouteDetailPage() {
   const [lastDeletedStop, setLastDeletedStop] = useState<RouteStopSummary | null>(null);
   const [undoDeleting, setUndoDeleting] = useState(false);
   const [sequenceDrafts, setSequenceDrafts] = useState<Record<string, number>>({});
+  const [recalculatingEta, setRecalculatingEta] = useState(false);
 
   const refreshManifest = async (routeId: string) => {
     setManifestLoading(true);
@@ -409,6 +410,42 @@ export function RouteDetailPage() {
     return date.toISOString();
   };
 
+  const etaSuggestions = useMemo(() => {
+    const sorted = [...stops].sort((a, b) => a.sequence - b.sequence);
+    if (!route?.route_date) return {} as Record<string, string>;
+    const start = new Date(`${route.route_date}T08:00:00`);
+    if (Number.isNaN(start.getTime())) return {} as Record<string, string>;
+    let cursor = start.getTime();
+    const suggestions: Record<string, string> = {};
+    sorted.forEach((stop) => {
+      suggestions[stop.id] = new Date(cursor).toISOString();
+      const serviceMinutes = stop.stop_type === 'PICKUP' ? 6 : 4;
+      cursor += (8 + serviceMinutes) * 60 * 1000;
+    });
+    return suggestions;
+  }, [route?.route_date, stops]);
+
+  const applySuggestedEta = async () => {
+    if (!id || stops.length === 0) return;
+    setRecalculatingEta(true);
+    setError('');
+    try {
+      const sorted = [...stops].sort((a, b) => a.sequence - b.sequence);
+      for (const stop of sorted) {
+        const plannedAt = etaSuggestions[stop.id];
+        if (!plannedAt) continue;
+        await apiClient.updateRouteStop(id, stop.id, { planned_at: plannedAt });
+      }
+      const refreshed = await apiClient.getRouteStops(id);
+      setStops(refreshed);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo recalcular ETA');
+    } finally {
+      setRecalculatingEta(false);
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -597,6 +634,9 @@ export function RouteDetailPage() {
                 {undoDeleting ? 'Revirtiendo...' : 'Deshacer eliminacion'}
               </Button>
             ) : null}
+            <Button type="button" variant="outline" onClick={applySuggestedEta} disabled={recalculatingEta || reorderingStops || !route}>
+              {recalculatingEta ? 'Recalculando ETA...' : 'Recalcular ETA'}
+            </Button>
           </div>
           <TableWrapper>
             <Table>
@@ -607,6 +647,7 @@ export function RouteDetailPage() {
                   <TableHead>Referencia</TableHead>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>ETA sugerida</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -652,6 +693,7 @@ export function RouteDetailPage() {
                         {stop.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>{toLocalDateTime(etaSuggestions[stop.id]) || '-'}</TableCell>
                     <TableCell>
                       <div className="inline-actions">
                         <Button

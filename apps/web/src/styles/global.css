@@ -160,6 +160,10 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
+.page-grid.four {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .form-row {
   display: grid;
   gap: 8px;
@@ -206,6 +210,14 @@ label {
 .card-content {
   display: grid;
   gap: 10px;
+}
+
+.card-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
 }
 
 .card-footer {

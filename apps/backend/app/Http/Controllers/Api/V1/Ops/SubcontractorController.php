@@ -143,4 +143,45 @@ class SubcontractorController extends Controller
             'message' => 'Subcontractor updated',
         ]);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('subcontractors')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Subcontractor not found.'],
+            ], 404);
+        }
+
+        $hasDrivers = DB::table('drivers')->where('subcontractor_id', $id)->exists();
+        $hasVehicles = DB::table('vehicles')->where('subcontractor_id', $id)->exists();
+        $hasRoutes = DB::table('routes')->where('subcontractor_id', $id)->exists();
+        $hasSettlements = DB::table('settlements')->where('subcontractor_id', $id)->exists();
+        $hasAdvances = DB::table('advances')->where('subcontractor_id', $id)->exists();
+        if ($hasDrivers || $hasVehicles || $hasRoutes || $hasSettlements || $hasAdvances) {
+            return response()->json([
+                'error' => [
+                    'code' => 'RESOURCE_CONFLICT',
+                    'message' => 'Subcontractor has linked resources and cannot be deleted.',
+                ],
+            ], 409);
+        }
+
+        DB::table('subcontractors')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'subcontractors.deleted', [
+            'subcontractor_id' => $id,
+        ]);
+
+        return response()->json([
+            'message' => 'Subcontractor deleted',
+        ]);
+    }
 }
