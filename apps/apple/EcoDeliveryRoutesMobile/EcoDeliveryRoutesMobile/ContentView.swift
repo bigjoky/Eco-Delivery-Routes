@@ -27,13 +27,27 @@ struct ContentView: View {
     @State private var incidentCode: String = "ABSENT_HOME"
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
+    @State private var hubs: [HubSummary] = []
+    @State private var depots: [DepotSummary] = []
+    @State private var points: [PointSummary] = []
+    @State private var networkIncludeDeleted = false
+    @State private var networkMessage = ""
 
     var body: some View {
         Group {
             if authSession.token == nil {
                 loginView
             } else {
-                driverView
+                TabView {
+                    driverView
+                        .tabItem {
+                            Label("Ruta", systemImage: "map")
+                        }
+                    networkView
+                        .tabItem {
+                            Label("Red", systemImage: "point.3.connected.trianglepath.dotted")
+                        }
+                }
             }
         }
         .task(id: authSession.token?.token) {
@@ -41,6 +55,7 @@ struct ContentView: View {
             guard authSession.token != nil else { return }
             await loadRoute()
             await loadRouteQuality()
+            await loadNetworkNodes()
         }
     }
 
@@ -210,6 +225,136 @@ struct ContentView: View {
         }
     }
 
+    private var networkView: some View {
+        NavigationStack {
+            List {
+                Section("Configuracion") {
+                    Toggle("Mostrar archivados", isOn: $networkIncludeDeleted)
+                        .onChange(of: networkIncludeDeleted) { _, _ in
+                            Task { await loadNetworkNodes() }
+                        }
+                    Button("Recargar red") {
+                        Task { await loadNetworkNodes() }
+                    }
+                    if !networkMessage.isEmpty {
+                        Text(networkMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Hubs") {
+                    ForEach(hubs) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text(item.city ?? "-")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archiveHub(id: item.id)
+                                            networkMessage = "Hub archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando hub"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restoreHub(id: item.id)
+                                            networkMessage = "Hub restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando hub"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Depots") {
+                    ForEach(depots) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archiveDepot(id: item.id)
+                                            networkMessage = "Depot archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando depot"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restoreDepot(id: item.id)
+                                            networkMessage = "Depot restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando depot"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Puntos") {
+                    ForEach(points) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · Depot \(item.depotId ?? "-") · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archivePoint(id: item.id)
+                                            networkMessage = "Punto archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando punto"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restorePoint(id: item.id)
+                                            networkMessage = "Punto restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando punto"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Red Operativa")
+        }
+    }
+
     private func login() async {
         do {
             let token = try await apiClient.login(email: email, password: password)
@@ -234,6 +379,16 @@ struct ContentView: View {
 
     private func loadRouteQuality() async {
         routeQuality = (try? await apiClient.qualitySnapshots(scopeType: "route")) ?? []
+    }
+
+    private func loadNetworkNodes() async {
+        do {
+            hubs = try await apiClient.hubs(onlyActive: false, includeDeleted: networkIncludeDeleted)
+            depots = try await apiClient.depots(hubId: nil, includeDeleted: networkIncludeDeleted)
+            points = try await apiClient.points(hubId: nil, depotId: nil, includeDeleted: networkIncludeDeleted)
+        } catch {
+            networkMessage = "No se pudo cargar red operativa"
+        }
     }
 
     private func createPickup(type: String) async {
