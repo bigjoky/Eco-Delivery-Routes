@@ -588,6 +588,19 @@ paths:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar subcontrata (solo si no tiene recursos vinculados)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+        '409': { description: Conflicto por recursos vinculados }
 
   /drivers:
     get:
@@ -656,6 +669,19 @@ paths:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar driver (solo si no tiene recursos vinculados)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+        '409': { description: Conflicto por recursos vinculados }
 
   /vehicles:
     get:
@@ -724,6 +750,19 @@ paths:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar vehiculo (solo si no tiene rutas vinculadas)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+        '409': { description: Conflicto por recursos vinculados }
 
   /settlements:
     get:

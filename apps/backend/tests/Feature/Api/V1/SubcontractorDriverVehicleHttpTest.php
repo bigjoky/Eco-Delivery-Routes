@@ -74,44 +74,61 @@ class SubcontractorDriverVehicleHttpTest extends TestCase
         ]);
         $updateVehicle->assertOk()->assertJsonPath('data.status', 'maintenance');
 
+        $deleteDriverConflict = $this->deleteJson("/api/v1/drivers/{$driverId}");
+        $deleteDriverConflict->assertStatus(409)->assertJsonPath('error.code', 'RESOURCE_CONFLICT');
+
+        $detachVehicleDriver = $this->patchJson("/api/v1/vehicles/{$vehicleId}", [
+            'assigned_driver_id' => null,
+        ]);
+        $detachVehicleDriver->assertOk();
+
+        $deleteDriver = $this->deleteJson("/api/v1/drivers/{$driverId}");
+        $deleteDriver->assertOk();
+
+        $deleteVehicle = $this->deleteJson("/api/v1/vehicles/{$vehicleId}");
+        $deleteVehicle->assertOk();
+
+        $deleteSubcontractor = $this->deleteJson("/api/v1/subcontractors/{$subcontractorId}");
+        $deleteSubcontractor->assertOk();
+
         $drivers = $this->getJson("/api/v1/drivers?subcontractor_id={$subcontractorId}");
         $drivers->assertOk();
         $driverRow = collect($drivers->json('data'))->firstWhere('code', 'DRV-MOD-001');
-        $this->assertNotNull($driverRow);
-        $this->assertSame($manager->name, $driverRow['last_editor_name'] ?? null);
-        $this->assertNotNull($driverRow['updated_at'] ?? null);
+        $this->assertNull($driverRow);
 
         $vehicles = $this->getJson("/api/v1/vehicles?subcontractor_id={$subcontractorId}");
         $vehicles->assertOk();
         $vehicleRow = collect($vehicles->json('data'))->firstWhere('code', 'VEH-MOD-001');
-        $this->assertNotNull($vehicleRow);
-        $this->assertSame($manager->name, $vehicleRow['last_editor_name'] ?? null);
-        $this->assertNotNull($vehicleRow['updated_at'] ?? null);
+        $this->assertNull($vehicleRow);
 
         $subcontractors = $this->getJson('/api/v1/subcontractors?limit=50');
         $subcontractors->assertOk();
         $subcontractorRow = collect($subcontractors->json('data'))->firstWhere('id', $subcontractorId);
-        $this->assertNotNull($subcontractorRow);
-        $this->assertSame($manager->name, $subcontractorRow['last_editor_name'] ?? null);
-        $this->assertNotNull($subcontractorRow['updated_at'] ?? null);
+        $this->assertNull($subcontractorRow);
 
         $events = DB::table('audit_logs')
             ->whereIn('event', [
                 'subcontractors.created',
                 'subcontractors.updated',
+                'subcontractors.deleted',
                 'drivers.created',
                 'drivers.updated',
+                'drivers.deleted',
                 'vehicles.created',
                 'vehicles.updated',
+                'vehicles.deleted',
             ])
             ->pluck('event')
             ->all();
         $this->assertContains('subcontractors.created', $events);
         $this->assertContains('subcontractors.updated', $events);
+        $this->assertContains('subcontractors.deleted', $events);
         $this->assertContains('drivers.created', $events);
         $this->assertContains('drivers.updated', $events);
+        $this->assertContains('drivers.deleted', $events);
         $this->assertContains('vehicles.created', $events);
         $this->assertContains('vehicles.updated', $events);
+        $this->assertContains('vehicles.deleted', $events);
     }
 
     public function test_driver_cannot_mutate_partners_module_resources(): void
@@ -134,6 +151,13 @@ class SubcontractorDriverVehicleHttpTest extends TestCase
             'code' => 'VEH-DENY-001',
         ]);
         $forbiddenVehicle->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
+
+        $forbiddenDeleteSubcontractor = $this->deleteJson('/api/v1/subcontractors/' . Str::uuid());
+        $forbiddenDeleteSubcontractor->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
+        $forbiddenDeleteDriver = $this->deleteJson('/api/v1/drivers/' . Str::uuid());
+        $forbiddenDeleteDriver->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
+        $forbiddenDeleteVehicle = $this->deleteJson('/api/v1/vehicles/' . Str::uuid());
+        $forbiddenDeleteVehicle->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
     private function createUserWithRole(string $roleCode): User

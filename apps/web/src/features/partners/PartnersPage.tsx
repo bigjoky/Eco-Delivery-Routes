@@ -279,6 +279,51 @@ export function PartnersPage() {
     }
   };
 
+  const deleteSubcontractor = async (row: SubcontractorSummary) => {
+    const confirmed = window.confirm(`Eliminar subcontrata ${row.legal_name}?`);
+    if (!confirmed) return;
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.deleteSubcontractor(row.id);
+      if (editingSubcontractorId === row.id) setEditingSubcontractorId('');
+      setMessage('Subcontrata eliminada');
+      await load();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar la subcontrata');
+    }
+  };
+
+  const deleteDriver = async (row: DriverSummary) => {
+    const confirmed = window.confirm(`Eliminar driver ${row.code} - ${row.name}?`);
+    if (!confirmed) return;
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.deleteDriver(row.id);
+      if (editingDriverId === row.id) setEditingDriverId('');
+      setMessage('Driver eliminado');
+      await load();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar el driver');
+    }
+  };
+
+  const deleteVehicle = async (row: VehicleSummary) => {
+    const confirmed = window.confirm(`Eliminar vehiculo ${row.code}${row.plate_number ? ` (${row.plate_number})` : ''}?`);
+    if (!confirmed) return;
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.deleteVehicle(row.id);
+      if (editingVehicleId === row.id) setEditingVehicleId('');
+      setMessage('Vehiculo eliminado');
+      await load();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar el vehiculo');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -352,7 +397,10 @@ export function PartnersPage() {
                     <TableCell>{subcontractor.status}</TableCell>
                     <TableCell>{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</TableCell>
                     <TableCell>
-                      <Button data-testid={`edit-subcontractor-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
+                      <div className="inline-actions">
+                        <Button data-testid={`edit-subcontractor-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
+                        <Button data-testid={`delete-subcontractor-${subcontractor.id}`} type="button" variant="outline" onClick={() => deleteSubcontractor(subcontractor)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -399,7 +447,10 @@ export function PartnersPage() {
                     <TableCell>{driver.status}</TableCell>
                     <TableCell>{driver.last_editor_name ?? '-'} · {formatDateTime(driver.updated_at)}</TableCell>
                     <TableCell>
-                      <Button data-testid={`edit-driver-${driver.id}`} type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
+                      <div className="inline-actions">
+                        <Button data-testid={`edit-driver-${driver.id}`} type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
+                        <Button data-testid={`delete-driver-${driver.id}`} type="button" variant="outline" onClick={() => deleteDriver(driver)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -451,7 +502,10 @@ export function PartnersPage() {
                     <TableCell>{vehicle.status}</TableCell>
                     <TableCell>{vehicle.last_editor_name ?? '-'} · {formatDateTime(vehicle.updated_at)}</TableCell>
                     <TableCell>
-                      <Button data-testid={`edit-vehicle-${vehicle.id}`} type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
+                      <div className="inline-actions">
+                        <Button data-testid={`edit-vehicle-${vehicle.id}`} type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
+                        <Button data-testid={`delete-vehicle-${vehicle.id}`} type="button" variant="outline" onClick={() => deleteVehicle(vehicle)}>Eliminar</Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

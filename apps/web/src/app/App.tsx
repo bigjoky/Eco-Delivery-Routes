@@ -13,6 +13,7 @@ import { QualityPage } from '../features/quality/QualityPage';
 import { RolesPage } from '../features/roles/RolesPage';
 import { RoleDetailPage } from '../features/roles/RoleDetailPage';
 import { RouteDetailPage } from '../features/routes/RouteDetailPage';
+import { RoutesBoardPage } from '../features/routes/RoutesBoardPage';
 import { RoutesPage } from '../features/routes/RoutesPage';
 import { SettlementDetailPage } from '../features/settlements/SettlementDetailPage';
 import { SettlementsPage } from '../features/settlements/SettlementsPage';
@@ -56,6 +57,10 @@ export function App() {
         <Route
           path="/routes"
           element={isAuthenticated && canAccess('routes', roles) ? <RoutesPage /> : <Navigate to="/" replace />}
+        />
+        <Route
+          path="/routes/board"
+          element={isAuthenticated && canAccess('routes', roles) ? <RoutesBoardPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/routes/:id"

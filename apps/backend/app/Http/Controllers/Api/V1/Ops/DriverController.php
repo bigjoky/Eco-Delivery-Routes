@@ -155,4 +155,42 @@ class DriverController extends Controller
             'message' => 'Driver updated',
         ]);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('drivers')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Driver not found.'],
+            ], 404);
+        }
+
+        $hasRoutes = DB::table('routes')->where('driver_id', $id)->exists();
+        $hasAssignedVehicles = DB::table('vehicles')->where('assigned_driver_id', $id)->exists();
+        if ($hasRoutes || $hasAssignedVehicles) {
+            return response()->json([
+                'error' => [
+                    'code' => 'RESOURCE_CONFLICT',
+                    'message' => 'Driver has linked resources and cannot be deleted.',
+                ],
+            ], 409);
+        }
+
+        DB::table('drivers')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'drivers.deleted', [
+            'driver_id' => $id,
+        ]);
+
+        return response()->json([
+            'message' => 'Driver deleted',
+        ]);
+    }
 }

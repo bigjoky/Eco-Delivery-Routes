@@ -157,4 +157,41 @@ class VehicleController extends Controller
             'message' => 'Vehicle updated',
         ]);
     }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('vehicles')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Vehicle not found.'],
+            ], 404);
+        }
+
+        $hasRoutes = DB::table('routes')->where('vehicle_id', $id)->exists();
+        if ($hasRoutes) {
+            return response()->json([
+                'error' => [
+                    'code' => 'RESOURCE_CONFLICT',
+                    'message' => 'Vehicle has linked routes and cannot be deleted.',
+                ],
+            ], 409);
+        }
+
+        DB::table('vehicles')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'vehicles.deleted', [
+            'vehicle_id' => $id,
+        ]);
+
+        return response()->json([
+            'message' => 'Vehicle deleted',
+        ]);
+    }
 }

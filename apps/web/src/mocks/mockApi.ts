@@ -2366,6 +2366,16 @@ export const mockApi = {
     return mockSubcontractors[index];
   },
 
+  async deleteSubcontractor(id: string) {
+    const hasDrivers = mockDrivers.some((item) => item.subcontractor_id === id);
+    const hasVehicles = mockVehicles.some((item) => item.subcontractor_id === id);
+    const hasRoutes = mockRoutes.some((item) => item.subcontractor_id === id);
+    if (hasDrivers || hasVehicles || hasRoutes) {
+      throw new Error('Subcontractor has linked resources and cannot be deleted.');
+    }
+    mockSubcontractors = mockSubcontractors.filter((item) => item.id !== id);
+  },
+
   async getDrivers(filters: { subcontractorId?: string; status?: string; limit?: number }) {
     let rows = [...mockDrivers];
     if (filters.subcontractorId) {
@@ -2425,6 +2435,15 @@ export const mockApi = {
       last_editor_name: 'Admin Demo',
     };
     return mockDrivers[index];
+  },
+
+  async deleteDriver(id: string) {
+    const hasAssignedVehicles = mockVehicles.some((item) => item.assigned_driver_id === id);
+    const hasRoutes = mockRoutes.some((item) => item.driver_id === id);
+    if (hasAssignedVehicles || hasRoutes) {
+      throw new Error('Driver has linked resources and cannot be deleted.');
+    }
+    mockDrivers = mockDrivers.filter((item) => item.id !== id);
   },
 
   async getVehicles(filters: { subcontractorId?: string; status?: string; limit?: number }) {
@@ -2487,6 +2506,14 @@ export const mockApi = {
       last_editor_name: 'Admin Demo',
     };
     return mockVehicles[index];
+  },
+
+  async deleteVehicle(id: string) {
+    const hasRoutes = mockRoutes.some((item) => item.vehicle_id === id);
+    if (hasRoutes) {
+      throw new Error('Vehicle has linked routes and cannot be deleted.');
+    }
+    mockVehicles = mockVehicles.filter((item) => item.id !== id);
   },
 
   async getAdvances(_: { subcontractorId?: string; status?: string; period?: string }) {

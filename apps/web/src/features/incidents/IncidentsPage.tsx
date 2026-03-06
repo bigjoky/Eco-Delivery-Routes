@@ -20,6 +20,24 @@ function incidentStatusHelp(resolvedAt?: string | null): string {
   return resolvedAt ? 'Incidencia resuelta y cerrada.' : 'Incidencia abierta pendiente de acción.';
 }
 
+function formatSlaTimeline(item: IncidentSummary): string {
+  if (item.resolved_at) return 'Resuelta';
+  if (!item.sla_due_at) return 'Sin vencimiento';
+  const dueAt = new Date(item.sla_due_at);
+  if (Number.isNaN(dueAt.getTime())) return 'Fecha SLA inválida';
+  const now = new Date();
+  const diffMinutes = Math.floor((dueAt.getTime() - now.getTime()) / 60000);
+  if (diffMinutes >= 0) {
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+    return `Vence en ${hours}h ${minutes}m`;
+  }
+  const overdue = Math.abs(diffMinutes);
+  const hours = Math.floor(overdue / 60);
+  const minutes = overdue % 60;
+  return `Vencida hace ${hours}h ${minutes}m`;
+}
+
 export function IncidentsPage() {
   const [items, setItems] = useState<IncidentSummary[]>([]);
   const [catalog, setCatalog] = useState<IncidentCatalogItem[]>([]);
@@ -208,6 +226,37 @@ export function IncidentsPage() {
     }
   };
 
+  const onOverrideSla = async (item: IncidentSummary) => {
+    const reason = window.prompt(`Motivo de ajuste SLA para ${item.id}`);
+    if (!reason || reason.trim() === '') return;
+    const priorityInput = window.prompt('Nueva prioridad (high/medium/low). Deja vacio para mantener.', item.priority ?? '');
+    const dueInput = window.prompt('Nuevo SLA due_at ISO (opcional).', item.sla_due_at ?? '');
+    try {
+      await apiClient.overrideIncidentSla(item.id, {
+        priority: priorityInput === 'high' || priorityInput === 'medium' || priorityInput === 'low' ? priorityInput : undefined,
+        sla_due_at: dueInput && dueInput.trim() !== '' ? dueInput : undefined,
+        reason: reason.trim(),
+      });
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo ajustar SLA');
+    }
+  };
+
+  const onEscalatePriority = async (item: IncidentSummary) => {
+    const reason = window.prompt(`Motivo de escalado para ${item.id}`);
+    if (!reason || reason.trim() === '') return;
+    try {
+      await apiClient.overrideIncidentSla(item.id, {
+        priority: 'high',
+        reason: reason.trim(),
+      });
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo escalar prioridad');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -372,6 +421,7 @@ export function IncidentsPage() {
                   <TableHead>Categoria</TableHead>
                   <TableHead>Prioridad</TableHead>
                   <TableHead>SLA</TableHead>
+                  <TableHead>Timeline SLA</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Accion</TableHead>
                 </TableRow>
@@ -390,6 +440,7 @@ export function IncidentsPage() {
                     </TableCell>
                     <TableCell>{item.priority ?? '-'}</TableCell>
                     <TableCell>{item.sla_status ?? '-'}</TableCell>
+                    <TableCell>{formatSlaTimeline(item)}</TableCell>
                     <TableCell title={incidentStatusHelp(item.resolved_at)}>
                       {item.resolved_at ? 'resuelta' : 'abierta'}
                     </TableCell>
@@ -397,16 +448,22 @@ export function IncidentsPage() {
                       {item.resolved_at ? (
                         <span>-</span>
                       ) : (
-                        <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
-                          {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
-                        </Button>
+                        <div className="inline-actions">
+                          <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
+                            {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
+                          </Button>
+                          {item.priority !== 'high' ? (
+                            <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>Escalar alta</Button>
+                          ) : null}
+                          <Button type="button" variant="outline" onClick={() => onOverrideSla(item)}>Ajustar SLA</Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9}>Sin incidencias para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={10}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
