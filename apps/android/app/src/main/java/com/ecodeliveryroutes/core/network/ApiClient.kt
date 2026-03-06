@@ -26,10 +26,28 @@ import java.nio.charset.StandardCharsets
 
 class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() }) {
     private val addressSuggestionsCache = mutableMapOf<String, Pair<Long, List<AddressSuggestion>>>()
+    private var addressSuggestionsCacheHits: Int = 0
+    private var addressSuggestionsCacheMisses: Int = 0
 
     companion object {
         private const val ADDRESS_SUGGESTIONS_TTL_MS = 5 * 60 * 1000L
     }
+
+    data class AddressSuggestionsCacheStats(
+        val hits: Int,
+        val misses: Int,
+        val size: Int,
+    )
+
+    fun clearAddressSuggestionsCache() {
+        addressSuggestionsCache.clear()
+    }
+
+    fun addressSuggestionsCacheStats(): AddressSuggestionsCacheStats = AddressSuggestionsCacheStats(
+        hits = addressSuggestionsCacheHits,
+        misses = addressSuggestionsCacheMisses,
+        size = addressSuggestionsCache.size,
+    )
 
     suspend fun login(email: String, password: String): String = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext "mock-token"
@@ -143,6 +161,7 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                     .put("reference", reference)
                     .put("pickup_type", pickupType)
             )
+            clearAddressSuggestionsCache()
             true
         }.getOrDefault(false)
     }
@@ -186,6 +205,7 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                 "$baseUrl/shipments",
                 payload
             )
+            clearAddressSuggestionsCache()
             true
         }.getOrDefault(false)
     }
@@ -209,11 +229,13 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         val now = System.currentTimeMillis()
         val cached = addressSuggestionsCache[cacheKey]
         if (cached != null && cached.first > now) {
+            addressSuggestionsCacheHits += 1
             return@withContext cached.second
         }
         if (cached != null && cached.first <= now) {
             addressSuggestionsCache.remove(cacheKey)
         }
+        addressSuggestionsCacheMisses += 1
 
         runCatching {
             fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())

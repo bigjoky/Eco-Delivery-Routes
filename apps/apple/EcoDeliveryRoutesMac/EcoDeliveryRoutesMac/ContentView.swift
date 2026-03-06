@@ -177,8 +177,8 @@ struct ContentView: View {
     @State private var operationalMessage: String = "Recepcion lista"
     @State private var advancesMessage: String = ""
     @State private var usersMessage: String = ""
-    @State private var email: String = "admin@eco.local"
-    @State private var password: String = "password123"
+    @State private var email: String = ""
+    @State private var password: String = ""
     @State private var loginMessage: String = "No autenticado"
     @State private var manifestRouteId: String = ""
     @State private var manifestRouteCode: String = "-"
@@ -247,32 +247,51 @@ struct ContentView: View {
                 }
             }
         }
+        .background(ecoBackground)
+        .tint(.teal)
         .task {
             await refreshAll()
         }
     }
 
+    private var ecoBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.05, green: 0.10, blue: 0.18),
+                Color(red: 0.08, green: 0.20, blue: 0.22),
+                Color(red: 0.16, green: 0.18, blue: 0.08)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
     private var loginView: some View {
-        VStack(spacing: 12) {
-            Image("Logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-            Text("Warehouse / Traffic Login")
-                .font(.headline)
-            TextField("Email", text: $email)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 320)
-            SecureField("Password", text: $password)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 320)
-            Button("Entrar") {
-                Task { await login() }
+        VStack {
+            VStack(spacing: 12) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 72)
+                Text("Warehouse / Traffic Login")
+                    .font(.headline)
+                TextField("Email", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+                Button("Entrar") {
+                    Task { await login() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(email.isEmpty || password.isEmpty)
+                Text(loginMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .disabled(email.isEmpty || password.isEmpty)
-            Text(loginMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .padding(20)
+            .frame(maxWidth: 360)
+            .ecoPanelStyle(cornerRadius: 14)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -280,152 +299,174 @@ struct ContentView: View {
 
     private var operationsTab: some View {
         HStack(spacing: 0) {
-            List(routeStops) { stop in
-                VStack(alignment: .leading) {
-                    Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
-                    Text(stop.reference).font(.caption)
-                    Text(stop.status).font(.caption2).foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedStopId = stop.id
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Paradas de la ruta")
+                    .font(.headline)
+                    .padding(.horizontal)
+
+                List(routeStops) { stop in
+                    VStack(alignment: .leading) {
+                        Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
+                        Text(stop.reference).font(.caption)
+                        Text(stop.status).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedStopId = stop.id
+                    }
                 }
             }
             .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Recepcion / Scan masivo")
-                    .font(.title3)
-                TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
-                TextField("Estado ruta (opcional)", text: $routeStatusFilter)
-                Text("Parada activa: \(selectedStop?.reference ?? "-")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Codigo de escaneo", text: $scanCode)
-                Button("Registrar scan") {
-                    Task {
-                        guard let target = selectedStop else { return }
-                        do {
-                            try await apiClient.registerScan(
-                                trackableType: target.entityType,
-                                trackableId: target.entityId,
-                                scanCode: scanCode
-                            )
-                            operationalMessage = "Scan registrado en hub"
-                        } catch {
-                            operationalMessage = "Error de scan"
-                        }
-                    }
-                }
-                Text(operationalMessage).font(.caption)
-                Button("Recargar manifiesto") {
-                    Task { await loadRoute() }
-                }
-                Divider()
-                Text("Manifest API (ruta por ID)")
-                    .font(.headline)
-                TextField("Route ID", text: $manifestRouteId)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button(manifestLoading ? "Cargando..." : "Cargar manifest") {
-                    Task { await loadManifestById() }
-                }
-                .disabled(manifestLoading || manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Export CSV") {
-                    Task { await exportManifest(format: "csv") }
-                }
-                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Export PDF") {
-                    Task { await exportManifest(format: "pdf") }
-                }
-                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if let manifestError {
-                    Text(manifestError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                Text("\(manifestRouteCode) | \(manifestRouteDate)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("Stops: \(manifestTotals.stops) · Deliveries: \(manifestTotals.deliveries) · Pickups: \(manifestTotals.pickups) · Completed: \(manifestTotals.completed)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let notes = manifestTotals.manifestNotes, !notes.isEmpty {
-                    Text("Notas: \(notes)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if !manifestRows.isEmpty {
-                    List(manifestRows.prefix(6)) { row in
-                        VStack(alignment: .leading) {
-                            Text("#\(row.sequence) \(row.stopType) \(row.reference)")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    GroupBox("Ruta y escaneo") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
+                            TextField("Estado ruta (opcional)", text: $routeStatusFilter)
+                            Text("Parada activa: \(selectedStop?.reference ?? "-")")
                                 .font(.caption)
-                            Text(row.status)
-                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            TextField("Codigo de escaneo", text: $scanCode)
+                            HStack {
+                                Button("Recargar manifiesto") {
+                                    Task { await loadRoute() }
+                                }
+                                Button("Registrar scan") {
+                                    Task {
+                                        guard let target = selectedStop else { return }
+                                        do {
+                                            try await apiClient.registerScan(
+                                                trackableType: target.entityType,
+                                                trackableId: target.entityId,
+                                                scanCode: scanCode
+                                            )
+                                            operationalMessage = "Scan registrado en hub"
+                                        } catch {
+                                            operationalMessage = "Error de scan"
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            Text(operationalMessage)
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .frame(maxHeight: 180)
-                }
-                Divider()
-                Text("Importar envios CSV")
-                    .font(.headline)
-                HStack {
-                    Button(importFileUrl == nil ? "Seleccionar CSV" : "CSV seleccionado") {
-                        showImportPicker = true
-                    }
-                    Toggle("Dry run", isOn: $importDryRun)
-                        .toggleStyle(.switch)
-                    Button(importRunning ? "Importando..." : "Importar") {
-                        Task { await importShipmentsCsv() }
-                    }
-                    .disabled(importRunning || importFileUrl == nil)
-                    Button("Descargar plantilla") {
-                        Task { await downloadShipmentsTemplate() }
-                    }
-                }
-                if let importFileUrl {
-                    Text(importFileUrl.lastPathComponent)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if !importMessage.isEmpty {
-                    Text(importMessage)
-                        .font(.caption)
-                        .foregroundStyle(importMessage.contains("Error") ? .red : .secondary)
-                }
-                if let importResult {
-                    Text("Creados: \(importResult.createdCount) · Errores: \(importResult.errorCount)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if !importWarnings.isEmpty {
-                        Text("Avisos: \(importWarnings.joined(separator: ", "))")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                    }
-                    if !importResult.rows.isEmpty {
-                        List(importResult.rows.prefix(5)) { row in
-                            VStack(alignment: .leading) {
-                                Text("Fila \(row.row): \(row.reference ?? "-")")
+
+                    GroupBox("Manifest API (ruta por ID)") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            TextField("Route ID", text: $manifestRouteId)
+                                .textFieldStyle(.roundedBorder)
+                            HStack {
+                                Button(manifestLoading ? "Cargando..." : "Cargar manifest") {
+                                    Task { await loadManifestById() }
+                                }
+                                .disabled(manifestLoading || manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                Button("Export CSV") {
+                                    Task { await exportManifest(format: "csv") }
+                                }
+                                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                Button("Export PDF") {
+                                    Task { await exportManifest(format: "pdf") }
+                                }
+                                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                            if let manifestError {
+                                Text(manifestError)
                                     .font(.caption)
-                                Text(row.status)
-                                    .font(.caption2)
-                                    .foregroundStyle(row.status == "error" ? .red : .secondary)
-                                if let errors = row.errors, !errors.isEmpty {
-                                    Text(errors.joined(separator: ", "))
+                                    .foregroundStyle(.red)
+                            }
+                            Text("\(manifestRouteCode) | \(manifestRouteDate)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Stops: \(manifestTotals.stops) · Deliveries: \(manifestTotals.deliveries) · Pickups: \(manifestTotals.pickups) · Completed: \(manifestTotals.completed)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if let notes = manifestTotals.manifestNotes, !notes.isEmpty {
+                                Text("Notas: \(notes)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !manifestRows.isEmpty {
+                                List(manifestRows.prefix(6)) { row in
+                                    VStack(alignment: .leading) {
+                                        Text("#\(row.sequence) \(row.stopType) \(row.reference)")
+                                            .font(.caption)
+                                        Text(row.status)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxHeight: 180)
+                            }
+                        }
+                    }
+
+                    GroupBox("Importar envios CSV") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Button(importFileUrl == nil ? "Seleccionar CSV" : "CSV seleccionado") {
+                                    showImportPicker = true
+                                }
+                                Toggle("Dry run", isOn: $importDryRun)
+                                    .toggleStyle(.switch)
+                                Button(importRunning ? "Importando..." : "Importar") {
+                                    Task { await importShipmentsCsv() }
+                                }
+                                .disabled(importRunning || importFileUrl == nil)
+                                Button("Descargar plantilla") {
+                                    Task { await downloadShipmentsTemplate() }
+                                }
+                            }
+                            if let importFileUrl {
+                                Text(importFileUrl.lastPathComponent)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !importMessage.isEmpty {
+                                Text(importMessage)
+                                    .font(.caption)
+                                    .foregroundStyle(importMessage.contains("Error") ? .red : .secondary)
+                            }
+                            if let importResult {
+                                Text("Creados: \(importResult.createdCount) · Errores: \(importResult.errorCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                if !importWarnings.isEmpty {
+                                    Text("Avisos: \(importWarnings.joined(separator: ", "))")
                                         .font(.caption2)
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(.orange)
+                                }
+                                if !importResult.rows.isEmpty {
+                                    List(importResult.rows.prefix(5)) { row in
+                                        VStack(alignment: .leading) {
+                                            Text("Fila \(row.row): \(row.reference ?? "-")")
+                                                .font(.caption)
+                                            Text(row.status)
+                                                .font(.caption2)
+                                                .foregroundStyle(row.status == "error" ? .red : .secondary)
+                                            if let errors = row.errors, !errors.isEmpty {
+                                                Text(errors.joined(separator: ", "))
+                                                    .font(.caption2)
+                                                    .foregroundStyle(.red)
+                                            }
+                                        }
+                                    }
+                                    .frame(maxHeight: 160)
                                 }
                             }
                         }
-                        .frame(maxHeight: 160)
                     }
+
+                    Spacer(minLength: 0)
                 }
-                Spacer()
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .navigationTitle("Manifiesto")
         .fileImporter(
@@ -1547,3 +1588,17 @@ struct ContentView: View {
 #Preview {
     ContentView(apiClient: APIClient(baseURL: nil))
 }
+private extension View {
+    @ViewBuilder
+    func ecoPanelStyle(cornerRadius: CGFloat = 14) -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .glassEffect(.regular.tint(.teal.opacity(0.08)).interactive(), in: .rect(cornerRadius: cornerRadius))
+        } else {
+            self
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
+}
+

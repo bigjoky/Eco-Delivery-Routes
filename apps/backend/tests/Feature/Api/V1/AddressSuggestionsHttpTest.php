@@ -93,6 +93,45 @@ class AddressSuggestionsHttpTest extends TestCase
             ->assertJsonFragment(['source' => 'point']);
     }
 
+    public function test_address_suggestions_rank_exact_city_and_postal_matches_first(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Coincidencia exacta',
+            'kind' => 'recipient',
+            'address_street' => 'Calle Exacta',
+            'address_number' => '1',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'country' => 'ES',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Coincidencia parcial',
+            'kind' => 'recipient',
+            'address_street' => 'Calle Parcial',
+            'address_number' => '2',
+            'postal_code' => '29002',
+            'city' => 'Malaga Este',
+            'country' => 'ES',
+            'created_at' => now(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        $response = $this->getJson('/api/v1/addresses/suggest?city=Malaga&postal_code=29001&limit=5');
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.0.address_street', 'Calle Exacta')
+            ->assertJsonPath('data.0.postal_code', '29001')
+            ->assertJsonPath('data.0.city', 'Malaga');
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $roleId = DB::table('roles')->where('code', $roleCode)->value('id');
