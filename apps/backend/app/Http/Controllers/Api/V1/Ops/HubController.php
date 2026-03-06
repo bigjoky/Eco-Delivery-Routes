@@ -31,6 +31,10 @@ class HubController extends Controller
         $query = DB::table('hubs')
             ->orderBy('code');
 
+        if (!$request->boolean('include_deleted', false)) {
+            $query->whereNull('deleted_at');
+        }
+
         if ($request->boolean('only_active', true)) {
             $query->where('is_active', true);
         }
@@ -67,6 +71,7 @@ class HubController extends Controller
             'is_active' => $payload['is_active'] ?? true,
             'created_at' => now(),
             'updated_at' => now(),
+            'deleted_at' => null,
         ]);
         $this->auditLogWriter->write($actor->id, 'hubs.created', [
             'hub_id' => $id,
@@ -86,7 +91,7 @@ class HubController extends Controller
             ], 403);
         }
 
-        $row = DB::table('hubs')->where('id', $id)->first();
+        $row = DB::table('hubs')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Hub not found.'],
@@ -109,7 +114,7 @@ class HubController extends Controller
             'changes' => array_keys($payload),
         ]);
 
-        return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()]);
+        return response()->json(['data' => DB::table('hubs')->where('id', $id)->whereNull('deleted_at')->first()]);
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -122,7 +127,7 @@ class HubController extends Controller
             ], 403);
         }
 
-        $row = DB::table('hubs')->where('id', $id)->first();
+        $row = DB::table('hubs')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Hub not found.'],
@@ -130,8 +135,8 @@ class HubController extends Controller
         }
 
         $linkedCounters = [
-            'depots' => DB::table('depots')->where('hub_id', $id)->count(),
-            'points' => DB::table('points')->where('hub_id', $id)->count(),
+            'depots' => DB::table('depots')->where('hub_id', $id)->whereNull('deleted_at')->count(),
+            'points' => DB::table('points')->where('hub_id', $id)->whereNull('deleted_at')->count(),
             'routes' => DB::table('routes')->where('hub_id', $id)->count(),
             'shipments' => DB::table('shipments')->where('hub_id', $id)->count(),
             'pickups' => DB::table('pickups')->where('hub_id', $id)->count(),
@@ -154,7 +159,10 @@ class HubController extends Controller
             ], 409);
         }
 
-        DB::table('hubs')->where('id', $id)->delete();
+        DB::table('hubs')->where('id', $id)->update([
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
         $this->auditLogWriter->write($actor->id, 'hubs.deleted', [
             'hub_id' => $id,
         ]);

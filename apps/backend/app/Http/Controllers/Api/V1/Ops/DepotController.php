@@ -30,6 +30,9 @@ class DepotController extends Controller
 
         $hubId = $request->query('hub_id');
         $query = DB::table('depots')->orderBy('code');
+        if (!$request->boolean('include_deleted', false)) {
+            $query->whereNull('deleted_at');
+        }
         if (is_string($hubId) && $hubId !== '') {
             $query->where('hub_id', $hubId);
         }
@@ -56,6 +59,15 @@ class DepotController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        if (!DB::table('hubs')->where('id', $payload['hub_id'])->whereNull('deleted_at')->exists()) {
+            return response()->json([
+                'error' => [
+                    'code' => 'VALIDATION_ERROR',
+                    'message' => 'Hub not found.',
+                ],
+            ], 422);
+        }
+
         $id = (string) Str::uuid();
         $code = $payload['code'] ?? (string) $this->sequenceService->next('depots');
         DB::table('depots')->insert([
@@ -68,6 +80,7 @@ class DepotController extends Controller
             'is_active' => $payload['is_active'] ?? true,
             'created_at' => now(),
             'updated_at' => now(),
+            'deleted_at' => null,
         ]);
         $this->auditLogWriter->write($actor->id, 'depots.created', [
             'depot_id' => $id,
@@ -88,7 +101,7 @@ class DepotController extends Controller
             ], 403);
         }
 
-        $row = DB::table('depots')->where('id', $id)->first();
+        $row = DB::table('depots')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Depot not found.'],
@@ -112,7 +125,7 @@ class DepotController extends Controller
             'changes' => array_keys($payload),
         ]);
 
-        return response()->json(['data' => DB::table('depots')->where('id', $id)->first()]);
+        return response()->json(['data' => DB::table('depots')->where('id', $id)->whereNull('deleted_at')->first()]);
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -125,14 +138,14 @@ class DepotController extends Controller
             ], 403);
         }
 
-        $row = DB::table('depots')->where('id', $id)->first();
+        $row = DB::table('depots')->where('id', $id)->whereNull('deleted_at')->first();
         if (!$row) {
             return response()->json([
                 'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Depot not found.'],
             ], 404);
         }
 
-        $linkedPoints = DB::table('points')->where('depot_id', $id)->count();
+        $linkedPoints = DB::table('points')->where('depot_id', $id)->whereNull('deleted_at')->count();
         if ($linkedPoints > 0) {
             return response()->json([
                 'error' => [
@@ -143,7 +156,10 @@ class DepotController extends Controller
             ], 409);
         }
 
-        DB::table('depots')->where('id', $id)->delete();
+        DB::table('depots')->where('id', $id)->update([
+            'deleted_at' => now(),
+            'updated_at' => now(),
+        ]);
         $this->auditLogWriter->write($actor->id, 'depots.deleted', [
             'depot_id' => $id,
         ]);
