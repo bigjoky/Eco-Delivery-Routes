@@ -186,6 +186,30 @@ class NetworkNodesHttpTest extends TestCase
         $this->assertContains('points.restored', $events);
     }
 
+    public function test_depot_cannot_be_created_under_archived_hub(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubCreate = $this->postJson('/api/v1/hubs', [
+            'name' => 'Hub Archived Parent',
+            'city' => 'Malaga',
+        ]);
+        $hubCreate->assertStatus(201);
+        $hubId = (string) $hubCreate->json('data.id');
+
+        $this->deleteJson('/api/v1/hubs/' . $hubId)->assertOk();
+
+        $createDepot = $this->postJson('/api/v1/depots', [
+            'hub_id' => $hubId,
+            'name' => 'Depot Invalid Parent',
+        ]);
+
+        $createDepot
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

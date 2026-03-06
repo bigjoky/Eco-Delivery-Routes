@@ -39,12 +39,16 @@ fun DriverRouteScreen(
     val incidentCode = remember { mutableStateOf("ABSENT_HOME") }
     val incidentNotes = remember { mutableStateOf("") }
     val message = remember { mutableStateOf("") }
+    val canAccessNetwork = remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         stops.value = ApiProvider.client.myRouteStops(routeDateFilter.value, routeStatusFilter.value)
         selectedStopId.value = stops.value.firstOrNull()?.id
         routeQuality.value = ApiProvider.client.qualityRouteSnapshots()
+        val profile = ApiProvider.client.me()
+        val allowedRoles = setOf("super_admin", "operations_manager", "warehouse_manager", "traffic_manager")
+        canAccessNetwork.value = profile?.roleCodes?.any { role -> allowedRoles.contains(role) } == true
     }
 
     val selectedStop = stops.value.firstOrNull { it.id == selectedStopId.value } ?: stops.value.firstOrNull()
@@ -84,7 +88,9 @@ fun DriverRouteScreen(
                 message.value = "KPI de ruta actualizado"
             }
         }) { Text("Refrescar KPI ruta") }
-        Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
+        if (canAccessNetwork.value) {
+            Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
+        }
         Text("Parada activa: ${selectedStop?.reference ?: "-"}")
         stops.value.forEach { stop ->
             Button(onClick = { selectedStopId.value = stop.id }) {

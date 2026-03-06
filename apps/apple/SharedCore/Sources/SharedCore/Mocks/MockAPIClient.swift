@@ -72,6 +72,16 @@ public final class MockAPIClient {
         return AuthToken(token: "mock-token")
     }
 
+    public func me() async throws -> User {
+        mockUsers.first ?? User(
+            id: "u-1",
+            name: "Admin Demo",
+            email: "admin@eco.local",
+            status: "active",
+            roles: [UserRole(id: "r-1", code: "super_admin", name: "Super Admin")]
+        )
+    }
+
     public func myRouteStops() async throws -> [DriverStop] {
         try await myRoute(routeDate: nil, status: nil).stops
     }

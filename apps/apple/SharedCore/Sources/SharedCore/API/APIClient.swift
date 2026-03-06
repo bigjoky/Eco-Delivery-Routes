@@ -4,6 +4,7 @@ public protocol APIClientProtocol {
     func setAuthToken(_ token: String?)
     func login(email: String, password: String) async throws -> AuthToken
     func logout() async
+    func me() async throws -> User
     func myRoute(routeDate: String?, status: String?) async throws -> DriverRouteMePayload
     func myRouteStops() async throws -> [DriverStop]
     func users(status: String?, page: Int, perPage: Int) async throws -> PaginatedResponse<User>
@@ -120,6 +121,13 @@ public final class APIClient: APIClientProtocol {
         let authToken = AuthToken(token: decoded.token, tokenType: decoded.tokenType)
         self.token = authToken.token
         return authToken
+    }
+
+    public func me() async throws -> User {
+        guard let baseURL else { return try await mock.me() }
+        let request = authorizedRequest(url: baseURL.appending(path: "auth/me"), method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<User>.self, from: data).data
     }
 
     public func myRouteStops() async throws -> [DriverStop] {

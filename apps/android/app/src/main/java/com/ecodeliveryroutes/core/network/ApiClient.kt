@@ -1,6 +1,7 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
+import com.ecodeliveryroutes.core.model.AuthProfile
 import com.ecodeliveryroutes.core.model.DepotSummary
 import com.ecodeliveryroutes.core.model.HubSummary
 import com.ecodeliveryroutes.core.model.PointSummary
@@ -47,6 +48,33 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
             }
             connection.inputStream.bufferedReader().use { it.readText() }
         }
+    }
+
+    suspend fun me(): AuthProfile? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext AuthProfile(
+                id = "u-mock-1",
+                name = "Admin Demo",
+                email = "admin@eco.local",
+                status = "active",
+                roleCodes = listOf("super_admin")
+            )
+        }
+        runCatching {
+            val payload = authedGet("$baseUrl/auth/me")
+            val data = JSONObject(payload).optJSONObject("data") ?: return@runCatching null
+            val roles = data.optJSONArray("roles") ?: JSONArray()
+            val roleCodes = (0 until roles.length()).mapNotNull { index ->
+                roles.optJSONObject(index)?.optString("code")?.ifBlank { null }
+            }
+            AuthProfile(
+                id = data.optString("id"),
+                name = data.optString("name"),
+                email = data.optString("email"),
+                status = data.optString("status"),
+                roleCodes = roleCodes
+            )
+        }.getOrNull()
     }
 
     suspend fun myRouteStops(routeDate: String? = null, status: String? = null): List<RouteStop> = withContext(Dispatchers.IO) {
