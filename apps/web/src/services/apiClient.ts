@@ -439,11 +439,12 @@ export const apiClient = {
     return json.data as RoleDetail;
   },
 
-  async getHubs(filters: { onlyActive?: boolean } = {}): Promise<HubSummary[]> {
+  async getHubs(filters: { onlyActive?: boolean; includeDeleted?: boolean } = {}): Promise<HubSummary[]> {
     if (USE_MOCK) return mockApi.getHubs(filters) as Promise<HubSummary[]>;
 
     const params = new URLSearchParams();
     if (filters.onlyActive !== undefined) params.set('only_active', filters.onlyActive ? '1' : '0');
+    if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE_URL}/hubs${suffix}`, {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
@@ -495,10 +496,21 @@ export const apiClient = {
     return json.data as { id: string; deleted: boolean };
   },
 
-  async getDepots(filters: { hubId?: string } = {}): Promise<DepotSummary[]> {
+  async restoreHub(id: string): Promise<HubSummary> {
+    if (USE_MOCK) return mockApi.restoreHub(id) as Promise<HubSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs/${id}/restore`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot restore hub');
+    return json.data as HubSummary;
+  },
+
+  async getDepots(filters: { hubId?: string; includeDeleted?: boolean } = {}): Promise<DepotSummary[]> {
     if (USE_MOCK) return mockApi.getDepots(filters) as Promise<DepotSummary[]>;
     const params = new URLSearchParams();
     if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/depots${suffix}`);
     return parseData<DepotSummary>(response);
@@ -551,11 +563,22 @@ export const apiClient = {
     return json.data as { id: string; deleted: boolean };
   },
 
-  async getPoints(filters: { hubId?: string; depotId?: string } = {}): Promise<PointSummary[]> {
+  async restoreDepot(id: string): Promise<DepotSummary> {
+    if (USE_MOCK) return mockApi.restoreDepot(id) as Promise<DepotSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/depots/${id}/restore`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot restore depot');
+    return json.data as DepotSummary;
+  },
+
+  async getPoints(filters: { hubId?: string; depotId?: string; includeDeleted?: boolean } = {}): Promise<PointSummary[]> {
     if (USE_MOCK) return mockApi.getPoints(filters) as Promise<PointSummary[]>;
     const params = new URLSearchParams();
     if (filters.hubId) params.set('hub_id', filters.hubId);
     if (filters.depotId) params.set('depot_id', filters.depotId);
+    if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/points${suffix}`);
     return parseData<PointSummary>(response);
@@ -607,6 +630,16 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete point');
     return json.data as { id: string; deleted: boolean };
+  },
+
+  async restorePoint(id: string): Promise<PointSummary> {
+    if (USE_MOCK) return mockApi.restorePoint(id) as Promise<PointSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/points/${id}/restore`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot restore point');
+    return json.data as PointSummary;
   },
 
   async getShipments(filters: {

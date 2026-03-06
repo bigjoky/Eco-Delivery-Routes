@@ -193,6 +193,50 @@ class PointController extends Controller
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }
 
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('points.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('points')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Point not found.'],
+            ], 404);
+        }
+        if ($row->deleted_at === null) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Point is already active.'],
+            ], 409);
+        }
+
+        if (!DB::table('hubs')->where('id', $row->hub_id)->whereNull('deleted_at')->exists()) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Cannot restore point while parent hub is archived.'],
+            ], 409);
+        }
+        if (!$this->isDepotConsistentWithHub((string) $row->hub_id, is_string($row->depot_id) ? $row->depot_id : null)) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Cannot restore point while parent depot is archived or inconsistent.'],
+            ], 409);
+        }
+
+        DB::table('points')->where('id', $id)->update([
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'points.restored', [
+            'point_id' => $id,
+        ]);
+
+        return response()->json(['data' => DB::table('points')->where('id', $id)->first()]);
+    }
+
     private function isDepotConsistentWithHub(string $hubId, ?string $depotId): bool
     {
         if (!$depotId) {

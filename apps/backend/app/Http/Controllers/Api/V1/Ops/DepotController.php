@@ -166,4 +166,42 @@ class DepotController extends Controller
 
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }
+
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('depots.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('depots')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Depot not found.'],
+            ], 404);
+        }
+        if ($row->deleted_at === null) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Depot is already active.'],
+            ], 409);
+        }
+        if (!DB::table('hubs')->where('id', $row->hub_id)->whereNull('deleted_at')->exists()) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Cannot restore depot while parent hub is archived.'],
+            ], 409);
+        }
+
+        DB::table('depots')->where('id', $id)->update([
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'depots.restored', [
+            'depot_id' => $id,
+        ]);
+
+        return response()->json(['data' => DB::table('depots')->where('id', $id)->first()]);
+    }
 }

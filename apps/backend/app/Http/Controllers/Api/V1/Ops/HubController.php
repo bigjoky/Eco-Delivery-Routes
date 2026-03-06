@@ -169,4 +169,37 @@ class HubController extends Controller
 
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }
+
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('hubs.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $row = DB::table('hubs')->where('id', $id)->first();
+        if (!$row) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Hub not found.'],
+            ], 404);
+        }
+        if ($row->deleted_at === null) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_CONFLICT', 'message' => 'Hub is already active.'],
+            ], 409);
+        }
+
+        DB::table('hubs')->where('id', $id)->update([
+            'deleted_at' => null,
+            'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'hubs.restored', [
+            'hub_id' => $id,
+        ]);
+
+        return response()->json(['data' => DB::table('hubs')->where('id', $id)->first()]);
+    }
 }
