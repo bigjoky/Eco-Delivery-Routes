@@ -1,6 +1,7 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
+import com.ecodeliveryroutes.core.model.AuthProfile
 import com.ecodeliveryroutes.core.model.DepotSummary
 import com.ecodeliveryroutes.core.model.HubSummary
 import com.ecodeliveryroutes.core.model.PointSummary
@@ -47,6 +48,33 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
             }
             connection.inputStream.bufferedReader().use { it.readText() }
         }
+    }
+
+    suspend fun me(): AuthProfile? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext AuthProfile(
+                id = "u-mock-1",
+                name = "Admin Demo",
+                email = "admin@eco.local",
+                status = "active",
+                roleCodes = listOf("super_admin")
+            )
+        }
+        runCatching {
+            val payload = authedGet("$baseUrl/auth/me")
+            val data = JSONObject(payload).optJSONObject("data") ?: return@runCatching null
+            val roles = data.optJSONArray("roles") ?: JSONArray()
+            val roleCodes = (0 until roles.length()).mapNotNull { index ->
+                roles.optJSONObject(index)?.optString("code")?.ifBlank { null }
+            }
+            AuthProfile(
+                id = data.optString("id"),
+                name = data.optString("name"),
+                email = data.optString("email"),
+                status = data.optString("status"),
+                roleCodes = roleCodes
+            )
+        }.getOrNull()
     }
 
     suspend fun myRouteStops(routeDate: String? = null, status: String? = null): List<RouteStop> = withContext(Dispatchers.IO) {
@@ -369,12 +397,176 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrDefault(false)
     }
 
+    suspend fun createHub(name: String, city: String, code: String? = null): HubSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext HubSummary("hub-mock", code ?: "HUB-MOCK", name, city, true, null)
+        runCatching {
+            val payload = JSONObject()
+                .put("name", name)
+                .put("city", city)
+                .put("is_active", true)
+            if (!code.isNullOrBlank()) payload.put("code", code)
+            val raw = authedPost("$baseUrl/hubs", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            HubSummary(
+                id = item.optString("id"),
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun updateHub(id: String, name: String, city: String?): HubSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext HubSummary(id, "HUB-MOCK", name, city, true, null)
+        runCatching {
+            val payload = JSONObject().put("name", name)
+            if (city != null) payload.put("city", city) else payload.put("city", JSONObject.NULL)
+            val raw = authedPatch("$baseUrl/hubs/$id", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            HubSummary(
+                id = item.optString("id"),
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun createDepot(hubId: String, name: String, city: String? = null, code: String? = null): DepotSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext null
+        runCatching {
+            val payload = JSONObject()
+                .put("hub_id", hubId)
+                .put("name", name)
+                .put("is_active", true)
+            if (!city.isNullOrBlank()) payload.put("city", city)
+            if (!code.isNullOrBlank()) payload.put("code", code)
+            val raw = authedPost("$baseUrl/depots", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            DepotSummary(
+                id = item.optString("id"),
+                hubId = item.optString("hub_id"),
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun updateDepot(id: String, name: String, city: String?): DepotSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext null
+        runCatching {
+            val payload = JSONObject().put("name", name)
+            if (city != null) payload.put("city", city) else payload.put("city", JSONObject.NULL)
+            val raw = authedPatch("$baseUrl/depots/$id", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            DepotSummary(
+                id = item.optString("id"),
+                hubId = item.optString("hub_id"),
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun createPoint(
+        hubId: String,
+        depotId: String? = null,
+        name: String,
+        city: String? = null,
+        code: String? = null
+    ): PointSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext null
+        runCatching {
+            val payload = JSONObject()
+                .put("hub_id", hubId)
+                .put("name", name)
+                .put("is_active", true)
+            if (!depotId.isNullOrBlank()) payload.put("depot_id", depotId)
+            if (!city.isNullOrBlank()) payload.put("city", city)
+            if (!code.isNullOrBlank()) payload.put("code", code)
+            val raw = authedPost("$baseUrl/points", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            PointSummary(
+                id = item.optString("id"),
+                hubId = item.optString("hub_id"),
+                depotId = item.optString("depot_id").ifBlank { null },
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun updatePoint(id: String, name: String, city: String?): PointSummary? = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext null
+        runCatching {
+            val payload = JSONObject().put("name", name)
+            if (city != null) payload.put("city", city) else payload.put("city", JSONObject.NULL)
+            val raw = authedPatch("$baseUrl/points/$id", payload)
+            val item = JSONObject(raw).optJSONObject("data") ?: return@runCatching null
+            PointSummary(
+                id = item.optString("id"),
+                hubId = item.optString("hub_id"),
+                depotId = item.optString("depot_id").ifBlank { null },
+                code = item.optString("code"),
+                name = item.optString("name"),
+                city = item.optString("city").ifBlank { null },
+                isActive = item.optBoolean("is_active", true),
+                deletedAt = item.optString("deleted_at").ifBlank { null }
+            )
+        }.getOrNull()
+    }
+
+    suspend fun archiveHub(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/hubs/$id")
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun archiveDepot(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/depots/$id")
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun archivePoint(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/points/$id")
+            true
+        }.getOrDefault(false)
+    }
+
     private fun authedGet(url: String): String {
         return executeWithRefresh("GET", url, null)
     }
 
     private fun authedPost(url: String, payload: JSONObject): String {
         return executeWithRefresh("POST", url, payload)
+    }
+
+    private fun authedPatch(url: String, payload: JSONObject): String {
+        return executeWithRefresh("PATCH", url, payload)
+    }
+
+    private fun authedDelete(url: String): String {
+        return executeWithRefresh("DELETE", url, null)
     }
 
     private fun executeWithRefresh(method: String, url: String, payload: JSONObject?): String {

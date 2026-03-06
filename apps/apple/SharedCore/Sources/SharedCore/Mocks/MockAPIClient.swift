@@ -72,6 +72,16 @@ public final class MockAPIClient {
         return AuthToken(token: "mock-token")
     }
 
+    public func me() async throws -> User {
+        mockUsers.first ?? User(
+            id: "u-1",
+            name: "Admin Demo",
+            email: "admin@eco.local",
+            status: "active",
+            roles: [UserRole(id: "r-1", code: "super_admin", name: "Super Admin")]
+        )
+    }
+
     public func myRouteStops() async throws -> [DriverStop] {
         try await myRoute(routeDate: nil, status: nil).stops
     }
@@ -443,6 +453,42 @@ public final class MockAPIClient {
             let depotMatch = depotId == nil || depotId?.isEmpty == true || row.depotId == depotId
             return hubMatch && depotMatch
         }
+    }
+
+    public func createHub(name: String, city: String) async throws -> HubSummary {
+        HubSummary(id: "hub-new", code: "HUB-NEW", name: name, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updateHub(id: String, name: String, city: String?) async throws -> HubSummary {
+        HubSummary(id: id, code: "AGP-HUB-01", name: name, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func createDepot(hubId: String, name: String, city: String?) async throws -> DepotSummary {
+        DepotSummary(id: "dep-new", hubId: hubId, code: "DPT-NEW", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updateDepot(id: String, name: String, city: String?) async throws -> DepotSummary {
+        DepotSummary(id: id, hubId: "hub-1", code: "DPT-AGP-0001", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func createPoint(hubId: String, depotId: String?, name: String, city: String?) async throws -> PointSummary {
+        PointSummary(id: "pt-new", hubId: hubId, depotId: depotId, code: "PNT-NEW", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func updatePoint(id: String, name: String, city: String?) async throws -> PointSummary {
+        PointSummary(id: id, hubId: "hub-1", depotId: "dep-1", code: "PNT-AGP-0001", name: name, addressLine: nil, city: city, isActive: true, deletedAt: nil)
+    }
+
+    public func archiveHub(id: String) async throws {
+        _ = id
+    }
+
+    public func archiveDepot(id: String) async throws {
+        _ = id
+    }
+
+    public func archivePoint(id: String) async throws {
+        _ = id
     }
 
     public func restoreHub(id: String) async throws -> HubSummary {

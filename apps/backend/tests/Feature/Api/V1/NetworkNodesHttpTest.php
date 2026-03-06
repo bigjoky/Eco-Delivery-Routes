@@ -186,6 +186,72 @@ class NetworkNodesHttpTest extends TestCase
         $this->assertContains('points.restored', $events);
     }
 
+    public function test_depot_cannot_be_created_under_archived_hub(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubCreate = $this->postJson('/api/v1/hubs', [
+            'name' => 'Hub Archived Parent',
+            'city' => 'Malaga',
+        ]);
+        $hubCreate->assertStatus(201);
+        $hubId = (string) $hubCreate->json('data.id');
+
+        $this->deleteJson('/api/v1/hubs/' . $hubId)->assertOk();
+
+        $createDepot = $this->postJson('/api/v1/depots', [
+            'hub_id' => $hubId,
+            'name' => 'Depot Invalid Parent',
+        ]);
+
+        $createDepot
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+    }
+
+    public function test_point_update_rejects_inconsistent_hub_and_depot(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubA = (string) DB::table('hubs')->value('id');
+        $hubB = (string) Str::uuid();
+        DB::table('hubs')->insert([
+            'id' => $hubB,
+            'code' => 'HUB-TEST-003',
+            'name' => 'Hub Test 3',
+            'city' => 'Granada',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $createDepot = $this->postJson('/api/v1/depots', [
+            'hub_id' => $hubA,
+            'name' => 'Depot Update Inconsistency',
+        ]);
+        $createDepot->assertStatus(201);
+        $depotId = (string) $createDepot->json('data.id');
+
+        $createPoint = $this->postJson('/api/v1/points', [
+            'hub_id' => $hubA,
+            'depot_id' => $depotId,
+            'name' => 'Point Update Inconsistency',
+        ]);
+        $createPoint->assertStatus(201);
+        $pointId = (string) $createPoint->json('data.id');
+
+        $invalidUpdate = $this->patchJson('/api/v1/points/' . $pointId, [
+            'hub_id' => $hubB,
+            'depot_id' => $depotId,
+        ]);
+
+        $invalidUpdate
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'VALIDATION_ERROR');
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

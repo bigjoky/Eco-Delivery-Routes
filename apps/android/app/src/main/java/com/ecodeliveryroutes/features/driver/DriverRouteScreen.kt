@@ -20,9 +20,14 @@ import com.ecodeliveryroutes.core.network.ApiProvider
 import com.ecodeliveryroutes.core.session.SessionStore
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 @Composable
-fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () -> Unit = {}) {
+fun DriverRouteScreen(
+    onOpenRouteQuality: (String) -> Unit = {},
+    onOpenNetworkNodes: () -> Unit = {},
+    onLogout: () -> Unit = {}
+) {
     val context = LocalContext.current
     val stops = remember { mutableStateOf<List<RouteStop>>(emptyList()) }
     val selectedStopId = remember { mutableStateOf<String?>(null) }
@@ -35,12 +40,22 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () ->
     val incidentCode = remember { mutableStateOf("ABSENT_HOME") }
     val incidentNotes = remember { mutableStateOf("") }
     val message = remember { mutableStateOf("") }
+    val canAccessNetwork = remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val prefs = context.getSharedPreferences("eco_driver_filters", android.content.Context.MODE_PRIVATE)
 
     LaunchedEffect(Unit) {
+        routeDateFilter.value = prefs.getString("route_date", LocalDate.now().toString()) ?: LocalDate.now().toString()
+        routeStatusFilter.value = prefs.getString("route_status", "") ?: ""
+        if (!isValidRouteDate(routeDateFilter.value)) {
+            routeDateFilter.value = LocalDate.now().toString()
+        }
         stops.value = ApiProvider.client.myRouteStops(routeDateFilter.value, routeStatusFilter.value)
         selectedStopId.value = stops.value.firstOrNull()?.id
         routeQuality.value = ApiProvider.client.qualityRouteSnapshots()
+        val profile = ApiProvider.client.me()
+        val allowedRoles = setOf("super_admin", "operations_manager", "warehouse_manager", "traffic_manager")
+        canAccessNetwork.value = profile?.roleCodes?.any { role -> allowedRoles.contains(role) } == true
     }
 
     val selectedStop = stops.value.firstOrNull { it.id == selectedStopId.value } ?: stops.value.firstOrNull()
@@ -60,7 +75,15 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () ->
             modifier = Modifier.fillMaxWidth()
         )
         Button(onClick = {
+            if (!isValidRouteDate(routeDateFilter.value)) {
+                message.value = "Fecha invalida. Usa YYYY-MM-DD."
+                return@Button
+            }
             scope.launch {
+                prefs.edit()
+                    .putString("route_date", routeDateFilter.value)
+                    .putString("route_status", routeStatusFilter.value)
+                    .apply()
                 stops.value = ApiProvider.client.myRouteStops(routeDateFilter.value, routeStatusFilter.value)
                 selectedStopId.value = stops.value.firstOrNull()?.id
             }
@@ -80,6 +103,9 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () ->
                 message.value = "KPI de ruta actualizado"
             }
         }) { Text("Refrescar KPI ruta") }
+        if (canAccessNetwork.value) {
+            Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
+        }
         Text("Parada activa: ${selectedStop?.reference ?: "-"}")
         stops.value.forEach { stop ->
             Button(onClick = { selectedStopId.value = stop.id }) {
@@ -202,5 +228,15 @@ private fun incidentCategoryForCode(code: String): String {
         normalized.startsWith("RETRY") -> "retry"
         normalized.startsWith("FAILED") -> "failed"
         else -> "general"
+    }
+}
+
+private fun isValidRouteDate(value: String): Boolean {
+    if (value.isBlank()) return true
+    return try {
+        LocalDate.parse(value)
+        true
+    } catch (_: DateTimeParseException) {
+        false
     }
 }

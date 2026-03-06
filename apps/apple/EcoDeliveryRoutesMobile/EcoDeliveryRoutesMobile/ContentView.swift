@@ -12,14 +12,8 @@ struct ContentView: View {
 
     @State private var routeStops: [DriverStop] = []
     @State private var selectedStopId: String?
-    @State private var routeDateFilter: String = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
-    }()
-    @State private var routeStatusFilter: String = ""
+    @AppStorage("driver_route_date_filter") private var routeDateFilter: String = ""
+    @AppStorage("driver_route_status_filter") private var routeStatusFilter: String = ""
     @State private var routeQuality: [QualitySnapshot] = []
     @State private var scanCode: String = ""
     @State private var podSignature: String = ""
@@ -27,20 +21,67 @@ struct ContentView: View {
     @State private var incidentCode: String = "ABSENT_HOME"
     @State private var incidentNotes: String = ""
     @State private var driverMessage: String = ""
+    @State private var hubs: [HubSummary] = []
+    @State private var depots: [DepotSummary] = []
+    @State private var points: [PointSummary] = []
+    @State private var networkIncludeDeleted = false
+    @State private var networkMessage = ""
+    @State private var roleCodes: [String] = []
+    @State private var newHubName: String = ""
+    @State private var newHubCity: String = ""
+    @State private var editHubId: String = ""
+    @State private var editHubName: String = ""
+    @State private var editHubCity: String = ""
+    @State private var newDepotHubId: String = ""
+    @State private var newDepotName: String = ""
+    @State private var newDepotCity: String = ""
+    @State private var editDepotId: String = ""
+    @State private var editDepotName: String = ""
+    @State private var editDepotCity: String = ""
+    @State private var newPointHubId: String = ""
+    @State private var newPointDepotId: String = ""
+    @State private var newPointName: String = ""
+    @State private var newPointCity: String = ""
+    @State private var editPointId: String = ""
+    @State private var editPointName: String = ""
+    @State private var editPointCity: String = ""
+
+    private var canAccessNetwork: Bool {
+        let allowed = Set(["super_admin", "operations_manager", "warehouse_manager", "traffic_manager"])
+        return !Set(roleCodes).isDisjoint(with: allowed)
+    }
 
     var body: some View {
         Group {
             if authSession.token == nil {
                 loginView
             } else {
-                driverView
+                TabView {
+                    driverView
+                        .tabItem {
+                            Label("Ruta", systemImage: "map")
+                        }
+                    if canAccessNetwork {
+                        networkView
+                            .tabItem {
+                                Label("Red", systemImage: "point.3.connected.trianglepath.dotted")
+                            }
+                    }
+                }
             }
         }
         .task(id: authSession.token?.token) {
             apiClient.setAuthToken(authSession.token?.token)
             guard authSession.token != nil else { return }
+            if routeDateFilter.isEmpty {
+                routeDateFilter = currentISODate()
+            }
+            await loadAuthProfile()
             await loadRoute()
             await loadRouteQuality()
+            if canAccessNetwork {
+                await loadNetworkNodes()
+            }
         }
     }
 
@@ -80,7 +121,13 @@ struct ContentView: View {
                     TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
                     TextField("Estado ruta (opcional)", text: $routeStatusFilter)
                     Button("Cargar ruta del dia") {
-                        Task { await loadRoute() }
+                        Task {
+                            guard isValidRouteDate(routeDateFilter) else {
+                                driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
+                                return
+                            }
+                            await loadRoute()
+                        }
                     }
                     ForEach(routeStops) { stop in
                         Button {
@@ -210,20 +257,306 @@ struct ContentView: View {
         }
     }
 
+    private var networkView: some View {
+        NavigationStack {
+            List {
+                Section("Configuracion") {
+                    Toggle("Mostrar archivados", isOn: $networkIncludeDeleted)
+                        .onChange(of: networkIncludeDeleted) { _, _ in
+                            Task { await loadNetworkNodes() }
+                        }
+                    Button("Recargar red") {
+                        Task { await loadNetworkNodes() }
+                    }
+                    if !networkMessage.isEmpty {
+                        Text(networkMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Crear Hub") {
+                    TextField("Nombre", text: $newHubName)
+                    TextField("Ciudad", text: $newHubCity)
+                    Button("Crear hub") {
+                        Task {
+                            do {
+                                _ = try await apiClient.createHub(name: newHubName, city: newHubCity)
+                                networkMessage = "Hub creado"
+                                newHubName = ""
+                                newHubCity = ""
+                                await loadNetworkNodes()
+                            } catch {
+                                networkMessage = "Error creando hub"
+                            }
+                        }
+                    }
+                    .disabled(newHubName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newHubCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                Section("Hubs") {
+                    ForEach(hubs) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text(item.city ?? "-")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Editar") {
+                                    editHubId = item.id
+                                    editHubName = item.name
+                                    editHubCity = item.city ?? ""
+                                }
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archiveHub(id: item.id)
+                                            networkMessage = "Hub archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando hub"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restoreHub(id: item.id)
+                                            networkMessage = "Hub restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando hub"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !editHubId.isEmpty {
+                        TextField("Nombre", text: $editHubName)
+                        TextField("Ciudad", text: $editHubCity)
+                        Button("Guardar hub") {
+                            Task {
+                                do {
+                                    _ = try await apiClient.updateHub(
+                                        id: editHubId,
+                                        name: editHubName,
+                                        city: editHubCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editHubCity
+                                    )
+                                    networkMessage = "Hub actualizado"
+                                    editHubId = ""
+                                    await loadNetworkNodes()
+                                } catch {
+                                    networkMessage = "Error actualizando hub"
+                                }
+                            }
+                        }
+                        Button("Cancelar edición hub") { editHubId = "" }
+                    }
+                }
+
+                Section("Crear Depot") {
+                    TextField("Hub ID", text: $newDepotHubId)
+                    TextField("Nombre", text: $newDepotName)
+                    TextField("Ciudad (opcional)", text: $newDepotCity)
+                    Button("Crear depot") {
+                        Task {
+                            do {
+                                _ = try await apiClient.createDepot(
+                                    hubId: newDepotHubId,
+                                    name: newDepotName,
+                                    city: newDepotCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newDepotCity
+                                )
+                                networkMessage = "Depot creado"
+                                newDepotName = ""
+                                newDepotCity = ""
+                                await loadNetworkNodes()
+                            } catch {
+                                networkMessage = "Error creando depot"
+                            }
+                        }
+                    }
+                    .disabled(newDepotHubId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newDepotName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                Section("Depots") {
+                    ForEach(depots) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Editar") {
+                                    editDepotId = item.id
+                                    editDepotName = item.name
+                                    editDepotCity = item.city ?? ""
+                                }
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archiveDepot(id: item.id)
+                                            networkMessage = "Depot archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando depot"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restoreDepot(id: item.id)
+                                            networkMessage = "Depot restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando depot"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !editDepotId.isEmpty {
+                        TextField("Nombre", text: $editDepotName)
+                        TextField("Ciudad", text: $editDepotCity)
+                        Button("Guardar depot") {
+                            Task {
+                                do {
+                                    _ = try await apiClient.updateDepot(
+                                        id: editDepotId,
+                                        name: editDepotName,
+                                        city: editDepotCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editDepotCity
+                                    )
+                                    networkMessage = "Depot actualizado"
+                                    editDepotId = ""
+                                    await loadNetworkNodes()
+                                } catch {
+                                    networkMessage = "Error actualizando depot"
+                                }
+                            }
+                        }
+                        Button("Cancelar edición depot") { editDepotId = "" }
+                    }
+                }
+
+                Section("Crear Punto") {
+                    TextField("Hub ID", text: $newPointHubId)
+                    TextField("Depot ID (opcional)", text: $newPointDepotId)
+                    TextField("Nombre", text: $newPointName)
+                    TextField("Ciudad (opcional)", text: $newPointCity)
+                    Button("Crear punto") {
+                        Task {
+                            do {
+                                _ = try await apiClient.createPoint(
+                                    hubId: newPointHubId,
+                                    depotId: newPointDepotId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newPointDepotId,
+                                    name: newPointName,
+                                    city: newPointCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newPointCity
+                                )
+                                networkMessage = "Punto creado"
+                                newPointName = ""
+                                newPointCity = ""
+                                newPointDepotId = ""
+                                await loadNetworkNodes()
+                            } catch {
+                                networkMessage = "Error creando punto"
+                            }
+                        }
+                    }
+                    .disabled(newPointHubId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newPointName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                Section("Puntos") {
+                    ForEach(points) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · Depot \(item.depotId ?? "-") · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if item.deletedAt == nil {
+                                Button("Editar") {
+                                    editPointId = item.id
+                                    editPointName = item.name
+                                    editPointCity = item.city ?? ""
+                                }
+                                Button("Archivar") {
+                                    Task {
+                                        do {
+                                            try await apiClient.archivePoint(id: item.id)
+                                            networkMessage = "Punto archivado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error archivando punto"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Button("Restaurar") {
+                                    Task {
+                                        do {
+                                            _ = try await apiClient.restorePoint(id: item.id)
+                                            networkMessage = "Punto restaurado"
+                                            await loadNetworkNodes()
+                                        } catch {
+                                            networkMessage = "Error restaurando punto"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !editPointId.isEmpty {
+                        TextField("Nombre", text: $editPointName)
+                        TextField("Ciudad", text: $editPointCity)
+                        Button("Guardar punto") {
+                            Task {
+                                do {
+                                    _ = try await apiClient.updatePoint(
+                                        id: editPointId,
+                                        name: editPointName,
+                                        city: editPointCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editPointCity
+                                    )
+                                    networkMessage = "Punto actualizado"
+                                    editPointId = ""
+                                    await loadNetworkNodes()
+                                } catch {
+                                    networkMessage = "Error actualizando punto"
+                                }
+                            }
+                        }
+                        Button("Cancelar edición punto") { editPointId = "" }
+                    }
+                }
+            }
+            .navigationTitle("Red Operativa")
+        }
+    }
+
     private func login() async {
         do {
             let token = try await apiClient.login(email: email, password: password)
             authSession.updateToken(token)
             apiClient.setAuthToken(token.token)
             loginMessage = "Sesion activa"
+            await loadAuthProfile()
             await loadRoute()
             await loadRouteQuality()
+            if canAccessNetwork {
+                await loadNetworkNodes()
+            }
         } catch {
             loginMessage = "Error de login"
         }
     }
 
     private func loadRoute() async {
+        guard isValidRouteDate(routeDateFilter) else {
+            driverMessage = "Fecha invalida. Usa YYYY-MM-DD."
+            return
+        }
         let payload = (try? await apiClient.myRoute(
             routeDate: routeDateFilter.isEmpty ? nil : routeDateFilter,
             status: routeStatusFilter.isEmpty ? nil : routeStatusFilter
@@ -234,6 +567,31 @@ struct ContentView: View {
 
     private func loadRouteQuality() async {
         routeQuality = (try? await apiClient.qualitySnapshots(scopeType: "route")) ?? []
+    }
+
+    private func loadNetworkNodes() async {
+        do {
+            hubs = try await apiClient.hubs(onlyActive: false, includeDeleted: networkIncludeDeleted)
+            depots = try await apiClient.depots(hubId: nil, includeDeleted: networkIncludeDeleted)
+            points = try await apiClient.points(hubId: nil, depotId: nil, includeDeleted: networkIncludeDeleted)
+            if newDepotHubId.isEmpty {
+                newDepotHubId = hubs.first?.id ?? ""
+            }
+            if newPointHubId.isEmpty {
+                newPointHubId = hubs.first?.id ?? ""
+            }
+        } catch {
+            networkMessage = "No se pudo cargar red operativa"
+        }
+    }
+
+    private func loadAuthProfile() async {
+        do {
+            let me = try await apiClient.me()
+            roleCodes = me.roles.map(\.code)
+        } catch {
+            roleCodes = []
+        }
     }
 
     private func createPickup(type: String) async {
@@ -273,6 +631,23 @@ struct ContentView: View {
         if normalized.hasPrefix("RETRY") { return "retry" }
         if normalized.hasPrefix("FAILED") { return "failed" }
         return "general"
+    }
+
+    private func isValidRouteDate(_ value: String) -> Bool {
+        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value) != nil
+    }
+
+    private func currentISODate() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 }
 
