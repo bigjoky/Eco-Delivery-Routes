@@ -1639,6 +1639,23 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /routes/assignment/preview:
+    get:
+      tags: [Routes]
+      summary: Previsualizar conflictos de asignacion ruta (subcontrata/conductor/vehiculo)
+      parameters:
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: driver_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: vehicle_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
   /routes/{id}:
     patch:
       tags: [Routes]
@@ -1919,6 +1936,12 @@ paths:
           name: catalog_code
           schema: { type: string }
         - in: query
+          name: priority
+          schema: { type: string, enum: [high, medium, low] }
+        - in: query
+          name: sla_status
+          schema: { type: string, enum: [on_track, at_risk, breached, resolved] }
+        - in: query
           name: incidentable_id
           schema: { type: string, format: uuid }
         - in: query
@@ -1949,6 +1972,20 @@ paths:
     get:
       tags: [Incidents]
       summary: Obtener catalogo de incidencias activo versionado
+      responses:
+        '200': { description: OK }
+
+  /incidents/board:
+    get:
+      tags: [Incidents]
+      summary: Dashboard resumido de incidencias (prioridad + SLA)
+      parameters:
+        - in: query
+          name: incidentable_type
+          schema: { type: string, enum: [shipment, pickup] }
+        - in: query
+          name: category
+          schema: { type: string, enum: [failed, absent, retry, general] }
       responses:
         '200': { description: OK }
 

@@ -29,6 +29,8 @@ export function RouteDetailPage() {
   const [driverId, setDriverId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [routeStatus, setRouteStatus] = useState('planned');
+  const [assignmentConflicts, setAssignmentConflicts] = useState<string[]>([]);
+  const [recommendedSubcontractorId, setRecommendedSubcontractorId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [stopType, setStopType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
@@ -120,6 +122,18 @@ export function RouteDetailPage() {
 
   const saveVehicleAssignment = async () => {
     if (!id) return;
+    const preview = await apiClient.previewRouteAssignment({
+      subcontractor_id: subcontractorId || null,
+      driver_id: driverId || null,
+      vehicle_id: vehicleId || null,
+    });
+    setAssignmentConflicts(preview.conflicts.map((item) => item.message));
+    setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+    if (!preview.valid) {
+      setError('Corrige las inconsistencias de asignacion antes de guardar.');
+      return;
+    }
+
     const selectedDriver = driverId ? drivers.find((item) => item.id === driverId) : null;
     const selectedVehicle = vehicleId ? vehicles.find((item) => item.id === vehicleId) : null;
     if (subcontractorId && selectedDriver?.subcontractor_id && selectedDriver.subcontractor_id !== subcontractorId) {
@@ -154,6 +168,27 @@ export function RouteDetailPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!driverId && !vehicleId && !subcontractorId) {
+      setAssignmentConflicts([]);
+      setRecommendedSubcontractorId(null);
+      return;
+    }
+    apiClient.previewRouteAssignment({
+      subcontractor_id: subcontractorId || null,
+      driver_id: driverId || null,
+      vehicle_id: vehicleId || null,
+    })
+      .then((preview) => {
+        setAssignmentConflicts(preview.conflicts.map((item) => item.message));
+        setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+      })
+      .catch(() => {
+        setAssignmentConflicts([]);
+        setRecommendedSubcontractorId(null);
+      });
+  }, [subcontractorId, driverId, vehicleId]);
 
   const createStop = async () => {
     const stopEntityId = stopType === 'DELIVERY' ? selectedShipmentId : selectedPickupId;
@@ -424,6 +459,10 @@ export function RouteDetailPage() {
             {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
             {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
           </div>
+          {assignmentConflicts.length > 0 ? <div className="helper error">{assignmentConflicts.join(' ')}</div> : null}
+          {recommendedSubcontractorId && !subcontractorId ? (
+            <div className="helper">Sugerencia: subcontrata recomendada {recommendedSubcontractorId}</div>
+          ) : null}
           {error ? <div className="helper">{error}</div> : null}
         </CardContent>
       </Card>

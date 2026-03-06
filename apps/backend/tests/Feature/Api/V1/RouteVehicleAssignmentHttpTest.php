@@ -221,6 +221,70 @@ class RouteVehicleAssignmentHttpTest extends TestCase
         $response->assertJsonValidationErrors(['vehicle_id']);
     }
 
+    public function test_assignment_preview_returns_conflicts_and_recommendation(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $subcontractorA = (string) Str::uuid();
+        $subcontractorB = (string) Str::uuid();
+        DB::table('subcontractors')->insert([
+            [
+                'id' => $subcontractorA,
+                'legal_name' => 'Preview A',
+                'tax_id' => 'B11111111',
+                'status' => 'active',
+                'payment_terms' => 'monthly',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $subcontractorB,
+                'legal_name' => 'Preview B',
+                'tax_id' => 'B22222222',
+                'status' => 'active',
+                'payment_terms' => 'monthly',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $driverId = (string) Str::uuid();
+        DB::table('drivers')->insert([
+            'id' => $driverId,
+            'subcontractor_id' => $subcontractorA,
+            'employment_type' => 'subcontractor',
+            'code' => 'DRV-PRE-001',
+            'name' => 'Driver Preview',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $vehicleId = (string) Str::uuid();
+        DB::table('vehicles')->insert([
+            'id' => $vehicleId,
+            'subcontractor_id' => $subcontractorB,
+            'assigned_driver_id' => null,
+            'code' => 'VEH-PRE-001',
+            'plate_number' => 'PRE1001',
+            'vehicle_type' => 'van',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/routes/assignment/preview?' . http_build_query([
+            'driver_id' => $driverId,
+            'vehicle_id' => $vehicleId,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('data.valid', false);
+        $response->assertJsonPath('data.recommended_subcontractor_id', $subcontractorA);
+        $this->assertNotEmpty($response->json('data.conflicts'));
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

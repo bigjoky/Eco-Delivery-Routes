@@ -40,6 +40,8 @@ export function RoutesPage() {
   const [createDriverId, setCreateDriverId] = useState('');
   const [createVehicleId, setCreateVehicleId] = useState('');
   const [createError, setCreateError] = useState('');
+  const [createPreviewConflicts, setCreatePreviewConflicts] = useState<string[]>([]);
+  const [createRecommendedSubcontractorId, setCreateRecommendedSubcontractorId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const routeSummary = useMemo(() => {
@@ -192,6 +194,20 @@ export function RoutesPage() {
       setCreateError(nextErrors.join(' '));
       return;
     }
+    if (createDriverId || createVehicleId || createSubcontractorId) {
+      const preview = await apiClient.previewRouteAssignment({
+        subcontractor_id: createSubcontractorId || null,
+        driver_id: createDriverId || null,
+        vehicle_id: createVehicleId || null,
+      });
+      setCreatePreviewConflicts(preview.conflicts.map((item) => item.message));
+      setCreateRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+      if (!preview.valid) {
+        setCreateError('Corrige las inconsistencias de asignacion antes de crear la ruta.');
+        return;
+      }
+    }
+
     setCreating(true);
     setCreateError('');
     try {
@@ -214,6 +230,27 @@ export function RoutesPage() {
       setCreating(false);
     }
   };
+
+  useEffect(() => {
+    if (!createDriverId && !createVehicleId && !createSubcontractorId) {
+      setCreatePreviewConflicts([]);
+      setCreateRecommendedSubcontractorId(null);
+      return;
+    }
+    apiClient.previewRouteAssignment({
+      subcontractor_id: createSubcontractorId || null,
+      driver_id: createDriverId || null,
+      vehicle_id: createVehicleId || null,
+    })
+      .then((preview) => {
+        setCreatePreviewConflicts(preview.conflicts.map((item) => item.message));
+        setCreateRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+      })
+      .catch(() => {
+        setCreatePreviewConflicts([]);
+        setCreateRecommendedSubcontractorId(null);
+      });
+  }, [createSubcontractorId, createDriverId, createVehicleId]);
 
   const setQuickRange = (range: 'today' | 'tomorrow' | 'next7' | 'clear') => {
     if (range === 'clear') {
@@ -319,6 +356,12 @@ export function RoutesPage() {
               {creating ? 'Creando...' : 'Crear ruta'}
             </Button>
           </div>
+          {createPreviewConflicts.length > 0 ? (
+            <div className="helper error">{createPreviewConflicts.join(' ')}</div>
+          ) : null}
+          {createRecommendedSubcontractorId && !createSubcontractorId ? (
+            <div className="helper">Sugerencia: seleccionar subcontrata vinculada automaticamente ({createRecommendedSubcontractorId}).</div>
+          ) : null}
           {createError ? <div className="helper">{createError}</div> : null}
         </CardContent>
       </Card>
