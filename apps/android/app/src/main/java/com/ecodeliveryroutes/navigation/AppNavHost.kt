@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import com.ecodeliveryroutes.core.session.SessionStore
 import com.ecodeliveryroutes.features.auth.LoginScreen
 import com.ecodeliveryroutes.features.driver.DriverRouteScreen
+import com.ecodeliveryroutes.features.network.NetworkNodesScreen
 import com.ecodeliveryroutes.features.quality.RouteQualityScreen
 
 @Composable
@@ -27,11 +28,16 @@ fun AppNavHost() {
         composable("driver_route") {
             DriverRouteScreen(onOpenRouteQuality = { routeId ->
                 navController.navigate("route_quality/$routeId")
+            }, onOpenNetworkNodes = {
+                navController.navigate("network_nodes")
             }, onLogout = {
                 navController.navigate("login") {
                     popUpTo("driver_route") { inclusive = true }
                 }
             })
+        }
+        composable("network_nodes") {
+            NetworkNodesScreen()
         }
         composable(
             route = "route_quality/{routeId}",

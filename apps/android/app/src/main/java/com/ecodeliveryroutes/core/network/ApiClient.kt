@@ -369,12 +369,40 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrDefault(false)
     }
 
+    suspend fun archiveHub(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/hubs/$id")
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun archiveDepot(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/depots/$id")
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun archivePoint(id: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext true
+        runCatching {
+            authedDelete("$baseUrl/points/$id")
+            true
+        }.getOrDefault(false)
+    }
+
     private fun authedGet(url: String): String {
         return executeWithRefresh("GET", url, null)
     }
 
     private fun authedPost(url: String, payload: JSONObject): String {
         return executeWithRefresh("POST", url, payload)
+    }
+
+    private fun authedDelete(url: String): String {
+        return executeWithRefresh("DELETE", url, null)
     }
 
     private fun executeWithRefresh(method: String, url: String, payload: JSONObject?): String {

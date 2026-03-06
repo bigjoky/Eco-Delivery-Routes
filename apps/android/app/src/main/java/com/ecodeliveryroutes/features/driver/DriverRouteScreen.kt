@@ -22,7 +22,11 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 @Composable
-fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () -> Unit = {}) {
+fun DriverRouteScreen(
+    onOpenRouteQuality: (String) -> Unit = {},
+    onOpenNetworkNodes: () -> Unit = {},
+    onLogout: () -> Unit = {}
+) {
     val context = LocalContext.current
     val stops = remember { mutableStateOf<List<RouteStop>>(emptyList()) }
     val selectedStopId = remember { mutableStateOf<String?>(null) }
@@ -80,6 +84,7 @@ fun DriverRouteScreen(onOpenRouteQuality: (String) -> Unit = {}, onLogout: () ->
                 message.value = "KPI de ruta actualizado"
             }
         }) { Text("Refrescar KPI ruta") }
+        Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
         Text("Parada activa: ${selectedStop?.reference ?: "-"}")
         stops.value.forEach { stop ->
             Button(onClick = { selectedStopId.value = stop.id }) {

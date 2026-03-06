@@ -40,6 +40,9 @@ public protocol APIClientProtocol {
     func hubs(onlyActive: Bool, includeDeleted: Bool) async throws -> [HubSummary]
     func depots(hubId: String?, includeDeleted: Bool) async throws -> [DepotSummary]
     func points(hubId: String?, depotId: String?, includeDeleted: Bool) async throws -> [PointSummary]
+    func archiveHub(id: String) async throws
+    func archiveDepot(id: String) async throws
+    func archivePoint(id: String) async throws
     func restoreHub(id: String) async throws -> HubSummary
     func restoreDepot(id: String) async throws -> DepotSummary
     func restorePoint(id: String) async throws -> PointSummary
@@ -592,6 +595,24 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataArrayEnvelope<PointSummary>.self, from: data).data
+    }
+
+    public func archiveHub(id: String) async throws {
+        guard let baseURL else { return try await mock.archiveHub(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "hubs/\(id)"), method: "DELETE")
+        _ = try await execute(request)
+    }
+
+    public func archiveDepot(id: String) async throws {
+        guard let baseURL else { return try await mock.archiveDepot(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "depots/\(id)"), method: "DELETE")
+        _ = try await execute(request)
+    }
+
+    public func archivePoint(id: String) async throws {
+        guard let baseURL else { return try await mock.archivePoint(id: id) }
+        let request = authorizedRequest(url: baseURL.appending(path: "points/\(id)"), method: "DELETE")
+        _ = try await execute(request)
     }
 
     public func restoreHub(id: String) async throws -> HubSummary {

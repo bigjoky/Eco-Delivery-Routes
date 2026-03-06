@@ -86,6 +86,7 @@ private struct RouteManifestTotals {
 struct ContentView: View {
     private enum Section: String, CaseIterable, Identifiable {
         case operations = "Operativa"
+        case network = "Red"
         case quality = "Calidad"
         case advances = "Anticipos"
         case tariffs = "Tarifas"
@@ -97,6 +98,7 @@ struct ContentView: View {
         var systemImage: String {
             switch self {
             case .operations: "shippingbox"
+            case .network: "point.3.connected.trianglepath.dotted"
             case .quality: "chart.bar"
             case .advances: "eurosign.circle"
             case .tariffs: "list.bullet.clipboard"
@@ -146,6 +148,11 @@ struct ContentView: View {
     @State private var settlements: [SettlementSummary] = []
     @State private var users: [User] = []
     @State private var userStatusFilter: String = ""
+    @State private var hubs: [HubSummary] = []
+    @State private var depots: [DepotSummary] = []
+    @State private var points: [PointSummary] = []
+    @State private var networkIncludeDeleted: Bool = false
+    @State private var networkMessage: String = ""
 
     @State private var scanCode: String = ""
     @State private var operationalMessage: String = "Recepcion lista"
@@ -192,6 +199,8 @@ struct ContentView: View {
                     switch selectedSection ?? .operations {
                     case .operations:
                         operationsTab
+                    case .network:
+                        networkTab
                     case .quality:
                         qualityTab
                     case .advances:
@@ -444,6 +453,147 @@ struct ContentView: View {
                         .background(.thinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding()
+                }
+            }
+        }
+    }
+
+    private var networkTab: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Mostrar archivados", isOn: $networkIncludeDeleted)
+                    .onChange(of: networkIncludeDeleted) { _, _ in
+                        Task { await loadNetworkNodes() }
+                    }
+
+                if !networkMessage.isEmpty {
+                    Text(networkMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Hubs").font(.headline)
+                List(hubs) { item in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("\(item.code) · \(item.name)")
+                            Text(item.city ?? "-")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if item.deletedAt == nil {
+                            Button("Archivar") {
+                                Task {
+                                    do {
+                                        try await apiClient.archiveHub(id: item.id)
+                                        networkMessage = "Hub archivado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error archivando hub"
+                                    }
+                                }
+                            }
+                        } else {
+                            Button("Restaurar") {
+                                Task {
+                                    do {
+                                        _ = try await apiClient.restoreHub(id: item.id)
+                                        networkMessage = "Hub restaurado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error restaurando hub"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 140)
+
+                Text("Depots").font(.headline)
+                List(depots) { item in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if item.deletedAt == nil {
+                            Button("Archivar") {
+                                Task {
+                                    do {
+                                        try await apiClient.archiveDepot(id: item.id)
+                                        networkMessage = "Depot archivado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error archivando depot"
+                                    }
+                                }
+                            }
+                        } else {
+                            Button("Restaurar") {
+                                Task {
+                                    do {
+                                        _ = try await apiClient.restoreDepot(id: item.id)
+                                        networkMessage = "Depot restaurado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error restaurando depot"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 140)
+
+                Text("Puntos").font(.headline)
+                List(points) { item in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("\(item.code) · \(item.name)")
+                            Text("Hub \(item.hubId) · Depot \(item.depotId ?? "-") · \(item.city ?? "-")")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if item.deletedAt == nil {
+                            Button("Archivar") {
+                                Task {
+                                    do {
+                                        try await apiClient.archivePoint(id: item.id)
+                                        networkMessage = "Punto archivado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error archivando punto"
+                                    }
+                                }
+                            }
+                        } else {
+                            Button("Restaurar") {
+                                Task {
+                                    do {
+                                        _ = try await apiClient.restorePoint(id: item.id)
+                                        networkMessage = "Punto restaurado"
+                                        await loadNetworkNodes()
+                                    } catch {
+                                        networkMessage = "Error restaurando punto"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(minHeight: 140)
+            }
+            .padding()
+            .navigationTitle("Red Operativa")
+            .toolbar {
+                Button("Recargar") {
+                    Task { await loadNetworkNodes() }
                 }
             }
         }
@@ -822,6 +972,7 @@ struct ContentView: View {
         guard authSession.token != nil else { return }
         await loadQualityThreshold()
         await loadQualityThresholdAlerts()
+        await loadNetworkNodes()
         await loadRoute()
         await loadManifestById()
         await loadRouteQuality()
@@ -829,6 +980,19 @@ struct ContentView: View {
         await loadTariffs()
         await loadSettlements()
         await loadUsers()
+    }
+
+    private func loadNetworkNodes() async {
+        do {
+            let loadedHubs = try await apiClient.hubs(onlyActive: false, includeDeleted: networkIncludeDeleted)
+            let loadedDepots = try await apiClient.depots(hubId: nil, includeDeleted: networkIncludeDeleted)
+            let loadedPoints = try await apiClient.points(hubId: nil, depotId: nil, includeDeleted: networkIncludeDeleted)
+            hubs = loadedHubs
+            depots = loadedDepots
+            points = loadedPoints
+        } catch {
+            networkMessage = "No se pudo cargar red operativa"
+        }
     }
 
     private func loadRoute() async {

@@ -445,6 +445,18 @@ public final class MockAPIClient {
         }
     }
 
+    public func archiveHub(id: String) async throws {
+        _ = id
+    }
+
+    public func archiveDepot(id: String) async throws {
+        _ = id
+    }
+
+    public func archivePoint(id: String) async throws {
+        _ = id
+    }
+
     public func restoreHub(id: String) async throws -> HubSummary {
         _ = id
         return HubSummary(id: "hub-1", code: "AGP-HUB-01", name: "Hub Malaga Centro", city: "Malaga", isActive: true, deletedAt: nil)
