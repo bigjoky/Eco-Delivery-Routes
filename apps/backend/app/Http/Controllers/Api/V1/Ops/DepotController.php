@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +13,10 @@ use Illuminate\Support\Str;
 
 class DepotController extends Controller
 {
-    public function __construct(private readonly SequenceService $sequenceService) {}
+    public function __construct(
+        private readonly SequenceService $sequenceService,
+        private readonly AuditLogWriter $auditLogWriter
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -65,6 +69,11 @@ class DepotController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'depots.created', [
+            'depot_id' => $id,
+            'hub_id' => $payload['hub_id'],
+            'depot_code' => $code,
+        ]);
 
         return response()->json(['data' => DB::table('depots')->where('id', $id)->first()], 201);
     }
@@ -97,6 +106,10 @@ class DepotController extends Controller
         DB::table('depots')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'depots.updated', [
+            'depot_id' => $id,
+            'changes' => array_keys($payload),
         ]);
 
         return response()->json(['data' => DB::table('depots')->where('id', $id)->first()]);
@@ -131,6 +144,9 @@ class DepotController extends Controller
         }
 
         DB::table('depots')->where('id', $id)->delete();
+        $this->auditLogWriter->write($actor->id, 'depots.deleted', [
+            'depot_id' => $id,
+        ]);
 
         return response()->json(['data' => ['id' => $id, 'deleted' => true]]);
     }
