@@ -1,6 +1,9 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
+import com.ecodeliveryroutes.core.model.DepotSummary
+import com.ecodeliveryroutes.core.model.HubSummary
+import com.ecodeliveryroutes.core.model.PointSummary
 import com.ecodeliveryroutes.core.model.QualityBreakdown
 import com.ecodeliveryroutes.core.model.QualityBreakdownComponents
 import com.ecodeliveryroutes.core.model.QualityBreakdownPeriod
@@ -264,6 +267,75 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         }.getOrElse {
             RouteAssignmentPublishPolicy(true, listOf("LOW_DRIVER_QUALITY", "LOW_SUBCONTRACTOR_QUALITY"), listOf("super_admin"))
         }
+    }
+
+    suspend fun hubs(onlyActive: Boolean = true): List<HubSummary> = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext listOf(
+                HubSummary("hub-1", "AGP-HUB-01", "Hub Malaga Centro", "Malaga", true),
+                HubSummary("hub-2", "SEV-HUB-01", "Hub Sevilla Norte", "Sevilla", true)
+            )
+        }
+        runCatching {
+            val suffix = if (onlyActive) "?only_active=1" else "?only_active=0"
+            val payload = authedGet("$baseUrl/hubs$suffix")
+            val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
+            (0 until rows.length()).map { index ->
+                val item = rows.getJSONObject(index)
+                HubSummary(
+                    id = item.optString("id"),
+                    code = item.optString("code"),
+                    name = item.optString("name"),
+                    city = item.optString("city").ifBlank { null },
+                    isActive = item.optBoolean("is_active", true)
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun depots(hubId: String? = null): List<DepotSummary> = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext emptyList()
+        runCatching {
+            val suffix = if (!hubId.isNullOrBlank()) "?hub_id=$hubId" else ""
+            val payload = authedGet("$baseUrl/depots$suffix")
+            val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
+            (0 until rows.length()).map { index ->
+                val item = rows.getJSONObject(index)
+                DepotSummary(
+                    id = item.optString("id"),
+                    hubId = item.optString("hub_id"),
+                    code = item.optString("code"),
+                    name = item.optString("name"),
+                    city = item.optString("city").ifBlank { null },
+                    isActive = item.optBoolean("is_active", true)
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun points(hubId: String? = null, depotId: String? = null): List<PointSummary> = withContext(Dispatchers.IO) {
+        if (baseUrl == null) return@withContext emptyList()
+        runCatching {
+            val query = buildList {
+                if (!hubId.isNullOrBlank()) add("hub_id=$hubId")
+                if (!depotId.isNullOrBlank()) add("depot_id=$depotId")
+            }.joinToString("&")
+            val suffix = if (query.isNotBlank()) "?$query" else ""
+            val payload = authedGet("$baseUrl/points$suffix")
+            val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
+            (0 until rows.length()).map { index ->
+                val item = rows.getJSONObject(index)
+                PointSummary(
+                    id = item.optString("id"),
+                    hubId = item.optString("hub_id"),
+                    depotId = item.optString("depot_id").ifBlank { null },
+                    code = item.optString("code"),
+                    name = item.optString("name"),
+                    city = item.optString("city").ifBlank { null },
+                    isActive = item.optBoolean("is_active", true)
+                )
+            }
+        }.getOrDefault(emptyList())
     }
 
     private fun authedGet(url: String): String {
