@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class SubcontractorController extends Controller
 {
+    public function __construct(private readonly AuditLogWriter $auditLogWriter)
+    {
+    }
+
     private function canRead(User $actor): bool
     {
         return $actor->hasPermission('settlements.read')
@@ -31,7 +36,23 @@ class SubcontractorController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $query = DB::table('subcontractors')
-            ->select('id', 'legal_name', 'tax_id', 'status')
+            ->select(
+                'subcontractors.id',
+                'subcontractors.legal_name',
+                'subcontractors.tax_id',
+                'subcontractors.status',
+                'subcontractors.payment_terms',
+                'subcontractors.updated_at',
+                DB::raw("(
+                    select users.name
+                    from audit_logs
+                    left join users on users.id = audit_logs.actor_user_id
+                    where audit_logs.event in ('subcontractors.created', 'subcontractors.updated')
+                      and json_extract(audit_logs.metadata, '$.subcontractor_id') = subcontractors.id
+                    order by audit_logs.id desc
+                    limit 1
+                ) as last_editor_name")
+            )
             ->orderBy('legal_name');
 
         if ($q !== '') {
@@ -73,6 +94,10 @@ class SubcontractorController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $this->auditLogWriter->write($actor->id, 'subcontractors.created', [
+            'subcontractor_id' => $id,
+            'tax_id' => $payload['tax_id'] ?? null,
+        ]);
 
         return response()->json([
             'data' => DB::table('subcontractors')->where('id', $id)->first(),
@@ -107,6 +132,10 @@ class SubcontractorController extends Controller
         DB::table('subcontractors')->where('id', $id)->update([
             ...$payload,
             'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'subcontractors.updated', [
+            'subcontractor_id' => $id,
+            'changes' => array_keys($payload),
         ]);
 
         return response()->json([

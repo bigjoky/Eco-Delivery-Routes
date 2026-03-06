@@ -42,6 +42,18 @@ export function PartnersPage() {
   const [editVehicleStatus, setEditVehicleStatus] = useState<'active' | 'inactive' | 'maintenance'>('active');
   const [editVehicleSubcontractorId, setEditVehicleSubcontractorId] = useState('');
   const [editVehicleDriverId, setEditVehicleDriverId] = useState('');
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   const load = async () => {
     setError('');
@@ -109,17 +121,32 @@ export function PartnersPage() {
     event.preventDefault();
     setMessage('');
     setError('');
+    let nextSubcontractorId = vehicleSubcontractorId || '';
+    if (vehicleDriverId) {
+      const selectedDriver = drivers.find((item) => item.id === vehicleDriverId);
+      if (selectedDriver?.subcontractor_id) {
+        if (nextSubcontractorId && nextSubcontractorId !== selectedDriver.subcontractor_id) {
+          setError('El driver seleccionado pertenece a otra subcontrata.');
+          return;
+        }
+        if (!nextSubcontractorId) {
+          nextSubcontractorId = selectedDriver.subcontractor_id;
+        }
+      }
+    }
     try {
       await apiClient.createVehicle({
         code: vehicleCode,
         plate_number: vehiclePlate,
         vehicle_type: 'van',
         status: 'active',
-        subcontractor_id: vehicleSubcontractorId || undefined,
+        subcontractor_id: nextSubcontractorId || undefined,
         assigned_driver_id: vehicleDriverId || undefined,
       });
       setVehicleCode('');
       setVehiclePlate('');
+      setVehicleSubcontractorId('');
+      setVehicleDriverId('');
       setMessage('Vehiculo creado');
       await load();
     } catch (createError) {
@@ -166,12 +193,21 @@ export function PartnersPage() {
     if (!editingDriverId) return;
     setMessage('');
     setError('');
+    const nextSubcontractorId = editDriverSubcontractorId || null;
+    const assignedVehicles = vehicles.filter((item) => item.assigned_driver_id === editingDriverId);
+    const hasVehicleMismatch = assignedVehicles.some((vehicle) => (
+      vehicle.subcontractor_id && vehicle.subcontractor_id !== nextSubcontractorId
+    ));
+    if (hasVehicleMismatch) {
+      setError('No puedes asignar este driver a otra subcontrata mientras tenga vehiculos vinculados de distinta subcontrata.');
+      return;
+    }
     try {
       await apiClient.updateDriver(editingDriverId, {
         name: editDriverName,
         dni: editDriverDni,
         status: editDriverStatus,
-        subcontractor_id: editDriverSubcontractorId || null,
+        subcontractor_id: nextSubcontractorId,
       });
       setEditingDriverId('');
       setMessage('Driver actualizado');
@@ -193,11 +229,24 @@ export function PartnersPage() {
     if (!editingVehicleId) return;
     setMessage('');
     setError('');
+    let nextSubcontractorId = editVehicleSubcontractorId || '';
+    if (editVehicleDriverId) {
+      const selectedDriver = drivers.find((item) => item.id === editVehicleDriverId);
+      if (selectedDriver?.subcontractor_id) {
+        if (nextSubcontractorId && nextSubcontractorId !== selectedDriver.subcontractor_id) {
+          setError('El driver seleccionado pertenece a otra subcontrata.');
+          return;
+        }
+        if (!nextSubcontractorId) {
+          nextSubcontractorId = selectedDriver.subcontractor_id;
+        }
+      }
+    }
     try {
       await apiClient.updateVehicle(editingVehicleId, {
         plate_number: editVehiclePlate,
         status: editVehicleStatus,
-        subcontractor_id: editVehicleSubcontractorId || null,
+        subcontractor_id: nextSubcontractorId || null,
         assigned_driver_id: editVehicleDriverId || null,
       });
       setEditingVehicleId('');
@@ -260,6 +309,7 @@ export function PartnersPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tax ID</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Ult. edicion</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -269,8 +319,9 @@ export function PartnersPage() {
                     <TableCell>{subcontractor.legal_name}</TableCell>
                     <TableCell>{subcontractor.tax_id ?? '-'}</TableCell>
                     <TableCell>{subcontractor.status}</TableCell>
+                    <TableCell>{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
+                      <Button data-testid={`edit-subcontractor-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -288,7 +339,7 @@ export function PartnersPage() {
                 <option value="suspended">suspended</option>
               </Select>
               <Input value={editSubcontractorPaymentTerms} onChange={(e) => setEditSubcontractorPaymentTerms(e.target.value)} placeholder="payment terms" />
-              <Button type="button" onClick={saveSubcontractor}>Guardar subcontrata</Button>
+              <Button data-testid="save-subcontractor" type="button" onClick={saveSubcontractor}>Guardar subcontrata</Button>
               <Button type="button" variant="outline" onClick={() => setEditingSubcontractorId('')}>Cancelar</Button>
             </div>
           ) : null}
@@ -303,6 +354,7 @@ export function PartnersPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Subcontrata</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Ult. edicion</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -314,8 +366,9 @@ export function PartnersPage() {
                     <TableCell>{driver.name}</TableCell>
                     <TableCell>{driver.subcontractor_name ?? '-'}</TableCell>
                     <TableCell>{driver.status}</TableCell>
+                    <TableCell>{driver.last_editor_name ?? '-'} · {formatDateTime(driver.updated_at)}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
+                      <Button data-testid={`edit-driver-${driver.id}`} type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -338,7 +391,7 @@ export function PartnersPage() {
                   <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
                 ))}
               </Select>
-              <Button type="button" onClick={saveDriver}>Guardar driver</Button>
+              <Button data-testid="save-driver" type="button" onClick={saveDriver}>Guardar driver</Button>
               <Button type="button" variant="outline" onClick={() => setEditingDriverId('')}>Cancelar</Button>
             </div>
           ) : null}
@@ -353,6 +406,7 @@ export function PartnersPage() {
                   <TableHead>Subcontrata</TableHead>
                   <TableHead>Driver</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Ult. edicion</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -364,8 +418,9 @@ export function PartnersPage() {
                     <TableCell>{vehicle.subcontractor_name ?? '-'}</TableCell>
                     <TableCell>{vehicle.assigned_driver_code ?? '-'}</TableCell>
                     <TableCell>{vehicle.status}</TableCell>
+                    <TableCell>{vehicle.last_editor_name ?? '-'} · {formatDateTime(vehicle.updated_at)}</TableCell>
                     <TableCell>
-                      <Button type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
+                      <Button data-testid={`edit-vehicle-${vehicle.id}`} type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -393,7 +448,7 @@ export function PartnersPage() {
                   <option key={driver.id} value={driver.id}>{driver.code} - {driver.name}</option>
                 ))}
               </Select>
-              <Button type="button" onClick={saveVehicle}>Guardar vehiculo</Button>
+              <Button data-testid="save-vehicle" type="button" onClick={saveVehicle}>Guardar vehiculo</Button>
               <Button type="button" variant="outline" onClick={() => setEditingVehicleId('')}>Cancelar</Button>
             </div>
           ) : null}

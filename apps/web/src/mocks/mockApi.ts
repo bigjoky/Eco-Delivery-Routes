@@ -69,12 +69,15 @@ let subcontractorSeq = 2;
 let driverSeq = 2;
 let vehicleSeq = 2;
 let routeSeq = 4;
+const nowIso = () => new Date().toISOString();
 let mockSubcontractors: Array<{
   id: string;
   legal_name: string;
   tax_id?: string | null;
   status: 'active' | 'inactive' | 'suspended';
   payment_terms?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 }> = [
   {
     id: 'sc-1',
@@ -82,6 +85,8 @@ let mockSubcontractors: Array<{
     tax_id: 'B00000001',
     status: 'active',
     payment_terms: 'monthly',
+    updated_at: '2026-03-06T08:00:00Z',
+    last_editor_name: 'Admin Demo',
   },
 ];
 let mockDrivers: Array<{
@@ -94,6 +99,8 @@ let mockDrivers: Array<{
   user_id?: string | null;
   subcontractor_id?: string | null;
   home_hub_id?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 }> = [
   {
     id: 'drv-1',
@@ -104,6 +111,8 @@ let mockDrivers: Array<{
     employment_type: 'subcontractor',
     subcontractor_id: 'sc-1',
     home_hub_id: 'hub-1',
+    updated_at: '2026-03-06T08:10:00Z',
+    last_editor_name: 'Admin Demo',
   },
 ];
 let mockVehicles: Array<{
@@ -116,6 +125,8 @@ let mockVehicles: Array<{
   subcontractor_id?: string | null;
   home_hub_id?: string | null;
   assigned_driver_id?: string | null;
+  updated_at?: string | null;
+  last_editor_name?: string | null;
 }> = [
   {
     id: 'veh-1',
@@ -127,6 +138,8 @@ let mockVehicles: Array<{
     subcontractor_id: 'sc-1',
     home_hub_id: 'hub-1',
     assigned_driver_id: 'drv-1',
+    updated_at: '2026-03-06T08:20:00Z',
+    last_editor_name: 'Admin Demo',
   },
 ];
 let mockRoutes: Array<{
@@ -2246,6 +2259,8 @@ export const mockApi = {
       tax_id: payload.tax_id,
       status: payload.status ?? 'active',
       payment_terms: payload.payment_terms ?? 'monthly',
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     mockSubcontractors = [created, ...mockSubcontractors];
     return created;
@@ -2262,6 +2277,8 @@ export const mockApi = {
     mockSubcontractors[index] = {
       ...mockSubcontractors[index],
       ...payload,
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     return mockSubcontractors[index];
   },
@@ -2300,6 +2317,8 @@ export const mockApi = {
       user_id: payload.user_id ?? null,
       subcontractor_id: payload.subcontractor_id ?? null,
       home_hub_id: payload.home_hub_id ?? null,
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     mockDrivers = [created, ...mockDrivers];
     return created;
@@ -2319,6 +2338,8 @@ export const mockApi = {
     mockDrivers[index] = {
       ...mockDrivers[index],
       ...payload,
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     return mockDrivers[index];
   },
@@ -2358,6 +2379,8 @@ export const mockApi = {
       subcontractor_id: payload.subcontractor_id ?? null,
       home_hub_id: payload.home_hub_id ?? null,
       assigned_driver_id: payload.assigned_driver_id ?? null,
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     mockVehicles = [created, ...mockVehicles];
     return created;
@@ -2377,6 +2400,8 @@ export const mockApi = {
     mockVehicles[index] = {
       ...mockVehicles[index],
       ...payload,
+      updated_at: nowIso(),
+      last_editor_name: 'Admin Demo',
     };
     return mockVehicles[index];
   },
