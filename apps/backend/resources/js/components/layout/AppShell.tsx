@@ -60,6 +60,7 @@ export function AppShell({
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
+  const canAccessOpenApi = roles.includes('super_admin') || roles.includes('admin');
   const visibleMenu = menu.filter((item) => {
     if (item.to === '/login' && isAuthenticated) return false;
     if (!item.feature) return true;
@@ -101,7 +102,10 @@ export function AppShell({
             <div className="sidebar-user-name">{currentUser?.name ?? 'Operador'}</div>
             <div className="sidebar-user-email">{currentUser?.email ?? 'Sesion activa'}</div>
             <div className="sidebar-user-actions">
-              <a href="/dashboard" className="sidebar-user-link">Dashboard</a>
+              <a href="/ops" className="sidebar-user-link">Operativa</a>
+              {canAccessOpenApi ? (
+                <a href="/api-docs" className="sidebar-user-link">OpenAPI</a>
+              ) : null}
               <a href="/profile" className="sidebar-user-link">Perfil</a>
               <button
                 type="button"

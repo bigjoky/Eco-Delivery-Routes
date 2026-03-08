@@ -208,6 +208,8 @@ class IncidentController extends Controller
 
         $payload = $request->validate([
             'notes' => ['nullable', 'string'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string'],
         ]);
 
         $exists = DB::table('incidents')->where('id', $id)->exists();
@@ -219,6 +221,8 @@ class IncidentController extends Controller
 
         DB::table('incidents')->where('id', $id)->update([
             'notes' => $payload['notes'] ?? DB::raw('notes'),
+            'resolution_reason_code' => $payload['reason_code'] ?? DB::raw('resolution_reason_code'),
+            'resolution_reason_detail' => $payload['reason_detail'] ?? DB::raw('resolution_reason_detail'),
             'resolved_at' => now(),
             'updated_at' => now(),
         ]);
@@ -226,6 +230,7 @@ class IncidentController extends Controller
         Log::info('ops.incident.resolved', [
             'actor_user_id' => $actor->id,
             'incident_id' => $id,
+            'reason_code' => $payload['reason_code'] ?? null,
             'latency_ms' => (int) round((microtime(true) - $start) * 1000),
         ]);
 
@@ -254,6 +259,8 @@ class IncidentController extends Controller
             'filters.sla_status' => ['nullable', 'in:on_track,at_risk,breached,resolved'],
             'filters.resolved' => ['nullable', 'in:open,resolved,0,1'],
             'notes' => ['nullable', 'string'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string'],
         ]);
 
         $applyToFiltered = (bool) ($payload['apply_to_filtered'] ?? false);
@@ -271,6 +278,8 @@ class IncidentController extends Controller
             ->whereNull('resolved_at')
             ->update([
                 'notes' => $payload['notes'] ?? DB::raw('notes'),
+                'resolution_reason_code' => $payload['reason_code'] ?? DB::raw('resolution_reason_code'),
+                'resolution_reason_detail' => $payload['reason_detail'] ?? DB::raw('resolution_reason_detail'),
                 'resolved_at' => now(),
                 'updated_at' => now(),
             ]);

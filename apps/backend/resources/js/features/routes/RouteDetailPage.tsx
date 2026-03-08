@@ -46,6 +46,12 @@ export function RouteDetailPage() {
   const [bulkShipmentIds, setBulkShipmentIds] = useState<string[]>([]);
   const [bulkPickupIds, setBulkPickupIds] = useState<string[]>([]);
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [selectedStopIds, setSelectedStopIds] = useState<string[]>([]);
+  const [bulkDeletingStops, setBulkDeletingStops] = useState(false);
+  const [bulkUpdatingStops, setBulkUpdatingStops] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<'' | 'planned' | 'in_progress' | 'completed'>('');
+  const [bulkPlannedAt, setBulkPlannedAt] = useState('');
+  const [bulkCompletedAt, setBulkCompletedAt] = useState('');
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
   const [manifestNotes, setManifestNotes] = useState('');
@@ -337,6 +343,70 @@ export function RouteDetailPage() {
     }
   };
 
+  const deleteSelectedStops = async () => {
+    if (!id) return;
+    if (selectedStopIds.length === 0) {
+      setError('Selecciona al menos una parada para eliminar.');
+      return;
+    }
+    const confirmed = window.confirm(`Eliminar ${selectedStopIds.length} paradas seleccionadas?`);
+    if (!confirmed) return;
+
+    setBulkDeletingStops(true);
+    setError('');
+    try {
+      let updatedStops = stops;
+      for (const stopId of selectedStopIds) {
+        updatedStops = await apiClient.deleteRouteStop(id, stopId);
+      }
+      setStops(updatedStops);
+      setSelectedStopIds([]);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo eliminar paradas en bloque');
+      apiClient.getRouteStops(id).then(setStops).catch(() => {});
+    } finally {
+      setBulkDeletingStops(false);
+    }
+  };
+
+  const updateSelectedStops = async () => {
+    if (!id) return;
+    if (selectedStopIds.length === 0) {
+      setError('Selecciona al menos una parada para actualizar.');
+      return;
+    }
+    if (!bulkStatus && !bulkPlannedAt && !bulkCompletedAt) {
+      setError('Define al menos un campo masivo (estado o ETA).');
+      return;
+    }
+
+    setBulkUpdatingStops(true);
+    setError('');
+    try {
+      const payload: {
+        status?: 'planned' | 'in_progress' | 'completed';
+        planned_at?: string | null;
+        completed_at?: string | null;
+      } = {};
+      if (bulkStatus) payload.status = bulkStatus;
+      if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
+      if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
+
+      for (const stopId of selectedStopIds) {
+        await apiClient.updateRouteStop(id, stopId, payload);
+      }
+
+      const refreshed = await apiClient.getRouteStops(id);
+      setStops(refreshed);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
+    } finally {
+      setBulkUpdatingStops(false);
+    }
+  };
+
   const undoDeleteStop = async () => {
     if (!id || !lastDeletedStop) return;
     setUndoDeleting(true);
@@ -454,6 +524,11 @@ export function RouteDetailPage() {
       setRecalculatingEta(false);
     }
   };
+
+  useEffect(() => {
+    const visible = new Set(stops.map((stop) => stop.id));
+    setSelectedStopIds((current) => current.filter((id) => visible.has(id)));
+  }, [stops]);
 
   return (
     <section className="page-grid">
@@ -648,10 +723,76 @@ export function RouteDetailPage() {
               {recalculatingEta ? 'Recalculando ETA...' : 'Recalcular ETA'}
             </Button>
           </div>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedStopIds(stops.map((stop) => stop.id))}
+              disabled={stops.length === 0 || bulkDeletingStops}
+            >
+              Seleccionar todo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedStopIds([])}
+              disabled={selectedStopIds.length === 0 || bulkDeletingStops}
+            >
+              Limpiar seleccion
+            </Button>
+            <span className="helper">Seleccionadas: {selectedStopIds.length}</span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={deleteSelectedStops}
+              disabled={selectedStopIds.length === 0 || bulkDeletingStops || bulkUpdatingStops}
+            >
+              {bulkDeletingStops ? 'Eliminando...' : 'Eliminar seleccionadas'}
+            </Button>
+          </div>
+          <div className="inline-actions">
+            <label htmlFor="bulk-stop-status">Estado masivo</label>
+            <select
+              id="bulk-stop-status"
+              value={bulkStatus}
+              onChange={(event) => setBulkStatus(event.target.value as '' | 'planned' | 'in_progress' | 'completed')}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            >
+              <option value="">Sin cambio</option>
+              <option value="planned">planned</option>
+              <option value="in_progress">in_progress</option>
+              <option value="completed">completed</option>
+            </select>
+            <label htmlFor="bulk-stop-planned-at">ETA planificada</label>
+            <input
+              id="bulk-stop-planned-at"
+              type="datetime-local"
+              value={bulkPlannedAt}
+              onChange={(event) => setBulkPlannedAt(event.target.value)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
+            <label htmlFor="bulk-stop-completed-at">ETA completada</label>
+            <input
+              id="bulk-stop-completed-at"
+              type="datetime-local"
+              value={bulkCompletedAt}
+              onChange={(event) => setBulkCompletedAt(event.target.value)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={updateSelectedStops}
+              disabled={selectedStopIds.length === 0 || bulkUpdatingStops || bulkDeletingStops}
+            >
+              {bulkUpdatingStops ? 'Aplicando...' : 'Aplicar cambios masivos'}
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Sel</TableHead>
                   <TableHead>Secuencia</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
@@ -674,6 +815,21 @@ export function RouteDetailPage() {
                       setDraggingStopId(null);
                     }}
                   >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedStopIds.includes(stop.id)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setSelectedStopIds((current) => (
+                            checked
+                              ? Array.from(new Set([...current, stop.id]))
+                              : current.filter((id) => id !== stop.id)
+                          ));
+                        }}
+                        disabled={bulkDeletingStops}
+                      />
+                    </TableCell>
                     <TableCell>
                       <input
                         type="number"
