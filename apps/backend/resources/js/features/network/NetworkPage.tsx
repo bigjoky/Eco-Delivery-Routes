@@ -431,19 +431,6 @@ export function NetworkPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Crear nodos rápidamente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="inline-actions">
-            <Button type="button" variant="outline" onClick={() => openCreateWizard('hub')}>Nuevo Hub</Button>
-            <Button type="button" variant="outline" onClick={() => openCreateWizard('depot')}>Nuevo Depot</Button>
-            <Button type="button" variant="outline" onClick={() => openCreateWizard('point')}>Nuevo Punto</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Resumen de red</CardTitle>
         </CardHeader>
         <CardContent>

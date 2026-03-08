@@ -228,7 +228,7 @@ a {
 
 .page-grid {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .page-grid.two {
@@ -248,16 +248,16 @@ a {
 
 .inline-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   align-items: center;
 }
 
 .filters-panel {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--surface-muted);
-  padding: 10px;
+  padding: 12px;
   display: grid;
   gap: 10px;
 }
@@ -272,7 +272,7 @@ label {
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
-  padding: 14px;
+  padding: 16px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 

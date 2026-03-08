@@ -17,6 +17,22 @@ function stopStatusHelp(status: string): string {
   return help[status] ?? status;
 }
 
+type RouteBulkActionTemplate = {
+  id: string;
+  name: string;
+  status: '' | 'planned' | 'in_progress' | 'completed';
+  plannedAt: string;
+  completedAt: string;
+  shiftMinutes: string;
+};
+
+type RouteOpsAuditItem = {
+  id: string;
+  at: string;
+  action: string;
+  details: string;
+};
+
 export function RouteDetailPage() {
   const { id } = useParams();
   const [stops, setStops] = useState<RouteStopSummary[]>([]);
@@ -64,6 +80,22 @@ export function RouteDetailPage() {
   const [recalculatingEta, setRecalculatingEta] = useState(false);
   const [bulkUpdatePreviewOpen, setBulkUpdatePreviewOpen] = useState(false);
   const [bulkUpdatePreviewRows, setBulkUpdatePreviewRows] = useState<Array<{ id: string; reference: string; changes: string[] }>>([]);
+  const [bulkTemplateName, setBulkTemplateName] = useState('');
+  const [selectedBulkTemplateId, setSelectedBulkTemplateId] = useState('');
+  const [bulkTemplates, setBulkTemplates] = useState<RouteBulkActionTemplate[]>([]);
+  const [opsAudit, setOpsAudit] = useState<RouteOpsAuditItem[]>([]);
+  const routeBulkTemplateStorageKey = `eco_delivery_routes_route_bulk_templates_${id ?? 'global'}`;
+  const routeOpsAuditStorageKey = `eco_delivery_routes_route_ops_audit_${id ?? 'global'}`;
+
+  const appendOpsAudit = (action: string, details: string) => {
+    const entry: RouteOpsAuditItem = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      at: new Date().toISOString(),
+      action,
+      details,
+    };
+    setOpsAudit((current) => [entry, ...current].slice(0, 30));
+  };
 
   const refreshManifest = async (routeId: string) => {
     setManifestLoading(true);
@@ -238,7 +270,12 @@ export function RouteDetailPage() {
     }
   };
 
-  const updateStop = async (stopId: string, payload: { sequence?: number; status?: 'planned' | 'in_progress' | 'completed' }) => {
+  const updateStop = async (stopId: string, payload: {
+    sequence?: number;
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+  }) => {
     if (!id) return;
     setError('');
     try {
@@ -260,6 +297,7 @@ export function RouteDetailPage() {
     try {
       const saved = await apiClient.reorderRouteStops(id, nextStops.map((stop) => stop.id));
       setStops(saved);
+      appendOpsAudit('stops.reordered', `Reordenadas ${saved.length} paradas.`);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo guardar el nuevo orden de paradas');
@@ -317,6 +355,7 @@ export function RouteDetailPage() {
         status: 'planned',
       });
       setStops(result.stops);
+      appendOpsAudit('stops.bulk_add', `Agregadas ${result.created_count} paradas en lote.`);
       setBulkShipmentIds([]);
       setBulkPickupIds([]);
       void refreshManifest(id);
@@ -364,6 +403,7 @@ export function RouteDetailPage() {
         updatedStops = await apiClient.deleteRouteStop(id, stopId);
       }
       setStops(updatedStops);
+      appendOpsAudit('stops.bulk_delete', `Eliminadas ${selectedStopIds.length} paradas en lote.`);
       setSelectedStopIds([]);
       void refreshManifest(id);
     } catch (exception) {
@@ -442,6 +482,7 @@ export function RouteDetailPage() {
       const refreshed = await apiClient.getRouteStops(id);
       setStops(refreshed);
       setBulkUpdatePreviewOpen(false);
+      appendOpsAudit('stops.bulk_update', `Actualizadas ${selectedStopIds.length} paradas en lote.`);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
@@ -566,6 +607,7 @@ export function RouteDetailPage() {
       }
       const refreshed = await apiClient.getRouteStops(id);
       setStops(refreshed);
+      appendOpsAudit('stops.eta_recalculated', `Recalculadas ETA para ${sorted.length} paradas.`);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo recalcular ETA');
@@ -578,6 +620,83 @@ export function RouteDetailPage() {
     const visible = new Set(stops.map((stop) => stop.id));
     setSelectedStopIds((current) => current.filter((id) => visible.has(id)));
   }, [stops]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const rawTemplates = window.localStorage.getItem(routeBulkTemplateStorageKey);
+    if (rawTemplates) {
+      try {
+        const parsed = JSON.parse(rawTemplates) as RouteBulkActionTemplate[];
+        setBulkTemplates(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setBulkTemplates([]);
+      }
+    } else {
+      setBulkTemplates([]);
+    }
+    const rawAudit = window.localStorage.getItem(routeOpsAuditStorageKey);
+    if (rawAudit) {
+      try {
+        const parsed = JSON.parse(rawAudit) as RouteOpsAuditItem[];
+        setOpsAudit(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setOpsAudit([]);
+      }
+    } else {
+      setOpsAudit([]);
+    }
+    setSelectedBulkTemplateId('');
+  }, [routeBulkTemplateStorageKey, routeOpsAuditStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(routeBulkTemplateStorageKey, JSON.stringify(bulkTemplates));
+  }, [routeBulkTemplateStorageKey, bulkTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(routeOpsAuditStorageKey, JSON.stringify(opsAudit));
+  }, [routeOpsAuditStorageKey, opsAudit]);
+
+  const saveBulkTemplate = () => {
+    if (!bulkTemplateName.trim()) {
+      setError('Define nombre de plantilla para guardar acciones masivas.');
+      return;
+    }
+    const template: RouteBulkActionTemplate = {
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: bulkTemplateName.trim(),
+      status: bulkStatus,
+      plannedAt: bulkPlannedAt,
+      completedAt: bulkCompletedAt,
+      shiftMinutes: bulkEtaShiftMinutes,
+    };
+    setBulkTemplates((current) => [template, ...current].slice(0, 20));
+    setSelectedBulkTemplateId(template.id);
+    setBulkTemplateName('');
+    appendOpsAudit('template.saved', `Plantilla guardada: ${template.name}`);
+  };
+
+  const applyBulkTemplate = () => {
+    const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
+    if (!template) {
+      setError('Selecciona una plantilla válida.');
+      return;
+    }
+    setBulkStatus(template.status);
+    setBulkPlannedAt(template.plannedAt);
+    setBulkCompletedAt(template.completedAt);
+    setBulkEtaShiftMinutes(template.shiftMinutes);
+    appendOpsAudit('template.applied', `Plantilla aplicada: ${template.name}`);
+  };
+
+  const deleteBulkTemplate = () => {
+    const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
+    if (!template) return;
+    setBulkTemplates((current) => current.filter((item) => item.id !== selectedBulkTemplateId));
+    setSelectedBulkTemplateId('');
+    appendOpsAudit('template.deleted', `Plantilla eliminada: ${template.name}`);
+  };
 
   return (
     <section className="page-grid">
@@ -839,6 +958,35 @@ export function RouteDetailPage() {
               {bulkDeletingStops ? 'Eliminando...' : 'Eliminar seleccionadas'}
             </Button>
           </div>
+          <div className="filters-panel">
+            <div className="inline-actions">
+              <label htmlFor="bulk-template-select">Plantilla masiva</label>
+              <select
+                id="bulk-template-select"
+                value={selectedBulkTemplateId}
+                onChange={(event) => setSelectedBulkTemplateId(event.target.value)}
+              >
+                <option value="">Selecciona plantilla</option>
+                {bulkTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+              <Button type="button" variant="outline" onClick={applyBulkTemplate} disabled={!selectedBulkTemplateId}>
+                Aplicar plantilla
+              </Button>
+              <Button type="button" variant="outline" onClick={deleteBulkTemplate} disabled={!selectedBulkTemplateId}>
+                Eliminar plantilla
+              </Button>
+              <input
+                value={bulkTemplateName}
+                onChange={(event) => setBulkTemplateName(event.target.value)}
+                placeholder="Nombre nueva plantilla"
+              />
+              <Button type="button" variant="outline" onClick={saveBulkTemplate}>
+                Guardar plantilla
+              </Button>
+            </div>
+          </div>
           <div className="inline-actions">
             <label htmlFor="bulk-stop-status">Estado masivo</label>
             <select
@@ -1017,6 +1165,37 @@ export function RouteDetailPage() {
           <div className="helper">
             Arrastra y suelta una fila para reordenar paradas. {reorderingStops ? 'Guardando orden...' : ''}
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Auditoría Operativa</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {opsAudit.length === 0 ? (
+            <div className="helper">Sin eventos aún.</div>
+          ) : (
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Acción</TableHead>
+                    <TableHead>Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {opsAudit.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{toLocalDateTime(entry.at)}</TableCell>
+                      <TableCell>{entry.action}</TableCell>
+                      <TableCell>{entry.details}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          )}
         </CardContent>
       </Card>
     </section>

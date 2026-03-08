@@ -621,6 +621,39 @@ export function ShipmentsPage() {
     return formatDate(date);
   })();
 
+  const serviceCutoffHour: Record<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel', number> = {
+    express_1030: 10,
+    express_1400: 14,
+    express_1900: 19,
+    economy_parcel: 19,
+    business_parcel: 19,
+    thermo_parcel: 14,
+  };
+
+  const serviceDefaultTime: Record<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel', string> = {
+    express_1030: '10:30:00',
+    express_1400: '14:00:00',
+    express_1900: '19:00:00',
+    economy_parcel: '19:00:00',
+    business_parcel: '19:00:00',
+    thermo_parcel: '14:00:00',
+  };
+
+  const normalizeScheduledAtForPayload = (): string | null => {
+    const raw = createScheduledAt.trim();
+    if (!raw) return null;
+    if (createOperation !== 'shipment') {
+      const pickupDate = Date.parse(raw.includes('T') ? raw : `${raw}T09:00:00`);
+      return Number.isNaN(pickupDate) ? null : new Date(pickupDate).toISOString();
+    }
+    const withTime = raw.includes('T')
+      ? raw
+      : `${raw}T${serviceDefaultTime[createServiceType]}`;
+    const parsed = Date.parse(withTime);
+    if (Number.isNaN(parsed)) return null;
+    return new Date(parsed).toISOString();
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const raw = window.localStorage.getItem(wizardStorageKey);
@@ -991,13 +1024,21 @@ export function ShipmentsPage() {
       }
     }
     if (createScheduledAt) {
-      const parsed = Date.parse(createScheduledAt);
+      const normalizedScheduledAt = normalizeScheduledAtForPayload();
+      const parsed = normalizedScheduledAt ? Date.parse(normalizedScheduledAt) : Number.NaN;
       if (Number.isNaN(parsed)) nextErrors.scheduledAt = 'Fecha/hora no valida (usa ISO).';
       if (!Number.isNaN(parsed)) {
         const minDate = new Date(`${minScheduledAt}T00:00:00Z`);
         const maxDate = new Date(`${maxScheduledAt}T23:59:59Z`);
         if (parsed < minDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser posterior a ${minScheduledAt}.`;
         if (parsed > maxDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser anterior a ${maxScheduledAt}.`;
+        if (createOperation === 'shipment') {
+          const scheduledDate = new Date(parsed);
+          const cutoff = serviceCutoffHour[createServiceType];
+          if (scheduledDate.getUTCHours() > cutoff || (scheduledDate.getUTCHours() === cutoff && scheduledDate.getUTCMinutes() > 30)) {
+            nextErrors.scheduledAt = `La hora supera la ventana del servicio (${serviceTypeLabel(createServiceType)}).`;
+          }
+        }
       }
     }
     setCreateFieldErrors(nextErrors);
@@ -1026,6 +1067,7 @@ export function ShipmentsPage() {
       const senderName = createSenderDocType === 'CIF'
         ? createSenderLegalName
         : [createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ');
+      const normalizedScheduledAt = normalizeScheduledAtForPayload();
       if (createOperation === 'shipment') {
         await apiClient.createShipment({
           hub_id: createHubId,
@@ -1055,7 +1097,7 @@ export function ShipmentsPage() {
           sender_province: createSenderProvince || null,
           sender_country: createSenderCountry || null,
           sender_address_notes: createSenderAddressNotes || null,
-          scheduled_at: createScheduledAt || null,
+          scheduled_at: normalizedScheduledAt,
           service_type: createServiceType,
         });
       } else {
@@ -1065,7 +1107,7 @@ export function ShipmentsPage() {
           pickup_type: createOperation === 'pickup_return' ? 'RETURN' : 'NORMAL',
           requester_name: senderName || null,
           address_line: composedSenderAddress || null,
-          scheduled_at: createScheduledAt || null,
+          scheduled_at: normalizedScheduledAt,
         });
       }
       setCreateExternalReference('');
@@ -1765,6 +1807,11 @@ export function ShipmentsPage() {
                 max={maxScheduledAt}
               />
               <div className="helper">Ventana: {minScheduledAt} a {maxScheduledAt}</div>
+              {createOperation === 'shipment' ? (
+                <div className="helper">
+                  Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
+                </div>
+              ) : null}
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
           </div>
