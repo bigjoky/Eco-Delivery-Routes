@@ -87,7 +87,7 @@ function ShipmentFilters({
   exportPdf,
 }: ShipmentFiltersProps) {
   return (
-    <div className="inline-actions">
+    <div className="filters-panel">
       <label htmlFor="shipment-query">Buscar</label>
       <input
         id="shipment-query"
@@ -148,12 +148,14 @@ function ShipmentFilters({
         <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
         <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
       </div>
-      <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
-        Export CSV
-      </Button>
-      <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
-        Export PDF
-      </Button>
+      <div className="inline-actions">
+        <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
+          Export CSV
+        </Button>
+        <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
+          Export PDF
+        </Button>
+      </div>
     </div>
   );
 }
@@ -919,6 +921,9 @@ export function ShipmentsPage() {
       if (!createPhone.trim()) {
         nextErrors.recipientPhone = 'Telefono destinatario obligatorio.';
       }
+      if (!createStreet.trim()) nextErrors.street = 'La calle del destinatario es obligatoria.';
+      if (!createCity.trim()) nextErrors.city = 'La ciudad del destinatario es obligatoria.';
+      if (!createPostalCode.trim()) nextErrors.postalCode = 'Codigo postal destinatario obligatorio.';
     }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
@@ -955,6 +960,9 @@ export function ShipmentsPage() {
       }
       if (!createSenderStreet.trim()) {
         nextErrors.senderStreet = 'La calle del remitente es obligatoria para recogidas.';
+      }
+      if (!createSenderPostalCode.trim()) {
+        nextErrors.senderPostalCode = 'Codigo postal remitente obligatorio para recogidas.';
       }
       if (!createSenderCity.trim()) {
         nextErrors.senderCity = 'La ciudad del remitente es obligatoria para recogidas.';

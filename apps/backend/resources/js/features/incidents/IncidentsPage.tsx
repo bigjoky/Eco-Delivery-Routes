@@ -72,6 +72,9 @@ export function IncidentsPage() {
   const [bulkResolveNotes, setBulkResolveNotes] = useState('Resueltas en lote desde panel web');
   const [bulkResolveReasonCode, setBulkResolveReasonCode] = useState<(typeof bulkResolveReasonOptions)[number]['code']>('DATA_CORRECTION');
   const [bulkResolveReasonDetail, setBulkResolveReasonDetail] = useState('');
+  const [bulkOverridePriority, setBulkOverridePriority] = useState<'' | 'high' | 'medium' | 'low'>('');
+  const [bulkOverrideDueAt, setBulkOverrideDueAt] = useState('');
+  const [bulkOverrideReason, setBulkOverrideReason] = useState('');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -357,14 +360,12 @@ export function IncidentsPage() {
   };
 
   const onBulkOverrideSla = async () => {
-    const reason = window.prompt('Motivo del ajuste SLA masivo');
-    if (!reason || reason.trim() === '') return;
-    const priorityInput = window.prompt('Nueva prioridad global (high/medium/low, opcional)', '');
-    const dueInput = window.prompt('Nuevo SLA due_at ISO (opcional)', '');
-    const priority = priorityInput === 'high' || priorityInput === 'medium' || priorityInput === 'low' ? priorityInput : undefined;
-    const slaDueAt = dueInput && dueInput.trim() !== '' ? dueInput.trim() : undefined;
-    if (!priority && !slaDueAt) {
+    if (!bulkOverridePriority && !bulkOverrideDueAt.trim()) {
       setResolveError('Define prioridad o due_at para el ajuste SLA masivo.');
+      return;
+    }
+    if (!bulkOverrideReason.trim()) {
+      setResolveError('Define un motivo para el ajuste SLA masivo.');
       return;
     }
     try {
@@ -381,10 +382,13 @@ export function IncidentsPage() {
           slaStatus: listSlaFilter || undefined,
           resolved: resolvedFilter || undefined,
         } : undefined,
-        priority,
-        slaDueAt,
-        reason: reason.trim(),
+        priority: bulkOverridePriority || undefined,
+        slaDueAt: bulkOverrideDueAt.trim() || undefined,
+        reason: bulkOverrideReason.trim(),
       });
+      setBulkOverridePriority('');
+      setBulkOverrideDueAt('');
+      setBulkOverrideReason('');
       await reload();
     } catch (exception) {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo aplicar override SLA masivo');
@@ -531,7 +535,8 @@ export function IncidentsPage() {
             </Button>
           </div>
           {showFilters ? (
-            <div className="form-row">
+            <div className="filters-panel">
+              <div className="form-row">
               <div>
                 <label>Estado</label>
                 <Select value={resolvedFilter} onChange={(e) => { setResolvedFilter(e.target.value as 'open' | 'resolved' | ''); setPage(1); }}>
@@ -594,6 +599,7 @@ export function IncidentsPage() {
                 <label>Buscar</label>
                 <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
               </div>
+              </div>
             </div>
           ) : null}
           <div className="inline-actions">
@@ -626,9 +632,41 @@ export function IncidentsPage() {
                 ? 'Resolver abiertas del filtro'
                 : `Resolver seleccionadas (${selectedIncidentIds.length})`}
             </Button>
-            <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
-              Override SLA masivo
-            </Button>
+          </div>
+          <div className="filters-panel">
+            <div className="helper">Override SLA masivo</div>
+            <div className="form-row">
+              <div>
+                <label>Prioridad</label>
+                <Select value={bulkOverridePriority} onChange={(event) => setBulkOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
+                  <option value="">Sin cambio</option>
+                  <option value="high">high</option>
+                  <option value="medium">medium</option>
+                  <option value="low">low</option>
+                </Select>
+              </div>
+              <div>
+                <label>SLA due_at (ISO)</label>
+                <Input
+                  value={bulkOverrideDueAt}
+                  onChange={(event) => setBulkOverrideDueAt(event.target.value)}
+                  placeholder="2026-03-31T14:00:00Z"
+                />
+              </div>
+              <div>
+                <label>Motivo</label>
+                <Input
+                  value={bulkOverrideReason}
+                  onChange={(event) => setBulkOverrideReason(event.target.value)}
+                  placeholder="Motivo del ajuste masivo"
+                />
+              </div>
+            </div>
+            <div className="inline-actions">
+              <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
+                Aplicar override SLA
+              </Button>
+            </div>
           </div>
           <TableWrapper>
             <Table>

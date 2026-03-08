@@ -52,6 +52,7 @@ export function RouteDetailPage() {
   const [bulkStatus, setBulkStatus] = useState<'' | 'planned' | 'in_progress' | 'completed'>('');
   const [bulkPlannedAt, setBulkPlannedAt] = useState('');
   const [bulkCompletedAt, setBulkCompletedAt] = useState('');
+  const [bulkEtaShiftMinutes, setBulkEtaShiftMinutes] = useState('0');
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
   const [manifestNotes, setManifestNotes] = useState('');
@@ -376,24 +377,34 @@ export function RouteDetailPage() {
       setError('Selecciona al menos una parada para actualizar.');
       return;
     }
-    if (!bulkStatus && !bulkPlannedAt && !bulkCompletedAt) {
-      setError('Define al menos un campo masivo (estado o ETA).');
+    const shiftMinutes = Number(bulkEtaShiftMinutes);
+    const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
+    if (!bulkStatus && !bulkPlannedAt && !bulkCompletedAt && !hasShift) {
+      setError('Define al menos un campo masivo (estado, ETA o desplazamiento).');
       return;
     }
 
     setBulkUpdatingStops(true);
     setError('');
     try {
-      const payload: {
-        status?: 'planned' | 'in_progress' | 'completed';
-        planned_at?: string | null;
-        completed_at?: string | null;
-      } = {};
-      if (bulkStatus) payload.status = bulkStatus;
-      if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
-      if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
-
       for (const stopId of selectedStopIds) {
+        const current = stops.find((stop) => stop.id === stopId);
+        const payload: {
+          status?: 'planned' | 'in_progress' | 'completed';
+          planned_at?: string | null;
+          completed_at?: string | null;
+        } = {};
+        if (bulkStatus) payload.status = bulkStatus;
+        if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
+        if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
+        if (hasShift && current) {
+          if (!bulkPlannedAt && current.planned_at) {
+            payload.planned_at = shiftIsoDateTime(current.planned_at, shiftMinutes);
+          }
+          if (!bulkCompletedAt && current.completed_at) {
+            payload.completed_at = shiftIsoDateTime(current.completed_at, shiftMinutes);
+          }
+        }
         await apiClient.updateRouteStop(id, stopId, payload);
       }
 
@@ -487,6 +498,12 @@ export function RouteDetailPage() {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return null;
     return date.toISOString();
+  };
+
+  const shiftIsoDateTime = (value: string, minutes: number) => {
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return value;
+    return new Date(parsed + (minutes * 60 * 1000)).toISOString();
   };
 
   const etaSuggestions = useMemo(() => {
@@ -777,6 +794,15 @@ export function RouteDetailPage() {
               type="datetime-local"
               value={bulkCompletedAt}
               onChange={(event) => setBulkCompletedAt(event.target.value)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
+            <label htmlFor="bulk-stop-shift">Desplazar ETA (min)</label>
+            <input
+              id="bulk-stop-shift"
+              type="number"
+              step={5}
+              value={bulkEtaShiftMinutes}
+              onChange={(event) => setBulkEtaShiftMinutes(event.target.value)}
               disabled={bulkUpdatingStops || bulkDeletingStops}
             />
             <Button

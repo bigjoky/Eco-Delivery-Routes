@@ -201,6 +201,9 @@ export function RoutesPage() {
   const selectedCreateVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
   const estimatedLoadKg = Math.max(0, Number(estimatedShipmentsCount) || 0) * Math.max(0, Number(estimatedAvgWeightKg) || 0);
   const loadCapacityDeltaKg = (selectedCreateVehicle?.capacity_kg ?? 0) - estimatedLoadKg;
+  const loadUtilization = selectedCreateVehicle && (selectedCreateVehicle.capacity_kg ?? 0) > 0
+    ? (estimatedLoadKg / (selectedCreateVehicle.capacity_kg ?? 1)) * 100
+    : null;
 
   const createRoute = async () => {
     const nextErrors: string[] = [];
@@ -466,7 +469,16 @@ export function RoutesPage() {
             <div className="kpi-item">
               <div className="kpi-label">Delta vs capacidad vehículo</div>
               <div className="kpi-value">{selectedCreateVehicle ? loadCapacityDeltaKg.toFixed(1) : '-'}</div>
-              <div className="helper">{selectedCreateVehicle ? `Capacidad: ${selectedCreateVehicle.capacity_kg ?? 0} kg` : 'Selecciona vehículo'}</div>
+              <div className="helper">
+                {selectedCreateVehicle
+                  ? `Capacidad: ${selectedCreateVehicle.capacity_kg ?? 0} kg`
+                  : 'Selecciona vehículo'}
+              </div>
+              {loadUtilization !== null ? (
+                <Badge variant={loadUtilization > 100 ? 'destructive' : loadUtilization > 90 ? 'warning' : 'success'}>
+                  Uso estimado {loadUtilization.toFixed(1)}%
+                </Badge>
+              ) : null}
             </div>
           </div>
         </CardContent>
@@ -568,7 +580,7 @@ export function RoutesPage() {
             ) : null}
           </div>
           {showFilters ? (
-            <>
+            <div className="filters-panel">
               <div className="form-row">
                 <div>
                   <label htmlFor="route-query">Buscar</label>
@@ -646,7 +658,7 @@ export function RoutesPage() {
                 <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
                 <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar fechas</Button>
               </div>
-            </>
+            </div>
           ) : null}
           <TableWrapper>
             <Table>
