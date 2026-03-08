@@ -31,6 +31,8 @@ body {
   color: var(--text);
   font-family: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .sr-only {
@@ -106,10 +108,27 @@ a {
 
 .sidebar-more summary {
   list-style: none;
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
 }
 
 .sidebar-more summary::-webkit-details-marker {
   display: none;
+}
+
+.sidebar-more summary::after {
+  content: '▾';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sidebar-more[open] summary::after {
+  content: '▴';
 }
 
 .sidebar-more-items {
@@ -222,6 +241,7 @@ a {
 .topbar-title {
   font-size: 20px;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .topbar-subtitle {
@@ -364,11 +384,17 @@ label {
 .btn-outline {
   border-color: var(--border);
   background: white;
+  color: #334155;
 }
 
 .btn-outline.btn-sort-active {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .btn-destructive {
@@ -558,6 +584,8 @@ textarea:focus {
   position: sticky;
   top: 0;
   z-index: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .table-cell {
@@ -565,10 +593,15 @@ textarea:focus {
   border-bottom: 1px solid #eef2f7;
   font-size: 14px;
   vertical-align: top;
+  line-height: 1.4;
 }
 
 .table-row:hover .table-cell {
   background: #f9fafb;
+}
+
+.table-row:nth-child(even) .table-cell {
+  background: #fcfdff;
 }
 
 .table-row:last-child .table-cell {
