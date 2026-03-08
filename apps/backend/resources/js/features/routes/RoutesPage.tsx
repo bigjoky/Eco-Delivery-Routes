@@ -677,6 +677,7 @@ export function RoutesPage() {
                   <TableRow key={item.id}>
                     <TableCell>
                       <Link to={`/routes/${item.id}`}>{item.code}</Link>
+                      <div className="helper">ID: {item.id}</div>
                     </TableCell>
                     <TableCell>{item.route_date}</TableCell>
                     <TableCell>

@@ -818,6 +818,7 @@ export function IncidentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Sel</TableHead>
+                  <TableHead>Incidencia ID</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
                   <TableHead>Ref. envio</TableHead>
@@ -844,6 +845,7 @@ export function IncidentsPage() {
                         <span>-</span>
                       )}
                     </TableCell>
+                    <TableCell>{item.id}</TableCell>
                     <TableCell>{item.incidentable_type}</TableCell>
                     <TableCell>{item.incidentable_id}</TableCell>
                     <TableCell>{item.shipment_reference ?? '-'}</TableCell>
@@ -878,7 +880,7 @@ export function IncidentsPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11}>Sin incidencias para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={12}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

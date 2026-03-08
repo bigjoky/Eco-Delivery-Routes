@@ -2492,6 +2492,7 @@ export function ShipmentsPage() {
                       <div>
                         <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
                       </div>
+                      <div className="helper">ID: {item.id}</div>
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
                     </TableCell>
                     <TableCell>

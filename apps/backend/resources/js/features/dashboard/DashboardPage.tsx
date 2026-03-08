@@ -96,6 +96,22 @@ export function DashboardPage() {
   const maxRouteTrend = Math.max(1, ...routeTrendValues);
   const maxIncidentTrend = Math.max(1, ...incidentTrendValues);
   const maxQualityTrend = Math.max(1, ...qualityTrendValues);
+  const sharedRangeQuery = useMemo(
+    () => (
+      overview.period.from && overview.period.to
+        ? `date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`
+        : ''
+    ),
+    [overview.period.from, overview.period.to]
+  );
+  const shipmentRangeQuery = useMemo(
+    () => (
+      overview.period.from && overview.period.to
+        ? `scheduled_from=${encodeURIComponent(overview.period.from)}&scheduled_to=${encodeURIComponent(overview.period.to)}`
+        : ''
+    ),
+    [overview.period.from, overview.period.to]
+  );
 
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then(setHubs).catch(() => setHubs([]));
@@ -206,9 +222,9 @@ export function DashboardPage() {
             <CardTitle>{overview.totals.shipments}</CardTitle>
           </CardHeader>
           <CardContent className="dashboard-kpi-content">
-            <div className="helper">Created: {overview.shipments_by_status.created}</div>
-            <div className="helper">Out: {overview.shipments_by_status.out_for_delivery}</div>
-            <div className="helper">Delivered: {overview.shipments_by_status.delivered}</div>
+            <Link className="helper" to={`/shipments?status=created${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Created: {overview.shipments_by_status.created}</Link>
+            <Link className="helper" to={`/shipments?status=out_for_delivery${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Out: {overview.shipments_by_status.out_for_delivery}</Link>
+            <Link className="helper" to={`/shipments?status=delivered${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Delivered: {overview.shipments_by_status.delivered}</Link>
             <TrendBars values={shipmentTrendValues} max={maxShipmentTrend} />
           </CardContent>
         </Card>
@@ -218,9 +234,9 @@ export function DashboardPage() {
             <CardTitle>{overview.totals.routes}</CardTitle>
           </CardHeader>
           <CardContent className="dashboard-kpi-content">
-            <div className="helper">Planned: {overview.routes_by_status.planned}</div>
-            <div className="helper">In progress: {overview.routes_by_status.in_progress}</div>
-            <div className="helper">Completed: {overview.routes_by_status.completed}</div>
+            <Link className="helper" to={`/routes?status=planned${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Planned: {overview.routes_by_status.planned}</Link>
+            <Link className="helper" to={`/routes?status=in_progress${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>In progress: {overview.routes_by_status.in_progress}</Link>
+            <Link className="helper" to={`/routes?status=completed${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Completed: {overview.routes_by_status.completed}</Link>
             <TrendBars values={routeTrendValues} max={maxRouteTrend} />
           </CardContent>
         </Card>
@@ -230,7 +246,7 @@ export function DashboardPage() {
             <CardTitle>{overview.totals.incidents_open}</CardTitle>
           </CardHeader>
           <CardContent className="dashboard-kpi-content">
-            <Link className="helper" to="/incidents?resolved=open">Ver incidencias abiertas</Link>
+            <Link className="helper" to={`/incidents?resolved=open${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Ver incidencias abiertas</Link>
             <TrendBars values={incidentTrendValues} max={maxIncidentTrend} />
           </CardContent>
         </Card>
@@ -280,6 +296,9 @@ export function DashboardPage() {
           <Link to="/shipments" className="btn btn-outline">Envíos</Link>
           <Link to="/routes" className="btn btn-outline">Rutas</Link>
           <Link to="/incidents" className="btn btn-outline">Incidencias</Link>
+          <Link to="/partners" className="btn btn-outline">Partners</Link>
+          <Link to="/workforce" className="btn btn-outline">Personal</Link>
+          <Link to="/fleet-controls" className="btn btn-outline">Flota</Link>
           <Link to="/quality" className="btn btn-outline">KPI Calidad</Link>
         </CardContent>
       </Card>

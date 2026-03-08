@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -846,6 +846,20 @@ export function RouteDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="inline-actions">
+            <Link to="/dashboard" className="helper">Dashboard</Link>
+            <span className="helper">/</span>
+            <Link to="/routes" className="btn btn-outline">Rutas</Link>
+            {route?.subcontractor_id ? (
+              <Link to={`/partners?focus=subcontractor&id=${encodeURIComponent(route.subcontractor_id)}`} className="btn btn-outline">Subcontrata</Link>
+            ) : null}
+            {route?.driver_id ? (
+              <Link to={`/partners?focus=driver&id=${encodeURIComponent(route.driver_id)}`} className="btn btn-outline">Conductor</Link>
+            ) : null}
+            {route?.vehicle_id ? (
+              <Link to={`/fleet-controls?vehicle_id=${encodeURIComponent(route.vehicle_id)}`} className="btn btn-outline">Flota</Link>
+            ) : null}
+          </div>
+          <div className="inline-actions">
             <label htmlFor="route-subcontractor">Subcontrata</label>
             <select id="route-subcontractor" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
               <option value="">Sin asignar</option>
@@ -885,6 +899,7 @@ export function RouteDetailPage() {
           </div>
           <div className="helper">
             Ruta: {route?.code ?? id}
+            {' | '}ID: {route?.id ?? id}
             {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
             {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
           </div>
