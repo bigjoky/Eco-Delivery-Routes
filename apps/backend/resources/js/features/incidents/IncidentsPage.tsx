@@ -81,6 +81,10 @@ export function IncidentsPage() {
   const [singleOverrideDueAt, setSingleOverrideDueAt] = useState('');
   const [singleOverrideReason, setSingleOverrideReason] = useState('');
   const [singleOverrideSaving, setSingleOverrideSaving] = useState(false);
+  const [resolveTarget, setResolveTarget] = useState<IncidentSummary | null>(null);
+  const [resolveNotes, setResolveNotes] = useState('Resuelta desde panel web');
+  const [resolveReasonCode, setResolveReasonCode] = useState<(typeof bulkResolveReasonOptions)[number]['code']>('DATA_CORRECTION');
+  const [resolveReasonDetail, setResolveReasonDetail] = useState('');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -290,12 +294,30 @@ export function IncidentsPage() {
     }
   };
 
-  const onResolve = async (id: string) => {
-    setResolvingId(id);
+  const onResolve = (item: IncidentSummary) => {
+    setResolveTarget(item);
+    setResolveNotes('Resuelta desde panel web');
+    setResolveReasonCode('DATA_CORRECTION');
+    setResolveReasonDetail('');
+    setResolveError('');
+  };
+
+  const confirmResolve = async () => {
+    if (!resolveTarget) return;
+    if (!resolveNotes.trim()) {
+      setResolveError('Define una nota de resolución.');
+      return;
+    }
+    setResolvingId(resolveTarget.id);
     setResolveError('');
     try {
-      await apiClient.resolveIncident(id, 'Resuelta desde panel web');
+      await apiClient.resolveIncident(resolveTarget.id, {
+        notes: resolveNotes.trim(),
+        reasonCode: resolveReasonCode,
+        reasonDetail: resolveReasonDetail.trim() || undefined,
+      });
       await reload();
+      setResolveTarget(null);
     } catch (exception) {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
     } finally {
@@ -450,6 +472,50 @@ export function IncidentsPage() {
 
   return (
     <section className="page-grid">
+      <Modal
+        open={resolveTarget !== null}
+        title={`Resolver incidencia · ${resolveTarget?.reference ?? resolveTarget?.id ?? ''}`}
+        onClose={() => setResolveTarget(null)}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setResolveTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={confirmResolve} disabled={resolvingId !== null}>
+              {resolvingId ? 'Resolviendo...' : 'Resolver incidencia'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="page-grid">
+          <div className="form-row">
+            <div>
+              <label>Motivo estructurado</label>
+              <Select value={resolveReasonCode} onChange={(event) => setResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
+                {bulkResolveReasonOptions.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label>Detalle del motivo</label>
+              <Input
+                value={resolveReasonDetail}
+                onChange={(event) => setResolveReasonDetail(event.target.value)}
+                placeholder="Detalle opcional"
+              />
+            </div>
+          </div>
+          <div>
+            <label>Nota de resolución</label>
+            <Input
+              value={resolveNotes}
+              onChange={(event) => setResolveNotes(event.target.value)}
+              placeholder="Describe la resolución"
+            />
+          </div>
+        </div>
+      </Modal>
       <Modal
         open={singleOverrideTarget !== null}
         title={`Ajustar SLA · ${singleOverrideTarget?.id ?? ''}`}
@@ -784,7 +850,7 @@ export function IncidentsPage() {
                         <span>-</span>
                       ) : (
                         <div className="inline-actions">
-                          <Button type="button" onClick={() => onResolve(item.id)} disabled={resolvingId === item.id}>
+                          <Button type="button" onClick={() => onResolve(item)} disabled={resolvingId === item.id}>
                             {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
                           </Button>
                           {item.priority !== 'high' ? (

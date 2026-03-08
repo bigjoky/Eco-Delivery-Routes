@@ -2176,17 +2176,32 @@ export const apiClient = {
     return data.data as IncidentSummary;
   },
 
-  async resolveIncident(id: string, notes?: string): Promise<IncidentSummary> {
-    if (USE_MOCK) return mockApi.resolveIncident(id, notes) as Promise<IncidentSummary>;
+  async resolveIncident(
+    id: string,
+    payload?: string | {
+      notes?: string;
+      reasonCode?: string;
+      reasonDetail?: string;
+    }
+  ): Promise<IncidentSummary> {
+    const normalizedPayload = typeof payload === 'string'
+      ? { notes: payload }
+      : (payload ?? {});
+    if (USE_MOCK) return mockApi.resolveIncident(id, normalizedPayload.notes) as Promise<IncidentSummary>;
     const response = await fetch(`${API_BASE_URL}/incidents/${id}/resolve`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
       },
-      body: JSON.stringify({ notes }),
+      body: JSON.stringify({
+        notes: normalizedPayload.notes,
+        reason_code: normalizedPayload.reasonCode,
+        reason_detail: normalizedPayload.reasonDetail,
+      }),
     });
     const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot resolve incident');
     return data.data as IncidentSummary;
   },
 

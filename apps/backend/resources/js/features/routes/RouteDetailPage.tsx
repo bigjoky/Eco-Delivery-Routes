@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Modal } from '../../components/ui/modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
@@ -61,6 +62,8 @@ export function RouteDetailPage() {
   const [undoDeleting, setUndoDeleting] = useState(false);
   const [sequenceDrafts, setSequenceDrafts] = useState<Record<string, number>>({});
   const [recalculatingEta, setRecalculatingEta] = useState(false);
+  const [bulkUpdatePreviewOpen, setBulkUpdatePreviewOpen] = useState(false);
+  const [bulkUpdatePreviewRows, setBulkUpdatePreviewRows] = useState<Array<{ id: string; reference: string; changes: string[] }>>([]);
 
   const refreshManifest = async (routeId: string) => {
     setManifestLoading(true);
@@ -371,8 +374,33 @@ export function RouteDetailPage() {
     }
   };
 
-  const updateSelectedStops = async () => {
-    if (!id) return;
+  const buildBulkStopPayload = (current?: RouteStopSummary): {
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+  } => {
+    const shiftMinutes = Number(bulkEtaShiftMinutes);
+    const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
+    const payload: {
+      status?: 'planned' | 'in_progress' | 'completed';
+      planned_at?: string | null;
+      completed_at?: string | null;
+    } = {};
+    if (bulkStatus) payload.status = bulkStatus;
+    if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
+    if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
+    if (hasShift && current) {
+      if (!bulkPlannedAt && current.planned_at) {
+        payload.planned_at = shiftIsoDateTime(current.planned_at, shiftMinutes);
+      }
+      if (!bulkCompletedAt && current.completed_at) {
+        payload.completed_at = shiftIsoDateTime(current.completed_at, shiftMinutes);
+      }
+    }
+    return payload;
+  };
+
+  const openBulkUpdatePreview = () => {
     if (selectedStopIds.length === 0) {
       setError('Selecciona al menos una parada para actualizar.');
       return;
@@ -383,33 +411,37 @@ export function RouteDetailPage() {
       setError('Define al menos un campo masivo (estado, ETA o desplazamiento).');
       return;
     }
+    const rows = selectedStopIds.map((stopId) => {
+      const current = stops.find((stop) => stop.id === stopId);
+      const payload = buildBulkStopPayload(current);
+      const changes: string[] = [];
+      if (payload.status) changes.push(`Estado -> ${payload.status}`);
+      if (payload.planned_at) changes.push(`ETA planificada -> ${toLocalDateTime(payload.planned_at)}`);
+      if (payload.completed_at) changes.push(`ETA completada -> ${toLocalDateTime(payload.completed_at)}`);
+      return {
+        id: stopId,
+        reference: current?.reference ?? current?.entity_id ?? stopId,
+        changes: changes.length > 0 ? changes : ['Sin cambios detectados'],
+      };
+    });
+    setBulkUpdatePreviewRows(rows);
+    setBulkUpdatePreviewOpen(true);
+  };
 
+  const updateSelectedStops = async () => {
+    if (!id) return;
     setBulkUpdatingStops(true);
     setError('');
     try {
       for (const stopId of selectedStopIds) {
         const current = stops.find((stop) => stop.id === stopId);
-        const payload: {
-          status?: 'planned' | 'in_progress' | 'completed';
-          planned_at?: string | null;
-          completed_at?: string | null;
-        } = {};
-        if (bulkStatus) payload.status = bulkStatus;
-        if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
-        if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
-        if (hasShift && current) {
-          if (!bulkPlannedAt && current.planned_at) {
-            payload.planned_at = shiftIsoDateTime(current.planned_at, shiftMinutes);
-          }
-          if (!bulkCompletedAt && current.completed_at) {
-            payload.completed_at = shiftIsoDateTime(current.completed_at, shiftMinutes);
-          }
-        }
+        const payload = buildBulkStopPayload(current);
         await apiClient.updateRouteStop(id, stopId, payload);
       }
 
       const refreshed = await apiClient.getRouteStops(id);
       setStops(refreshed);
+      setBulkUpdatePreviewOpen(false);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
@@ -549,6 +581,46 @@ export function RouteDetailPage() {
 
   return (
     <section className="page-grid">
+      <Modal
+        open={bulkUpdatePreviewOpen}
+        onClose={() => setBulkUpdatePreviewOpen(false)}
+        title="Previsualización cambios masivos"
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setBulkUpdatePreviewOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={updateSelectedStops} disabled={bulkUpdatingStops || bulkUpdatePreviewRows.length === 0}>
+              {bulkUpdatingStops ? 'Aplicando...' : `Confirmar (${bulkUpdatePreviewRows.length})`}
+            </Button>
+          </>
+        )}
+      >
+        <div className="page-grid">
+          <div className="helper">Se aplicarán cambios a {bulkUpdatePreviewRows.length} parada(s).</div>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Parada</TableHead>
+                  <TableHead>Cambios</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bulkUpdatePreviewRows.slice(0, 20).map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.reference}</TableCell>
+                    <TableCell>{row.changes.join(' · ')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+          {bulkUpdatePreviewRows.length > 20 ? (
+            <div className="helper">Mostrando 20 de {bulkUpdatePreviewRows.length} paradas.</div>
+          ) : null}
+        </div>
+      </Modal>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Asignaciones de Ruta</CardTitle>
@@ -805,13 +877,16 @@ export function RouteDetailPage() {
               onChange={(event) => setBulkEtaShiftMinutes(event.target.value)}
               disabled={bulkUpdatingStops || bulkDeletingStops}
             />
+            <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('-15')} disabled={bulkUpdatingStops || bulkDeletingStops}>-15m</Button>
+            <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('15')} disabled={bulkUpdatingStops || bulkDeletingStops}>+15m</Button>
+            <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('30')} disabled={bulkUpdatingStops || bulkDeletingStops}>+30m</Button>
             <Button
               type="button"
               variant="outline"
-              onClick={updateSelectedStops}
+              onClick={openBulkUpdatePreview}
               disabled={selectedStopIds.length === 0 || bulkUpdatingStops || bulkDeletingStops}
             >
-              {bulkUpdatingStops ? 'Aplicando...' : 'Aplicar cambios masivos'}
+              Previsualizar cambios
             </Button>
           </div>
           <TableWrapper>
