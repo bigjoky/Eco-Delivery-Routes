@@ -1807,6 +1807,28 @@ export function ShipmentsPage() {
     setSelectedRecipientTemplateId(template.id);
     setNewRecipientTemplateName('');
     setCreateError('');
+
+    const displayName = template.docType === 'CIF'
+      ? template.legalName
+      : [template.firstName, template.lastName].filter((value) => value.trim() !== '').join(' ');
+    void apiClient.createContact({
+      kind: 'recipient',
+      display_name: displayName || null,
+      legal_name: template.docType === 'CIF' ? template.legalName || null : null,
+      document_id: template.documentId || null,
+      phone: template.phone || null,
+      email: template.email || null,
+      address_line: [template.street, template.number, template.postalCode, template.city].filter((value) => value.trim() !== '').join(' ') || null,
+      address_street: template.street || null,
+      address_number: template.number || null,
+      postal_code: template.postalCode || null,
+      city: template.city || null,
+      province: template.province || null,
+      country: template.country || null,
+      address_notes: template.notes || null,
+    }).catch(() => {
+      // local template remains available even if server sync fails
+    });
   };
 
   const deleteSelectedRecipientTemplate = () => {
@@ -1860,6 +1882,28 @@ export function ShipmentsPage() {
     setSelectedSenderTemplateId(template.id);
     setNewSenderTemplateName('');
     setCreateError('');
+
+    const displayName = template.docType === 'CIF'
+      ? template.legalName
+      : [template.firstName, template.lastName].filter((value) => value.trim() !== '').join(' ');
+    void apiClient.createContact({
+      kind: 'sender',
+      display_name: displayName || null,
+      legal_name: template.docType === 'CIF' ? template.legalName || null : null,
+      document_id: template.documentId || null,
+      phone: template.phone || null,
+      email: template.email || null,
+      address_line: [template.street, template.number, template.postalCode, template.city].filter((value) => value.trim() !== '').join(' ') || null,
+      address_street: template.street || null,
+      address_number: template.number || null,
+      postal_code: template.postalCode || null,
+      city: template.city || null,
+      province: template.province || null,
+      country: template.country || null,
+      address_notes: template.notes || null,
+    }).catch(() => {
+      // local template remains available even if server sync fails
+    });
   };
 
   const deleteSelectedSenderTemplate = () => {

@@ -48,6 +48,7 @@
 - Checklist de validación previa visible antes de crear.
 - Botón `Crear envío/recogida` bloqueado hasta cumplir validaciones mínimas.
 - Plantillas rápidas separadas para `destinatario` y `remitente` desde modal (guardar/aplicar/eliminar).
+- Sincronización de plantillas de contacto a backend (`POST /api/v1/contacts`) para reutilización compartida por equipo.
 
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).

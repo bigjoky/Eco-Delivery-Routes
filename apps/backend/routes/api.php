@@ -87,6 +87,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('hubs/{id}', [HubController::class, 'destroy']);
         Route::post('hubs/{id}/restore', [HubController::class, 'restore']);
         Route::get('contacts', [ContactController::class, 'index']);
+        Route::post('contacts', [ContactController::class, 'store']);
         Route::get('addresses/suggest', [AddressSuggestionController::class, 'index']);
         Route::get('depots', [DepotController::class, 'index']);
         Route::post('depots', [DepotController::class, 'store']);

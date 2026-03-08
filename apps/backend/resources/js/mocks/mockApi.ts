@@ -21,6 +21,55 @@ let mockShipments = [
   { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
   { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
 ];
+let mockContacts: Array<{
+  id: string;
+  display_name?: string | null;
+  legal_name?: string | null;
+  document_id?: string | null;
+  phone?: string | null;
+  phone_alt?: string | null;
+  email?: string | null;
+  address_line?: string | null;
+  address_street?: string | null;
+  address_number?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  address_notes?: string | null;
+  kind?: 'sender' | 'recipient' | 'both' | null;
+}> = [
+  {
+    id: 'c-1',
+    display_name: 'Cliente Demo',
+    document_id: '12345678A',
+    phone: '+34950111222',
+    email: 'cliente@eco.local',
+    address_line: 'Calle 1, 29001 Malaga',
+    address_street: 'Calle 1',
+    address_number: '12',
+    postal_code: '29001',
+    city: 'Malaga',
+    province: 'Malaga',
+    country: 'ES',
+    kind: 'recipient',
+  },
+  {
+    id: 'c-2',
+    display_name: 'Remitente Demo',
+    document_id: 'B12345678',
+    phone: '+34950111333',
+    email: 'remitente@eco.local',
+    address_line: 'Calle 2, 29002 Malaga',
+    address_street: 'Calle 2',
+    address_number: '21',
+    postal_code: '29002',
+    city: 'Malaga',
+    province: 'Malaga',
+    country: 'ES',
+    kind: 'sender',
+  },
+];
 const mockRoles = [
   { id: 'r-1', code: 'super_admin', name: 'Super Admin' },
   { id: 'r-2', code: 'operations_manager', name: 'Operations Manager' },
@@ -1284,41 +1333,9 @@ export const mockApi = {
     limit?: number;
     q?: string;
   } = {}) {
-    const rows = [
-      {
-        id: 'c-1',
-        display_name: 'Cliente Demo',
-        document_id: '12345678A',
-        phone: '+34950111222',
-        email: 'cliente@eco.local',
-        address_line: 'Calle 1, 29001 Malaga',
-        address_street: 'Calle 1',
-        address_number: '12',
-        postal_code: '29001',
-        city: 'Malaga',
-        province: 'Malaga',
-        country: 'ES',
-        kind: 'recipient',
-      },
-      {
-        id: 'c-2',
-        display_name: 'Remitente Demo',
-        document_id: 'B12345678',
-        phone: '+34950111333',
-        email: 'remitente@eco.local',
-        address_line: 'Calle 2, 29002 Malaga',
-        address_street: 'Calle 2',
-        address_number: '21',
-        postal_code: '29002',
-        city: 'Malaga',
-        province: 'Malaga',
-        country: 'ES',
-        kind: 'sender',
-      },
-    ];
-    let filtered = rows;
+    let filtered = [...mockContacts];
     if (filters.kind) {
-      filtered = filtered.filter((row) => row.kind === filters.kind);
+      filtered = filtered.filter((row) => row.kind === filters.kind || row.kind === 'both');
     }
     if (filters.phone) {
       filtered = filtered.filter((row) => (row.phone ?? '').includes(filters.phone ?? ''));
@@ -1342,6 +1359,71 @@ export const mockApi = {
     }
     const limit = Math.max(1, Math.min(filters.limit ?? 50, 100));
     return filtered.slice(0, limit);
+  },
+
+  async createContact(payload: {
+    kind: 'sender' | 'recipient' | 'both';
+    display_name?: string | null;
+    legal_name?: string | null;
+    document_id?: string | null;
+    phone?: string | null;
+    phone_alt?: string | null;
+    email?: string | null;
+    address_line?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }) {
+    const query = (payload.phone ?? payload.email ?? payload.document_id ?? '').trim().toLowerCase();
+    const existing = query
+      ? mockContacts.find((item) => (
+        (item.phone ?? '').toLowerCase() === query
+          || (item.email ?? '').toLowerCase() === query
+          || (item.document_id ?? '').toLowerCase() === query
+      ))
+      : null;
+    if (existing) {
+      if (!existing.kind) existing.kind = payload.kind;
+      else if (existing.kind !== payload.kind && existing.kind !== 'both') existing.kind = 'both';
+      existing.display_name = existing.display_name ?? payload.display_name ?? null;
+      existing.legal_name = existing.legal_name ?? payload.legal_name ?? null;
+      existing.document_id = existing.document_id ?? payload.document_id ?? null;
+      existing.phone_alt = existing.phone_alt ?? payload.phone_alt ?? null;
+      existing.email = existing.email ?? payload.email ?? null;
+      existing.address_line = existing.address_line ?? payload.address_line ?? null;
+      existing.address_street = existing.address_street ?? payload.address_street ?? null;
+      existing.address_number = existing.address_number ?? payload.address_number ?? null;
+      existing.postal_code = existing.postal_code ?? payload.postal_code ?? null;
+      existing.city = existing.city ?? payload.city ?? null;
+      existing.province = existing.province ?? payload.province ?? null;
+      existing.country = existing.country ?? payload.country ?? null;
+      existing.address_notes = existing.address_notes ?? payload.address_notes ?? null;
+      return existing;
+    }
+    const created = {
+      id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      display_name: payload.display_name ?? null,
+      legal_name: payload.legal_name ?? null,
+      document_id: payload.document_id ?? null,
+      phone: payload.phone ?? null,
+      phone_alt: payload.phone_alt ?? null,
+      email: payload.email ?? null,
+      address_line: payload.address_line ?? null,
+      address_street: payload.address_street ?? null,
+      address_number: payload.address_number ?? null,
+      postal_code: payload.postal_code ?? null,
+      city: payload.city ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? null,
+      address_notes: payload.address_notes ?? null,
+      kind: payload.kind,
+    };
+    mockContacts = [created, ...mockContacts];
+    return created;
   },
 
   async getAddressSuggestions(filters: {

@@ -750,6 +750,31 @@ export const apiClient = {
     return parseData<ContactSummary>(response);
   },
 
+  async createContact(payload: {
+    kind: 'sender' | 'recipient' | 'both';
+    display_name?: string | null;
+    legal_name?: string | null;
+    document_id?: string | null;
+    phone?: string | null;
+    phone_alt?: string | null;
+    email?: string | null;
+    address_line?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }): Promise<ContactSummary> {
+    if (USE_MOCK) return mockApi.createContact(payload) as Promise<ContactSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseItemData<ContactSummary>(response);
+  },
+
   async getAddressSuggestions(filters: {
     q?: string;
     kind?: 'sender' | 'recipient';

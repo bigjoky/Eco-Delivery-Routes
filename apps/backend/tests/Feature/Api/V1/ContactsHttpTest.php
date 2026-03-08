@@ -125,6 +125,49 @@ class ContactsHttpTest extends TestCase
         $this->assertCount(1, $response->json('data'));
     }
 
+    public function test_contacts_can_be_created_as_shared_templates(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $response = $this->postJson('/api/v1/contacts', [
+            'kind' => 'recipient',
+            'display_name' => 'Cliente Plantilla',
+            'document_id' => '12345678Z',
+            'phone' => '+34950000001',
+            'address_street' => 'Calle Nueva',
+            'address_number' => '10',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'country' => 'ES',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.display_name', 'Cliente Plantilla')
+            ->assertJsonPath('data.kind', 'recipient');
+
+        $this->assertDatabaseHas('contacts', [
+            'display_name' => 'Cliente Plantilla',
+            'document_id' => '12345678Z',
+            'kind' => 'recipient',
+        ]);
+    }
+
+    public function test_contacts_create_requires_contacts_write_permission(): void
+    {
+        $viewer = $this->createUserWithRole('viewer');
+        $this->actingAs($viewer, 'sanctum');
+
+        $response = $this->postJson('/api/v1/contacts', [
+            'kind' => 'sender',
+            'display_name' => 'No Permitido',
+            'phone' => '+34950000009',
+        ]);
+
+        $response->assertForbidden();
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $roleId = DB::table('roles')->where('code', $roleCode)->value('id');
