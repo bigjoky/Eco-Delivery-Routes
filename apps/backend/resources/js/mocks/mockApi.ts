@@ -3369,7 +3369,11 @@ export const mockApi = {
     mockSubcontractors = mockSubcontractors.filter((item) => item.id !== id);
   },
 
-  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+  async bulkUpdateSubcontractorStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    _reason?: { code?: string; detail?: string; note?: string }
+  ) {
     let affected = 0;
     mockSubcontractors = mockSubcontractors.map((item) => {
       if (!ids.includes(item.id)) return item;
@@ -3454,7 +3458,11 @@ export const mockApi = {
     mockDrivers = mockDrivers.filter((item) => item.id !== id);
   },
 
-  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+  async bulkUpdateDriverStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    _reason?: { code?: string; detail?: string; note?: string }
+  ) {
     let affected = 0;
     mockDrivers = mockDrivers.map((item) => {
       if (!ids.includes(item.id)) return item;
@@ -3539,7 +3547,11 @@ export const mockApi = {
     mockVehicles = mockVehicles.filter((item) => item.id !== id);
   },
 
-  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance') {
+  async bulkUpdateVehicleStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'maintenance',
+    _reason?: { code?: string; detail?: string; note?: string }
+  ) {
     let affected = 0;
     mockVehicles = mockVehicles.map((item) => {
       if (!ids.includes(item.id)) return item;

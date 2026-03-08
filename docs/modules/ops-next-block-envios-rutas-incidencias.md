@@ -49,6 +49,8 @@
 - Botón `Crear envío/recogida` bloqueado hasta cumplir validaciones mínimas.
 - Plantillas rápidas separadas para `destinatario` y `remitente` desde modal (guardar/aplicar/eliminar).
 - Sincronización de plantillas de contacto a backend (`POST /api/v1/contacts`) para reutilización compartida por equipo.
+- Contactos compartidos recientes en modal con aplicación en 1 clic.
+- Priorización por frecuencia de uso (plantillas y contactos recientes).
 
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).
@@ -61,3 +63,7 @@
 
 4. UI
 - Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).
+- Dashboard: eliminadas acciones rápidas y bloque SLA en una sola fila.
+
+5. Partners
+- Acciones masivas con motivo estructurado (`reason_code`, `reason_detail`, `reason`) y auditoría enriquecida.

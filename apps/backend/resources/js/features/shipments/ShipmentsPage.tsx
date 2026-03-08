@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
-import { AuditLogEntry, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 import {
@@ -363,6 +363,12 @@ export function ShipmentsPage() {
   const [senderTemplates, setSenderTemplates] = useState<SenderQuickTemplate[]>([]);
   const [selectedSenderTemplateId, setSelectedSenderTemplateId] = useState('');
   const [newSenderTemplateName, setNewSenderTemplateName] = useState('');
+  const [recentRecipientContacts, setRecentRecipientContacts] = useState<ContactSummary[]>([]);
+  const [recentSenderContacts, setRecentSenderContacts] = useState<ContactSummary[]>([]);
+  const [recipientUsageMap, setRecipientUsageMap] = useState<Record<string, number>>({});
+  const [senderUsageMap, setSenderUsageMap] = useState<Record<string, number>>({});
+  const recipientUsageStorageKey = 'eco_delivery_routes_recipient_usage_v1';
+  const senderUsageStorageKey = 'eco_delivery_routes_sender_usage_v1';
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const wizardStorageKey = 'eco_delivery_routes_shipments_wizard_state';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
@@ -776,6 +782,76 @@ export function ShipmentsPage() {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(senderTemplatesStorageKey, JSON.stringify(senderTemplates));
   }, [senderTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recipientUsageStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') setRecipientUsageMap(parsed);
+    } catch {
+      setRecipientUsageMap({});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(recipientUsageStorageKey, JSON.stringify(recipientUsageMap));
+  }, [recipientUsageMap]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(senderUsageStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') setSenderUsageMap(parsed);
+    } catch {
+      setSenderUsageMap({});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(senderUsageStorageKey, JSON.stringify(senderUsageMap));
+  }, [senderUsageMap]);
+
+  const bumpUsage = (setter: Dispatch<SetStateAction<Record<string, number>>>, key: string) => {
+    if (!key) return;
+    setter((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
+  };
+
+  const rankedRecipientTemplates = useMemo(
+    () => recipientTemplates.slice().sort((a, b) => (recipientUsageMap[`tpl:${b.id}`] ?? 0) - (recipientUsageMap[`tpl:${a.id}`] ?? 0)),
+    [recipientTemplates, recipientUsageMap]
+  );
+  const rankedSenderTemplates = useMemo(
+    () => senderTemplates.slice().sort((a, b) => (senderUsageMap[`tpl:${b.id}`] ?? 0) - (senderUsageMap[`tpl:${a.id}`] ?? 0)),
+    [senderTemplates, senderUsageMap]
+  );
+  const rankedRecentRecipientContacts = useMemo(
+    () => recentRecipientContacts.slice().sort((a, b) => (recipientUsageMap[`contact:${b.id}`] ?? 0) - (recipientUsageMap[`contact:${a.id}`] ?? 0)),
+    [recentRecipientContacts, recipientUsageMap]
+  );
+  const rankedRecentSenderContacts = useMemo(
+    () => recentSenderContacts.slice().sort((a, b) => (senderUsageMap[`contact:${b.id}`] ?? 0) - (senderUsageMap[`contact:${a.id}`] ?? 0)),
+    [recentSenderContacts, senderUsageMap]
+  );
+
+  useEffect(() => {
+    if (!recipientModalOpen) return;
+    apiClient.getContacts({ kind: 'recipient', limit: 8 })
+      .then((rows) => setRecentRecipientContacts(rows))
+      .catch(() => setRecentRecipientContacts([]));
+  }, [recipientModalOpen]);
+
+  useEffect(() => {
+    if (!senderModalOpen) return;
+    apiClient.getContacts({ kind: 'sender', limit: 8 })
+      .then((rows) => setRecentSenderContacts(rows))
+      .catch(() => setRecentSenderContacts([]));
+  }, [senderModalOpen]);
 
   const validateWizardStep = (step: 1 | 2 | 3 | 4): string | null => {
     if (step === 1) {
@@ -1777,6 +1853,35 @@ export function ShipmentsPage() {
     setCreateProvince(template.province);
     setCreateCountry(template.country || 'ES');
     setCreateAddressNotes(template.notes);
+    bumpUsage(setRecipientUsageMap, `tpl:${template.id}`);
+  };
+
+  const applyRecipientContact = (contact: ContactSummary) => {
+    const docId = (contact.document_id ?? '').trim();
+    const inferredDocType = inferDocumentType(docId, createConsigneeDocType);
+    setCreateConsigneeDocType(inferredDocType);
+    setCreateConsigneeDocumentId(docId);
+    if (inferredDocType === 'CIF') {
+      setCreateConsignee(contact.legal_name ?? contact.display_name ?? '');
+      setCreateConsigneeFirstName('');
+      setCreateConsigneeLastName('');
+    } else {
+      const fullName = (contact.display_name ?? '').trim();
+      const parts = fullName.split(' ').filter(Boolean);
+      setCreateConsigneeFirstName(parts.shift() ?? '');
+      setCreateConsigneeLastName(parts.join(' '));
+      setCreateConsignee('');
+    }
+    setCreatePhone(contact.phone ?? '');
+    setCreateEmail(contact.email ?? '');
+    setCreateStreet(contact.address_street ?? '');
+    setCreateNumber(contact.address_number ?? '');
+    setCreatePostalCode(contact.postal_code ?? '');
+    setCreateCity(contact.city ?? '');
+    setCreateProvince(contact.province ?? '');
+    setCreateCountry(contact.country ?? 'ES');
+    setCreateAddressNotes(contact.address_notes ?? '');
+    bumpUsage(setRecipientUsageMap, `contact:${contact.id}`);
   };
 
   const saveCurrentRecipientAsTemplate = () => {
@@ -1805,6 +1910,7 @@ export function ShipmentsPage() {
     };
     setRecipientTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
     setSelectedRecipientTemplateId(template.id);
+    bumpUsage(setRecipientUsageMap, `tpl:${template.id}`);
     setNewRecipientTemplateName('');
     setCreateError('');
 
@@ -1852,6 +1958,35 @@ export function ShipmentsPage() {
     setCreateSenderProvince(template.province);
     setCreateSenderCountry(template.country || 'ES');
     setCreateSenderAddressNotes(template.notes);
+    bumpUsage(setSenderUsageMap, `tpl:${template.id}`);
+  };
+
+  const applySenderContact = (contact: ContactSummary) => {
+    const docId = (contact.document_id ?? '').trim();
+    const inferredDocType = inferDocumentType(docId, createSenderDocType);
+    setCreateSenderDocType(inferredDocType);
+    setCreateSenderDocumentId(docId);
+    if (inferredDocType === 'CIF') {
+      setCreateSenderLegalName(contact.legal_name ?? contact.display_name ?? '');
+      setCreateSenderFirstName('');
+      setCreateSenderLastName('');
+    } else {
+      const fullName = (contact.display_name ?? '').trim();
+      const parts = fullName.split(' ').filter(Boolean);
+      setCreateSenderFirstName(parts.shift() ?? '');
+      setCreateSenderLastName(parts.join(' '));
+      setCreateSenderLegalName('');
+    }
+    setCreateSenderPhone(contact.phone ?? '');
+    setCreateSenderEmail(contact.email ?? '');
+    setCreateSenderStreet(contact.address_street ?? '');
+    setCreateSenderNumber(contact.address_number ?? '');
+    setCreateSenderPostalCode(contact.postal_code ?? '');
+    setCreateSenderCity(contact.city ?? '');
+    setCreateSenderProvince(contact.province ?? '');
+    setCreateSenderCountry(contact.country ?? 'ES');
+    setCreateSenderAddressNotes(contact.address_notes ?? '');
+    bumpUsage(setSenderUsageMap, `contact:${contact.id}`);
   };
 
   const saveCurrentSenderAsTemplate = () => {
@@ -1880,6 +2015,7 @@ export function ShipmentsPage() {
     };
     setSenderTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
     setSelectedSenderTemplateId(template.id);
+    bumpUsage(setSenderUsageMap, `tpl:${template.id}`);
     setNewSenderTemplateName('');
     setCreateError('');
 
@@ -2211,12 +2347,12 @@ export function ShipmentsPage() {
             onChange={(event) => {
               const templateId = event.target.value;
               setSelectedRecipientTemplateId(templateId);
-              const template = recipientTemplates.find((item) => item.id === templateId);
+              const template = rankedRecipientTemplates.find((item) => item.id === templateId);
               if (template) applyRecipientTemplate(template);
             }}
           >
             <option value="">Seleccionar plantilla</option>
-            {recipientTemplates.map((template) => (
+            {rankedRecipientTemplates.map((template) => (
               <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
@@ -2231,6 +2367,17 @@ export function ShipmentsPage() {
           <Button type="button" variant="outline" onClick={deleteSelectedRecipientTemplate} disabled={!selectedRecipientTemplateId}>
             Eliminar
           </Button>
+        </div>
+        <div className="inline-actions">
+          <span className="helper">Contactos compartidos recientes</span>
+          {rankedRecentRecipientContacts.length === 0 ? (
+            <span className="helper">Sin contactos recientes</span>
+          ) : null}
+          {rankedRecentRecipientContacts.map((contact) => (
+            <Button key={contact.id} type="button" variant="outline" onClick={() => applyRecipientContact(contact)}>
+              {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
+            </Button>
+          ))}
         </div>
         <div className="form-row">
           <label htmlFor="create-shipment-consignee-lookup">Buscar por movil</label>
@@ -2424,12 +2571,12 @@ export function ShipmentsPage() {
             onChange={(event) => {
               const templateId = event.target.value;
               setSelectedSenderTemplateId(templateId);
-              const template = senderTemplates.find((item) => item.id === templateId);
+              const template = rankedSenderTemplates.find((item) => item.id === templateId);
               if (template) applySenderTemplate(template);
             }}
           >
             <option value="">Seleccionar plantilla</option>
-            {senderTemplates.map((template) => (
+            {rankedSenderTemplates.map((template) => (
               <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
@@ -2444,6 +2591,17 @@ export function ShipmentsPage() {
           <Button type="button" variant="outline" onClick={deleteSelectedSenderTemplate} disabled={!selectedSenderTemplateId}>
             Eliminar
           </Button>
+        </div>
+        <div className="inline-actions">
+          <span className="helper">Contactos compartidos recientes</span>
+          {rankedRecentSenderContacts.length === 0 ? (
+            <span className="helper">Sin contactos recientes</span>
+          ) : null}
+          {rankedRecentSenderContacts.map((contact) => (
+            <Button key={contact.id} type="button" variant="outline" onClick={() => applySenderContact(contact)}>
+              {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
+            </Button>
+          ))}
         </div>
         <div className="form-row">
           <label htmlFor="create-sender-lookup">Buscar por movil</label>

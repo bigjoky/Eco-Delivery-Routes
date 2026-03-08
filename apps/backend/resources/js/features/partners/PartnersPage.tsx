@@ -68,6 +68,9 @@ export function PartnersPage() {
   const [selectedSubcontractorIds, setSelectedSubcontractorIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
+  const [bulkReasonCode, setBulkReasonCode] = useState<'REBALANCE' | 'COMPLIANCE' | 'PERFORMANCE' | 'OTHER'>('REBALANCE');
+  const [bulkReasonDetail, setBulkReasonDetail] = useState('');
+  const [bulkReasonNote, setBulkReasonNote] = useState('');
   const formatDateTime = (value?: string | null) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -493,8 +496,16 @@ export function PartnersPage() {
     }
     setMessage('');
     setError('');
+    if (!bulkReasonNote.trim()) {
+      setError('Define una nota de motivo para la acción masiva.');
+      return;
+    }
     try {
-      const result = await apiClient.bulkUpdateSubcontractorStatus(selectedSubcontractorIds, status);
+      const result = await apiClient.bulkUpdateSubcontractorStatus(selectedSubcontractorIds, status, {
+        code: bulkReasonCode,
+        detail: bulkReasonDetail.trim() || undefined,
+        note: bulkReasonNote.trim(),
+      });
       setMessage(`Subcontratas actualizadas (${result.affected_count}).`);
       setSelectedSubcontractorIds([]);
       await load();
@@ -510,8 +521,16 @@ export function PartnersPage() {
     }
     setMessage('');
     setError('');
+    if (!bulkReasonNote.trim()) {
+      setError('Define una nota de motivo para la acción masiva.');
+      return;
+    }
     try {
-      const result = await apiClient.bulkUpdateDriverStatus(selectedDriverIds, status);
+      const result = await apiClient.bulkUpdateDriverStatus(selectedDriverIds, status, {
+        code: bulkReasonCode,
+        detail: bulkReasonDetail.trim() || undefined,
+        note: bulkReasonNote.trim(),
+      });
       setMessage(`Conductores actualizados (${result.affected_count}).`);
       setSelectedDriverIds([]);
       await load();
@@ -527,8 +546,16 @@ export function PartnersPage() {
     }
     setMessage('');
     setError('');
+    if (!bulkReasonNote.trim()) {
+      setError('Define una nota de motivo para la acción masiva.');
+      return;
+    }
     try {
-      const result = await apiClient.bulkUpdateVehicleStatus(selectedVehicleIds, status);
+      const result = await apiClient.bulkUpdateVehicleStatus(selectedVehicleIds, status, {
+        code: bulkReasonCode,
+        detail: bulkReasonDetail.trim() || undefined,
+        note: bulkReasonNote.trim(),
+      });
       setMessage(`Vehículos actualizados (${result.affected_count}).`);
       setSelectedVehicleIds([]);
       await load();
@@ -697,6 +724,19 @@ export function PartnersPage() {
           ) : null}
 
           <h3>Subcontratas</h3>
+          <div className="filters-panel">
+            <div className="helper">Motivo estructurado para acciones masivas (auditado)</div>
+            <div className="inline-actions">
+              <Select value={bulkReasonCode} onChange={(e) => setBulkReasonCode(e.target.value as 'REBALANCE' | 'COMPLIANCE' | 'PERFORMANCE' | 'OTHER')}>
+                <option value="REBALANCE">Rebalanceo operativo</option>
+                <option value="COMPLIANCE">Cumplimiento documental</option>
+                <option value="PERFORMANCE">Rendimiento</option>
+                <option value="OTHER">Otro</option>
+              </Select>
+              <Input value={bulkReasonDetail} onChange={(e) => setBulkReasonDetail(e.target.value)} placeholder="Detalle (opcional)" />
+              <Input value={bulkReasonNote} onChange={(e) => setBulkReasonNote(e.target.value)} placeholder="Nota obligatoria para auditoría" />
+            </div>
+          </div>
           <div className="inline-actions">
             <Button
               type="button"

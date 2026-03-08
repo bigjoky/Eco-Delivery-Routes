@@ -719,6 +719,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, suspended] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -822,6 +825,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, suspended] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -925,6 +931,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, maintenance] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }

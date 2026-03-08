@@ -199,6 +199,9 @@ class SubcontractorController extends Controller
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['uuid', 'distinct', 'exists:subcontractors,id'],
             'status' => ['required', 'in:active,inactive,suspended'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string', 'max:220'],
+            'reason' => ['nullable', 'string', 'max:220'],
         ]);
 
         $affected = DB::table('subcontractors')
@@ -212,6 +215,9 @@ class SubcontractorController extends Controller
             'ids' => $payload['ids'],
             'status' => $payload['status'],
             'affected_count' => $affected,
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
+            'reason' => $payload['reason'] ?? null,
         ]);
 
         return response()->json([

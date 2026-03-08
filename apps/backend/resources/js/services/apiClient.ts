@@ -2970,12 +2970,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateSubcontractorStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateSubcontractorStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateSubcontractorStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update subcontractors'));
@@ -3049,12 +3053,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateDriverStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateDriverStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateDriverStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/drivers/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update drivers'));
@@ -3128,12 +3136,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateVehicleStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateVehicleStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'maintenance',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateVehicleStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/vehicles/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update vehicles'));

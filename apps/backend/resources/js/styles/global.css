@@ -905,6 +905,16 @@ textarea:focus {
   gap: 6px;
 }
 
+.dashboard-sla-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-sla-item {
+  min-height: 70px;
+}
+
 .trend-bar {
   width: 10px;
   border-radius: 4px 4px 2px 2px;
@@ -938,6 +948,11 @@ textarea:focus {
   .dashboard-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .dashboard-sla-row {
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    overflow-x: auto;
   }
 
   .inline-actions {
