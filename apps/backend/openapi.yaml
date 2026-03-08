@@ -2272,6 +2272,8 @@ paths:
               type: object
               properties:
                 notes: { type: string }
+                reason_code: { type: string }
+                reason_detail: { type: string }
       responses:
         '200': { description: OK }
 
@@ -2291,6 +2293,8 @@ paths:
                   type: array
                   items: { type: string, format: uuid }
                 notes: { type: string }
+                reason_code: { type: string }
+                reason_detail: { type: string }
       responses:
         '200': { description: OK }
 

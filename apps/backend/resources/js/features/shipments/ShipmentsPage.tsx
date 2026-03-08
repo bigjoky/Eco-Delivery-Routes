@@ -1579,7 +1579,7 @@ export function ShipmentsPage() {
                   <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
                 ))}
               </select>
-              {createFieldErrors.hub ? <div className="helper">{createFieldErrors.hub}</div> : null}
+              {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>
               <label htmlFor="create-shipment-point">Punto operativo (opcional)</label>
@@ -1648,7 +1648,7 @@ export function ShipmentsPage() {
                 max={maxScheduledAt}
               />
               <div className="helper">Ventana: {minScheduledAt} a {maxScheduledAt}</div>
-              {createFieldErrors.scheduledAt ? <div className="helper">{createFieldErrors.scheduledAt}</div> : null}
+              {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
           </div>
           ) : null}
@@ -1749,7 +1749,7 @@ export function ShipmentsPage() {
           >
             {consigneeLookupLoading ? 'Buscando...' : 'Buscar'}
           </Button>
-          {consigneeLookupError ? <div className="helper">{consigneeLookupError}</div> : null}
+          {consigneeLookupError ? <div className="helper error">{consigneeLookupError}</div> : null}
         </div>
         <div className="form-row">
           <label htmlFor="create-shipment-consignee-doc-type">Tipo documento</label>
@@ -1774,7 +1774,7 @@ export function ShipmentsPage() {
             }}
             placeholder="DNI/CIF"
           />
-          {createFieldErrors.recipientDocument ? <div className="helper">{createFieldErrors.recipientDocument}</div> : null}
+          {createFieldErrors.recipientDocument ? <div className="helper error">{createFieldErrors.recipientDocument}</div> : null}
           {createConsigneeDocType === 'CIF' ? (
             <>
               <label htmlFor="create-shipment-consignee-legal-name">Razon social</label>
@@ -1803,7 +1803,7 @@ export function ShipmentsPage() {
               />
             </>
           )}
-          {createFieldErrors.recipientName ? <div className="helper">{createFieldErrors.recipientName}</div> : null}
+          {createFieldErrors.recipientName ? <div className="helper error">{createFieldErrors.recipientName}</div> : null}
           <label htmlFor="create-shipment-phone">Telefono</label>
           <input
             id="create-shipment-phone"
@@ -1811,8 +1811,8 @@ export function ShipmentsPage() {
             onChange={(event) => setCreatePhone(event.target.value)}
             placeholder="+34 950 111 222"
           />
-          {createFieldErrors.recipientPhone ? <div className="helper">{createFieldErrors.recipientPhone}</div> : null}
-          {createFieldErrors.phone ? <div className="helper">{createFieldErrors.phone}</div> : null}
+          {createFieldErrors.recipientPhone ? <div className="helper error">{createFieldErrors.recipientPhone}</div> : null}
+          {createFieldErrors.phone ? <div className="helper error">{createFieldErrors.phone}</div> : null}
           <label htmlFor="create-shipment-email">Email</label>
           <input
             id="create-shipment-email"
@@ -1820,7 +1820,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateEmail(event.target.value)}
             placeholder="cliente@eco.local"
           />
-          {createFieldErrors.email ? <div className="helper">{createFieldErrors.email}</div> : null}
+          {createFieldErrors.email ? <div className="helper error">{createFieldErrors.email}</div> : null}
         </div>
         <div className="form-row">
           <label htmlFor="create-shipment-street">Calle</label>
@@ -1830,7 +1830,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateStreet(event.target.value)}
             placeholder="Calle y via"
           />
-          {createFieldErrors.street ? <div className="helper">{createFieldErrors.street}</div> : null}
+          {createFieldErrors.street ? <div className="helper error">{createFieldErrors.street}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => void suggestRecipientAddresses()}>
               Sugerir direccion
@@ -1868,7 +1868,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreatePostalCode(event.target.value)}
             placeholder="29001"
           />
-          {createFieldErrors.postalCode ? <div className="helper">{createFieldErrors.postalCode}</div> : null}
+          {createFieldErrors.postalCode ? <div className="helper error">{createFieldErrors.postalCode}</div> : null}
           <label htmlFor="create-shipment-city">Ciudad</label>
           <input
             id="create-shipment-city"
@@ -1876,7 +1876,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateCity(event.target.value)}
             placeholder="Malaga"
           />
-          {createFieldErrors.city ? <div className="helper">{createFieldErrors.city}</div> : null}
+          {createFieldErrors.city ? <div className="helper error">{createFieldErrors.city}</div> : null}
           <label htmlFor="create-shipment-province">Provincia</label>
           <input
             id="create-shipment-province"
@@ -1933,7 +1933,7 @@ export function ShipmentsPage() {
           >
             {senderLookupLoading ? 'Buscando...' : 'Buscar'}
           </Button>
-          {senderLookupError ? <div className="helper">{senderLookupError}</div> : null}
+          {senderLookupError ? <div className="helper error">{senderLookupError}</div> : null}
         </div>
         <div className="form-row">
           <label htmlFor="create-sender-doc-type">Tipo documento</label>
@@ -1958,7 +1958,7 @@ export function ShipmentsPage() {
             }}
             placeholder="DNI/CIF"
           />
-          {createFieldErrors.senderDocument ? <div className="helper">{createFieldErrors.senderDocument}</div> : null}
+          {createFieldErrors.senderDocument ? <div className="helper error">{createFieldErrors.senderDocument}</div> : null}
           {createSenderDocType === 'CIF' ? (
             <>
               <label htmlFor="create-sender-legal-name">Razon social</label>
@@ -1987,7 +1987,7 @@ export function ShipmentsPage() {
               />
             </>
           )}
-          {createFieldErrors.senderName ? <div className="helper">{createFieldErrors.senderName}</div> : null}
+          {createFieldErrors.senderName ? <div className="helper error">{createFieldErrors.senderName}</div> : null}
           <label htmlFor="create-sender-phone">Telefono</label>
           <input
             id="create-sender-phone"
@@ -1995,7 +1995,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderPhone(event.target.value)}
             placeholder="+34 600 111 222"
           />
-          {createFieldErrors.senderPhone ? <div className="helper">{createFieldErrors.senderPhone}</div> : null}
+          {createFieldErrors.senderPhone ? <div className="helper error">{createFieldErrors.senderPhone}</div> : null}
           <label htmlFor="create-sender-email">Email</label>
           <input
             id="create-sender-email"
@@ -2003,7 +2003,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderEmail(event.target.value)}
             placeholder="remitente@eco.local"
           />
-          {createFieldErrors.senderEmail ? <div className="helper">{createFieldErrors.senderEmail}</div> : null}
+          {createFieldErrors.senderEmail ? <div className="helper error">{createFieldErrors.senderEmail}</div> : null}
         </div>
         <div className="form-row">
           <label htmlFor="create-sender-street">Calle</label>
@@ -2013,7 +2013,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderStreet(event.target.value)}
             placeholder="Calle y via"
           />
-          {createFieldErrors.senderStreet ? <div className="helper">{createFieldErrors.senderStreet}</div> : null}
+          {createFieldErrors.senderStreet ? <div className="helper error">{createFieldErrors.senderStreet}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => void suggestSenderAddresses()}>
               Sugerir direccion
@@ -2051,7 +2051,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderPostalCode(event.target.value)}
             placeholder="29001"
           />
-          {createFieldErrors.senderPostalCode ? <div className="helper">{createFieldErrors.senderPostalCode}</div> : null}
+          {createFieldErrors.senderPostalCode ? <div className="helper error">{createFieldErrors.senderPostalCode}</div> : null}
           <label htmlFor="create-sender-city">Ciudad</label>
           <input
             id="create-sender-city"
@@ -2059,7 +2059,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderCity(event.target.value)}
             placeholder="Malaga"
           />
-          {createFieldErrors.senderCity ? <div className="helper">{createFieldErrors.senderCity}</div> : null}
+          {createFieldErrors.senderCity ? <div className="helper error">{createFieldErrors.senderCity}</div> : null}
           <label htmlFor="create-sender-province">Provincia</label>
           <input
             id="create-sender-province"
@@ -2378,7 +2378,7 @@ export function ShipmentsPage() {
               Reset columnas
             </Button>
           </div>
-          {exportError ? <div className="helper">{exportError}</div> : null}
+          {exportError ? <div className="helper error">{exportError}</div> : null}
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
@@ -2445,7 +2445,7 @@ export function ShipmentsPage() {
               Descargar plantilla
             </Button>
             </div>
-          {importError ? <div className="helper">{importError}</div> : null}
+          {importError ? <div className="helper error">{importError}</div> : null}
           {importMessage ? <div className="helper">{importMessage}</div> : null}
           {importJob ? (
             <div className="kpi-grid">
