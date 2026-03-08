@@ -37,6 +37,15 @@ Base del sistema web/PWA de **Eco Delivery Routes**.
 - Ejecutar desde la raiz:
   - `./scripts/verify_release_envios_rutas.sh`
 
+## Desarrollo local
+
+- Backend/API + Web Inertia (2 terminales):
+  - `cd apps/backend && php artisan serve`
+  - `cd apps/backend && npm run dev`
+- OpenAPI:
+  - YAML: `http://127.0.0.1:8000/openapi.yaml`
+  - Swagger UI: `http://127.0.0.1:8000/api-docs`
+
 ## Checklist CI sugerido
 
 - Backend: `./vendor/bin/phpunit` en `apps/backend`.
