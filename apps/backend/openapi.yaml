@@ -696,6 +696,28 @@ paths:
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
 
+  /subcontractors/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de subcontratas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, suspended] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /drivers:
     get:
       tags: [Ops]
@@ -777,6 +799,28 @@ paths:
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
 
+  /drivers/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de conductores
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, suspended] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /vehicles:
     get:
       tags: [Ops]
@@ -857,6 +901,28 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
+
+  /vehicles/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de vehiculos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, maintenance] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
 
   /workforce:
     get:

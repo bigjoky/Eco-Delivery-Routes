@@ -3224,6 +3224,21 @@ export const mockApi = {
     mockSubcontractors = mockSubcontractors.filter((item) => item.id !== id);
   },
 
+  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+    let affected = 0;
+    mockSubcontractors = mockSubcontractors.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
+  },
+
   async getDrivers(filters: { subcontractorId?: string; status?: string; limit?: number }) {
     let rows = [...mockDrivers];
     if (filters.subcontractorId) {
@@ -3294,6 +3309,21 @@ export const mockApi = {
     mockDrivers = mockDrivers.filter((item) => item.id !== id);
   },
 
+  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+    let affected = 0;
+    mockDrivers = mockDrivers.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
+  },
+
   async getVehicles(filters: { subcontractorId?: string; status?: string; limit?: number }) {
     let rows = [...mockVehicles];
     if (filters.subcontractorId) {
@@ -3362,6 +3392,21 @@ export const mockApi = {
       throw new Error('Vehicle has linked routes and cannot be deleted.');
     }
     mockVehicles = mockVehicles.filter((item) => item.id !== id);
+  },
+
+  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance') {
+    let affected = 0;
+    mockVehicles = mockVehicles.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
   },
 
   async getWorkforce(filters: {

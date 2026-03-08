@@ -172,14 +172,17 @@ Route::prefix('v1')->group(function () {
         Route::get('subcontractors', [SubcontractorController::class, 'index']);
         Route::post('subcontractors', [SubcontractorController::class, 'store']);
         Route::patch('subcontractors/{id}', [SubcontractorController::class, 'update']);
+        Route::post('subcontractors/bulk-status', [SubcontractorController::class, 'bulkStatus']);
         Route::delete('subcontractors/{id}', [SubcontractorController::class, 'destroy']);
         Route::get('drivers', [DriverController::class, 'index']);
         Route::post('drivers', [DriverController::class, 'store']);
         Route::patch('drivers/{id}', [DriverController::class, 'update']);
+        Route::post('drivers/bulk-status', [DriverController::class, 'bulkStatus']);
         Route::delete('drivers/{id}', [DriverController::class, 'destroy']);
         Route::get('vehicles', [VehicleController::class, 'index']);
         Route::post('vehicles', [VehicleController::class, 'store']);
         Route::patch('vehicles/{id}', [VehicleController::class, 'update']);
+        Route::post('vehicles/bulk-status', [VehicleController::class, 'bulkStatus']);
         Route::delete('vehicles/{id}', [VehicleController::class, 'destroy']);
         Route::get('workforce', [WorkforceController::class, 'index']);
         Route::post('workforce', [WorkforceController::class, 'store']);

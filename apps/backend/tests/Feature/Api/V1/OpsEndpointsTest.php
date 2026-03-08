@@ -35,8 +35,11 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("Route::get('settlements/preview'", $contents);
         $this->assertStringContainsString("Route::get('subcontractors'", $contents);
         $this->assertStringContainsString("Route::delete('subcontractors/{id}'", $contents);
+        $this->assertStringContainsString("Route::post('subcontractors/bulk-status'", $contents);
         $this->assertStringContainsString("Route::delete('drivers/{id}'", $contents);
+        $this->assertStringContainsString("Route::post('drivers/bulk-status'", $contents);
         $this->assertStringContainsString("Route::delete('vehicles/{id}'", $contents);
+        $this->assertStringContainsString("Route::post('vehicles/bulk-status'", $contents);
         $this->assertStringContainsString("Route::get('workforce'", $contents);
         $this->assertStringContainsString("Route::delete('workforce/{id}'", $contents);
         $this->assertStringContainsString("Route::get('compliance-documents'", $contents);
@@ -202,8 +205,11 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("settlements/preview", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/subcontractors:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/subcontractors/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/subcontractors/bulk-status:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/drivers/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/drivers/bulk-status:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/vehicles/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/vehicles/bulk-status:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/workforce:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/workforce/{id}:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/compliance-documents:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

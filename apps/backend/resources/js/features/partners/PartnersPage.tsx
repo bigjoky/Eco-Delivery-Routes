@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -55,6 +55,9 @@ export function PartnersPage() {
   const [editVehicleStatus, setEditVehicleStatus] = useState<'active' | 'inactive' | 'maintenance'>('active');
   const [editVehicleSubcontractorId, setEditVehicleSubcontractorId] = useState('');
   const [editVehicleDriverId, setEditVehicleDriverId] = useState('');
+  const [selectedSubcontractorIds, setSelectedSubcontractorIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const formatDateTime = (value?: string | null) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -414,6 +417,61 @@ export function PartnersPage() {
     }
   };
 
+  const toggleSelected = (setState: Dispatch<SetStateAction<string[]>>, id: string, checked: boolean) => {
+    setState((current) => (checked ? Array.from(new Set([...current, id])) : current.filter((item) => item !== id)));
+  };
+
+  const bulkUpdateSubcontractors = async (status: 'active' | 'inactive' | 'suspended') => {
+    if (!selectedSubcontractorIds.length) {
+      setError('Selecciona al menos una subcontrata.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateSubcontractorStatus(selectedSubcontractorIds, status);
+      setMessage(`Subcontratas actualizadas (${result.affected_count}).`);
+      setSelectedSubcontractorIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar subcontratas.');
+    }
+  };
+
+  const bulkUpdateDrivers = async (status: 'active' | 'inactive' | 'suspended') => {
+    if (!selectedDriverIds.length) {
+      setError('Selecciona al menos un conductor.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateDriverStatus(selectedDriverIds, status);
+      setMessage(`Conductores actualizados (${result.affected_count}).`);
+      setSelectedDriverIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar conductores.');
+    }
+  };
+
+  const bulkUpdateVehicles = async (status: 'active' | 'inactive' | 'maintenance') => {
+    if (!selectedVehicleIds.length) {
+      setError('Selecciona al menos un vehículo.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateVehicleStatus(selectedVehicleIds, status);
+      setMessage(`Vehículos actualizados (${result.affected_count}).`);
+      setSelectedVehicleIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar vehículos.');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Modal
@@ -579,11 +637,26 @@ export function PartnersPage() {
             >
               Export CSV subcontratas
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateSubcontractors('active'); }}>
+              Activar seleccion ({selectedSubcontractorIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateSubcontractors('suspended'); }}>
+              Suspender seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredSubcontractors.length > 0 && filteredSubcontractors.every((item) => selectedSubcontractorIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedSubcontractorIds(event.target.checked ? filteredSubcontractors.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tax ID</TableHead>
                   <TableHead>Estado</TableHead>
@@ -594,6 +667,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredSubcontractors.map((subcontractor) => (
                   <TableRow key={subcontractor.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedSubcontractorIds.includes(subcontractor.id)}
+                        onChange={(event) => toggleSelected(setSelectedSubcontractorIds, subcontractor.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{subcontractor.legal_name}</TableCell>
                     <TableCell>{subcontractor.tax_id ?? '-'}</TableCell>
                     <TableCell>{subcontractor.status}</TableCell>
@@ -645,11 +725,26 @@ export function PartnersPage() {
             >
               Export CSV conductores
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateDrivers('active'); }}>
+              Activar seleccion ({selectedDriverIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateDrivers('suspended'); }}>
+              Suspender seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredDrivers.length > 0 && filteredDrivers.every((item) => selectedDriverIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedDriverIds(event.target.checked ? filteredDrivers.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>DNI</TableHead>
                   <TableHead>Nombre</TableHead>
@@ -662,6 +757,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredDrivers.map((driver) => (
                   <TableRow key={driver.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedDriverIds.includes(driver.id)}
+                        onChange={(event) => toggleSelected(setSelectedDriverIds, driver.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{driver.code}</TableCell>
                     <TableCell>{driver.dni ?? '-'}</TableCell>
                     <TableCell>{driver.name}</TableCell>
@@ -720,11 +822,26 @@ export function PartnersPage() {
             >
               Export CSV vehículos
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateVehicles('active'); }}>
+              Activar seleccion ({selectedVehicleIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateVehicles('maintenance'); }}>
+              Mantenimiento seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredVehicles.length > 0 && filteredVehicles.every((item) => selectedVehicleIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedVehicleIds(event.target.checked ? filteredVehicles.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>Matricula</TableHead>
                   <TableHead>Subcontrata</TableHead>
@@ -737,6 +854,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredVehicles.map((vehicle) => (
                   <TableRow key={vehicle.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedVehicleIds.includes(vehicle.id)}
+                        onChange={(event) => toggleSelected(setSelectedVehicleIds, vehicle.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{vehicle.code}</TableCell>
                     <TableCell>{vehicle.plate_number ?? '-'}</TableCell>
                     <TableCell>{vehicle.subcontractor_name ?? '-'}</TableCell>

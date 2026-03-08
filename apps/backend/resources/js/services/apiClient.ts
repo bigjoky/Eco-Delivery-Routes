@@ -2941,6 +2941,18 @@ export const apiClient = {
     }
   },
 
+  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateSubcontractorStatus(ids, status) as Promise<{ affected_count: number }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/bulk-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status }),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update subcontractors'));
+    return { affected_count: Number(json?.data?.affected_count ?? 0) };
+  },
+
   async getDrivers(filters: {
     subcontractorId?: string;
     status?: string;
@@ -3008,6 +3020,18 @@ export const apiClient = {
     }
   },
 
+  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateDriverStatus(ids, status) as Promise<{ affected_count: number }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/drivers/bulk-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status }),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update drivers'));
+    return { affected_count: Number(json?.data?.affected_count ?? 0) };
+  },
+
   async getVehicles(filters: {
     subcontractorId?: string;
     status?: string;
@@ -3073,6 +3097,18 @@ export const apiClient = {
       const json = await response.json();
       throw new Error(json?.error?.message ?? 'Cannot delete vehicle');
     }
+  },
+
+  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance'): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateVehicleStatus(ids, status) as Promise<{ affected_count: number }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicles/bulk-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status }),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update vehicles'));
+    return { affected_count: Number(json?.data?.affected_count ?? 0) };
   },
 
   async getWorkforce(filters: {
