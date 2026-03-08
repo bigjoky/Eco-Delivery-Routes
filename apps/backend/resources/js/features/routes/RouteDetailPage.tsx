@@ -48,6 +48,10 @@ export function RouteDetailPage() {
   const [bulkAdding, setBulkAdding] = useState(false);
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([]);
   const [bulkDeletingStops, setBulkDeletingStops] = useState(false);
+  const [bulkUpdatingStops, setBulkUpdatingStops] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<'' | 'planned' | 'in_progress' | 'completed'>('');
+  const [bulkPlannedAt, setBulkPlannedAt] = useState('');
+  const [bulkCompletedAt, setBulkCompletedAt] = useState('');
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
   const [manifestNotes, setManifestNotes] = useState('');
@@ -363,6 +367,43 @@ export function RouteDetailPage() {
       apiClient.getRouteStops(id).then(setStops).catch(() => {});
     } finally {
       setBulkDeletingStops(false);
+    }
+  };
+
+  const updateSelectedStops = async () => {
+    if (!id) return;
+    if (selectedStopIds.length === 0) {
+      setError('Selecciona al menos una parada para actualizar.');
+      return;
+    }
+    if (!bulkStatus && !bulkPlannedAt && !bulkCompletedAt) {
+      setError('Define al menos un campo masivo (estado o ETA).');
+      return;
+    }
+
+    setBulkUpdatingStops(true);
+    setError('');
+    try {
+      const payload: {
+        status?: 'planned' | 'in_progress' | 'completed';
+        planned_at?: string | null;
+        completed_at?: string | null;
+      } = {};
+      if (bulkStatus) payload.status = bulkStatus;
+      if (bulkPlannedAt) payload.planned_at = toIsoDateTime(bulkPlannedAt);
+      if (bulkCompletedAt) payload.completed_at = toIsoDateTime(bulkCompletedAt);
+
+      for (const stopId of selectedStopIds) {
+        await apiClient.updateRouteStop(id, stopId, payload);
+      }
+
+      const refreshed = await apiClient.getRouteStops(id);
+      setStops(refreshed);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
+    } finally {
+      setBulkUpdatingStops(false);
     }
   };
 
@@ -704,9 +745,47 @@ export function RouteDetailPage() {
               type="button"
               variant="outline"
               onClick={deleteSelectedStops}
-              disabled={selectedStopIds.length === 0 || bulkDeletingStops}
+              disabled={selectedStopIds.length === 0 || bulkDeletingStops || bulkUpdatingStops}
             >
               {bulkDeletingStops ? 'Eliminando...' : 'Eliminar seleccionadas'}
+            </Button>
+          </div>
+          <div className="inline-actions">
+            <label htmlFor="bulk-stop-status">Estado masivo</label>
+            <select
+              id="bulk-stop-status"
+              value={bulkStatus}
+              onChange={(event) => setBulkStatus(event.target.value as '' | 'planned' | 'in_progress' | 'completed')}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            >
+              <option value="">Sin cambio</option>
+              <option value="planned">planned</option>
+              <option value="in_progress">in_progress</option>
+              <option value="completed">completed</option>
+            </select>
+            <label htmlFor="bulk-stop-planned-at">ETA planificada</label>
+            <input
+              id="bulk-stop-planned-at"
+              type="datetime-local"
+              value={bulkPlannedAt}
+              onChange={(event) => setBulkPlannedAt(event.target.value)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
+            <label htmlFor="bulk-stop-completed-at">ETA completada</label>
+            <input
+              id="bulk-stop-completed-at"
+              type="datetime-local"
+              value={bulkCompletedAt}
+              onChange={(event) => setBulkCompletedAt(event.target.value)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={updateSelectedStops}
+              disabled={selectedStopIds.length === 0 || bulkUpdatingStops || bulkDeletingStops}
+            >
+              {bulkUpdatingStops ? 'Aplicando...' : 'Aplicar cambios masivos'}
             </Button>
           </div>
           <TableWrapper>

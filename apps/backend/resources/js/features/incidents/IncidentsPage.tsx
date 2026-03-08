@@ -38,6 +38,14 @@ function formatSlaTimeline(item: IncidentSummary): string {
   return `Vencida hace ${hours}h ${minutes}m`;
 }
 
+const bulkResolveReasonOptions = [
+  { code: 'DELIVERY_CONFIRMED_EXTERNALLY', label: 'Entrega confirmada externamente' },
+  { code: 'CUSTOMER_RESCHEDULED', label: 'Cliente reprogramado' },
+  { code: 'DUPLICATE_INCIDENT', label: 'Incidencia duplicada' },
+  { code: 'DATA_CORRECTION', label: 'Correccion de datos operativos' },
+  { code: 'OTHER', label: 'Otro motivo' },
+] as const;
+
 export function IncidentsPage() {
   const [items, setItems] = useState<IncidentSummary[]>([]);
   const [catalog, setCatalog] = useState<IncidentCatalogItem[]>([]);
@@ -62,6 +70,8 @@ export function IncidentsPage() {
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
   const [bulkResolveNotes, setBulkResolveNotes] = useState('Resueltas en lote desde panel web');
+  const [bulkResolveReasonCode, setBulkResolveReasonCode] = useState<(typeof bulkResolveReasonOptions)[number]['code']>('DATA_CORRECTION');
+  const [bulkResolveReasonDetail, setBulkResolveReasonDetail] = useState('');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -300,12 +310,20 @@ export function IncidentsPage() {
       setResolveError('Define una nota de resolucion para el cierre masivo.');
       return;
     }
+    if (!bulkResolveReasonCode) {
+      setResolveError('Selecciona un motivo estructurado de resolucion.');
+      return;
+    }
     setBulkResolving(true);
     setResolveError('');
     try {
+      const reasonLabel = bulkResolveReasonOptions.find((item) => item.code === bulkResolveReasonCode)?.label ?? bulkResolveReasonCode;
+      const composedNotes = `[${bulkResolveReasonCode}] ${reasonLabel}`
+        + (bulkResolveReasonDetail.trim() ? ` | Detalle: ${bulkResolveReasonDetail.trim()}` : '')
+        + ` | Nota: ${bulkResolveNotes.trim()}`;
       await apiClient.resolveIncidentsBulk(
         selectedIncidentIds,
-        bulkResolveNotes.trim(),
+        composedNotes,
         {
           applyToFiltered: bulkScope === 'filtered',
           filters: bulkScope === 'filtered' ? {
@@ -584,6 +602,16 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={selectOpenInPage}>
               Seleccionar abiertas (página)
             </Button>
+            <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
+              {bulkResolveReasonOptions.map((item) => (
+                <option key={item.code} value={item.code}>{item.label}</option>
+              ))}
+            </Select>
+            <Input
+              value={bulkResolveReasonDetail}
+              onChange={(event) => setBulkResolveReasonDetail(event.target.value)}
+              placeholder="Detalle del motivo (opcional)"
+            />
             <Input
               value={bulkResolveNotes}
               onChange={(event) => setBulkResolveNotes(event.target.value)}
