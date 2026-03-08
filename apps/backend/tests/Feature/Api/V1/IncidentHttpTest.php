@@ -53,9 +53,21 @@ class IncidentHttpTest extends TestCase
 
         $resolved = $this->patchJson('/api/v1/incidents/' . $id . '/resolve', [
             'notes' => 'resolved from test',
+            'reason_code' => 'MANUAL_REVIEW',
+            'reason_detail' => 'resuelto por operador',
         ]);
         $resolved->assertOk();
         $this->assertNotNull($resolved->json('data.resolved_at'));
+        $this->assertSame('MANUAL_REVIEW', $resolved->json('data.resolution_reason_code'));
+        $this->assertSame('resuelto por operador', $resolved->json('data.resolution_reason_detail'));
+        $auditResolve = DB::table('audit_logs')
+            ->where('event', 'incidents.resolved')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($auditResolve);
+        $resolveMetadata = json_decode((string) $auditResolve->metadata, true);
+        $this->assertSame($id, $resolveMetadata['incident_id'] ?? null);
+        $this->assertSame('MANUAL_REVIEW', $resolveMetadata['reason_code'] ?? null);
 
         $resolvedList = $this->getJson('/api/v1/incidents?incidentable_id=' . $incidentableId . '&resolved=resolved');
         $resolvedList->assertOk();
@@ -117,6 +129,15 @@ class IncidentHttpTest extends TestCase
         $row = DB::table('incidents')->where('id', $openOne)->first();
         $this->assertSame('DATA_CORRECTION', $row->resolution_reason_code);
         $this->assertSame('ajuste operativo', $row->resolution_reason_detail);
+        $auditBulk = DB::table('audit_logs')
+            ->where('event', 'incidents.resolved.bulk')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($auditBulk);
+        $bulkMetadata = json_decode((string) $auditBulk->metadata, true);
+        $this->assertSame('DATA_CORRECTION', $bulkMetadata['reason_code'] ?? null);
+        $this->assertSame(2, $bulkMetadata['requested_count'] ?? null);
+        $this->assertSame(1, $bulkMetadata['updated_count'] ?? null);
     }
 
     public function test_incidents_bulk_resolve_apply_to_filtered_works(): void

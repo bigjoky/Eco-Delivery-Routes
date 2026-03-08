@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
+use App\Infrastructure\Auth\AuditLogWriter;
 use App\Models\User;
 use App\Services\SequenceService;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +14,10 @@ use Illuminate\Support\Str;
 
 class IncidentController extends Controller
 {
-    public function __construct(private readonly SequenceService $sequenceService) {}
+    public function __construct(
+        private readonly SequenceService $sequenceService,
+        private readonly AuditLogWriter $auditLogWriter
+    ) {}
 
     public function catalog(Request $request): JsonResponse
     {
@@ -233,6 +237,12 @@ class IncidentController extends Controller
             'reason_code' => $payload['reason_code'] ?? null,
             'latency_ms' => (int) round((microtime(true) - $start) * 1000),
         ]);
+        $this->auditLogWriter->write($actor->id, 'incidents.resolved', [
+            'incident_id' => $id,
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
+            'resolved_from' => 'single',
+        ]);
 
         return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);
     }
@@ -283,6 +293,14 @@ class IncidentController extends Controller
                 'resolved_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        $this->auditLogWriter->write($actor->id, 'incidents.resolved.bulk', [
+            'requested_count' => count($ids),
+            'updated_count' => (int) $updated,
+            'apply_to_filtered' => $applyToFiltered,
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
+        ]);
 
         return response()->json([
             'data' => [
