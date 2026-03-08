@@ -66,6 +66,7 @@ export function IncidentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
+  const [showFilters, setShowFilters] = useState(false);
 
   const incidentSummary = useMemo(() => {
     const openCount = items.filter((item) => !item.resolved_at).length;
@@ -76,6 +77,28 @@ export function IncidentsPage() {
       resolved: resolvedCount,
     };
   }, [items]);
+
+  const activeFiltersCount = useMemo(() => {
+    return [
+      resolvedFilter,
+      listTypeFilter,
+      listCategoryFilter,
+      listCatalogFilter,
+      listPriorityFilter,
+      listSlaFilter,
+      listIncidentableId,
+      listSearch,
+    ].filter((value) => value !== '').length;
+  }, [
+    resolvedFilter,
+    listTypeFilter,
+    listCategoryFilter,
+    listCatalogFilter,
+    listPriorityFilter,
+    listSlaFilter,
+    listIncidentableId,
+    listSearch,
+  ]);
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
@@ -462,71 +485,11 @@ export function IncidentsPage() {
             </div>
           </div>
           {resolveError ? <div className="helper error">{resolveError}</div> : null}
-          <div className="form-row">
-            <div>
-              <label>Estado</label>
-              <Select value={resolvedFilter} onChange={(e) => { setResolvedFilter(e.target.value as 'open' | 'resolved' | ''); setPage(1); }}>
-                <option value="">todas</option>
-                <option value="open">abiertas</option>
-                <option value="resolved">resueltas</option>
-              </Select>
-            </div>
-            <div>
-              <label>Tipo</label>
-              <Select value={listTypeFilter} onChange={(e) => { setListTypeFilter(e.target.value as 'shipment' | 'pickup' | ''); setPage(1); }}>
-                <option value="">tipo</option>
-                <option value="shipment">shipment</option>
-                <option value="pickup">pickup</option>
-              </Select>
-            </div>
-            <div>
-              <label>Categoria</label>
-              <Select value={listCategoryFilter} onChange={(e) => { setListCategoryFilter(e.target.value as 'failed' | 'absent' | 'retry' | 'general' | ''); setPage(1); }}>
-                <option value="">categoria</option>
-                <option value="failed">failed</option>
-                <option value="absent">absent</option>
-                <option value="retry">retry</option>
-                <option value="general">general</option>
-              </Select>
-            </div>
-            <div>
-              <label>Catalogo</label>
-              <Select value={listCatalogFilter} onChange={(e) => { setListCatalogFilter(e.target.value); setPage(1); }}>
-                <option value="">catalogo</option>
-                {catalog.map((item) => (
-                  <option key={item.code} value={item.code}>{item.code}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label>Prioridad</label>
-              <Select value={listPriorityFilter} onChange={(e) => { setListPriorityFilter(e.target.value as 'high' | 'medium' | 'low' | ''); setPage(1); }}>
-                <option value="">prioridad</option>
-                <option value="high">high</option>
-                <option value="medium">medium</option>
-                <option value="low">low</option>
-              </Select>
-            </div>
-            <div>
-              <label>SLA</label>
-              <Select value={listSlaFilter} onChange={(e) => { setListSlaFilter(e.target.value as 'on_track' | 'at_risk' | 'breached' | 'resolved' | ''); setPage(1); }}>
-                <option value="">sla</option>
-                <option value="on_track">on_track</option>
-                <option value="at_risk">at_risk</option>
-                <option value="breached">breached</option>
-                <option value="resolved">resolved</option>
-              </Select>
-            </div>
-            <div>
-              <label>Referencia objetivo</label>
-              <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
-            </div>
-            <div>
-              <label>Buscar</label>
-              <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
-            </div>
-          </div>
           <div className="inline-actions">
+            <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
+              {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+            </Button>
+            <span className="helper">Filtros activos: {activeFiltersCount}</span>
             <Button type="button" variant={resolvedFilter === 'open' ? 'secondary' : 'outline'} onClick={() => { setResolvedFilter('open'); setPage(1); }}>
               Abiertas
             </Button>
@@ -539,6 +502,74 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
             </Button>
+          </div>
+          {showFilters ? (
+            <div className="form-row">
+              <div>
+                <label>Estado</label>
+                <Select value={resolvedFilter} onChange={(e) => { setResolvedFilter(e.target.value as 'open' | 'resolved' | ''); setPage(1); }}>
+                  <option value="">todas</option>
+                  <option value="open">abiertas</option>
+                  <option value="resolved">resueltas</option>
+                </Select>
+              </div>
+              <div>
+                <label>Tipo</label>
+                <Select value={listTypeFilter} onChange={(e) => { setListTypeFilter(e.target.value as 'shipment' | 'pickup' | ''); setPage(1); }}>
+                  <option value="">tipo</option>
+                  <option value="shipment">shipment</option>
+                  <option value="pickup">pickup</option>
+                </Select>
+              </div>
+              <div>
+                <label>Categoria</label>
+                <Select value={listCategoryFilter} onChange={(e) => { setListCategoryFilter(e.target.value as 'failed' | 'absent' | 'retry' | 'general' | ''); setPage(1); }}>
+                  <option value="">categoria</option>
+                  <option value="failed">failed</option>
+                  <option value="absent">absent</option>
+                  <option value="retry">retry</option>
+                  <option value="general">general</option>
+                </Select>
+              </div>
+              <div>
+                <label>Catalogo</label>
+                <Select value={listCatalogFilter} onChange={(e) => { setListCatalogFilter(e.target.value); setPage(1); }}>
+                  <option value="">catalogo</option>
+                  {catalog.map((item) => (
+                    <option key={item.code} value={item.code}>{item.code}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label>Prioridad</label>
+                <Select value={listPriorityFilter} onChange={(e) => { setListPriorityFilter(e.target.value as 'high' | 'medium' | 'low' | ''); setPage(1); }}>
+                  <option value="">prioridad</option>
+                  <option value="high">high</option>
+                  <option value="medium">medium</option>
+                  <option value="low">low</option>
+                </Select>
+              </div>
+              <div>
+                <label>SLA</label>
+                <Select value={listSlaFilter} onChange={(e) => { setListSlaFilter(e.target.value as 'on_track' | 'at_risk' | 'breached' | 'resolved' | ''); setPage(1); }}>
+                  <option value="">sla</option>
+                  <option value="on_track">on_track</option>
+                  <option value="at_risk">at_risk</option>
+                  <option value="breached">breached</option>
+                  <option value="resolved">resolved</option>
+                </Select>
+              </div>
+              <div>
+                <label>Referencia objetivo</label>
+                <Input value={listIncidentableId} onChange={(e) => { setListIncidentableId(e.target.value); setPage(1); }} placeholder="Incidentable ID" />
+              </div>
+              <div>
+                <label>Buscar</label>
+                <Input value={listSearch} onChange={(e) => { setListSearch(e.target.value); setPage(1); }} placeholder="Buscar (id, notas, catalogo)" />
+              </div>
+            </div>
+          ) : null}
+          <div className="inline-actions">
             <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
               Modo selección
             </Button>

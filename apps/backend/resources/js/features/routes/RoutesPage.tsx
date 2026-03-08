@@ -52,6 +52,7 @@ export function RoutesPage() {
   const [publishPolicyEnforce, setPublishPolicyEnforce] = useState(true);
   const [publishPolicyCriticalCodes, setPublishPolicyCriticalCodes] = useState<string[]>(['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY']);
   const [publishPolicyBypassRoles, setPublishPolicyBypassRoles] = useState('super_admin');
+  const [showFilters, setShowFilters] = useState(false);
 
   const routeSummary = useMemo(() => {
     const counts = items.reduce((acc, item) => {
@@ -67,6 +68,10 @@ export function RoutesPage() {
       pageCount: items.length,
     };
   }, [items, meta.total]);
+
+  const activeFiltersCount = useMemo(() => {
+    return [query, hubFilter, subcontractorFilter, status, dateFrom, dateTo].filter((value) => value !== '').length;
+  }, [query, hubFilter, subcontractorFilter, status, dateFrom, dateTo]);
 
   const reload = (page: number) =>
     apiClient
@@ -553,84 +558,96 @@ export function RoutesPage() {
               <div className="kpi-value">{routeSummary.cancelled}</div>
             </div>
           </div>
-          <div className="form-row">
-            <div>
-              <label htmlFor="route-query">Buscar</label>
-              <input
-                id="route-query"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Codigo ruta o referencia"
-              />
-            </div>
-            <div>
-              <label htmlFor="route-hub">Hub</label>
-              <select id="route-hub" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
-                <option value="">Todos</option>
-                {hubs.map((hub) => (
-                  <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="route-subcontractor">Subcontrata</label>
-              <select
-                id="route-subcontractor"
-                value={subcontractorFilter}
-                onChange={(event) => setSubcontractorFilter(event.target.value)}
-              >
-                <option value="">Todas</option>
-                {subcontractors.map((item) => (
-                  <option key={item.id} value={item.id}>{item.legal_name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="route-status">Estado</label>
-              <select
-                id="route-status"
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="planned">planned</option>
-                <option value="in_progress">in_progress</option>
-                <option value="completed">completed</option>
-                <option value="cancelled">cancelled</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="route-date-from">Desde</label>
-              <input
-                id="route-date-from"
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="route-date-to">Hasta</label>
-              <input
-                id="route-date-to"
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-              />
-            </div>
-          </div>
           <div className="inline-actions">
-            <span className="helper">Estados rapidos</span>
-            <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
-            <Button type="button" variant={status === 'planned' ? 'secondary' : 'outline'} onClick={() => setStatus('planned')}>Planned</Button>
-            <Button type="button" variant={status === 'in_progress' ? 'secondary' : 'outline'} onClick={() => setStatus('in_progress')}>En ruta</Button>
-            <Button type="button" variant={status === 'completed' ? 'secondary' : 'outline'} onClick={() => setStatus('completed')}>Completada</Button>
-            <Button type="button" variant={status === 'cancelled' ? 'secondary' : 'outline'} onClick={() => setStatus('cancelled')}>Cancelada</Button>
-            <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
-            <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
-            <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
-            <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar fechas</Button>
-            <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
+            <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
+              {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+            </Button>
+            <span className="helper">Filtros activos: {activeFiltersCount}</span>
+            {activeFiltersCount > 0 ? (
+              <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
+            ) : null}
           </div>
+          {showFilters ? (
+            <>
+              <div className="form-row">
+                <div>
+                  <label htmlFor="route-query">Buscar</label>
+                  <input
+                    id="route-query"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Codigo ruta o referencia"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="route-hub">Hub</label>
+                  <select id="route-hub" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
+                    <option value="">Todos</option>
+                    {hubs.map((hub) => (
+                      <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="route-subcontractor">Subcontrata</label>
+                  <select
+                    id="route-subcontractor"
+                    value={subcontractorFilter}
+                    onChange={(event) => setSubcontractorFilter(event.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {subcontractors.map((item) => (
+                      <option key={item.id} value={item.id}>{item.legal_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="route-status">Estado</label>
+                  <select
+                    id="route-status"
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    <option value="planned">planned</option>
+                    <option value="in_progress">in_progress</option>
+                    <option value="completed">completed</option>
+                    <option value="cancelled">cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="route-date-from">Desde</label>
+                  <input
+                    id="route-date-from"
+                    type="date"
+                    value={dateFrom}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="route-date-to">Hasta</label>
+                  <input
+                    id="route-date-to"
+                    type="date"
+                    value={dateTo}
+                    onChange={(event) => setDateTo(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="inline-actions">
+                <span className="helper">Estados rapidos</span>
+                <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
+                <Button type="button" variant={status === 'planned' ? 'secondary' : 'outline'} onClick={() => setStatus('planned')}>Planned</Button>
+                <Button type="button" variant={status === 'in_progress' ? 'secondary' : 'outline'} onClick={() => setStatus('in_progress')}>En ruta</Button>
+                <Button type="button" variant={status === 'completed' ? 'secondary' : 'outline'} onClick={() => setStatus('completed')}>Completada</Button>
+                <Button type="button" variant={status === 'cancelled' ? 'secondary' : 'outline'} onClick={() => setStatus('cancelled')}>Cancelada</Button>
+                <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>Hoy</Button>
+                <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
+                <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
+                <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar fechas</Button>
+              </div>
+            </>
+          ) : null}
           <TableWrapper>
             <Table>
               <TableHeader>
