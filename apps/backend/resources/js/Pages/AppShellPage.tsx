@@ -3,7 +3,7 @@ import { App } from '../app/App';
 
 export default function AppShellPage() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/ops">
       <App />
     </BrowserRouter>
   );
