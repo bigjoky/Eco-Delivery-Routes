@@ -45,7 +45,18 @@ const sections = [
   },
 ];
 
-export function AppShell({ children, roles, isAuthenticated }: PropsWithChildren<{ roles: string[]; isAuthenticated: boolean }>) {
+export function AppShell({
+  children,
+  roles,
+  isAuthenticated,
+  currentUser,
+  onLogout,
+}: PropsWithChildren<{
+  roles: string[];
+  isAuthenticated: boolean;
+  currentUser?: { name: string; email?: string } | null;
+  onLogout?: () => Promise<void> | void;
+}>) {
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
@@ -85,6 +96,25 @@ export function AppShell({ children, roles, isAuthenticated }: PropsWithChildren
             );
           })}
         </nav>
+        <div className="sidebar-footer">
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-name">{currentUser?.name ?? 'Operador'}</div>
+            <div className="sidebar-user-email">{currentUser?.email ?? 'Sesion activa'}</div>
+            <div className="sidebar-user-actions">
+              <a href="/dashboard" className="sidebar-user-link">Dashboard</a>
+              <a href="/profile" className="sidebar-user-link">Perfil</a>
+              <button
+                type="button"
+                className="sidebar-user-link sidebar-user-button"
+                onClick={() => {
+                  void onLogout?.();
+                }}
+              >
+                Cerrar sesion
+              </button>
+            </div>
+          </div>
+        </div>
       </aside>
       <div className="app-content">
         <header className="topbar">

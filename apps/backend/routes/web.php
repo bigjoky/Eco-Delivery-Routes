@@ -34,6 +34,6 @@ Route::middleware('api.docs.access')->group(function () {
 
 Route::get('/ops/{any?}', function () {
     return Inertia::render('AppShellPage');
-})->where('any', '.*');
+})->where('any', '.*')->middleware('auth');
 
 require __DIR__.'/auth.php';
