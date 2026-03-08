@@ -7,7 +7,7 @@
 - [ ] RBAC verificado para roles críticos.
 - [ ] Errores estandarizados (código + mensaje).
 
-## Clientes
+## Web/PWA
 
 - [ ] Manejo de sesión y estados de carga/error.
 - [ ] Acceso por rol respetado en UI.
