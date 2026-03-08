@@ -29,6 +29,15 @@ import { UserDetailPage } from '../features/users/UserDetailPage';
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(sessionStore.isAuthenticated());
   const [roles, setRoles] = useState(sessionStore.getRoles());
+  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string } | null>(null);
+
+  useEffect(() => {
+    apiClient.getCurrentUser().then((profile) => {
+      setCurrentUser({ name: profile.name, email: profile.email });
+      setRoles(profile.roles.map((role) => role.code));
+      setIsAuthenticated(true);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     sessionStore.syncFromStorage();
@@ -39,13 +48,34 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-    if (roles.length > 0) return;
-    apiClient.getCurrentUser().catch(() => undefined);
+    if (!isAuthenticated || roles.length > 0) return;
+    apiClient.getCurrentUser().then((profile) => {
+      setCurrentUser({ name: profile.name, email: profile.email });
+      setRoles(profile.roles.map((role) => role.code));
+      setIsAuthenticated(true);
+    }).catch(() => undefined);
   }, [isAuthenticated, roles.length]);
 
+  async function handleLogout() {
+    try {
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      await fetch('/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: csrf ? { 'X-CSRF-TOKEN': csrf } : undefined,
+      });
+    } catch {
+      // Fallback to API token logout.
+      await apiClient.logout().catch(() => undefined);
+    } finally {
+      sessionStore.setToken(null);
+      sessionStore.setRoles([]);
+      window.location.href = '/login';
+    }
+  }
+
   return (
-    <AppShell isAuthenticated={isAuthenticated} roles={roles}>
+    <AppShell isAuthenticated={isAuthenticated} roles={roles} currentUser={currentUser} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
         <Route path="/login" element={<LoginPage />} />
