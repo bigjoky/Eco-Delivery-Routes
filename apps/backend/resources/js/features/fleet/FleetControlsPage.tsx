@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -208,6 +208,11 @@ export function FleetControlsPage() {
 
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">Control de Flota</span>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Controles avanzados de vehículos</CardTitle>

@@ -22,6 +22,14 @@ const initialOverview: DashboardOverview = {
   alerts: [],
 };
 
+export function buildDashboardRangeQuery(from: string, to: string, mode: 'routes' | 'shipments' | 'incidents'): string {
+  if (!from || !to) return '';
+  if (mode === 'shipments') {
+    return `scheduled_from=${encodeURIComponent(from)}&scheduled_to=${encodeURIComponent(to)}`;
+  }
+  return `date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`;
+}
+
 function TrendBars({ values, max }: { values: number[]; max: number }) {
   return (
     <div className="trend-bars">
@@ -97,19 +105,11 @@ export function DashboardPage() {
   const maxIncidentTrend = Math.max(1, ...incidentTrendValues);
   const maxQualityTrend = Math.max(1, ...qualityTrendValues);
   const sharedRangeQuery = useMemo(
-    () => (
-      overview.period.from && overview.period.to
-        ? `date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`
-        : ''
-    ),
+    () => buildDashboardRangeQuery(overview.period.from, overview.period.to, 'routes'),
     [overview.period.from, overview.period.to]
   );
   const shipmentRangeQuery = useMemo(
-    () => (
-      overview.period.from && overview.period.to
-        ? `scheduled_from=${encodeURIComponent(overview.period.from)}&scheduled_to=${encodeURIComponent(overview.period.to)}`
-        : ''
-    ),
+    () => buildDashboardRangeQuery(overview.period.from, overview.period.to, 'shipments'),
     [overview.period.from, overview.period.to]
   );
 

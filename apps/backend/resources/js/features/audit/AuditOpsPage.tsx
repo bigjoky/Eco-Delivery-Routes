@@ -27,7 +27,7 @@ type AuditResource =
   | 'compliance_document'
   | 'vehicle_control';
 
-function parseMetadata(metadata: AuditLogEntry['metadata']): Record<string, unknown> {
+export function parseMetadata(metadata: AuditLogEntry['metadata']): Record<string, unknown> {
   if (!metadata) return {};
   if (typeof metadata === 'string') {
     try {
@@ -46,7 +46,7 @@ function parseMetadata(metadata: AuditLogEntry['metadata']): Record<string, unkn
   return { value: String(metadata) };
 }
 
-function getEntityLink(row: AuditLogEntry): { to: string; label: string } | null {
+export function getEntityLink(row: AuditLogEntry): { to: string; label: string } | null {
   const metadata = parseMetadata(row.metadata);
   const settlementId = typeof metadata.settlement_id === 'string' ? metadata.settlement_id : null;
   const routeId = typeof metadata.route_id === 'string' ? metadata.route_id : null;

@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -538,6 +538,11 @@ export function PartnersPage() {
 
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">Partners</span>
+      </div>
       <Modal
         open={createOpen}
         onClose={closeCreateWizard}
