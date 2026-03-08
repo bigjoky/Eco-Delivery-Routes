@@ -34,6 +34,7 @@ export function SettlementDetailPage() {
   const [bulkSubcontractorId, setBulkSubcontractorId] = useState('');
   const [bulkPreview, setBulkPreview] = useState<SettlementBulkReconcilePreview | null>(null);
   const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
+  const [showAudit, setShowAudit] = useState(false);
 
   const reload = async () => {
     if (!settlementId) return;
@@ -72,8 +73,9 @@ export function SettlementDetailPage() {
   }, [settlementId]);
 
   useEffect(() => {
+    if (!showAudit) return;
     loadAudit();
-  }, [settlementId, auditEventFilter]);
+  }, [settlementId, auditEventFilter, showAudit]);
 
   const onPreview = async () => {
     if (!settlementId) return;
@@ -448,49 +450,62 @@ export function SettlementDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Timeline auditoria</CardTitle>
-          <CardDescription>Eventos de liquidacion y ajustes del periodo.</CardDescription>
+          <CardTitle>Auditoría</CardTitle>
+          <CardDescription>Acceso bajo demanda al timeline de liquidación.</CardDescription>
         </CardHeader>
-        <CardContent className="page-grid">
-          <div className="form-row">
-            <Input
-              value={auditEventFilter}
-              onChange={(e) => setAuditEventFilter(e.target.value)}
-              placeholder="Filtrar por evento (ej: settlement.adjustment.approved)"
-            />
-            <Button type="button" variant="outline" onClick={loadAudit}>Refrescar</Button>
-          </div>
-          <TableWrapper>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Evento</TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>Detalle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {auditRows.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4}>Sin eventos para este filtro.</TableCell>
-                  </TableRow>
-                )}
-                {auditRows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{row.event}</TableCell>
-                    <TableCell>{row.actor_name ?? row.actor_user_id ?? 'sistema'}</TableCell>
-                    <TableCell>
-                      {row.metadata ? JSON.stringify(row.metadata) : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableWrapper>
+        <CardContent>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
         </CardContent>
       </Card>
+      {showAudit ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Timeline auditoria</CardTitle>
+            <CardDescription>Eventos de liquidacion y ajustes del periodo.</CardDescription>
+          </CardHeader>
+          <CardContent className="page-grid">
+            <div className="form-row">
+              <Input
+                value={auditEventFilter}
+                onChange={(e) => setAuditEventFilter(e.target.value)}
+                placeholder="Filtrar por evento (ej: settlement.adjustment.approved)"
+              />
+              <Button type="button" variant="outline" onClick={loadAudit}>Refrescar</Button>
+            </div>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditRows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4}>Sin eventos para este filtro.</TableCell>
+                    </TableRow>
+                  )}
+                  {auditRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
+                      <TableCell>{row.event}</TableCell>
+                      <TableCell>{row.actor_name ?? row.actor_user_id ?? 'sistema'}</TableCell>
+                      <TableCell>
+                        {row.metadata ? JSON.stringify(row.metadata) : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }
