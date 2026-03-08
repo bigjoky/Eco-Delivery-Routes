@@ -23,21 +23,43 @@ class DashboardController extends Controller
         $periodPreset = (string) $request->query('period', '7d');
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
+        $hubId = $request->query('hub_id');
+        $subcontractorId = $request->query('subcontractor_id');
         [$from, $to, $preset] = $this->resolvePeriod(
             is_string($dateFrom) ? $dateFrom : null,
             is_string($dateTo) ? $dateTo : null,
             $periodPreset
         );
 
-        $cacheKey = sprintf('dashboard_overview:%s:%s:%s:%s', $actor->id, $from, $to, $preset);
-        $payload = Cache::remember($cacheKey, now()->addSeconds(60), function () use ($from, $to, $preset): array {
-            return $this->buildPayload($from, $to, $preset);
+        $cacheKey = sprintf(
+            'dashboard_overview:%s:%s:%s:%s:%s:%s',
+            $actor->id,
+            $from,
+            $to,
+            $preset,
+            is_string($hubId) ? $hubId : '',
+            is_string($subcontractorId) ? $subcontractorId : ''
+        );
+        $payload = Cache::remember($cacheKey, now()->addSeconds(60), function () use ($from, $to, $preset, $hubId, $subcontractorId): array {
+            return $this->buildPayload(
+                from: $from,
+                to: $to,
+                preset: $preset,
+                hubId: is_string($hubId) && $hubId !== '' ? $hubId : null,
+                subcontractorId: is_string($subcontractorId) && $subcontractorId !== '' ? $subcontractorId : null
+            );
         });
 
         return response()->json(['data' => $payload]);
     }
 
-    private function buildPayload(string $from, string $to, string $preset): array
+    private function buildPayload(
+        string $from,
+        string $to,
+        string $preset,
+        ?string $hubId = null,
+        ?string $subcontractorId = null
+    ): array
     {
         $threshold = (float) (DB::table('quality_threshold_settings')
             ->where('scope_type', 'global')
@@ -50,6 +72,9 @@ class DashboardController extends Controller
             ->whereBetween('route_date', [$from, $to]);
         $incidentsWindow = DB::table('incidents')
             ->whereBetween(DB::raw('DATE(created_at)'), [$from, $to]);
+        $this->applyShipmentFilters($shipmentsWindow, $hubId, $subcontractorId);
+        $this->applyRouteFilters($routesWindow, $hubId, $subcontractorId);
+        $this->applyIncidentFilters($incidentsWindow, $hubId, $subcontractorId);
 
         $shipmentsByStatus = [
             'created' => (clone $shipmentsWindow)->where('status', 'created')->count(),
@@ -66,12 +91,34 @@ class DashboardController extends Controller
         $routeQualityRows = DB::table('quality_snapshots')
             ->where('scope_type', 'route')
             ->whereBetween('period_end', [$from, $to])
+            ->when($hubId !== null || $subcontractorId !== null, function ($query) use ($hubId, $subcontractorId): void {
+                $query->whereIn('scope_id', function ($routes) use ($hubId, $subcontractorId): void {
+                    $routes->select('id')->from('routes');
+                    if ($hubId !== null) {
+                        $routes->where('hub_id', $hubId);
+                    }
+                    if ($subcontractorId !== null) {
+                        $routes->where('subcontractor_id', $subcontractorId);
+                    }
+                });
+            })
             ->select('scope_id', DB::raw('MAX(service_quality_score) as service_quality_score'))
             ->groupBy('scope_id')
             ->get();
         $driverQualityRows = DB::table('quality_snapshots')
             ->where('scope_type', 'driver')
             ->whereBetween('period_end', [$from, $to])
+            ->when($hubId !== null || $subcontractorId !== null, function ($query) use ($hubId, $subcontractorId): void {
+                $query->whereIn('scope_id', function ($drivers) use ($hubId, $subcontractorId): void {
+                    $drivers->select('id')->from('drivers');
+                    if ($hubId !== null) {
+                        $drivers->where('home_hub_id', $hubId);
+                    }
+                    if ($subcontractorId !== null) {
+                        $drivers->where('subcontractor_id', $subcontractorId);
+                    }
+                });
+            })
             ->select('scope_id', DB::raw('MAX(service_quality_score) as service_quality_score'))
             ->groupBy('scope_id')
             ->get();
@@ -101,6 +148,8 @@ class DashboardController extends Controller
         $recentRoutes = DB::table('routes')
             ->leftJoin('route_stops', 'route_stops.route_id', '=', 'routes.id')
             ->whereBetween('routes.route_date', [$from, $to])
+            ->when($hubId !== null, fn ($query) => $query->where('routes.hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('routes.subcontractor_id', $subcontractorId))
             ->groupBy('routes.id', 'routes.code', 'routes.route_date', 'routes.status')
             ->select(
                 'routes.id',
@@ -114,12 +163,17 @@ class DashboardController extends Controller
             ->get();
         $recentShipments = DB::table('shipments')
             ->whereBetween(DB::raw('DATE(COALESCE(scheduled_at, created_at))'), [$from, $to])
+            ->when($hubId !== null, fn ($query) => $query->where('hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('subcontractor_id', $subcontractorId))
             ->select('id', 'reference', 'external_reference', 'status', 'consignee_name', 'service_type')
             ->orderByDesc('created_at')
             ->limit(5)
             ->get();
         $recentIncidents = DB::table('incidents')
             ->whereBetween(DB::raw('DATE(created_at)'), [$from, $to])
+            ->when($hubId !== null || $subcontractorId !== null, function ($query) use ($hubId, $subcontractorId): void {
+                $this->applyIncidentFilters($query, $hubId, $subcontractorId);
+            })
             ->whereNull('resolved_at')
             ->select('id', 'incidentable_type', 'incidentable_id', 'catalog_code', 'category', 'priority', 'sla_due_at', 'notes', 'resolved_at')
             ->orderByDesc('created_at')
@@ -155,6 +209,8 @@ class DashboardController extends Controller
             ->join('hubs', 'hubs.id', '=', 'routes.hub_id')
             ->leftJoin('route_stops', 'route_stops.route_id', '=', 'routes.id')
             ->whereBetween('routes.route_date', [$from, $to])
+            ->when($hubId !== null, fn ($query) => $query->where('routes.hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('routes.subcontractor_id', $subcontractorId))
             ->groupBy('hubs.id', 'hubs.code', 'hubs.name')
             ->select(
                 'hubs.id as hub_id',
@@ -185,6 +241,8 @@ class DashboardController extends Controller
         $productivityByRoute = DB::table('routes')
             ->leftJoin('route_stops', 'route_stops.route_id', '=', 'routes.id')
             ->whereBetween('routes.route_date', [$from, $to])
+            ->when($hubId !== null, fn ($query) => $query->where('routes.hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('routes.subcontractor_id', $subcontractorId))
             ->groupBy('routes.id', 'routes.code', 'routes.route_date', 'routes.status')
             ->select(
                 'routes.id as route_id',
@@ -212,13 +270,17 @@ class DashboardController extends Controller
             })
             ->values();
 
-        $incidentsOpenCount = DB::table('incidents')->whereNull('resolved_at')->count();
+        $incidentsOpenCount = (clone $incidentsWindow)->whereNull('resolved_at')->count();
         $shipmentsIncidentCount = (clone $shipmentsWindow)->where('status', 'incident')->count();
         $plannedWithoutDriver = DB::table('routes')
             ->whereBetween('route_date', [$from, $to])
             ->where('status', 'planned')
             ->whereNull('driver_id')
+            ->when($hubId !== null, fn ($query) => $query->where('hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('subcontractor_id', $subcontractorId))
             ->count();
+
+        $trends = $this->buildTrends($from, $to, $hubId, $subcontractorId);
 
         $alerts = collect([
             [
@@ -257,6 +319,10 @@ class DashboardController extends Controller
 
         return [
             'period' => ['from' => $from, 'to' => $to, 'preset' => $preset],
+            'filters' => [
+                'hub_id' => $hubId,
+                'subcontractor_id' => $subcontractorId,
+            ],
             'totals' => [
                 'shipments' => (clone $shipmentsWindow)->count(),
                 'routes' => (clone $routesWindow)->count(),
@@ -276,6 +342,7 @@ class DashboardController extends Controller
                 'driver_avg' => $driverAvg,
                 'below_threshold_routes' => $belowThresholdRoutes,
             ],
+            'trends' => $trends,
             'recent' => [
                 'routes' => $recentRoutes,
                 'shipments' => $recentShipments,
@@ -285,6 +352,127 @@ class DashboardController extends Controller
             'productivity_by_route' => $productivityByRoute,
             'alerts' => $alerts,
         ];
+    }
+
+    private function buildTrends(string $from, string $to, ?string $hubId, ?string $subcontractorId): array
+    {
+        $start = Carbon::parse($from)->startOfDay();
+        $end = Carbon::parse($to)->startOfDay();
+
+        $shipments = [];
+        $routes = [];
+        $incidents = [];
+        $quality = [];
+
+        for ($cursor = $start->copy(); $cursor->lessThanOrEqualTo($end); $cursor->addDay()) {
+            $date = $cursor->toDateString();
+
+            $shipmentsQuery = DB::table('shipments')
+                ->whereDate(DB::raw('COALESCE(scheduled_at, created_at)'), $date);
+            $this->applyShipmentFilters($shipmentsQuery, $hubId, $subcontractorId);
+
+            $routesQuery = DB::table('routes')->whereDate('route_date', $date);
+            $this->applyRouteFilters($routesQuery, $hubId, $subcontractorId);
+
+            $incidentsQuery = DB::table('incidents')->whereDate('created_at', $date);
+            $this->applyIncidentFilters($incidentsQuery, $hubId, $subcontractorId);
+
+            $routeQualityQuery = DB::table('quality_snapshots')
+                ->where('scope_type', 'route')
+                ->whereDate('period_end', $date);
+            if ($hubId !== null || $subcontractorId !== null) {
+                $routeQualityQuery->whereIn('scope_id', function ($routes) use ($hubId, $subcontractorId): void {
+                    $routes->select('id')->from('routes');
+                    if ($hubId !== null) {
+                        $routes->where('hub_id', $hubId);
+                    }
+                    if ($subcontractorId !== null) {
+                        $routes->where('subcontractor_id', $subcontractorId);
+                    }
+                });
+            }
+
+            $shipments[] = [
+                'date' => $date,
+                'total' => (clone $shipmentsQuery)->count(),
+                'delivered' => (clone $shipmentsQuery)->where('status', 'delivered')->count(),
+                'incident' => (clone $shipmentsQuery)->where('status', 'incident')->count(),
+            ];
+            $routes[] = [
+                'date' => $date,
+                'total' => (clone $routesQuery)->count(),
+                'completed' => (clone $routesQuery)->where('status', 'completed')->count(),
+            ];
+            $incidents[] = [
+                'date' => $date,
+                'open' => (clone $incidentsQuery)->whereNull('resolved_at')->count(),
+                'resolved' => (clone $incidentsQuery)->whereNotNull('resolved_at')->count(),
+            ];
+            $quality[] = [
+                'date' => $date,
+                'route_avg' => round((float) ((clone $routeQualityQuery)->avg('service_quality_score') ?? 0), 2),
+            ];
+        }
+
+        return [
+            'shipments' => $shipments,
+            'routes' => $routes,
+            'incidents' => $incidents,
+            'quality' => $quality,
+        ];
+    }
+
+    private function applyShipmentFilters($query, ?string $hubId, ?string $subcontractorId): void
+    {
+        if ($hubId !== null) {
+            $query->where('hub_id', $hubId);
+        }
+        if ($subcontractorId !== null) {
+            $query->where('subcontractor_id', $subcontractorId);
+        }
+    }
+
+    private function applyRouteFilters($query, ?string $hubId, ?string $subcontractorId): void
+    {
+        if ($hubId !== null) {
+            $query->where('hub_id', $hubId);
+        }
+        if ($subcontractorId !== null) {
+            $query->where('subcontractor_id', $subcontractorId);
+        }
+    }
+
+    private function applyIncidentFilters($query, ?string $hubId, ?string $subcontractorId): void
+    {
+        if ($hubId === null && $subcontractorId === null) {
+            return;
+        }
+
+        $query->where(function ($incidentFilter) use ($hubId, $subcontractorId): void {
+            $incidentFilter->whereExists(function ($subquery) use ($hubId, $subcontractorId): void {
+                $subquery->select(DB::raw(1))
+                    ->from('shipments')
+                    ->whereColumn('shipments.id', 'incidents.incidentable_id')
+                    ->where('incidents.incidentable_type', 'shipment');
+                if ($hubId !== null) {
+                    $subquery->where('shipments.hub_id', $hubId);
+                }
+                if ($subcontractorId !== null) {
+                    $subquery->where('shipments.subcontractor_id', $subcontractorId);
+                }
+            })->orWhereExists(function ($subquery) use ($hubId, $subcontractorId): void {
+                $subquery->select(DB::raw(1))
+                    ->from('pickups')
+                    ->whereColumn('pickups.id', 'incidents.incidentable_id')
+                    ->where('incidents.incidentable_type', 'pickup');
+                if ($hubId !== null) {
+                    $subquery->where('pickups.hub_id', $hubId);
+                }
+                if ($subcontractorId !== null) {
+                    $subquery->where('pickups.subcontractor_id', $subcontractorId);
+                }
+            });
+        });
     }
 
     private function resolvePeriod(?string $dateFrom, ?string $dateTo, string $preset): array

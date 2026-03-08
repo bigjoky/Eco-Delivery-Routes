@@ -511,6 +511,20 @@ label {
   color: #0f172a;
 }
 
+.trend-bars {
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 56px;
+}
+
+.trend-bar {
+  width: 10px;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
+}
+
 
 @media (max-width: 720px) {
   .app-shell {

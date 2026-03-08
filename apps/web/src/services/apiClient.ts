@@ -1267,6 +1267,8 @@ export const apiClient = {
     period?: 'today' | '7d' | '30d';
     dateFrom?: string;
     dateTo?: string;
+    hubId?: string;
+    subcontractorId?: string;
   } = {}): Promise<DashboardOverview> {
     if (USE_MOCK) {
       return mockApi.getDashboardOverview(filters) as Promise<DashboardOverview>;
@@ -1275,6 +1277,8 @@ export const apiClient = {
     if (filters.period) params.set('period', filters.period);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
     if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/dashboard/overview${suffix}`);
     const json = await response.json();

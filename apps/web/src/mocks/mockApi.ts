@@ -617,6 +617,10 @@ export const mockApi = {
         to,
         preset: filters.dateFrom || filters.dateTo ? 'custom' as const : preset,
       },
+      filters: {
+        hub_id: null,
+        subcontractor_id: null,
+      },
       totals: {
         shipments: mockShipments.length,
         routes: mockRoutes.length,
@@ -638,6 +642,24 @@ export const mockApi = {
         route_avg: routeAvg,
         driver_avg: driverAvg,
         below_threshold_routes: belowThresholdRoutes,
+      },
+      trends: {
+        shipments: [
+          { date: from, total: 8, delivered: 6, incident: 1 },
+          { date: to, total: 12, delivered: 10, incident: 1 },
+        ],
+        routes: [
+          { date: from, total: 3, completed: 1 },
+          { date: to, total: 4, completed: 2 },
+        ],
+        incidents: [
+          { date: from, open: 2, resolved: 1 },
+          { date: to, open: 1, resolved: 2 },
+        ],
+        quality: [
+          { date: from, route_avg: 93.4 },
+          { date: to, route_avg: 95.2 },
+        ],
       },
       sla: {
         on_track: 1,

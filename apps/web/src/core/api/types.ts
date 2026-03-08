@@ -348,6 +348,10 @@ export type DashboardOverview = {
     to: string;
     preset: 'today' | '7d' | '30d' | 'custom';
   };
+  filters: {
+    hub_id?: string | null;
+    subcontractor_id?: string | null;
+  };
   totals: {
     shipments: number;
     routes: number;
@@ -369,6 +373,12 @@ export type DashboardOverview = {
     route_avg: number;
     driver_avg: number;
     below_threshold_routes: number;
+  };
+  trends: {
+    shipments: Array<{ date: string; total: number; delivered: number; incident: number }>;
+    routes: Array<{ date: string; total: number; completed: number }>;
+    incidents: Array<{ date: string; open: number; resolved: number }>;
+    quality: Array<{ date: string; route_avg: number }>;
   };
   sla: {
     on_track: number;

@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.ecodeliveryroutes.core.session.SessionStore
 import com.ecodeliveryroutes.features.auth.LoginScreen
+import com.ecodeliveryroutes.features.dashboard.DashboardOverviewScreen
 import com.ecodeliveryroutes.features.driver.DriverRouteScreen
 import com.ecodeliveryroutes.features.network.NetworkNodesScreen
 import com.ecodeliveryroutes.features.quality.RouteQualityScreen
@@ -16,28 +17,39 @@ import com.ecodeliveryroutes.features.shipments.ShipmentDraftScreen
 @Composable
 fun AppNavHost() {
     val navController = rememberNavController()
-    val startDestination = if (SessionStore.isAuthenticated()) "driver_route" else "login"
+    val startDestination = if (SessionStore.isAuthenticated()) "dashboard_overview" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(onSuccess = {
-                navController.navigate("driver_route") {
+                navController.navigate("dashboard_overview") {
                     popUpTo("login") { inclusive = true }
                 }
             })
         }
-        composable("driver_route") {
-            DriverRouteScreen(onOpenRouteQuality = { routeId ->
-                navController.navigate("route_quality/$routeId")
-            }, onOpenNetworkNodes = {
-                navController.navigate("network_nodes")
-            }, onOpenShipmentDraft = {
-                navController.navigate("shipment_draft")
-            }, onLogout = {
-                navController.navigate("login") {
-                    popUpTo("driver_route") { inclusive = true }
-                }
+        composable("dashboard_overview") {
+            DashboardOverviewScreen(onOpenDriverRoute = {
+                navController.navigate("driver_route")
             })
+        }
+        composable("driver_route") {
+            DriverRouteScreen(
+                onOpenDashboard = { navController.navigate("dashboard_overview") },
+                onOpenRouteQuality = { routeId ->
+                    navController.navigate("route_quality/$routeId")
+                },
+                onOpenNetworkNodes = {
+                    navController.navigate("network_nodes")
+                },
+                onOpenShipmentDraft = {
+                    navController.navigate("shipment_draft")
+                },
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("dashboard_overview") { inclusive = true }
+                    }
+                }
+            )
         }
         composable("shipment_draft") {
             ShipmentDraftScreen()

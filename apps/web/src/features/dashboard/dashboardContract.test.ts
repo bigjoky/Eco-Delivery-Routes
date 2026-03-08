@@ -10,6 +10,8 @@ describe('dashboard overview contract', () => {
     expect(Array.isArray(overview.alerts)).toBe(true);
     expect(Array.isArray(overview.productivity_by_hub)).toBe(true);
     expect(Array.isArray(overview.productivity_by_route)).toBe(true);
+    expect(Array.isArray(overview.trends.shipments)).toBe(true);
+    expect(overview.filters.hub_id === null || typeof overview.filters.hub_id === 'string').toBe(true);
     expect(overview.sla.breached).toBeTypeOf('number');
   });
 

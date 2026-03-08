@@ -146,6 +146,14 @@ struct ContentView: View {
                     }
                     Text("Calidad rutas: \(overview.quality.routeAvg, format: .number.precision(.fractionLength(2)))% · Umbral \(overview.totals.qualityThreshold, format: .number.precision(.fractionLength(2)))%")
                         .foregroundStyle(.secondary)
+                    GroupBox("Tendencia 7d") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            trendRow(title: "Envíos", values: overview.trends.shipments.map(\.total))
+                            trendRow(title: "Rutas", values: overview.trends.routes.map(\.total))
+                            trendRow(title: "Incidencias abiertas", values: overview.trends.incidents.map(\.open))
+                            trendRow(title: "Calidad ruta", values: overview.trends.quality.map { Int($0.routeAvg.rounded()) })
+                        }
+                    }
                     if !overview.alerts.isEmpty {
                         GroupBox("Alertas") {
                             VStack(alignment: .leading, spacing: 6) {
@@ -352,6 +360,22 @@ struct ContentView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.10)))
+    }
+
+    private func trendRow(title: String, values: [Int]) -> some View {
+        let maxValue = max(values.max() ?? 1, 1)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.teal.opacity(0.8))
+                        .frame(width: 12, height: CGFloat(max(6, Int((Double(value) / Double(maxValue)) * 40))))
+                }
+            }
+        }
     }
 
     private func bootstrap() async {

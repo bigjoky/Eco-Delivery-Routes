@@ -24,6 +24,7 @@ import java.time.format.DateTimeParseException
 
 @Composable
 fun DriverRouteScreen(
+    onOpenDashboard: () -> Unit = {},
     onOpenRouteQuality: (String) -> Unit = {},
     onOpenNetworkNodes: () -> Unit = {},
     onOpenShipmentDraft: () -> Unit = {},
@@ -106,6 +107,7 @@ fun DriverRouteScreen(
                 message.value = "KPI de ruta actualizado"
             }
         }) { Text("Refrescar KPI ruta") }
+        Button(onClick = onOpenDashboard) { Text("Overview operativo") }
         if (canAccessNetwork.value) {
             Button(onClick = onOpenNetworkNodes) { Text("Red operativa (Hubs/Depots/Puntos)") }
         }

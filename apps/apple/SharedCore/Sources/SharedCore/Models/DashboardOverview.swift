@@ -2,21 +2,35 @@ import Foundation
 
 public struct DashboardOverview: Codable {
     public let period: DashboardPeriod
+    public let filters: DashboardFilters
     public let totals: DashboardTotals
     public let shipmentsByStatus: DashboardShipmentsByStatus
     public let routesByStatus: DashboardRoutesByStatus
     public let quality: DashboardQuality
     public let sla: DashboardSLA
+    public let trends: DashboardTrends
     public let alerts: [DashboardAlert]
 
     enum CodingKeys: String, CodingKey {
         case period
+        case filters
         case totals
         case shipmentsByStatus = "shipments_by_status"
         case routesByStatus = "routes_by_status"
         case quality
         case sla
+        case trends
         case alerts
+    }
+}
+
+public struct DashboardFilters: Codable {
+    public let hubId: String?
+    public let subcontractorId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case hubId = "hub_id"
+        case subcontractorId = "subcontractor_id"
     }
 }
 
@@ -99,4 +113,44 @@ public struct DashboardAlert: Codable, Identifiable {
     public let message: String
     public let href: String
     public let count: Int
+}
+
+public struct DashboardTrends: Codable {
+    public let shipments: [DashboardShipmentTrend]
+    public let routes: [DashboardRouteTrend]
+    public let incidents: [DashboardIncidentTrend]
+    public let quality: [DashboardQualityTrend]
+}
+
+public struct DashboardShipmentTrend: Codable, Identifiable {
+    public var id: String { date }
+    public let date: String
+    public let total: Int
+    public let delivered: Int
+    public let incident: Int
+}
+
+public struct DashboardRouteTrend: Codable, Identifiable {
+    public var id: String { date }
+    public let date: String
+    public let total: Int
+    public let completed: Int
+}
+
+public struct DashboardIncidentTrend: Codable, Identifiable {
+    public var id: String { date }
+    public let date: String
+    public let open: Int
+    public let resolved: Int
+}
+
+public struct DashboardQualityTrend: Codable, Identifiable {
+    public var id: String { date }
+    public let date: String
+    public let routeAvg: Double
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case routeAvg = "route_avg"
+    }
 }

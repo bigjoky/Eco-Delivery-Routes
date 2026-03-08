@@ -414,11 +414,30 @@ public final class MockAPIClient {
 
         return DashboardOverview(
             period: DashboardPeriod(from: from, to: to, preset: resolvedPreset),
+            filters: DashboardFilters(hubId: nil, subcontractorId: nil),
             totals: DashboardTotals(shipments: 124, routes: 18, incidentsOpen: 7, qualityThreshold: 95),
             shipmentsByStatus: DashboardShipmentsByStatus(created: 22, outForDelivery: 31, delivered: 65, incident: 6),
             routesByStatus: DashboardRoutesByStatus(planned: 6, inProgress: 8, completed: 4),
             quality: DashboardQuality(routeAvg: 94.7, driverAvg: 96.2, belowThresholdRoutes: 5),
             sla: DashboardSLA(onTrack: 4, atRisk: 2, breached: 1, resolved: 9),
+            trends: DashboardTrends(
+                shipments: [
+                    DashboardShipmentTrend(date: from, total: 14, delivered: 10, incident: 2),
+                    DashboardShipmentTrend(date: to, total: 18, delivered: 15, incident: 1),
+                ],
+                routes: [
+                    DashboardRouteTrend(date: from, total: 4, completed: 2),
+                    DashboardRouteTrend(date: to, total: 5, completed: 3),
+                ],
+                incidents: [
+                    DashboardIncidentTrend(date: from, open: 3, resolved: 1),
+                    DashboardIncidentTrend(date: to, open: 2, resolved: 2),
+                ],
+                quality: [
+                    DashboardQualityTrend(date: from, routeAvg: 93.8),
+                    DashboardQualityTrend(date: to, routeAvg: 95.1),
+                ]
+            ),
             alerts: [
                 DashboardAlert(
                     id: "incidents-open",
