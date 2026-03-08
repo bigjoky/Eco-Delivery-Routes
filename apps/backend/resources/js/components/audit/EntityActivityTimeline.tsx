@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Select } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../ui/table';
 import type { AuditLogEntry } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
@@ -87,6 +87,56 @@ function summarizeMetadata(metadata: AuditLogEntry['metadata']): string {
   return '-';
 }
 
+type FieldDiff = {
+  field: string;
+  before: string;
+  after: string;
+};
+
+function extractFieldDiffs(metadata: AuditLogEntry['metadata']): FieldDiff[] {
+  const data = metadataObject(metadata);
+  const diffs: FieldDiff[] = [];
+
+  const before = data.before;
+  const after = data.after;
+  if (before && after && typeof before === 'object' && typeof after === 'object' && !Array.isArray(before) && !Array.isArray(after)) {
+    const keys = Array.from(new Set([...Object.keys(before as Record<string, unknown>), ...Object.keys(after as Record<string, unknown>)]));
+    keys.forEach((key) => {
+      const beforeValue = toText((before as Record<string, unknown>)[key]);
+      const afterValue = toText((after as Record<string, unknown>)[key]);
+      if (beforeValue !== afterValue) {
+        diffs.push({ field: key, before: beforeValue, after: afterValue });
+      }
+    });
+  }
+
+  const changes = data.changes;
+  if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
+    Object.entries(changes as Record<string, unknown>).forEach(([key, value]) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const beforeValue = toText((value as Record<string, unknown>).before);
+        const afterValue = toText((value as Record<string, unknown>).after);
+        if (beforeValue !== afterValue) {
+          diffs.push({ field: key, before: beforeValue, after: afterValue });
+        }
+        return;
+      }
+      const text = toText(value);
+      diffs.push({ field: key, before: '-', after: text });
+    });
+  }
+
+  if (Array.isArray(changes) && changes.length > 0) {
+    diffs.push({
+      field: 'bulk_changes',
+      before: '-',
+      after: `${changes.length} cambios`,
+    });
+  }
+
+  return diffs.slice(0, 6);
+}
+
 function entityLinkFromMetadata(metadata: AuditLogEntry['metadata']): { to: string; label: string } | null {
   const data = metadataObject(metadata);
   const shipmentId = typeof data.shipment_id === 'string' ? data.shipment_id : null;
@@ -114,16 +164,23 @@ export function EntityActivityTimeline({
   const [rows, setRows] = useState<AuditLogEntry[]>([]);
   const [actorFilter, setActorFilter] = useState('');
   const [eventFilter, setEventFilter] = useState(eventPrefix ?? '');
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setEventFilter(eventPrefix ?? '');
+    setPage(1);
   }, [eventPrefix]);
 
   useEffect(() => {
     if (!entityId) {
       setRows([]);
+      setPage(1);
+      setLastPage(1);
+      setTotal(0);
       return;
     }
     setLoading(true);
@@ -134,20 +191,28 @@ export function EntityActivityTimeline({
         id: entityId,
         event: eventFilter.trim() || undefined,
         actor: actorFilter.trim() || undefined,
-        page: 1,
+        page,
         perPage: maxRows,
       })
       .then((result) => {
         setRows(result.data);
+        setLastPage(result.meta.last_page || 1);
+        setTotal(result.meta.total || 0);
       })
       .catch((exception) => {
         setRows([]);
+        setLastPage(1);
+        setTotal(0);
         setError(exception instanceof Error ? exception.message : 'No se pudo cargar actividad.');
       })
       .finally(() => setLoading(false));
-  }, [resource, entityId, eventFilter, actorFilter, maxRows]);
+  }, [resource, entityId, eventFilter, actorFilter, maxRows, page]);
 
-  const totalRows = useMemo(() => rows.length, [rows]);
+  const totalRows = useMemo(() => total, [total]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [entityId, resource, eventFilter, actorFilter]);
 
   return (
     <Card>
@@ -161,10 +226,11 @@ export function EntityActivityTimeline({
             onChange={(event) => setActorFilter(event.target.value)}
             placeholder="Filtrar actor"
           />
-          <Select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
-            <option value="">Todos los eventos</option>
-            <option value={eventPrefix ?? ''}>{eventPrefix ?? 'Prefijo por defecto'}</option>
-          </Select>
+          <Input
+            value={eventFilter}
+            onChange={(event) => setEventFilter(event.target.value)}
+            placeholder={eventPrefix ? `Prefijo sugerido: ${eventPrefix}` : 'Prefijo evento (opcional)'}
+          />
           <span className="helper">Eventos: {totalRows}</span>
         </div>
         {error ? <div className="helper error">{error}</div> : null}
@@ -187,7 +253,17 @@ export function EntityActivityTimeline({
                     <TableCell>{new Date(row.created_at).toLocaleString('es-ES')}</TableCell>
                     <TableCell>{row.event}</TableCell>
                     <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
-                    <TableCell>{summarizeMetadata(row.metadata)}</TableCell>
+                    <TableCell>
+                      {extractFieldDiffs(row.metadata).length > 0 ? (
+                        <div className="page-grid">
+                          {extractFieldDiffs(row.metadata).map((diff) => (
+                            <div key={`${row.id}-${diff.field}`} className="helper">
+                              <strong>{diff.field}</strong>: <span style={{ color: 'var(--danger)' }}>{diff.before}</span>{' -> '}<span style={{ color: 'var(--success)' }}>{diff.after}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : summarizeMetadata(row.metadata)}
+                    </TableCell>
                     <TableCell>
                       {link ? <Link to={link.to}>{link.label}</Link> : '-'}
                     </TableCell>
@@ -205,9 +281,18 @@ export function EntityActivityTimeline({
                 </TableRow>
               ) : null}
             </TableBody>
-          </Table>
-        </TableWrapper>
-      </CardContent>
-    </Card>
+            </Table>
+          </TableWrapper>
+          <div className="inline-actions" style={{ marginTop: 8 }}>
+            <Button type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1 || loading}>
+              Anterior
+            </Button>
+            <span className="helper">Página {page} de {lastPage}</span>
+            <Button type="button" variant="outline" onClick={() => setPage((value) => Math.min(lastPage, value + 1))} disabled={page >= lastPage || loading}>
+              Siguiente
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
   );
 }
