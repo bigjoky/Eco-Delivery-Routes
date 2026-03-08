@@ -164,6 +164,40 @@ final class TVMonitorService {
         let data: T
     }
 
+    private struct DashboardOverviewDTO: Decodable {
+        struct Totals: Decodable {
+            let routes: Int
+            let qualityThreshold: Double
+
+            enum CodingKeys: String, CodingKey {
+                case routes
+                case qualityThreshold = "quality_threshold"
+            }
+        }
+
+        struct Alert: Decodable {
+            let id: String
+            let title: String
+            let count: Int
+        }
+
+        struct Sla: Decodable {
+            let onTrack: Int
+            let atRisk: Int
+            let breached: Int
+
+            enum CodingKeys: String, CodingKey {
+                case onTrack = "on_track"
+                case atRisk = "at_risk"
+                case breached
+            }
+        }
+
+        let totals: Totals
+        let alerts: [Alert]
+        let sla: Sla
+    }
+
     private struct QualityRowDTO: Decodable {
         let id: String
         let scopeId: String
@@ -202,19 +236,22 @@ final class TVMonitorService {
         await ensureAuthenticated(baseURL: baseURL)
 
         do {
+            async let overview = fetchOverview(baseURL: baseURL)
             async let routesDTO = fetchQuality(baseURL: baseURL, scope: "route")
             async let driversDTO = fetchQuality(baseURL: baseURL, scope: "driver")
             async let subcontractorsDTO = fetchQuality(baseURL: baseURL, scope: "subcontractor")
-            async let threshold = fetchThreshold(baseURL: baseURL)
             async let hubsCount = fetchRowsCount(baseURL: baseURL, path: "hubs?only_active=1&include_deleted=0")
             async let depotsCount = fetchRowsCount(baseURL: baseURL, path: "depots?include_deleted=0")
             async let pointsCount = fetchRowsCount(baseURL: baseURL, path: "points?include_deleted=0")
 
+            let overviewDTO = try await overview
             let routes = mapRows(try await routesDTO)
             let drivers = mapRows(try await driversDTO)
             let subcontractors = mapRows(try await subcontractorsDTO)
-            let thresholdValue = try await threshold
+            let thresholdValue = overviewDTO.totals.qualityThreshold
             let alerts = buildAlerts(threshold: thresholdValue, routes: routes, drivers: drivers, subcontractors: subcontractors)
+            let overviewAlerts = overviewDTO.alerts.map { "\($0.title): \($0.count)" }
+            let slaSummary = "SLA · OnTrack \(overviewDTO.sla.onTrack) · AtRisk \(overviewDTO.sla.atRisk) · Breached \(overviewDTO.sla.breached)"
 
             return TVDashboardSnapshot(
                 routeRows: routes,
@@ -225,7 +262,7 @@ final class TVMonitorService {
                 depotsCount: try await depotsCount,
                 pointsCount: try await pointsCount,
                 status: "Conectado",
-                alerts: alerts
+                alerts: [slaSummary] + overviewAlerts + alerts
             )
         } catch {
             return mockSnapshot(status: "Error API")
@@ -273,9 +310,17 @@ final class TVMonitorService {
     }
 
     private func fetchThreshold(baseURL: String) async throws -> Double {
-        guard let url = URL(string: "\(baseURL)/quality/threshold") else { return 95 }
+        guard let url = URL(string: "\(baseURL)/kpis/quality/threshold") else { return 95 }
         let data = try await authorizedGet(url: url, baseURL: baseURL)
         return try JSONDecoder().decode(DataObjectEnvelope<ThresholdDTO>.self, from: data).data.threshold
+    }
+
+    private func fetchOverview(baseURL: String) async throws -> DashboardOverviewDTO {
+        guard let url = URL(string: "\(baseURL)/dashboard/overview?period=7d") else {
+            throw URLError(.badURL)
+        }
+        let data = try await authorizedGet(url: url, baseURL: baseURL)
+        return try JSONDecoder().decode(DataObjectEnvelope<DashboardOverviewDTO>.self, from: data).data
     }
 
     private func fetchRowsCount(baseURL: String, path: String) async throws -> Int {

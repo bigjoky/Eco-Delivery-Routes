@@ -370,6 +370,12 @@ export type DashboardOverview = {
     driver_avg: number;
     below_threshold_routes: number;
   };
+  sla: {
+    on_track: number;
+    at_risk: number;
+    breached: number;
+    resolved: number;
+  };
   recent: {
     routes: RouteSummary[];
     shipments: ShipmentSummary[];

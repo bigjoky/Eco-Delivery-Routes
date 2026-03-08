@@ -42,6 +42,8 @@ struct ContentView: View {
     @State private var hubsCount = 0
     @State private var depotsCount = 0
     @State private var pointsCount = 0
+    @State private var dashboardOverview: DashboardOverview?
+    @State private var dashboardMessage = ""
 
     private let serviceTypes = [
         "express_1030",
@@ -111,6 +113,8 @@ struct ContentView: View {
 
     private var appView: some View {
         TabView {
+            NavigationStack { overviewTab }
+                .tabItem { Label("Inicio", systemImage: "rectangle.3.group") }
             NavigationStack { routeTab }
                 .tabItem { Label("Ruta", systemImage: "map") }
             NavigationStack { pickupsAndShipmentsTab }
@@ -121,6 +125,59 @@ struct ContentView: View {
                 .tabItem { Label("Cuenta", systemImage: "person.circle") }
         }
         .tint(.teal)
+    }
+
+    private var overviewTab: some View {
+        List {
+            Section("Everything at a glance") {
+                if let overview = dashboardOverview {
+                    Text("Periodo: \(overview.period.from) · \(overview.period.to)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Envíos").font(.caption)
+                            Text("\(overview.totals.shipments)").font(.title2.bold())
+                        }
+                        Spacer()
+                        VStack(alignment: .leading) {
+                            Text("Rutas").font(.caption)
+                            Text("\(overview.totals.routes)").font(.title2.bold())
+                        }
+                        Spacer()
+                        VStack(alignment: .leading) {
+                            Text("Incidencias").font(.caption)
+                            Text("\(overview.totals.incidentsOpen)").font(.title2.bold())
+                        }
+                    }
+                    Text("Calidad rutas: \(overview.quality.routeAvg, format: .number.precision(.fractionLength(2)))% · Umbral \(overview.totals.qualityThreshold, format: .number.precision(.fractionLength(2)))%")
+                    Text("SLA · OnTrack \(overview.sla.onTrack) · AtRisk \(overview.sla.atRisk) · Breached \(overview.sla.breached)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if !overview.alerts.isEmpty {
+                        ForEach(overview.alerts) { alert in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(alert.title) · \(alert.count)")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(alert.message)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } else {
+                    Text("Sin overview cargado.")
+                        .foregroundStyle(.secondary)
+                }
+                Button("Actualizar overview") { Task { await loadDashboardOverview() } }
+            }
+            if !dashboardMessage.isEmpty {
+                Section {
+                    Text(dashboardMessage).font(.footnote)
+                }
+            }
+        }
+        .navigationTitle("Inicio")
     }
 
     private var routeTab: some View {
@@ -314,6 +371,7 @@ struct ContentView: View {
 
     private func bootstrap() async {
         await loadProfile()
+        await loadDashboardOverview()
         await loadRoute()
         await loadQuality()
         await loadNetworkCounts()
@@ -380,6 +438,16 @@ struct ContentView: View {
             hubsCount = 0
             depotsCount = 0
             pointsCount = 0
+        }
+    }
+
+    private func loadDashboardOverview() async {
+        do {
+            dashboardOverview = try await apiClient.dashboardOverview(period: "7d", dateFrom: nil, dateTo: nil)
+            dashboardMessage = "Overview actualizado."
+        } catch {
+            dashboardOverview = nil
+            dashboardMessage = "No se pudo cargar overview."
         }
     }
 

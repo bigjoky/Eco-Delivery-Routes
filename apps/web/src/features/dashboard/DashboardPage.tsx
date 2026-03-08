@@ -13,6 +13,7 @@ const initialOverview: DashboardOverview = {
   shipments_by_status: { created: 0, out_for_delivery: 0, delivered: 0, incident: 0 },
   routes_by_status: { planned: 0, in_progress: 0, completed: 0 },
   quality: { route_avg: 0, driver_avg: 0, below_threshold_routes: 0 },
+  sla: { on_track: 0, at_risk: 0, breached: 0, resolved: 0 },
   recent: { routes: [], shipments: [], incidents: [] },
   productivity_by_hub: [],
   productivity_by_route: [],
@@ -158,6 +159,31 @@ export function DashboardPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>SLA incidencias</CardTitle>
+          <CardDescription>Estado operativo de cumplimiento SLA en el periodo.</CardDescription>
+        </CardHeader>
+        <CardContent className="inline-actions">
+          <Link to="/incidents?sla=on_track" className="kpi-item">
+            <div className="kpi-label">On Track</div>
+            <div className="kpi-value">{overview.sla.on_track}</div>
+          </Link>
+          <Link to="/incidents?sla=at_risk" className="kpi-item">
+            <div className="kpi-label">At Risk</div>
+            <div className="kpi-value">{overview.sla.at_risk}</div>
+          </Link>
+          <Link to="/incidents?sla=breached" className="kpi-item">
+            <div className="kpi-label">Breached</div>
+            <div className="kpi-value">{overview.sla.breached}</div>
+          </Link>
+          <Link to="/incidents?resolved=resolved" className="kpi-item">
+            <div className="kpi-label">Resolved</div>
+            <div className="kpi-value">{overview.sla.resolved}</div>
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Acciones rápidas</CardTitle>
         </CardHeader>
         <CardContent className="inline-actions">
@@ -193,7 +219,11 @@ export function DashboardPage() {
                   )}
                   {overview.productivity_by_hub.map((row) => (
                     <TableRow key={row.hub_id}>
-                      <TableCell>{row.hub_code} · {row.hub_name}</TableCell>
+                      <TableCell>
+                        <Link to={`/routes?hub_id=${encodeURIComponent(row.hub_id)}&date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`}>
+                          {row.hub_code} · {row.hub_name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{row.routes_completed}/{row.routes_total}</TableCell>
                       <TableCell>{row.completed_stops}/{row.planned_stops}</TableCell>
                       <TableCell>{row.completion_ratio.toFixed(2)}%</TableCell>
@@ -227,7 +257,14 @@ export function DashboardPage() {
                   )}
                   {overview.productivity_by_route.map((row) => (
                     <TableRow key={row.route_id}>
-                      <TableCell><Link to={`/routes/${row.route_id}`}>{row.route_code}</Link></TableCell>
+                      <TableCell>
+                        <Link to={`/routes/${row.route_id}`}>{row.route_code}</Link>
+                        <div>
+                          <Link className="helper" to={`/routes?q=${encodeURIComponent(row.route_code)}&date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`}>
+                            Ver en listado
+                          </Link>
+                        </div>
+                      </TableCell>
                       <TableCell>{row.route_date}</TableCell>
                       <TableCell>{row.status}</TableCell>
                       <TableCell>{row.completed_stops}/{row.planned_stops} ({row.completion_ratio.toFixed(2)}%)</TableCell>

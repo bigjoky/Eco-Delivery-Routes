@@ -33,6 +33,8 @@ struct ContentView: View {
     @State private var qualityScope = "route"
     @State private var qualityRows: [QualitySnapshot] = []
     @State private var qualityMessage = ""
+    @State private var dashboardOverview: DashboardOverview?
+    @State private var dashboardMessage = ""
 
     @State private var hubs: [HubSummary] = []
     @State private var depots: [DepotSummary] = []
@@ -135,11 +137,38 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Resumen operativo")
                     .font(.title2.weight(.semibold))
-                HStack(spacing: 12) {
-                    metricCard(title: "Paradas de ruta", value: "\(routeStops.count)")
-                    metricCard(title: "KPI cargados", value: "\(qualityRows.count)")
-                    metricCard(title: "Hubs", value: "\(hubs.count)")
-                    metricCard(title: "Depots/Puntos", value: "\(depots.count)/\(points.count)")
+                if let overview = dashboardOverview {
+                    HStack(spacing: 12) {
+                        metricCard(title: "Envíos", value: "\(overview.totals.shipments)")
+                        metricCard(title: "Rutas", value: "\(overview.totals.routes)")
+                        metricCard(title: "Incidencias", value: "\(overview.totals.incidentsOpen)")
+                        metricCard(title: "SLA Breached", value: "\(overview.sla.breached)")
+                    }
+                    Text("Calidad rutas: \(overview.quality.routeAvg, format: .number.precision(.fractionLength(2)))% · Umbral \(overview.totals.qualityThreshold, format: .number.precision(.fractionLength(2)))%")
+                        .foregroundStyle(.secondary)
+                    if !overview.alerts.isEmpty {
+                        GroupBox("Alertas") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(overview.alerts) { alert in
+                                    Text("• \(alert.title) (\(alert.count))")
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        metricCard(title: "Paradas de ruta", value: "\(routeStops.count)")
+                        metricCard(title: "KPI cargados", value: "\(qualityRows.count)")
+                        metricCard(title: "Hubs", value: "\(hubs.count)")
+                        metricCard(title: "Depots/Puntos", value: "\(depots.count)/\(points.count)")
+                    }
+                }
+                Button("Actualizar overview") {
+                    Task { await loadDashboardOverview() }
+                }
+                if !dashboardMessage.isEmpty {
+                    Text(dashboardMessage).font(.footnote)
                 }
                 if let me {
                     Text("Sesion: \(me.name) · \(me.email)")
@@ -327,6 +356,7 @@ struct ContentView: View {
 
     private func bootstrap() async {
         await loadProfile()
+        await loadDashboardOverview()
         await loadRoute()
         await loadQuality()
         await loadNetwork()
@@ -380,6 +410,16 @@ struct ContentView: View {
         } catch {
             qualityRows = []
             qualityMessage = "No se pudo cargar KPI."
+        }
+    }
+
+    private func loadDashboardOverview() async {
+        do {
+            dashboardOverview = try await apiClient.dashboardOverview(period: "7d", dateFrom: nil, dateTo: nil)
+            dashboardMessage = "Overview actualizado."
+        } catch {
+            dashboardOverview = nil
+            dashboardMessage = "No se pudo cargar overview."
         }
     }
 

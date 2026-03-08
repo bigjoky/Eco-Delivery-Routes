@@ -639,6 +639,12 @@ export const mockApi = {
         driver_avg: driverAvg,
         below_threshold_routes: belowThresholdRoutes,
       },
+      sla: {
+        on_track: 1,
+        at_risk: 1,
+        breached: 0,
+        resolved: 0,
+      },
       recent: {
         routes: mockRoutes.slice(0, 5),
         shipments: mockShipments.slice(0, 5),

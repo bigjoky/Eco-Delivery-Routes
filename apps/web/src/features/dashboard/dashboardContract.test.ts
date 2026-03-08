@@ -10,6 +10,7 @@ describe('dashboard overview contract', () => {
     expect(Array.isArray(overview.alerts)).toBe(true);
     expect(Array.isArray(overview.productivity_by_hub)).toBe(true);
     expect(Array.isArray(overview.productivity_by_route)).toBe(true);
+    expect(overview.sla.breached).toBeTypeOf('number');
   });
 
   test('supports period filter', async () => {

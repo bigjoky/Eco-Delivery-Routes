@@ -30,5 +30,7 @@ class DashboardOverviewEndpointTest extends TestCase
         $this->assertStringContainsString('productivity_by_route', $contents);
         $this->assertStringContainsString('alerts', $contents);
         $this->assertStringContainsString('quality_threshold', $contents);
+        $this->assertStringContainsString('Cache::remember', $contents);
+        $this->assertStringContainsString("'sla'", $contents);
     }
 }
