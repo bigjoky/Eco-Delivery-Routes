@@ -330,6 +330,30 @@ paths:
         '200': { description: CSV export }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /dashboard/overview/export.pdf:
+    get:
+      tags: [Dashboard]
+      summary: Exportar overview agregado a PDF
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, enum: [today, 7d, 30d], default: 7d }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: PDF export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /audit-logs:
     get:
       tags: [Audit]
@@ -2249,6 +2273,25 @@ paths:
             schema:
               type: object
               properties:
+                notes: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /incidents/resolve-bulk:
+    post:
+      tags: [Incidents]
+      summary: Resolver incidencias en lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident_ids]
+              properties:
+                incident_ids:
+                  type: array
+                  items: { type: string, format: uuid }
                 notes: { type: string }
       responses:
         '200': { description: OK }

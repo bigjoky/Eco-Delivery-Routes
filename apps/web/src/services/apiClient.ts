@@ -1375,6 +1375,36 @@ export const apiClient = {
     URL.revokeObjectURL(url);
   },
 
+  async exportDashboardOverviewPdf(filters: {
+    period?: 'today' | '7d' | '30d';
+    dateFrom?: string;
+    dateTo?: string;
+    hubId?: string;
+    subcontractorId?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return;
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/dashboard/overview/export.pdf${suffix}`);
+    if (!response.ok) {
+      throw new Error('Cannot export dashboard PDF');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'dashboard_overview.pdf';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  },
+
   async getQualityTopRoutesUnderThreshold(filters: {
     threshold?: number;
     limit?: number;
@@ -2050,6 +2080,21 @@ export const apiClient = {
     });
     const data = await response.json();
     return data.data as IncidentSummary;
+  },
+
+  async resolveIncidentsBulk(ids: string[], notes?: string): Promise<{ requested_count: number; updated_count: number }> {
+    if (USE_MOCK) return mockApi.resolveIncidentsBulk(ids, notes) as Promise<{ requested_count: number; updated_count: number }>;
+    const response = await fetch(`${API_BASE_URL}/incidents/resolve-bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ incident_ids: ids, notes }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot bulk resolve incidents');
+    return data.data as { requested_count: number; updated_count: number };
   },
 
   async overrideIncidentSla(id: string, payload: {

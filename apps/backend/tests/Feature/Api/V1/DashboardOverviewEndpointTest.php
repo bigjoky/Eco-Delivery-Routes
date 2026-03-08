@@ -17,7 +17,9 @@ class DashboardOverviewEndpointTest extends TestCase
         $this->assertIsString($routes);
         $this->assertIsString($openApi);
         $this->assertStringContainsString("Route::get('dashboard/overview'", $routes);
+        $this->assertStringContainsString("Route::get('dashboard/overview/export.pdf'", $routes);
         $this->assertStringContainsString('/dashboard/overview:', $openApi);
+        $this->assertStringContainsString('/dashboard/overview/export.pdf:', $openApi);
     }
 
     public function test_dashboard_controller_contains_alerts_and_productivity_logic(): void

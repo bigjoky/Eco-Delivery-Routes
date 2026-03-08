@@ -287,6 +287,44 @@ class IncidentController extends Controller
         return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);
     }
 
+    public function resolveBulk(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'incident_ids' => ['required', 'array', 'min:1', 'max:200'],
+            'incident_ids.*' => ['uuid'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('strval', $payload['incident_ids'] ?? [])));
+        if ($ids === []) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'incident_ids cannot be empty.'],
+            ], 422);
+        }
+
+        $updated = DB::table('incidents')
+            ->whereIn('id', $ids)
+            ->whereNull('resolved_at')
+            ->update([
+                'notes' => $payload['notes'] ?? DB::raw('notes'),
+                'resolved_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'data' => [
+                'requested_count' => count($ids),
+                'updated_count' => (int) $updated,
+            ],
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([

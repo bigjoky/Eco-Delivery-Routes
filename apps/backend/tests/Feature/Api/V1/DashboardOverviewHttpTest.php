@@ -89,6 +89,13 @@ class DashboardOverviewHttpTest extends TestCase
         $this->assertStringContainsString('section,metric,value', $response->streamedContent());
     }
 
+    public function test_dashboard_overview_export_pdf_returns_file(): void
+    {
+        $response = $this->get('/api/v1/dashboard/overview/export.pdf?period=7d');
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

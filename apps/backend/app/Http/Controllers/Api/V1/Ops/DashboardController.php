@@ -132,6 +132,71 @@ class DashboardController extends Controller
         }, 200, $headers);
     }
 
+    public function exportPdf(Request $request)
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboard($actor)) {
+            return $this->forbidden();
+        }
+
+        $periodPreset = (string) $request->query('period', '7d');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $hubId = $request->query('hub_id');
+        $subcontractorId = $request->query('subcontractor_id');
+        [$from, $to, $preset] = $this->resolvePeriod(
+            is_string($dateFrom) ? $dateFrom : null,
+            is_string($dateTo) ? $dateTo : null,
+            $periodPreset
+        );
+
+        $payload = $this->buildPayload(
+            from: $from,
+            to: $to,
+            preset: $preset,
+            hubId: is_string($hubId) && $hubId !== '' ? $hubId : null,
+            subcontractorId: is_string($subcontractorId) && $subcontractorId !== '' ? $subcontractorId : null
+        );
+
+        $label = sprintf(
+            'Dashboard %s to %s | Shipments %s | Routes %s | Incidents Open %s',
+            (string) ($payload['period']['from'] ?? ''),
+            (string) ($payload['period']['to'] ?? ''),
+            (string) ($payload['totals']['shipments'] ?? 0),
+            (string) ($payload['totals']['routes'] ?? 0),
+            (string) ($payload['totals']['incidents_open'] ?? 0)
+        );
+
+        $safeLabel = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $label);
+        $stream = "BT /F1 12 Tf 50 780 Td (" . $safeLabel . ") Tj ET";
+        $len = strlen($stream);
+        $pdf = "%PDF-1.4\n"
+            . "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
+            . "2 0 obj << /Type /Pages /Count 1 /Kids [3 0 R] >> endobj\n"
+            . "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n"
+            . "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n"
+            . "5 0 obj << /Length $len >> stream\n"
+            . $stream . "\n"
+            . "endstream endobj\n"
+            . "xref\n0 6\n"
+            . "0000000000 65535 f \n"
+            . "0000000010 00000 n \n"
+            . "0000000060 00000 n \n"
+            . "0000000117 00000 n \n"
+            . "0000000243 00000 n \n"
+            . "0000000313 00000 n \n"
+            . "trailer << /Size 6 /Root 1 0 R >>\n"
+            . "startxref\n"
+            . "410\n"
+            . "%%EOF";
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="dashboard_overview_' . $from . '_' . $to . '.pdf"',
+        ]);
+    }
+
     private function buildPayload(
         string $from,
         string $to,

@@ -152,6 +152,17 @@ export function DashboardPage() {
           >
             Exportar CSV
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => apiClient.exportDashboardOverviewPdf({
+              period,
+              hubId: hubId || undefined,
+              subcontractorId: subcontractorId || undefined,
+            })}
+          >
+            Exportar PDF
+          </Button>
         </div>
       </header>
 

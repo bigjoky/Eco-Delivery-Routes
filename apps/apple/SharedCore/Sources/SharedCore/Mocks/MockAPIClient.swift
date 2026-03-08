@@ -465,6 +465,26 @@ public final class MockAPIClient {
         )
     }
 
+    public func exportDashboardOverviewCsv(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws {
+        _ = (period, dateFrom, dateTo, hubId, subcontractorId)
+    }
+
+    public func exportDashboardOverviewPdf(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws {
+        _ = (period, dateFrom, dateTo, hubId, subcontractorId)
+    }
+
     public func routeAssignmentPreview(
         subcontractorId: String?,
         driverId: String?,
