@@ -450,6 +450,24 @@ paths:
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Hubs]
+      summary: Crear hub
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, city]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                city: { type: string }
+                is_active: { type: boolean }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /tariffs/{id}:
     patch:
@@ -1538,26 +1556,6 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: OK }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /hubs:
-    post:
-      tags: [Hubs]
-      summary: Crear hub
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, city]
-              properties:
-                code: { type: string }
-                name: { type: string }
-                city: { type: string }
-                is_active: { type: boolean }
-      responses:
-        '201': { description: Creado }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /hubs/{id}:
