@@ -60,6 +60,7 @@ export function IncidentsPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [bulkResolving, setBulkResolving] = useState(false);
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
+  const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -267,20 +268,76 @@ export function IncidentsPage() {
   };
 
   const onResolveSelected = async () => {
-    if (selectedIncidentIds.length === 0) {
+    if (bulkScope === 'selected' && selectedIncidentIds.length === 0) {
       setResolveError('Selecciona al menos una incidencia abierta.');
       return;
     }
     setBulkResolving(true);
     setResolveError('');
     try {
-      await apiClient.resolveIncidentsBulk(selectedIncidentIds, 'Resueltas en lote desde panel web');
+      await apiClient.resolveIncidentsBulk(
+        selectedIncidentIds,
+        'Resueltas en lote desde panel web',
+        {
+          applyToFiltered: bulkScope === 'filtered',
+          filters: bulkScope === 'filtered' ? {
+            incidentableType: listTypeFilter || undefined,
+            incidentableId: listIncidentableId || undefined,
+            q: listSearch || undefined,
+            category: listCategoryFilter || undefined,
+            catalogCode: listCatalogFilter || undefined,
+            priority: listPriorityFilter || undefined,
+            slaStatus: listSlaFilter || undefined,
+            resolved: resolvedFilter || undefined,
+          } : undefined,
+        }
+      );
       setSelectedIncidentIds([]);
       await reload();
     } catch (exception) {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver incidencias en lote');
     } finally {
       setBulkResolving(false);
+    }
+  };
+
+  const selectOpenInPage = () => {
+    setBulkScope('selected');
+    setSelectedIncidentIds(items.filter((item) => !item.resolved_at).map((item) => item.id));
+  };
+
+  const onBulkOverrideSla = async () => {
+    const reason = window.prompt('Motivo del ajuste SLA masivo');
+    if (!reason || reason.trim() === '') return;
+    const priorityInput = window.prompt('Nueva prioridad global (high/medium/low, opcional)', '');
+    const dueInput = window.prompt('Nuevo SLA due_at ISO (opcional)', '');
+    const priority = priorityInput === 'high' || priorityInput === 'medium' || priorityInput === 'low' ? priorityInput : undefined;
+    const slaDueAt = dueInput && dueInput.trim() !== '' ? dueInput.trim() : undefined;
+    if (!priority && !slaDueAt) {
+      setResolveError('Define prioridad o due_at para el ajuste SLA masivo.');
+      return;
+    }
+    try {
+      await apiClient.overrideIncidentSlaBulk({
+        incidentIds: bulkScope === 'selected' ? selectedIncidentIds : [],
+        applyToFiltered: bulkScope === 'filtered',
+        filters: bulkScope === 'filtered' ? {
+          incidentableType: listTypeFilter || undefined,
+          incidentableId: listIncidentableId || undefined,
+          q: listSearch || undefined,
+          category: listCategoryFilter || undefined,
+          catalogCode: listCatalogFilter || undefined,
+          priority: listPriorityFilter || undefined,
+          slaStatus: listSlaFilter || undefined,
+          resolved: resolvedFilter || undefined,
+        } : undefined,
+        priority,
+        slaDueAt,
+        reason: reason.trim(),
+      });
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo aplicar override SLA masivo');
     }
   };
 
@@ -482,8 +539,22 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
             </Button>
-            <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || selectedIncidentIds.length === 0}>
-              {bulkResolving ? 'Resolviendo selección...' : `Resolver seleccionadas (${selectedIncidentIds.length})`}
+            <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
+              Modo selección
+            </Button>
+            <Button type="button" variant={bulkScope === 'filtered' ? 'secondary' : 'outline'} onClick={() => setBulkScope('filtered')}>
+              Modo filtro completo
+            </Button>
+            <Button type="button" variant="outline" onClick={selectOpenInPage}>
+              Seleccionar abiertas (página)
+            </Button>
+            <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || (bulkScope === 'selected' && selectedIncidentIds.length === 0)}>
+              {bulkResolving ? 'Resolviendo...' : bulkScope === 'filtered'
+                ? 'Resolver abiertas del filtro'
+                : `Resolver seleccionadas (${selectedIncidentIds.length})`}
+            </Button>
+            <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
+              Override SLA masivo
             </Button>
           </div>
           <TableWrapper>

@@ -2082,15 +2082,45 @@ export const apiClient = {
     return data.data as IncidentSummary;
   },
 
-  async resolveIncidentsBulk(ids: string[], notes?: string): Promise<{ requested_count: number; updated_count: number }> {
-    if (USE_MOCK) return mockApi.resolveIncidentsBulk(ids, notes) as Promise<{ requested_count: number; updated_count: number }>;
+  async resolveIncidentsBulk(
+    ids: string[],
+    notes?: string,
+    options?: {
+      applyToFiltered?: boolean;
+      filters?: {
+        incidentableType?: 'shipment' | 'pickup';
+        incidentableId?: string;
+        q?: string;
+        category?: 'failed' | 'absent' | 'retry' | 'general';
+        catalogCode?: string;
+        priority?: 'high' | 'medium' | 'low';
+        slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
+        resolved?: 'open' | 'resolved';
+      };
+    }
+  ): Promise<{ requested_count: number; updated_count: number }> {
+    if (USE_MOCK) return mockApi.resolveIncidentsBulk(ids, notes, options) as Promise<{ requested_count: number; updated_count: number }>;
     const response = await fetch(`${API_BASE_URL}/incidents/resolve-bulk`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
       },
-      body: JSON.stringify({ incident_ids: ids, notes }),
+      body: JSON.stringify({
+        incident_ids: ids,
+        notes,
+        apply_to_filtered: options?.applyToFiltered ? true : false,
+        filters: options?.filters ? {
+          incidentable_type: options.filters.incidentableType,
+          incidentable_id: options.filters.incidentableId,
+          q: options.filters.q,
+          category: options.filters.category,
+          catalog_code: options.filters.catalogCode,
+          priority: options.filters.priority,
+          sla_status: options.filters.slaStatus,
+          resolved: options.filters.resolved,
+        } : undefined,
+      }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot bulk resolve incidents');
@@ -2114,6 +2144,53 @@ export const apiClient = {
     const data = await response.json();
     if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot override incident SLA');
     return data.data as IncidentSummary;
+  },
+
+  async overrideIncidentSlaBulk(payload: {
+    incidentIds?: string[];
+    applyToFiltered?: boolean;
+    filters?: {
+      incidentableType?: 'shipment' | 'pickup';
+      incidentableId?: string;
+      q?: string;
+      category?: 'failed' | 'absent' | 'retry' | 'general';
+      catalogCode?: string;
+      priority?: 'high' | 'medium' | 'low';
+      slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
+      resolved?: 'open' | 'resolved';
+    };
+    priority?: 'high' | 'medium' | 'low';
+    slaDueAt?: string;
+    reason: string;
+  }): Promise<{ requested_count: number; updated_count: number }> {
+    if (USE_MOCK) return mockApi.overrideIncidentSlaBulk(payload) as Promise<{ requested_count: number; updated_count: number }>;
+    const response = await fetch(`${API_BASE_URL}/incidents/override-sla-bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        incident_ids: payload.incidentIds ?? [],
+        apply_to_filtered: payload.applyToFiltered ? true : false,
+        filters: payload.filters ? {
+          incidentable_type: payload.filters.incidentableType,
+          incidentable_id: payload.filters.incidentableId,
+          q: payload.filters.q,
+          category: payload.filters.category,
+          catalog_code: payload.filters.catalogCode,
+          priority: payload.filters.priority,
+          sla_status: payload.filters.slaStatus,
+          resolved: payload.filters.resolved,
+        } : undefined,
+        priority: payload.priority,
+        sla_due_at: payload.slaDueAt,
+        reason: payload.reason,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot bulk override incident SLA');
+    return data.data as { requested_count: number; updated_count: number };
   },
 
   async getIncidentCatalog(): Promise<IncidentCatalogItem[]> {

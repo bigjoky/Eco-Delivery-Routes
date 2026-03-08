@@ -114,6 +114,89 @@ class IncidentHttpTest extends TestCase
         $response->assertJsonPath('data.updated_count', 1);
     }
 
+    public function test_incidents_bulk_resolve_apply_to_filtered_works(): void
+    {
+        $shipmentCatalog = DB::table('incident_catalog_versions as versions')
+            ->join('incident_catalog_items as items', 'items.version_id', '=', 'versions.id')
+            ->where('versions.is_active', true)
+            ->where('items.is_active', true)
+            ->whereIn('items.applies_to', ['shipment', 'both'])
+            ->select('items.code', 'items.category')
+            ->orderBy('items.code')
+            ->first();
+        $this->assertNotNull($shipmentCatalog);
+
+        $targetIncidentableId = (string) Str::uuid();
+        $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => $targetIncidentableId,
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'bulk resolve filtered target',
+        ])->assertCreated();
+
+        $response = $this->postJson('/api/v1/incidents/resolve-bulk', [
+            'apply_to_filtered' => true,
+            'filters' => [
+                'incidentable_type' => 'shipment',
+                'incidentable_id' => $targetIncidentableId,
+                'resolved' => 'open',
+            ],
+            'notes' => 'resolved from filtered bulk',
+        ]);
+        $response->assertOk();
+        $response->assertJsonPath('data.requested_count', 1);
+        $response->assertJsonPath('data.updated_count', 1);
+    }
+
+    public function test_incident_override_sla_single_and_bulk(): void
+    {
+        $shipmentCatalog = DB::table('incident_catalog_versions as versions')
+            ->join('incident_catalog_items as items', 'items.version_id', '=', 'versions.id')
+            ->where('versions.is_active', true)
+            ->where('items.is_active', true)
+            ->whereIn('items.applies_to', ['shipment', 'both'])
+            ->select('items.code', 'items.category')
+            ->orderBy('items.code')
+            ->first();
+        $this->assertNotNull($shipmentCatalog);
+
+        $firstId = (string) $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'override one',
+        ])->assertCreated()->json('data.id');
+
+        $secondId = (string) $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'override two',
+        ])->assertCreated()->json('data.id');
+
+        $single = $this->patchJson('/api/v1/incidents/' . $firstId . '/override-sla', [
+            'priority' => 'high',
+            'reason' => 'single override test',
+        ]);
+        $single->assertOk();
+        $single->assertJsonPath('data.priority_override', 'high');
+
+        $bulk = $this->postJson('/api/v1/incidents/override-sla-bulk', [
+            'incident_ids' => [$secondId],
+            'priority' => 'low',
+            'reason' => 'bulk override test',
+        ]);
+        $bulk->assertOk();
+        $bulk->assertJsonPath('data.requested_count', 1);
+        $bulk->assertJsonPath('data.updated_count', 1);
+
+        $row = DB::table('incidents')->where('id', $secondId)->first();
+        $this->assertSame('low', $row->priority_override);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

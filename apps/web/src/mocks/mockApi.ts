@@ -2591,9 +2591,31 @@ export const mockApi = {
     return resolved;
   },
 
-  async resolveIncidentsBulk(ids: string[], notes?: string) {
+  async resolveIncidentsBulk(
+    ids: string[],
+    notes?: string,
+    options?: {
+      applyToFiltered?: boolean;
+      filters?: {
+        incidentableType?: 'shipment' | 'pickup';
+        incidentableId?: string;
+        q?: string;
+        category?: 'failed' | 'absent' | 'retry' | 'general';
+        catalogCode?: string;
+        priority?: 'high' | 'medium' | 'low';
+        slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
+        resolved?: 'open' | 'resolved';
+      };
+    }
+  ) {
+    const targetIds = options?.applyToFiltered
+      ? (await this.getIncidents(options.filters ?? {}))
+        .filter((item) => !item.resolved_at)
+        .map((item) => item.id)
+      : ids;
+
     const now = new Date().toISOString();
-    const setIds = new Set(ids);
+    const setIds = new Set(targetIds);
     let updatedCount = 0;
     mockIncidents = mockIncidents.map((item) => {
       if (!setIds.has(item.id) || item.resolved_at) return item;
@@ -2605,7 +2627,46 @@ export const mockApi = {
       };
     });
     return {
-      requested_count: ids.length,
+      requested_count: targetIds.length,
+      updated_count: updatedCount,
+    };
+  },
+
+  async overrideIncidentSlaBulk(payload: {
+    incidentIds?: string[];
+    applyToFiltered?: boolean;
+    filters?: {
+      incidentableType?: 'shipment' | 'pickup';
+      incidentableId?: string;
+      q?: string;
+      category?: 'failed' | 'absent' | 'retry' | 'general';
+      catalogCode?: string;
+      priority?: 'high' | 'medium' | 'low';
+      slaStatus?: 'on_track' | 'at_risk' | 'breached' | 'resolved';
+      resolved?: 'open' | 'resolved';
+    };
+    priority?: 'high' | 'medium' | 'low';
+    slaDueAt?: string;
+    reason: string;
+  }) {
+    const targetIds = payload.applyToFiltered
+      ? (await this.getIncidents(payload.filters ?? {})).map((item) => item.id)
+      : (payload.incidentIds ?? []);
+    const setIds = new Set(targetIds);
+    let updatedCount = 0;
+    mockIncidents = mockIncidents.map((item) => {
+      if (!setIds.has(item.id)) return item;
+      updatedCount += 1;
+      const nextCategory = payload.priority
+        ? (payload.priority === 'high' ? 'failed' : payload.priority === 'medium' ? 'absent' : 'general')
+        : item.category;
+      return {
+        ...item,
+        category: nextCategory,
+      };
+    });
+    return {
+      requested_count: targetIds.length,
       updated_count: updatedCount,
     };
   },
