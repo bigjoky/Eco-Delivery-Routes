@@ -99,6 +99,8 @@ Route::prefix('v1')->group(function () {
         Route::get('routes', [RouteController::class, 'index']);
         Route::get('routes/bulk-templates', [RouteBulkTemplateController::class, 'index']);
         Route::post('routes/bulk-templates', [RouteBulkTemplateController::class, 'store']);
+        Route::patch('routes/bulk-templates/{id}', [RouteBulkTemplateController::class, 'update']);
+        Route::post('routes/bulk-templates/{id}/duplicate', [RouteBulkTemplateController::class, 'duplicate']);
         Route::delete('routes/bulk-templates/{id}', [RouteBulkTemplateController::class, 'destroy']);
         Route::get('routes/assignment/preview', [RouteController::class, 'assignmentPreview']);
         Route::get('routes/assignment/publish-policy', [RouteController::class, 'assignmentPublishPolicy']);

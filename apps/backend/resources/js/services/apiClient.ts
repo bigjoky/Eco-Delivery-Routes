@@ -1196,6 +1196,35 @@ export const apiClient = {
     }
   },
 
+  async updateRouteBulkTemplate(id: string, payload: {
+    name?: string;
+    status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+    planned_at?: string | null;
+    completed_at?: string | null;
+    shift_minutes?: number;
+  }): Promise<void> {
+    if (USE_MOCK) return mockApi.updateRouteBulkTemplate(id, payload) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/bulk-templates/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const json = await response.json().catch(() => null);
+      throw new Error(json?.error?.message ?? 'Cannot update route bulk template');
+    }
+  },
+
+  async duplicateRouteBulkTemplate(id: string): Promise<{ id: string }> {
+    if (USE_MOCK) return mockApi.duplicateRouteBulkTemplate(id) as Promise<{ id: string }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/bulk-templates/${id}/duplicate`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot duplicate route bulk template');
+    return json.data as { id: string };
+  },
+
   async createRoute(payload: {
     hub_id: string;
     code: string;

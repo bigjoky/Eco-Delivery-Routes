@@ -1880,6 +1880,76 @@ paths:
       responses:
         '201': { description: Creado }
 
+  /routes/bulk-templates:
+    get:
+      tags: [Routes]
+      summary: Listar plantillas masivas de ruta del usuario actual
+      parameters:
+        - in: query
+          name: route_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Routes]
+      summary: Crear plantilla masiva de ruta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteBulkTemplateRequest'
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /routes/bulk-templates/{id}:
+    patch:
+      tags: [Routes]
+      summary: Actualizar plantilla masiva de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteBulkTemplateRequest'
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Plantilla no encontrada }
+    delete:
+      tags: [Routes]
+      summary: Eliminar plantilla masiva de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Plantilla no encontrada }
+
+  /routes/bulk-templates/{id}/duplicate:
+    post:
+      tags: [Routes]
+      summary: Duplicar plantilla masiva de ruta
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '201': { description: Duplicado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Plantilla no encontrada }
+
   /routes/assignment/preview:
     get:
       tags: [Routes]
@@ -3082,6 +3152,24 @@ components:
         subcontractor_id: { type: string, format: uuid, nullable: true }
         vehicle_id: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+    CreateRouteBulkTemplateRequest:
+      type: object
+      required: [name]
+      properties:
+        route_id: { type: string, format: uuid, nullable: true }
+        name: { type: string, maxLength: 120 }
+        status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+        planned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        shift_minutes: { type: integer, minimum: -1440, maximum: 1440 }
+    UpdateRouteBulkTemplateRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 120, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed], nullable: true }
+        planned_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+        shift_minutes: { type: integer, minimum: -1440, maximum: 1440 }
     UpdateRouteManifestRequest:
       type: object
       properties:

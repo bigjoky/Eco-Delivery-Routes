@@ -82,6 +82,7 @@ export function RouteDetailPage() {
   const [bulkUpdatePreviewRows, setBulkUpdatePreviewRows] = useState<Array<{ id: string; reference: string; changes: string[] }>>([]);
   const [bulkTemplateName, setBulkTemplateName] = useState('');
   const [selectedBulkTemplateId, setSelectedBulkTemplateId] = useState('');
+  const [selectedBulkTemplateName, setSelectedBulkTemplateName] = useState('');
   const [bulkTemplates, setBulkTemplates] = useState<RouteBulkActionTemplate[]>([]);
   const [opsAudit, setOpsAudit] = useState<RouteOpsAuditItem[]>([]);
   const routeBulkTemplateStorageKey = `eco_delivery_routes_route_bulk_templates_${id ?? 'global'}`;
@@ -720,6 +721,47 @@ export function RouteDetailPage() {
     appendOpsAudit('template.applied', `Plantilla aplicada: ${template.name}`);
   };
 
+  const renameBulkTemplate = async () => {
+    const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
+    if (!template || !selectedBulkTemplateName.trim()) return;
+    setBulkTemplates((current) => current.map((item) => (
+      item.id === selectedBulkTemplateId
+        ? { ...item, name: selectedBulkTemplateName.trim() }
+        : item
+    )));
+    try {
+      await apiClient.updateRouteBulkTemplate(selectedBulkTemplateId, { name: selectedBulkTemplateName.trim() });
+    } catch {
+      // keep optimistic rename local for now
+    }
+    appendOpsAudit('template.renamed', `Plantilla renombrada: ${selectedBulkTemplateName.trim()}`);
+  };
+
+  const duplicateBulkTemplate = async () => {
+    const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
+    if (!template) return;
+    const tempId = `tpl-copy-${Date.now()}`;
+    const optimistic: RouteBulkActionTemplate = {
+      ...template,
+      id: tempId,
+      name: `${template.name} (copia)`,
+    };
+    setBulkTemplates((current) => [optimistic, ...current].slice(0, 20));
+    try {
+      const created = await apiClient.duplicateRouteBulkTemplate(selectedBulkTemplateId);
+      setBulkTemplates((current) => current.map((item) => (
+        item.id === tempId ? { ...item, id: created.id } : item
+      )));
+      setSelectedBulkTemplateId(created.id);
+      setSelectedBulkTemplateName(`${template.name} (copia)`);
+    } catch {
+      // keep local duplicated template fallback
+      setSelectedBulkTemplateId(tempId);
+      setSelectedBulkTemplateName(`${template.name} (copia)`);
+    }
+    appendOpsAudit('template.duplicated', `Plantilla duplicada: ${template.name}`);
+  };
+
   const deleteBulkTemplate = async () => {
     const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
     if (!template) return;
@@ -1021,13 +1063,30 @@ export function RouteDetailPage() {
               <select
                 id="bulk-template-select"
                 value={selectedBulkTemplateId}
-                onChange={(event) => setSelectedBulkTemplateId(event.target.value)}
+                onChange={(event) => {
+                  const idValue = event.target.value;
+                  setSelectedBulkTemplateId(idValue);
+                  const selected = bulkTemplates.find((item) => item.id === idValue);
+                  setSelectedBulkTemplateName(selected?.name ?? '');
+                }}
               >
                 <option value="">Selecciona plantilla</option>
                 {bulkTemplates.map((template) => (
                   <option key={template.id} value={template.id}>{template.name}</option>
                 ))}
               </select>
+              <input
+                value={selectedBulkTemplateName}
+                onChange={(event) => setSelectedBulkTemplateName(event.target.value)}
+                placeholder="Renombrar plantilla seleccionada"
+                disabled={!selectedBulkTemplateId}
+              />
+              <Button type="button" variant="outline" onClick={renameBulkTemplate} disabled={!selectedBulkTemplateId || !selectedBulkTemplateName.trim()}>
+                Renombrar
+              </Button>
+              <Button type="button" variant="outline" onClick={duplicateBulkTemplate} disabled={!selectedBulkTemplateId}>
+                Duplicar
+              </Button>
               <Button type="button" variant="outline" onClick={applyBulkTemplate} disabled={!selectedBulkTemplateId}>
                 Aplicar plantilla
               </Button>

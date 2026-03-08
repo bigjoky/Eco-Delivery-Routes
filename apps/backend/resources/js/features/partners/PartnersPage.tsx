@@ -16,6 +16,10 @@ export function PartnersPage() {
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [partnersQuery, setPartnersQuery] = useState('');
   const [partnersSort, setPartnersSort] = useState<'name' | 'updated_desc' | 'updated_asc' | 'editor'>('updated_desc');
+  const [subcontractorStatusFilter, setSubcontractorStatusFilter] = useState<'' | 'active' | 'inactive' | 'suspended'>('');
+  const [driverStatusFilter, setDriverStatusFilter] = useState<'' | 'active' | 'inactive' | 'suspended'>('');
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState<'' | 'active' | 'inactive' | 'maintenance'>('');
+  const [subcontractorScopeFilter, setSubcontractorScopeFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -100,9 +104,49 @@ export function PartnersPage() {
       return partnersSort === 'updated_asc' ? aTs - bTs : bTs - aTs;
     });
   };
-  const filteredSubcontractors = useMemo(() => sortBy(subcontractors, (row) => row.legal_name), [subcontractors, partnersSort, normalizedQuery]);
-  const filteredDrivers = useMemo(() => sortBy(drivers, (row) => `${row.code} ${row.name}`), [drivers, partnersSort, normalizedQuery]);
-  const filteredVehicles = useMemo(() => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`), [vehicles, partnersSort, normalizedQuery]);
+  const filteredSubcontractors = useMemo(
+    () => sortBy(subcontractors, (row) => `${row.legal_name} ${row.tax_id ?? ''}`)
+      .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter),
+    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter]
+  );
+  const filteredDrivers = useMemo(
+    () => sortBy(drivers, (row) => `${row.code} ${row.name} ${row.dni ?? ''}`)
+      .filter((row) => !driverStatusFilter || row.status === driverStatusFilter)
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
+    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter]
+  );
+  const filteredVehicles = useMemo(
+    () => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`)
+      .filter((row) => !vehicleStatusFilter || row.status === vehicleStatusFilter)
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
+    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter]
+  );
+
+  const partnersSummary = useMemo(() => ({
+    subcontractors: subcontractors.length,
+    subcontractorsActive: subcontractors.filter((item) => item.status === 'active').length,
+    drivers: drivers.length,
+    driversActive: drivers.filter((item) => item.status === 'active').length,
+    vehicles: vehicles.length,
+    vehiclesActive: vehicles.filter((item) => item.status === 'active').length,
+  }), [subcontractors, drivers, vehicles]);
+
+  const exportCsv = (filename: string, header: string[], rows: string[][]) => {
+    const csvValue = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const lines = [header.join(',')];
+    rows.forEach((row) => {
+      lines.push(row.map((value) => csvValue(value)).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   const createSubcontractor = async () => {
     setMessage('');
@@ -445,6 +489,14 @@ export function PartnersPage() {
           <CardTitle className="page-title">Subcontratas + Drivers + Vehiculos</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="kpi-grid">
+            <div className="kpi-item"><div className="kpi-label">Subcontratas</div><div className="kpi-value">{partnersSummary.subcontractors}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Subcontratas activas</div><div className="kpi-value">{partnersSummary.subcontractorsActive}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Conductores</div><div className="kpi-value">{partnersSummary.drivers}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Conductores activos</div><div className="kpi-value">{partnersSummary.driversActive}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Vehículos</div><div className="kpi-value">{partnersSummary.vehicles}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Vehículos activos</div><div className="kpi-value">{partnersSummary.vehiclesActive}</div></div>
+          </div>
           <div className="inline-actions">
             <Button type="button" onClick={openCreateWizard}>+ Crear</Button>
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
@@ -468,11 +520,66 @@ export function PartnersPage() {
                     <option value="name">Nombre/código</option>
                   </Select>
                 </div>
+                <div>
+                  <label>Subcontrata (scope)</label>
+                  <Select value={subcontractorScopeFilter} onChange={(e) => setSubcontractorScopeFilter(e.target.value)}>
+                    <option value="">Todas</option>
+                    {subcontractors.map((item) => (
+                      <option key={item.id} value={item.id}>{item.legal_name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label>Estado subcontrata</label>
+                  <Select value={subcontractorStatusFilter} onChange={(e) => setSubcontractorStatusFilter(e.target.value as '' | 'active' | 'inactive' | 'suspended')}>
+                    <option value="">Todos</option>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                    <option value="suspended">suspended</option>
+                  </Select>
+                </div>
+                <div>
+                  <label>Estado conductor</label>
+                  <Select value={driverStatusFilter} onChange={(e) => setDriverStatusFilter(e.target.value as '' | 'active' | 'inactive' | 'suspended')}>
+                    <option value="">Todos</option>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                    <option value="suspended">suspended</option>
+                  </Select>
+                </div>
+                <div>
+                  <label>Estado vehículo</label>
+                  <Select value={vehicleStatusFilter} onChange={(e) => setVehicleStatusFilter(e.target.value as '' | 'active' | 'inactive' | 'maintenance')}>
+                    <option value="">Todos</option>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                    <option value="maintenance">maintenance</option>
+                  </Select>
+                </div>
               </div>
             </div>
           ) : null}
 
           <h3>Subcontratas</h3>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => exportCsv(
+                'partners_subcontractors.csv',
+                ['name', 'tax_id', 'status', 'payment_terms', 'updated_at'],
+                filteredSubcontractors.map((row) => [
+                  row.legal_name,
+                  row.tax_id ?? '',
+                  row.status,
+                  row.payment_terms ?? '',
+                  row.updated_at ?? '',
+                ])
+              )}
+            >
+              Export CSV subcontratas
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -519,6 +626,26 @@ export function PartnersPage() {
           ) : null}
 
           <h3>Drivers</h3>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => exportCsv(
+                'partners_drivers.csv',
+                ['code', 'dni', 'name', 'subcontractor', 'status', 'updated_at'],
+                filteredDrivers.map((row) => [
+                  row.code,
+                  row.dni ?? '',
+                  row.name,
+                  row.subcontractor_name ?? '',
+                  row.status,
+                  row.updated_at ?? '',
+                ])
+              )}
+            >
+              Export CSV conductores
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -574,6 +701,26 @@ export function PartnersPage() {
           ) : null}
 
           <h3>Vehiculos</h3>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => exportCsv(
+                'partners_vehicles.csv',
+                ['code', 'plate', 'subcontractor', 'driver', 'status', 'updated_at'],
+                filteredVehicles.map((row) => [
+                  row.code,
+                  row.plate_number ?? '',
+                  row.subcontractor_name ?? '',
+                  row.assigned_driver_code ?? '',
+                  row.status,
+                  row.updated_at ?? '',
+                ])
+              )}
+            >
+              Export CSV vehículos
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>

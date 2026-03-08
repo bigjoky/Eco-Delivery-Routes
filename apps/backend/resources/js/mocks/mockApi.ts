@@ -1674,6 +1674,39 @@ export const mockApi = {
     mockRouteBulkTemplates = mockRouteBulkTemplates.filter((item) => item.id !== id);
   },
 
+  async updateRouteBulkTemplate(id: string, payload: {
+    name?: string;
+    status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+    planned_at?: string | null;
+    completed_at?: string | null;
+    shift_minutes?: number;
+  }) {
+    mockRouteBulkTemplates = mockRouteBulkTemplates.map((item) => (
+      item.id === id
+        ? {
+          ...item,
+          name: payload.name ?? item.name,
+          status: payload.status ?? item.status,
+          planned_at: payload.planned_at ?? item.planned_at,
+          completed_at: payload.completed_at ?? item.completed_at,
+          shift_minutes: payload.shift_minutes ?? item.shift_minutes ?? 0,
+        }
+        : item
+    ));
+  },
+
+  async duplicateRouteBulkTemplate(id: string) {
+    const source = mockRouteBulkTemplates.find((item) => item.id === id);
+    if (!source) throw new Error('Template not found');
+    const row = {
+      ...source,
+      id: `rbt-${routeBulkTemplateSeq++}`,
+      name: `${source.name} (copia)`,
+    };
+    mockRouteBulkTemplates = [row, ...mockRouteBulkTemplates].slice(0, 50);
+    return { id: row.id };
+  },
+
   async createRoute(payload: {
     hub_id: string;
     code: string;
