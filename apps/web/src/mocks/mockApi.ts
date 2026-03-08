@@ -544,6 +544,135 @@ export const mockApi = {
     return { threshold: 95, source_type: 'default' as const, source_id: null, can_manage: true };
   },
 
+  async getDashboardOverview(filters: {
+    period?: 'today' | '7d' | '30d';
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}) {
+    const threshold = 95;
+    const now = new Date();
+    const to = filters.dateTo ?? now.toISOString().slice(0, 10);
+    const fromDate = new Date(now);
+    const preset = filters.period ?? '7d';
+    if (filters.dateFrom) {
+      fromDate.setTime(new Date(filters.dateFrom).getTime());
+    } else if (preset === 'today') {
+      fromDate.setDate(now.getDate());
+    } else if (preset === '30d') {
+      fromDate.setDate(now.getDate() - 29);
+    } else {
+      fromDate.setDate(now.getDate() - 6);
+    }
+    const from = fromDate.toISOString().slice(0, 10);
+
+    const shipmentsCreated = mockShipments.filter((item) => item.status === 'created').length;
+    const shipmentsOut = mockShipments.filter((item) => item.status === 'out_for_delivery').length;
+    const shipmentsDelivered = mockShipments.filter((item) => item.status === 'delivered').length;
+    const shipmentsIncident = mockShipments.filter((item) => item.status === 'incident').length;
+    const routesPlanned = mockRoutes.filter((item) => item.status === 'planned').length;
+    const routesInProgress = mockRoutes.filter((item) => item.status === 'in_progress').length;
+    const routesCompleted = mockRoutes.filter((item) => item.status === 'completed').length;
+
+    const routeAvg = 94.6;
+    const driverAvg = 96.1;
+    const belowThresholdRoutes = mockRoutes.filter((item) => item.status !== 'completed').length;
+
+    const productivityByRoute = mockRoutes.slice(0, 5).map((route) => {
+      const routeStops = mockRouteStops.filter((stop) => stop.route_id === route.id);
+      const plannedStops = routeStops.length || route.stops_count || 0;
+      const completedStops = routeStops.filter((stop) => stop.status === 'completed').length;
+      const completionRatio = plannedStops > 0 ? Number(((completedStops / plannedStops) * 100).toFixed(2)) : 0;
+      return {
+        route_id: route.id,
+        route_code: route.code,
+        route_date: route.route_date,
+        status: route.status,
+        planned_stops: plannedStops,
+        completed_stops: completedStops,
+        completion_ratio: completionRatio,
+      };
+    });
+
+    const productivityByHub = mockHubs.map((hub) => {
+      const routes = mockRoutes.filter((route) => route.hub_id === hub.id);
+      const routeIds = new Set(routes.map((route) => route.id));
+      const stops = mockRouteStops.filter((stop) => routeIds.has(stop.route_id));
+      const plannedStops = stops.length;
+      const completedStops = stops.filter((stop) => stop.status === 'completed').length;
+      return {
+        hub_id: hub.id,
+        hub_code: hub.code,
+        hub_name: hub.name,
+        routes_total: routes.length,
+        routes_completed: routes.filter((route) => route.status === 'completed').length,
+        planned_stops: plannedStops,
+        completed_stops: completedStops,
+        completion_ratio: plannedStops > 0 ? Number(((completedStops / plannedStops) * 100).toFixed(2)) : 0,
+      };
+    });
+
+    return {
+      period: {
+        from,
+        to,
+        preset: filters.dateFrom || filters.dateTo ? 'custom' as const : preset,
+      },
+      totals: {
+        shipments: mockShipments.length,
+        routes: mockRoutes.length,
+        incidents_open: mockIncidents.filter((item) => !item.resolved_at).length,
+        quality_threshold: threshold,
+      },
+      shipments_by_status: {
+        created: shipmentsCreated,
+        out_for_delivery: shipmentsOut,
+        delivered: shipmentsDelivered,
+        incident: shipmentsIncident,
+      },
+      routes_by_status: {
+        planned: routesPlanned,
+        in_progress: routesInProgress,
+        completed: routesCompleted,
+      },
+      quality: {
+        route_avg: routeAvg,
+        driver_avg: driverAvg,
+        below_threshold_routes: belowThresholdRoutes,
+      },
+      sla: {
+        on_track: 1,
+        at_risk: 1,
+        breached: 0,
+        resolved: 0,
+      },
+      recent: {
+        routes: mockRoutes.slice(0, 5),
+        shipments: mockShipments.slice(0, 5),
+        incidents: mockIncidents.filter((item) => !item.resolved_at).slice(0, 5),
+      },
+      productivity_by_hub: productivityByHub,
+      productivity_by_route: productivityByRoute,
+      alerts: [
+        {
+          id: 'open-incidents',
+          severity: 'high' as const,
+          title: 'Incidencias abiertas',
+          message: 'Revisar incidencias pendientes con SLA en riesgo.',
+          href: '/incidents?resolved=open',
+          count: mockIncidents.filter((item) => !item.resolved_at).length,
+        },
+        {
+          id: 'quality-risk',
+          severity: 'medium' as const,
+          title: 'Rutas bajo umbral',
+          message: 'Hay rutas por debajo del objetivo de calidad.',
+          href: '/quality?scopeType=route',
+          count: belowThresholdRoutes,
+        },
+      ],
+    };
+  },
+
   async getQualityThresholdHistory(_: {
     event?: string;
     scopeType?: 'global' | 'role' | 'user';

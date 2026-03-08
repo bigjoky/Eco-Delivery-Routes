@@ -7,6 +7,7 @@ import { sessionStore } from '../core/auth/sessionStore';
 import { apiClient } from '../services/apiClient';
 import { AdvancesPage } from '../features/advances/AdvancesPage';
 import { LoginPage } from '../features/auth/LoginPage';
+import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
 import { NetworkPage } from '../features/network/NetworkPage';
 import { PartnersPage } from '../features/partners/PartnersPage';
@@ -46,58 +47,63 @@ export function App() {
   return (
     <AppShell isAuthenticated={isAuthenticated} roles={roles}>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/dashboard"
+          element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" replace />}
+        />
         <Route
           path="/shipments"
-          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentsPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentsPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/shipments/:id"
-          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentDetailPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentDetailPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes"
-          element={isAuthenticated && canAccess('routes', roles) ? <RoutesPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? <RoutesPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes/board"
-          element={isAuthenticated && canAccess('routes', roles) ? <RoutesBoardPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? <RoutesBoardPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes/:id"
-          element={isAuthenticated && canAccess('routes', roles) ? <RouteDetailPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? <RouteDetailPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/incidents"
-          element={isAuthenticated && canAccess('incidents', roles) ? <IncidentsPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('incidents', roles) ? <IncidentsPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/network"
-          element={isAuthenticated && canAccess('network', roles) ? <NetworkPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('network', roles) ? <NetworkPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/partners"
-          element={isAuthenticated && canAccess('partners', roles) ? <PartnersPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('partners', roles) ? <PartnersPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/tariffs"
-          element={isAuthenticated && canAccess('tariffs', roles) ? <TariffsPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('tariffs', roles) ? <TariffsPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/advances"
-          element={isAuthenticated && canAccess('advances', roles) ? <AdvancesPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('advances', roles) ? <AdvancesPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementsPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementsPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements/:id"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementDetailPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementDetailPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements/preview"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementPreviewPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementPreviewPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/quality"
@@ -107,25 +113,25 @@ export function App() {
                 <QualityPage />
               </ErrorBoundary>
             )
-            : <Navigate to="/" replace />}
+            : <Navigate to="/login" replace />}
         />
         <Route
           path="/users"
-          element={isAuthenticated && canAccess('users', roles) ? <UsersPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('users', roles) ? <UsersPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/users/:id"
-          element={isAuthenticated && canAccess('users', roles) ? <UserDetailPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('users', roles) ? <UserDetailPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/roles"
-          element={isAuthenticated && canAccess('roles', roles) ? <RolesPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('roles', roles) ? <RolesPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/roles/:id"
-          element={isAuthenticated && canAccess('roles', roles) ? <RoleDetailPage /> : <Navigate to="/" replace />}
+          element={isAuthenticated && canAccess('roles', roles) ? <RoleDetailPage /> : <Navigate to="/login" replace />}
         />
-        <Route path="*" element={<Navigate to={isAuthenticated ? '/shipments' : '/'} replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </AppShell>
   );

@@ -4,1094 +4,411 @@ import SwiftUI
 struct ContentView: View {
     let monitorService: TVMonitorService
 
-    @State private var users: [TVUser] = []
-    @State private var roles: [TVRole] = []
-    @State private var routeQuality: [TVRouteQuality] = []
-    @State private var driverQuality: [TVDriverQuality] = []
-    @State private var subcontractorQuality: [TVSubcontractorQuality] = []
-    @State private var routeBreakdown: TVRouteBreakdown?
-    @State private var driverBreakdown: TVDriverBreakdown?
-    @State private var subcontractorBreakdown: TVSubcontractorBreakdown?
-    @State private var qualityThreshold: Double = 95
-    @State private var thresholdDeltaAlertCount: Int = 0
-    @State private var thresholdDeltaTopScopes: [TVThresholdAlertTopScope] = []
-    @State private var thresholdDeltaWindowHours: Int = 24
-    @State private var thresholdDeltaTrigger: Double = 5
-    @State private var hubsCount: Int = 0
-    @State private var depotsCount: Int = 0
-    @State private var pointsCount: Int = 0
-    @State private var archivedNodesCount: Int = 0
-    @State private var lastRefreshText: String = "Sin refresco"
-    @State private var statusText: String = "Conectando..."
+    @State private var snapshot = TVDashboardSnapshot.empty
+    @State private var lastRefresh = "Sin refresco"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Eco Delivery Routes Monitor")
-                .font(.largeTitle)
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.04, green: 0.10, blue: 0.18),
+                    Color(red: 0.07, green: 0.18, blue: 0.26),
+                    Color(red: 0.13, green: 0.14, blue: 0.08),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-            Text(statusText)
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 32) {
-                VStack(alignment: .leading) {
-                    Text("Usuarios")
-                        .font(.headline)
-                    Text("\(users.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Roles")
-                        .font(.headline)
-                    Text("\(roles.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Rutas KPI")
-                        .font(.headline)
-                    Text("\(routeQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Conductores KPI")
-                        .font(.headline)
-                    Text("\(driverQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Subcontratas KPI")
-                        .font(.headline)
-                    Text("\(subcontractorQuality.count)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Alertas delta")
-                    .font(.headline)
-                    Text("\(thresholdDeltaAlertCount)")
-                    .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Hubs/Depots/Puntos")
-                        .font(.headline)
-                    Text("\(hubsCount)/\(depotsCount)/\(pointsCount)")
-                        .font(.title)
-                }
-                VStack(alignment: .leading) {
-                    Text("Nodos archivados")
-                        .font(.headline)
-                    Text("\(archivedNodesCount)")
-                        .font(.title)
-                }
-            }
-
-            HStack(spacing: 40) {
-                VStack(alignment: .leading) {
-                    Text("Últimos usuarios")
-                        .font(.headline)
-                    ForEach(users.prefix(5)) { user in
-                        Text(user.name)
-                    }
-                }
-                VStack(alignment: .leading) {
-                    Text("Roles disponibles")
-                        .font(.headline)
-                    ForEach(roles.prefix(5)) { role in
-                        Text(role.name)
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por ruta")
-                    .font(.headline)
-                ForEach(routeQuality.prefix(6)) { item in
-                    Text("\(item.routeCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
-                }
-            }
-
-            if let routeBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose ruta en riesgo")
-                        .font(.headline)
-                    Text("\(routeBreakdown.routeCode) · \(routeBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(routeBreakdown.assigned) · Completados: \(routeBreakdown.completed)")
-                    Text("Fallidas: \(routeBreakdown.failed) · Ausencias: \(routeBreakdown.absent) · Reintentos: \(routeBreakdown.retry)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por conductor")
-                    .font(.headline)
-                ForEach(driverQuality.prefix(6)) { item in
-                    Text("\(item.driverCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
-                }
-            }
-
-            if let driverBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose conductor en riesgo")
-                        .font(.headline)
-                    Text("\(driverBreakdown.driverCode) · \(driverBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(driverBreakdown.assigned) · Completados: \(driverBreakdown.completed)")
-                    Text("Fallidas: \(driverBreakdown.failed) · Ausencias: \(driverBreakdown.absent) · Reintentos: \(driverBreakdown.retry)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Calidad por subcontrata")
-                    .font(.headline)
-                ForEach(subcontractorQuality.prefix(6)) { item in
-                    Text("\(item.subcontractorCode) · \(item.score, specifier: "%.2f")% · \(item.completed)/\(item.assigned)")
-                }
-            }
-
-            if let subcontractorBreakdown {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desglose subcontrata en riesgo")
-                        .font(.headline)
-                    Text("\(subcontractorBreakdown.subcontractorCode) · \(subcontractorBreakdown.score, specifier: "%.2f")%")
-                    Text("Asignados: \(subcontractorBreakdown.assigned) · Completados: \(subcontractorBreakdown.completed)")
-                    Text("Fallidas: \(subcontractorBreakdown.failed) · Ausencias: \(subcontractorBreakdown.absent) · Reintentos: \(subcontractorBreakdown.retry)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Alertas KPI < \(qualityThreshold, specifier: "%.2f")%")
-                    .font(.headline)
-                ForEach(routeQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Ruta \(item.routeCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                ForEach(driverQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Conductor \(item.driverCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                ForEach(subcontractorQuality.filter { $0.score < qualityThreshold }.prefix(3)) { item in
-                    Text("Subcontrata \(item.subcontractorCode) en alerta: \(item.score, specifier: "%.2f")%")
-                        .foregroundStyle(.red)
-                }
-                Text("Cambios bruscos umbral: \(thresholdDeltaAlertCount) en \(thresholdDeltaWindowHours)h (trigger ±\(thresholdDeltaTrigger, specifier: "%.2f"))")
-                    .font(.caption)
-                    .foregroundStyle(thresholdDeltaAlertCount > 0 ? .red : .secondary)
-                if !thresholdDeltaTopScopes.isEmpty {
-                    ForEach(thresholdDeltaTopScopes.prefix(5)) { scope in
-                        Text("Top: \(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-") (\(scope.alertsCount))")
-                            .font(.caption2)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Eco Delivery Routes")
+                            .font(.system(size: 52, weight: .bold))
+                        Text("Monitor tvOS · \(snapshot.status)")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                        Text(lastRefresh)
+                            .font(.headline)
                             .foregroundStyle(.secondary)
                     }
+
+                    HStack(spacing: 12) {
+                        metricCard("Rutas", value: "\(snapshot.routeRows.count)")
+                        metricCard("Conductores", value: "\(snapshot.driverRows.count)")
+                        metricCard("Subcontratas", value: "\(snapshot.subcontractorRows.count)")
+                        metricCard("Umbral KPI", value: "\(formatPercent(snapshot.threshold))%")
+                        metricCard("Nodos red", value: "\(snapshot.hubsCount)/\(snapshot.depotsCount)/\(snapshot.pointsCount)")
+                    }
+
+                    HStack(alignment: .top, spacing: 14) {
+                        qualityColumn(
+                            title: "Rutas en riesgo",
+                            rows: snapshot.routeRows.prefix(6).map {
+                                "\($0.label) · \(formatPercent($0.score))%"
+                            }
+                        )
+                        qualityColumn(
+                            title: "Conductores en riesgo",
+                            rows: snapshot.driverRows.prefix(6).map {
+                                "\($0.label) · \(formatPercent($0.score))%"
+                            }
+                        )
+                        qualityColumn(
+                            title: "Subcontratas en riesgo",
+                            rows: snapshot.subcontractorRows.prefix(6).map {
+                                "\($0.label) · \(formatPercent($0.score))%"
+                            }
+                        )
+                    }
+
+                    qualityColumn(
+                        title: "Alertas KPI < \(formatPercent(snapshot.threshold))%",
+                        rows: snapshot.alerts
+                    )
+                }
+                .padding(36)
+            }
+        }
+        .task { await startPolling() }
+    }
+
+    private func metricCard(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+            Text(value)
+                .font(.system(size: 34, weight: .bold))
+        }
+        .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+    }
+
+    private func qualityColumn(title: String, rows: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+            if rows.isEmpty {
+                Text("Sin datos.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(rows, id: \.self) { row in
+                    Text(row)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+    }
 
-            Text(lastRefreshText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .task {
-            await startPolling()
-        }
+    private func formatPercent(_ value: Double) -> String {
+        String(format: "%.2f", value)
     }
 
     private func startPolling() async {
         while !Task.isCancelled {
-            await refresh()
+            snapshot = await monitorService.loadSnapshot()
+            let formatter = DateFormatter()
+            formatter.timeStyle = .medium
+            formatter.dateStyle = .none
+            lastRefresh = "Ultima actualizacion: \(formatter.string(from: Date()))"
             try? await Task.sleep(nanoseconds: 30_000_000_000)
         }
     }
+}
 
-    private func refresh() async {
-        let payload = await monitorService.snapshot()
-        users = payload.users
-        roles = payload.roles
-        routeQuality = payload.routeQuality
-        driverQuality = payload.driverQuality
-        subcontractorQuality = payload.subcontractorQuality
-        routeBreakdown = payload.routeBreakdown
-        driverBreakdown = payload.driverBreakdown
-        subcontractorBreakdown = payload.subcontractorBreakdown
-        qualityThreshold = payload.threshold
-        thresholdDeltaAlertCount = payload.thresholdDeltaAlertCount
-        thresholdDeltaTopScopes = payload.thresholdDeltaTopScopes
-        thresholdDeltaWindowHours = payload.thresholdDeltaWindowHours
-        thresholdDeltaTrigger = payload.thresholdDeltaTrigger
-        hubsCount = payload.hubsCount
-        depotsCount = payload.depotsCount
-        pointsCount = payload.pointsCount
-        archivedNodesCount = payload.archivedNodesCount
-        statusText = payload.status
-
-        let formatter = DateFormatter()
-        formatter.timeStyle = .medium
-        formatter.dateStyle = .none
-        lastRefreshText = "Última actualización: \(formatter.string(from: Date()))"
+struct TVDashboardSnapshot {
+    struct QualityRow: Identifiable {
+        let id: String
+        let label: String
+        let score: Double
     }
-}
 
-#Preview {
-    ContentView(monitorService: TVMonitorService())
-}
-
-struct TVUser: Identifiable {
-    let id: String
-    let name: String
-}
-
-struct TVRole: Identifiable {
-    let id: String
-    let name: String
-}
-
-struct TVSnapshot {
-    let users: [TVUser]
-    let roles: [TVRole]
-    let routeQuality: [TVRouteQuality]
-    let driverQuality: [TVDriverQuality]
-    let subcontractorQuality: [TVSubcontractorQuality]
-    let routeBreakdown: TVRouteBreakdown?
-    let driverBreakdown: TVDriverBreakdown?
-    let subcontractorBreakdown: TVSubcontractorBreakdown?
+    let routeRows: [QualityRow]
+    let driverRows: [QualityRow]
+    let subcontractorRows: [QualityRow]
     let threshold: Double
-    let thresholdDeltaAlertCount: Int
-    let thresholdDeltaTopScopes: [TVThresholdAlertTopScope]
-    let thresholdDeltaWindowHours: Int
-    let thresholdDeltaTrigger: Double
     let hubsCount: Int
     let depotsCount: Int
     let pointsCount: Int
-    let archivedNodesCount: Int
     let status: String
-}
+    let alerts: [String]
 
-struct TVThresholdAlertTopScope: Identifiable {
-    var id: String { "\(scopeType)|\(scopeId ?? "")" }
-    let scopeType: String
-    let scopeId: String?
-    let scopeLabel: String?
-    let alertsCount: Int
-}
-
-struct TVRouteQuality: Identifiable {
-    let id: String
-    let routeId: String
-    let routeCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-}
-
-struct TVDriverQuality: Identifiable {
-    let id: String
-    let driverId: String
-    let driverCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-}
-
-struct TVSubcontractorQuality: Identifiable {
-    let id: String
-    let subcontractorId: String
-    let subcontractorCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-}
-
-struct TVRouteBreakdown {
-    let routeId: String
-    let routeCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-    let failed: Int
-    let absent: Int
-    let retry: Int
-}
-
-struct TVDriverBreakdown {
-    let driverId: String
-    let driverCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-    let failed: Int
-    let absent: Int
-    let retry: Int
-}
-
-struct TVSubcontractorBreakdown {
-    let subcontractorId: String
-    let subcontractorCode: String
-    let score: Double
-    let assigned: Int
-    let completed: Int
-    let failed: Int
-    let absent: Int
-    let retry: Int
+    static let empty = TVDashboardSnapshot(
+        routeRows: [],
+        driverRows: [],
+        subcontractorRows: [],
+        threshold: 95,
+        hubsCount: 0,
+        depotsCount: 0,
+        pointsCount: 0,
+        status: "Inicializando",
+        alerts: []
+    )
 }
 
 final class TVMonitorService {
-    private var runtimeToken: String? = ProcessInfo.processInfo.environment["API_TOKEN"]
-
-    func snapshot() async -> TVSnapshot {
-        let apiSnapshot = await fetchQualityFromAPI()
-
-        return TVSnapshot(
-            users: [
-                TVUser(id: "u-1", name: "Admin Demo"),
-                TVUser(id: "u-2", name: "Ops Demo"),
-                TVUser(id: "u-3", name: "Hub Manager")
-            ],
-            roles: [
-                TVRole(id: "r-1", name: "Super Admin"),
-                TVRole(id: "r-2", name: "Ops Manager"),
-                TVRole(id: "r-3", name: "Viewer")
-            ],
-            routeQuality: apiSnapshot.routeQuality,
-            driverQuality: apiSnapshot.driverQuality,
-            subcontractorQuality: apiSnapshot.subcontractorQuality,
-            routeBreakdown: apiSnapshot.routeBreakdown,
-            driverBreakdown: apiSnapshot.driverBreakdown,
-            subcontractorBreakdown: apiSnapshot.subcontractorBreakdown,
-            threshold: apiSnapshot.threshold,
-            thresholdDeltaAlertCount: apiSnapshot.thresholdDeltaAlertCount,
-            thresholdDeltaTopScopes: apiSnapshot.thresholdDeltaTopScopes,
-            thresholdDeltaWindowHours: apiSnapshot.thresholdDeltaWindowHours,
-            thresholdDeltaTrigger: apiSnapshot.thresholdDeltaTrigger,
-            hubsCount: apiSnapshot.hubsCount,
-            depotsCount: apiSnapshot.depotsCount,
-            pointsCount: apiSnapshot.pointsCount,
-            archivedNodesCount: apiSnapshot.archivedNodesCount,
-            status: apiSnapshot.status
-        )
+    private struct LoginResponse: Decodable {
+        let token: String
     }
 
-    private func fetchQualityFromAPI() async -> (
-        routeQuality: [TVRouteQuality],
-        driverQuality: [TVDriverQuality],
-        subcontractorQuality: [TVSubcontractorQuality],
-        routeBreakdown: TVRouteBreakdown?,
-        driverBreakdown: TVDriverBreakdown?,
-        subcontractorBreakdown: TVSubcontractorBreakdown?,
-        threshold: Double,
-        thresholdDeltaAlertCount: Int,
-        thresholdDeltaTopScopes: [TVThresholdAlertTopScope],
-        thresholdDeltaWindowHours: Int,
-        thresholdDeltaTrigger: Double,
-        hubsCount: Int,
-        depotsCount: Int,
-        pointsCount: Int,
-        archivedNodesCount: Int,
-        status: String
-    ) {
-        let fallbackThreshold = Double(ProcessInfo.processInfo.environment["QUALITY_THRESHOLD"] ?? "") ?? 95
-        guard
-            let rawBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"],
-            !rawBaseURL.isEmpty
-        else {
-            return (
-                mockRouteQuality(),
-                mockDriverQuality(),
-                mockSubcontractorQuality(),
-                mockRouteBreakdown(),
-                mockDriverBreakdown(),
-                mockSubcontractorBreakdown(),
-                fallbackThreshold,
-                0,
-                [],
-                24,
-                5,
-                2,
-                4,
-                8,
-                1,
-                "Monitor activo (solo lectura/mock)"
-            )
+    private struct DataEnvelope<T: Decodable>: Decodable {
+        let data: [T]
+    }
+
+    private struct DataObjectEnvelope<T: Decodable>: Decodable {
+        let data: T
+    }
+
+    private struct DashboardOverviewDTO: Decodable {
+        struct Totals: Decodable {
+            let routes: Int
+            let qualityThreshold: Double
+
+            enum CodingKeys: String, CodingKey {
+                case routes
+                case qualityThreshold = "quality_threshold"
+            }
         }
 
-        let normalizedBaseURL = rawBaseURL.hasSuffix("/v1") ? rawBaseURL : "\(rawBaseURL)/v1"
-        guard
-            let routeURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=route"),
-            let driverURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=driver"),
-            let subcontractorURL = URL(string: "\(normalizedBaseURL)/kpis/quality?scope_type=subcontractor")
-        else {
-            return (
-                mockRouteQuality(),
-                mockDriverQuality(),
-                mockSubcontractorQuality(),
-                mockRouteBreakdown(),
-                mockDriverBreakdown(),
-                mockSubcontractorBreakdown(),
-                fallbackThreshold,
-                0,
-                [],
-                24,
-                5,
-                2,
-                4,
-                8,
-                1,
-                "Monitor activo (URL invalida, fallback mock)"
-            )
+        struct Alert: Decodable {
+            let id: String
+            let title: String
+            let count: Int
         }
 
-        var token = await resolveAuthToken(normalizedBaseURL: normalizedBaseURL, explicitToken: nil)
+        struct Sla: Decodable {
+            let onTrack: Int
+            let atRisk: Int
+            let breached: Int
+
+            enum CodingKeys: String, CodingKey {
+                case onTrack = "on_track"
+                case atRisk = "at_risk"
+                case breached
+            }
+        }
+
+        let totals: Totals
+        let alerts: [Alert]
+        let sla: Sla
+    }
+
+    private struct QualityRowDTO: Decodable {
+        let id: String
+        let scopeId: String
+        let scopeLabel: String?
+        let serviceQualityScore: Double
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case scopeId = "scope_id"
+            case scopeLabel = "scope_label"
+            case serviceQualityScore = "service_quality_score"
+        }
+    }
+
+    private struct ThresholdDTO: Decodable {
+        let threshold: Double
+    }
+
+    private let rawBaseURL: String
+    private let apiEmail: String?
+    private let apiPassword: String?
+    private var token: String?
+
+    init() {
+        rawBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? ""
+        apiEmail = ProcessInfo.processInfo.environment["API_EMAIL"]
+        apiPassword = ProcessInfo.processInfo.environment["API_PASSWORD"]
+        token = ProcessInfo.processInfo.environment["API_TOKEN"]
+    }
+
+    func loadSnapshot() async -> TVDashboardSnapshot {
+        guard let baseURL = normalizedBaseURL() else {
+            return mockSnapshot(status: "Sin API_BASE_URL configurada")
+        }
+
+        await ensureAuthenticated(baseURL: baseURL)
 
         do {
-            guard
-                let routeResult = try await authorizedGet(url: routeURL, normalizedBaseURL: normalizedBaseURL, token: token),
-                let driverResult = try await authorizedGet(url: driverURL, normalizedBaseURL: normalizedBaseURL, token: token),
-                let subcontractorResult = try await authorizedGet(url: subcontractorURL, normalizedBaseURL: normalizedBaseURL, token: token)
-            else {
-                return (
-                    mockRouteQuality(),
-                    mockDriverQuality(),
-                    mockSubcontractorQuality(),
-                    mockRouteBreakdown(),
-                    mockDriverBreakdown(),
-                    mockSubcontractorBreakdown(),
-                    fallbackThreshold,
-                    0,
-                    [],
-                    24,
-                    5,
-                    2,
-                    4,
-                    8,
-                    1,
-                    "Monitor fallback (error HTTP API calidad)"
-                )
-            }
-            let routeData = routeResult.data
-            let driverData = driverResult.data
-            let subcontractorData = subcontractorResult.data
-            token = subcontractorResult.token ?? driverResult.token ?? routeResult.token ?? token
+            async let overview = fetchOverview(baseURL: baseURL)
+            async let routesDTO = fetchQuality(baseURL: baseURL, scope: "route")
+            async let driversDTO = fetchQuality(baseURL: baseURL, scope: "driver")
+            async let subcontractorsDTO = fetchQuality(baseURL: baseURL, scope: "subcontractor")
+            async let hubsCount = fetchRowsCount(baseURL: baseURL, path: "hubs?only_active=1&include_deleted=0")
+            async let depotsCount = fetchRowsCount(baseURL: baseURL, path: "depots?include_deleted=0")
+            async let pointsCount = fetchRowsCount(baseURL: baseURL, path: "points?include_deleted=0")
 
-            let routeDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: routeData)
-            let driverDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: driverData)
-            let subcontractorDecoded = try JSONDecoder().decode(QualityEnvelope.self, from: subcontractorData)
-            let mappedRoutes = routeDecoded.data.map {
-                TVRouteQuality(
-                    id: $0.id,
-                    routeId: $0.scopeId,
-                    routeCode: $0.scopeLabel ?? $0.scopeId,
-                    score: $0.serviceQualityScore,
-                    assigned: $0.assignedWithAttempt,
-                    completed: $0.deliveredCompleted + $0.pickupsCompleted
-                )
-            }
-            let mappedDrivers = driverDecoded.data.map {
-                TVDriverQuality(
-                    id: $0.id,
-                    driverId: $0.scopeId,
-                    driverCode: $0.scopeLabel ?? $0.scopeId,
-                    score: $0.serviceQualityScore,
-                    assigned: $0.assignedWithAttempt,
-                    completed: $0.deliveredCompleted + $0.pickupsCompleted
-                )
-            }
-            let mappedSubcontractors = subcontractorDecoded.data.map {
-                TVSubcontractorQuality(
-                    id: $0.id,
-                    subcontractorId: $0.scopeId,
-                    subcontractorCode: $0.scopeLabel ?? $0.scopeId,
-                    score: $0.serviceQualityScore,
-                    assigned: $0.assignedWithAttempt,
-                    completed: $0.deliveredCompleted + $0.pickupsCompleted
-                )
-            }
+            let overviewDTO = try await overview
+            let routes = mapRows(try await routesDTO)
+            let drivers = mapRows(try await driversDTO)
+            let subcontractors = mapRows(try await subcontractorsDTO)
+            let thresholdValue = overviewDTO.totals.qualityThreshold
+            let alerts = buildAlerts(threshold: thresholdValue, routes: routes, drivers: drivers, subcontractors: subcontractors)
+            let overviewAlerts = overviewDTO.alerts.map { "\($0.title): \($0.count)" }
+            let slaSummary = "SLA · OnTrack \(overviewDTO.sla.onTrack) · AtRisk \(overviewDTO.sla.atRisk) · Breached \(overviewDTO.sla.breached)"
 
-            if mappedRoutes.isEmpty && mappedDrivers.isEmpty && mappedSubcontractors.isEmpty {
-                return (
-                    mockRouteQuality(),
-                    mockDriverQuality(),
-                    mockSubcontractorQuality(),
-                    mockRouteBreakdown(),
-                    mockDriverBreakdown(),
-                    mockSubcontractorBreakdown(),
-                    fallbackThreshold,
-                    0,
-                    [],
-                    24,
-                    5,
-                    2,
-                    4,
-                    8,
-                    1,
-                    "Monitor API sin datos, fallback mock"
-                )
-            }
-            let worstRoute = mappedRoutes.min(by: { $0.score < $1.score })
-            let routeBreakdown = await fetchRouteBreakdownFromAPI(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token,
-                routeId: worstRoute?.routeId
-            )
-            let worstDriver = mappedDrivers.min(by: { $0.score < $1.score })
-            let driverBreakdown = await fetchDriverBreakdownFromAPI(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token,
-                driverId: worstDriver?.driverId
-            )
-            let worstSubcontractor = mappedSubcontractors.min(by: { $0.score < $1.score })
-            let subcontractorBreakdown = await fetchSubcontractorBreakdownFromAPI(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token,
-                subcontractorId: worstSubcontractor?.subcontractorId
-            )
-            let threshold = await fetchThresholdFromAPI(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token,
-                fallbackThreshold: fallbackThreshold
-            )
-            let deltaAlert = await fetchThresholdDeltaAlertSummary(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token
-            )
-            let topScopes = await fetchThresholdDeltaTopScopes(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token
-            )
-            let networkSummary = await fetchNetworkSummaryFromAPI(
-                normalizedBaseURL: normalizedBaseURL,
-                token: token
-            )
-            return (
-                mappedRoutes,
-                mappedDrivers,
-                mappedSubcontractors,
-                routeBreakdown,
-                driverBreakdown,
-                subcontractorBreakdown,
-                threshold,
-                deltaAlert.count,
-                topScopes,
-                deltaAlert.windowHours,
-                deltaAlert.deltaTrigger,
-                networkSummary.hubsCount,
-                networkSummary.depotsCount,
-                networkSummary.pointsCount,
-                networkSummary.archivedNodesCount,
-                "Monitor activo (API real)"
+            return TVDashboardSnapshot(
+                routeRows: routes,
+                driverRows: drivers,
+                subcontractorRows: subcontractors,
+                threshold: thresholdValue,
+                hubsCount: try await hubsCount,
+                depotsCount: try await depotsCount,
+                pointsCount: try await pointsCount,
+                status: "Conectado",
+                alerts: [slaSummary] + overviewAlerts + alerts
             )
         } catch {
-            return (
-                mockRouteQuality(),
-                mockDriverQuality(),
-                mockSubcontractorQuality(),
-                mockRouteBreakdown(),
-                mockDriverBreakdown(),
-                mockSubcontractorBreakdown(),
-                fallbackThreshold,
-                0,
-                [],
-                24,
-                5,
-                2,
-                4,
-                8,
-                1,
-                "Monitor fallback (error conexion API)"
-            )
+            return mockSnapshot(status: "Error API")
         }
     }
 
-    private func fetchNetworkSummaryFromAPI(normalizedBaseURL: String, token: String?) async -> (hubsCount: Int, depotsCount: Int, pointsCount: Int, archivedNodesCount: Int) {
-        guard
-            let hubsURL = URL(string: "\(normalizedBaseURL)/hubs?only_active=0&include_deleted=1"),
-            let depotsURL = URL(string: "\(normalizedBaseURL)/depots?include_deleted=1"),
-            let pointsURL = URL(string: "\(normalizedBaseURL)/points?include_deleted=1")
-        else {
-            return (2, 4, 8, 1)
-        }
-
-        do {
-            guard
-                let hubsResult = try await authorizedGet(url: hubsURL, normalizedBaseURL: normalizedBaseURL, token: token),
-                let depotsResult = try await authorizedGet(url: depotsURL, normalizedBaseURL: normalizedBaseURL, token: hubsResult.token),
-                let pointsResult = try await authorizedGet(url: pointsURL, normalizedBaseURL: normalizedBaseURL, token: depotsResult.token)
-            else {
-                return (2, 4, 8, 1)
-            }
-
-            let hubsSummary = decodeNetworkRowsSummary(from: hubsResult.data)
-            let depotsSummary = decodeNetworkRowsSummary(from: depotsResult.data)
-            let pointsSummary = decodeNetworkRowsSummary(from: pointsResult.data)
-            return (
-                hubsSummary.total,
-                depotsSummary.total,
-                pointsSummary.total,
-                hubsSummary.archived + depotsSummary.archived + pointsSummary.archived
-            )
-        } catch {
-            return (2, 4, 8, 1)
-        }
+    private func normalizedBaseURL() -> String? {
+        guard !rawBaseURL.isEmpty else { return nil }
+        return rawBaseURL.hasSuffix("/v1") ? rawBaseURL : "\(rawBaseURL)/v1"
     }
 
-    private func decodeNetworkRowsSummary(from data: Data) -> (total: Int, archived: Int) {
+    private func ensureAuthenticated(baseURL: String) async {
+        if let token, !token.isEmpty { return }
         guard
-            let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let rows = payload["data"] as? [[String: Any]]
+            let apiEmail, !apiEmail.isEmpty,
+            let apiPassword, !apiPassword.isEmpty,
+            let loginURL = URL(string: "\(baseURL)/auth/login")
         else {
-            return (0, 0)
-        }
-
-        let archived = rows.reduce(0) { partial, row in
-            let deletedAt = row["deleted_at"] as? String
-            return partial + ((deletedAt?.isEmpty == false) ? 1 : 0)
-        }
-        return (rows.count, archived)
-    }
-
-    private func resolveAuthToken(normalizedBaseURL: String, explicitToken: String?) async -> String? {
-        if let explicitToken, !explicitToken.isEmpty {
-            runtimeToken = explicitToken
-            return explicitToken
-        }
-        if let runtimeToken, !runtimeToken.isEmpty {
-            return runtimeToken
-        }
-
-        guard
-            let email = ProcessInfo.processInfo.environment["API_EMAIL"],
-            let password = ProcessInfo.processInfo.environment["API_PASSWORD"],
-            !email.isEmpty,
-            !password.isEmpty,
-            let loginURL = URL(string: "\(normalizedBaseURL)/auth/login")
-        else {
-            return nil
+            return
         }
 
         var request = URLRequest(url: loginURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "email": email,
-            "password": password,
+            "email": apiEmail,
+            "password": apiPassword,
             "device_name": "apple-tv-monitor",
         ])
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                return nil
-            }
-            let decoded = try JSONDecoder().decode(LoginEnvelope.self, from: data)
-            runtimeToken = decoded.token
-            return decoded.token
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
+            let decoded = try JSONDecoder().decode(LoginResponse.self, from: data)
+            token = decoded.token
         } catch {
-            return nil
+            token = nil
         }
     }
 
-    private func authorizedGet(
-        url: URL,
-        normalizedBaseURL: String,
-        token: String?
-    ) async throws -> (data: Data, token: String?)? {
-        let activeToken = await resolveAuthToken(normalizedBaseURL: normalizedBaseURL, explicitToken: token)
+    private func fetchQuality(baseURL: String, scope: String) async throws -> [QualityRowDTO] {
+        guard let url = URL(string: "\(baseURL)/kpis/quality?scope_type=\(scope)") else { return [] }
+        let data = try await authorizedGet(url: url, baseURL: baseURL)
+        return try JSONDecoder().decode(DataEnvelope<QualityRowDTO>.self, from: data).data
+    }
+
+    private func fetchThreshold(baseURL: String) async throws -> Double {
+        guard let url = URL(string: "\(baseURL)/kpis/quality/threshold") else { return 95 }
+        let data = try await authorizedGet(url: url, baseURL: baseURL)
+        return try JSONDecoder().decode(DataObjectEnvelope<ThresholdDTO>.self, from: data).data.threshold
+    }
+
+    private func fetchOverview(baseURL: String) async throws -> DashboardOverviewDTO {
+        guard let url = URL(string: "\(baseURL)/dashboard/overview?period=7d") else {
+            throw URLError(.badURL)
+        }
+        let data = try await authorizedGet(url: url, baseURL: baseURL)
+        return try JSONDecoder().decode(DataObjectEnvelope<DashboardOverviewDTO>.self, from: data).data
+    }
+
+    private func fetchRowsCount(baseURL: String, path: String) async throws -> Int {
+        guard let url = URL(string: "\(baseURL)/\(path)") else { return 0 }
+        let data = try await authorizedGet(url: url, baseURL: baseURL)
+        let rows = try JSONDecoder().decode(DataEnvelope<NetworkRowDTO>.self, from: data).data
+        return rows.count
+    }
+
+    private struct NetworkRowDTO: Decodable {
+        let id: String
+    }
+
+    private func authorizedGet(url: URL, baseURL: String) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        if let activeToken, !activeToken.isEmpty {
-            request.setValue("Bearer \(activeToken)", forHTTPHeaderField: "Authorization")
+        if let token, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { return nil }
-        if (200...299).contains(http.statusCode) {
-            return (data, activeToken)
-        }
-        if http.statusCode == 401, let activeToken, let refreshed = await refreshAuthToken(normalizedBaseURL: normalizedBaseURL, currentToken: activeToken) {
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            token = nil
+            await ensureAuthenticated(baseURL: baseURL)
             var retry = URLRequest(url: url)
             retry.httpMethod = "GET"
-            retry.setValue("Bearer \(refreshed)", forHTTPHeaderField: "Authorization")
-            let (retryData, retryResponse) = try await URLSession.shared.data(for: retry)
-            guard let retryHttp = retryResponse as? HTTPURLResponse, (200...299).contains(retryHttp.statusCode) else {
-                return nil
+            if let token, !token.isEmpty {
+                retry.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
-            runtimeToken = refreshed
-            return (retryData, refreshed)
+            return try await URLSession.shared.data(for: retry).0
         }
-        return nil
+        return data
     }
 
-    private func refreshAuthToken(normalizedBaseURL: String, currentToken: String) async -> String? {
-        guard let refreshURL = URL(string: "\(normalizedBaseURL)/auth/refresh") else {
-            return nil
-        }
-        var request = URLRequest(url: refreshURL)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                runtimeToken = nil
-                return nil
-            }
-            let decoded = try JSONDecoder().decode(LoginEnvelope.self, from: data)
-            runtimeToken = decoded.token
-            return decoded.token
-        } catch {
-            runtimeToken = nil
-            return nil
-        }
-    }
-
-    private func fetchThresholdDeltaAlertSummary(normalizedBaseURL: String, token: String?) async -> (count: Int, windowHours: Int, deltaTrigger: Double) {
-        let defaultWindow = 24
-        let defaultTrigger = 5.0
-        guard let settingsURL = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/alert-settings") else {
-            return (0, defaultWindow, defaultTrigger)
-        }
-
-        do {
-            guard let settingsResult = try await authorizedGet(url: settingsURL, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return (0, defaultWindow, defaultTrigger)
-            }
-            let settingsDecoded = try JSONDecoder().decode(QualityThresholdAlertSettingsEnvelope.self, from: settingsResult.data)
-            let windowHours = settingsDecoded.data.windowHours
-            let deltaTrigger = settingsDecoded.data.largeDeltaThreshold
-
-            let formatter = DateFormatter()
-            formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = "yyyy-MM-dd"
-            let now = Date()
-            let from = Calendar(identifier: .gregorian).date(byAdding: .hour, value: -windowHours, to: now) ?? now
-            let dateFrom = formatter.string(from: from)
-            let dateTo = formatter.string(from: now)
-            guard let historyURL = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history?date_from=\(dateFrom)&date_to=\(dateTo)&page=1&per_page=100") else {
-                return (0, windowHours, deltaTrigger)
-            }
-            guard let historyResult = try await authorizedGet(url: historyURL, normalizedBaseURL: normalizedBaseURL, token: settingsResult.token) else {
-                return (0, windowHours, deltaTrigger)
-            }
-            let historyDecoded = try JSONDecoder().decode(QualityThresholdHistoryEnvelope.self, from: historyResult.data)
-            let count = historyDecoded.data.filter { $0.event == "quality.threshold.alert.large_delta" }.count
-            return (count, windowHours, deltaTrigger)
-        } catch {
-            return (0, defaultWindow, defaultTrigger)
-        }
-    }
-
-    private func fetchThresholdDeltaTopScopes(normalizedBaseURL: String, token: String?) async -> [TVThresholdAlertTopScope] {
-        guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold/history/alerts/top-scopes?limit=5") else {
-            return []
-        }
-
-        do {
-            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return []
-            }
-            let decoded = try JSONDecoder().decode(QualityThresholdTopScopesEnvelope.self, from: result.data)
-            return decoded.data.map {
-                TVThresholdAlertTopScope(
-                    scopeType: $0.scopeType,
-                    scopeId: $0.scopeId,
-                    scopeLabel: $0.scopeLabel,
-                    alertsCount: $0.alertsCount
+    private func mapRows(_ rows: [QualityRowDTO]) -> [TVDashboardSnapshot.QualityRow] {
+        rows
+            .map {
+                TVDashboardSnapshot.QualityRow(
+                    id: $0.id,
+                    label: $0.scopeLabel ?? $0.scopeId,
+                    score: $0.serviceQualityScore
                 )
             }
-        } catch {
-            return []
+            .sorted(by: { $0.score < $1.score })
+    }
+
+    private func buildAlerts(
+        threshold: Double,
+        routes: [TVDashboardSnapshot.QualityRow],
+        drivers: [TVDashboardSnapshot.QualityRow],
+        subcontractors: [TVDashboardSnapshot.QualityRow]
+    ) -> [String] {
+        let routeAlerts = routes.filter { $0.score < threshold }.prefix(3).map {
+            "Ruta \($0.label): \(String(format: "%.2f", $0.score))%"
         }
-    }
-
-    private func fetchThresholdFromAPI(normalizedBaseURL: String, token: String?, fallbackThreshold: Double) async -> Double {
-        guard let url = URL(string: "\(normalizedBaseURL)/kpis/quality/threshold") else {
-            return fallbackThreshold
+        let driverAlerts = drivers.filter { $0.score < threshold }.prefix(3).map {
+            "Conductor \($0.label): \(String(format: "%.2f", $0.score))%"
         }
-
-        do {
-            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return fallbackThreshold
-            }
-            let decoded = try JSONDecoder().decode(QualityThresholdEnvelope.self, from: result.data)
-            return decoded.data.threshold
-        } catch {
-            return fallbackThreshold
+        let subcontractorAlerts = subcontractors.filter { $0.score < threshold }.prefix(3).map {
+            "Subcontrata \($0.label): \(String(format: "%.2f", $0.score))%"
         }
+        let alerts = Array(routeAlerts + driverAlerts + subcontractorAlerts)
+        return alerts.isEmpty ? ["Sin alertas por debajo del umbral."] : alerts
     }
 
-    private func fetchRouteBreakdownFromAPI(normalizedBaseURL: String, token: String?, routeId: String?) async -> TVRouteBreakdown? {
-        guard let routeId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/routes/\(routeId)/breakdown") else {
-            return nil
-        }
-
-        do {
-            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return nil
-            }
-            let decoded = try JSONDecoder().decode(RouteBreakdownEnvelope.self, from: result.data)
-            return TVRouteBreakdown(
-                routeId: decoded.data.routeId,
-                routeCode: decoded.data.routeCode ?? decoded.data.routeId,
-                score: decoded.data.serviceQualityScore,
-                assigned: decoded.data.components.assignedWithAttempt,
-                completed: decoded.data.components.completedTotal,
-                failed: decoded.data.components.failedCount,
-                absent: decoded.data.components.absentCount,
-                retry: decoded.data.components.retryCount
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func mockRouteQuality() -> [TVRouteQuality] {
-        [
-            TVRouteQuality(id: "rq-1", routeId: "r-1", routeCode: "R-AGP-20260227", score: 96.10, assigned: 120, completed: 115),
-            TVRouteQuality(id: "rq-2", routeId: "r-2", routeCode: "R-AGP-20260228", score: 94.50, assigned: 98, completed: 93),
-            TVRouteQuality(id: "rq-3", routeId: "r-3", routeCode: "R-AGP-20260301", score: 97.20, assigned: 110, completed: 107),
-        ]
-    }
-
-    private func mockDriverQuality() -> [TVDriverQuality] {
-        [
-            TVDriverQuality(id: "dq-1", driverId: "d-1", driverCode: "DRV-AGP-001", score: 96.0, assigned: 160, completed: 154),
-            TVDriverQuality(id: "dq-2", driverId: "d-2", driverCode: "DRV-AGP-002", score: 93.5, assigned: 140, completed: 131),
-        ]
-    }
-
-    private func mockSubcontractorQuality() -> [TVSubcontractorQuality] {
-        [
-            TVSubcontractorQuality(id: "sq-1", subcontractorId: "sub-1", subcontractorCode: "Rapid Last Mile", score: 95.8, assigned: 320, completed: 306),
-            TVSubcontractorQuality(id: "sq-2", subcontractorId: "sub-2", subcontractorCode: "ThermoParcel", score: 93.4, assigned: 280, completed: 261),
-        ]
-    }
-
-    private func mockRouteBreakdown() -> TVRouteBreakdown {
-        TVRouteBreakdown(
-            routeId: "r-2",
-            routeCode: "R-AGP-20260228",
-            score: 94.5,
-            assigned: 98,
-            completed: 93,
-            failed: 3,
-            absent: 1,
-            retry: 1
-        )
-    }
-
-    private func fetchDriverBreakdownFromAPI(normalizedBaseURL: String, token: String?, driverId: String?) async -> TVDriverBreakdown? {
-        guard let driverId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/drivers/\(driverId)/breakdown") else {
-            return nil
-        }
-        do {
-            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return nil
-            }
-            let decoded = try JSONDecoder().decode(DriverBreakdownEnvelope.self, from: result.data)
-            return TVDriverBreakdown(
-                driverId: decoded.data.driverId,
-                driverCode: decoded.data.driverCode ?? decoded.data.driverId,
-                score: decoded.data.serviceQualityScore,
-                assigned: decoded.data.components.assignedWithAttempt,
-                completed: decoded.data.components.completedTotal,
-                failed: decoded.data.components.failedCount,
-                absent: decoded.data.components.absentCount,
-                retry: decoded.data.components.retryCount
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func mockDriverBreakdown() -> TVDriverBreakdown {
-        TVDriverBreakdown(
-            driverId: "d-2",
-            driverCode: "DRV-AGP-002",
-            score: 93.5,
-            assigned: 140,
-            completed: 131,
-            failed: 5,
-            absent: 3,
-            retry: 1
-        )
-    }
-
-    private func fetchSubcontractorBreakdownFromAPI(normalizedBaseURL: String, token: String?, subcontractorId: String?) async -> TVSubcontractorBreakdown? {
-        guard let subcontractorId, let url = URL(string: "\(normalizedBaseURL)/kpis/quality/subcontractors/\(subcontractorId)/breakdown") else {
-            return nil
-        }
-        do {
-            guard let result = try await authorizedGet(url: url, normalizedBaseURL: normalizedBaseURL, token: token) else {
-                return nil
-            }
-            let decoded = try JSONDecoder().decode(SubcontractorBreakdownEnvelope.self, from: result.data)
-            return TVSubcontractorBreakdown(
-                subcontractorId: decoded.data.subcontractorId,
-                subcontractorCode: decoded.data.subcontractorCode ?? decoded.data.subcontractorId,
-                score: decoded.data.serviceQualityScore,
-                assigned: decoded.data.components.assignedWithAttempt,
-                completed: decoded.data.components.completedTotal,
-                failed: decoded.data.components.failedCount,
-                absent: decoded.data.components.absentCount,
-                retry: decoded.data.components.retryCount
-            )
-        } catch {
-            return nil
-        }
-    }
-
-    private func mockSubcontractorBreakdown() -> TVSubcontractorBreakdown {
-        TVSubcontractorBreakdown(
-            subcontractorId: "sub-2",
-            subcontractorCode: "ThermoParcel",
-            score: 93.4,
-            assigned: 280,
-            completed: 261,
-            failed: 10,
-            absent: 6,
-            retry: 3
+    private func mockSnapshot(status: String) -> TVDashboardSnapshot {
+        TVDashboardSnapshot(
+            routeRows: [
+                .init(id: "r1", label: "R-AGP-01", score: 92.4),
+                .init(id: "r2", label: "R-AGP-02", score: 95.8),
+            ],
+            driverRows: [
+                .init(id: "d1", label: "DRV-01", score: 93.2),
+                .init(id: "d2", label: "DRV-02", score: 97.1),
+            ],
+            subcontractorRows: [
+                .init(id: "s1", label: "SUB-01", score: 94.0),
+            ],
+            threshold: 95,
+            hubsCount: 2,
+            depotsCount: 4,
+            pointsCount: 8,
+            status: status,
+            alerts: ["Monitor en modo fallback por falta de conexion."]
         )
     }
 }
 
-private struct QualityEnvelope: Decodable {
-    let data: [RouteQualityPayload]
-}
-
-private struct RouteQualityPayload: Decodable {
-    let id: String
-    let scopeId: String
-    let scopeLabel: String?
-    let serviceQualityScore: Double
-    let assignedWithAttempt: Int
-    let deliveredCompleted: Int
-    let pickupsCompleted: Int
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case scopeId = "scope_id"
-        case scopeLabel = "scope_label"
-        case serviceQualityScore = "service_quality_score"
-        case assignedWithAttempt = "assigned_with_attempt"
-        case deliveredCompleted = "delivered_completed"
-        case pickupsCompleted = "pickups_completed"
-    }
-}
-
-private struct RouteBreakdownEnvelope: Decodable {
-    let data: RouteBreakdownPayload
-}
-
-private struct RouteBreakdownPayload: Decodable {
-    let routeId: String
-    let routeCode: String?
-    let serviceQualityScore: Double
-    let components: RouteBreakdownComponentsPayload
-
-    enum CodingKeys: String, CodingKey {
-        case routeId = "route_id"
-        case routeCode = "route_code"
-        case serviceQualityScore = "service_quality_score"
-        case components
-    }
-}
-
-private struct RouteBreakdownComponentsPayload: Decodable {
-    let assignedWithAttempt: Int
-    let completedTotal: Int
-    let failedCount: Int
-    let absentCount: Int
-    let retryCount: Int
-
-    enum CodingKeys: String, CodingKey {
-        case assignedWithAttempt = "assigned_with_attempt"
-        case completedTotal = "completed_total"
-        case failedCount = "failed_count"
-        case absentCount = "absent_count"
-        case retryCount = "retry_count"
-    }
-}
-
-private struct DriverBreakdownEnvelope: Decodable {
-    let data: DriverBreakdownPayload
-}
-
-private struct DriverBreakdownPayload: Decodable {
-    let driverId: String
-    let driverCode: String?
-    let serviceQualityScore: Double
-    let components: RouteBreakdownComponentsPayload
-
-    enum CodingKeys: String, CodingKey {
-        case driverId = "driver_id"
-        case driverCode = "driver_code"
-        case serviceQualityScore = "service_quality_score"
-        case components
-    }
-}
-
-private struct SubcontractorBreakdownEnvelope: Decodable {
-    let data: SubcontractorBreakdownPayload
-}
-
-private struct SubcontractorBreakdownPayload: Decodable {
-    let subcontractorId: String
-    let subcontractorCode: String?
-    let serviceQualityScore: Double
-    let components: RouteBreakdownComponentsPayload
-
-    enum CodingKeys: String, CodingKey {
-        case subcontractorId = "subcontractor_id"
-        case subcontractorCode = "subcontractor_code"
-        case serviceQualityScore = "service_quality_score"
-        case components
-    }
-}
-
-private struct QualityThresholdEnvelope: Decodable {
-    let data: QualityThresholdPayload
-}
-
-private struct QualityThresholdPayload: Decodable {
-    let threshold: Double
-}
-
-private struct QualityThresholdAlertSettingsEnvelope: Decodable {
-    let data: QualityThresholdAlertSettingsPayload
-}
-
-private struct QualityThresholdAlertSettingsPayload: Decodable {
-    let largeDeltaThreshold: Double
-    let windowHours: Int
-
-    enum CodingKeys: String, CodingKey {
-        case largeDeltaThreshold = "large_delta_threshold"
-        case windowHours = "window_hours"
-    }
-}
-
-private struct QualityThresholdHistoryEnvelope: Decodable {
-    let data: [QualityThresholdHistoryPayload]
-}
-
-private struct QualityThresholdHistoryPayload: Decodable {
-    let event: String
-}
-
-private struct QualityThresholdTopScopesEnvelope: Decodable {
-    let data: [QualityThresholdTopScopePayload]
-}
-
-private struct QualityThresholdTopScopePayload: Decodable {
-    let scopeType: String
-    let scopeId: String?
-    let scopeLabel: String?
-    let alertsCount: Int
-
-    enum CodingKeys: String, CodingKey {
-        case scopeType = "scope_type"
-        case scopeId = "scope_id"
-        case scopeLabel = "scope_label"
-        case alertsCount = "alerts_count"
-    }
-}
-
-private struct LoginEnvelope: Decodable {
-    let token: String
+#Preview {
+    ContentView(monitorService: TVMonitorService())
 }

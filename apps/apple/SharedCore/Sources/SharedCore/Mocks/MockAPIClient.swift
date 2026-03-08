@@ -404,6 +404,42 @@ public final class MockAPIClient {
         ].prefix(max(1, min(limit ?? 5, 100))))
     }
 
+    public func dashboardOverview(period: String?, dateFrom: String?, dateTo: String?) async throws -> DashboardOverview {
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let to = dateTo ?? formatter.string(from: now)
+        let from = dateFrom ?? formatter.string(from: Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now)
+        let resolvedPreset = period ?? ((dateFrom != nil || dateTo != nil) ? "custom" : "7d")
+
+        return DashboardOverview(
+            period: DashboardPeriod(from: from, to: to, preset: resolvedPreset),
+            totals: DashboardTotals(shipments: 124, routes: 18, incidentsOpen: 7, qualityThreshold: 95),
+            shipmentsByStatus: DashboardShipmentsByStatus(created: 22, outForDelivery: 31, delivered: 65, incident: 6),
+            routesByStatus: DashboardRoutesByStatus(planned: 6, inProgress: 8, completed: 4),
+            quality: DashboardQuality(routeAvg: 94.7, driverAvg: 96.2, belowThresholdRoutes: 5),
+            sla: DashboardSLA(onTrack: 4, atRisk: 2, breached: 1, resolved: 9),
+            alerts: [
+                DashboardAlert(
+                    id: "incidents-open",
+                    severity: "high",
+                    title: "Incidencias abiertas",
+                    message: "Hay incidencias pendientes de resolución.",
+                    href: "/incidents?resolved=open",
+                    count: 7
+                ),
+                DashboardAlert(
+                    id: "quality-below-threshold",
+                    severity: "medium",
+                    title: "Rutas bajo umbral",
+                    message: "Revisar rutas por debajo del objetivo de calidad.",
+                    href: "/quality?scopeType=route",
+                    count: 5
+                ),
+            ]
+        )
+    }
+
     public func routeAssignmentPreview(
         subcontractorId: String?,
         driverId: String?,
