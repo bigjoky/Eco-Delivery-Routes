@@ -10,7 +10,7 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    return redirect('/ops');
 })->middleware(['auth'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -19,19 +19,19 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/openapi.yaml', function () {
-    $path = base_path('openapi.yaml');
-    abort_unless(File::exists($path), 404);
-
-    return response()->file($path, [
-        'Content-Type' => 'application/yaml; charset=utf-8',
-        'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-        'Pragma' => 'no-cache',
-        'Expires' => '0',
-    ]);
-});
-
 Route::middleware('api.docs.access')->group(function () {
+    Route::get('/openapi.yaml', function () {
+        $path = base_path('openapi.yaml');
+        abort_unless(File::exists($path), 404);
+
+        return response()->file($path, [
+            'Content-Type' => 'application/yaml; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    });
+
     Route::view('/api-docs', 'api-docs')->name('api.docs');
 });
 

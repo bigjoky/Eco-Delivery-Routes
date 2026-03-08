@@ -31,12 +31,10 @@ class AuthNavigationFlowTest extends TestCase
         $this->actingAs($user);
 
         $this->get('/dashboard')
-            ->assertOk()
-            ->assertSee('Dashboard');
+            ->assertRedirect('/ops');
 
         $this->get('/ops')
             ->assertOk()
             ->assertSee('AppShellPage');
     }
 }
-

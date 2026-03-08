@@ -10,12 +10,8 @@ class EnsureApiDocsAccess
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! app()->environment('production')) {
-            return $next($request);
-        }
-
         $user = $request->user();
-        if (! $user || ! $user->hasRole('super_admin')) {
+        if (! $user || (! $user->hasRole('super_admin') && ! $user->hasRole('admin'))) {
             abort(403, 'Forbidden');
         }
 

@@ -1,6 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import InstallPwaButton from '@/components/InstallPwaButton';
-import { Link } from '@inertiajs/react';
 import { Head } from '@inertiajs/react';
 
 export default function Dashboard() {
@@ -41,20 +40,6 @@ export default function Dashboard() {
                                     className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
                                 >
                                     Abrir Operativa
-                                </a>
-                                <Link
-                                    href="/api-docs"
-                                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                >
-                                    Ver OpenAPI
-                                </Link>
-                                <a
-                                    href="/openapi.yaml"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                >
-                                    Abrir Spec YAML
                                 </a>
                                 <InstallPwaButton />
                             </div>
