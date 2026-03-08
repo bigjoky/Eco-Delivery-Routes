@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -1319,6 +1320,12 @@ export function RouteDetailPage() {
           )}
         </CardContent>
       </Card>
+      <EntityActivityTimeline
+        title="Actividad de ruta (auditoría persistida)"
+        resource="route"
+        entityId={id}
+        eventPrefix="route."
+      />
     </section>
   );
 }

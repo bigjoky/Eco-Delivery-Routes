@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -289,6 +290,12 @@ export function ShipmentDetailPage() {
           </TableWrapper>
         </CardContent>
       </Card>
+      <EntityActivityTimeline
+        title="Actividad del envío"
+        resource="shipment"
+        entityId={shipment?.id ?? id}
+        eventPrefix="shipments."
+      />
     </section>
   );
 }

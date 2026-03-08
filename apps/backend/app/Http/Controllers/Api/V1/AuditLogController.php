@@ -137,7 +137,10 @@ class AuditLogController extends Controller
             } elseif ($resource === 'route') {
                 $query->whereRaw("json_extract(metadata, '$.route_id') = ?", [$id]);
             } elseif ($resource === 'shipment') {
-                $query->whereRaw("json_extract(metadata, '$.shipment_id') = ?", [$id]);
+                $query->where(function ($nested) use ($id): void {
+                    $nested->whereRaw("json_extract(metadata, '$.shipment_id') = ?", [$id])
+                        ->orWhere('audit_logs.metadata', 'like', '%' . $id . '%');
+                });
             } elseif ($resource === 'incident') {
                 $query->whereRaw("json_extract(metadata, '$.incident_id') = ?", [$id]);
             } elseif ($resource === 'workforce') {
