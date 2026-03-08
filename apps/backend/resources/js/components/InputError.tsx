@@ -1,4 +1,5 @@
 import { HTMLAttributes } from 'react';
+import { cn } from '@/lib/cn';
 
 export default function InputError({
     message,
@@ -8,7 +9,7 @@ export default function InputError({
     return message ? (
         <p
             {...props}
-            className={'text-sm text-red-600 ' + className}
+            className={cn('helper error', className)}
         >
             {message}
         </p>
