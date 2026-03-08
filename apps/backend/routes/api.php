@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Ops\PickupController;
 use App\Http\Controllers\Api\V1\Ops\PodController;
 use App\Http\Controllers\Api\V1\Ops\QualityController;
 use App\Http\Controllers\Api\V1\Ops\RouteController;
+use App\Http\Controllers\Api\V1\Ops\RouteBulkTemplateController;
 use App\Http\Controllers\Api\V1\Ops\SettlementAdjustmentController;
 use App\Http\Controllers\Api\V1\Ops\SettlementController;
 use App\Http\Controllers\Api\V1\Ops\ShipmentController;
@@ -96,6 +97,9 @@ Route::prefix('v1')->group(function () {
         Route::post('points/{id}/restore', [PointController::class, 'restore']);
 
         Route::get('routes', [RouteController::class, 'index']);
+        Route::get('routes/bulk-templates', [RouteBulkTemplateController::class, 'index']);
+        Route::post('routes/bulk-templates', [RouteBulkTemplateController::class, 'store']);
+        Route::delete('routes/bulk-templates/{id}', [RouteBulkTemplateController::class, 'destroy']);
         Route::get('routes/assignment/preview', [RouteController::class, 'assignmentPreview']);
         Route::get('routes/assignment/publish-policy', [RouteController::class, 'assignmentPublishPolicy']);
         Route::put('routes/assignment/publish-policy', [RouteController::class, 'upsertAssignmentPublishPolicy']);

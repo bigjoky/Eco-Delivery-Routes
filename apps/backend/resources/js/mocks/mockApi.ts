@@ -70,6 +70,16 @@ let subcontractorSeq = 2;
 let driverSeq = 2;
 let vehicleSeq = 2;
 let routeSeq = 4;
+let routeBulkTemplateSeq = 1;
+let mockRouteBulkTemplates: Array<{
+  id: string;
+  route_id?: string | null;
+  name: string;
+  status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+  planned_at?: string | null;
+  completed_at?: string | null;
+  shift_minutes?: number | null;
+}> = [];
 const nowIso = () => new Date().toISOString();
 let mockSubcontractors: Array<{
   id: string;
@@ -1632,6 +1642,36 @@ export const mockApi = {
     const dir = filters.dir === 'asc' ? 1 : -1;
     rows = rows.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? dir : -dir));
     return rows;
+  },
+
+  async getRouteBulkTemplates(routeId?: string) {
+    if (!routeId) return mockRouteBulkTemplates;
+    return mockRouteBulkTemplates.filter((item) => !item.route_id || item.route_id === routeId);
+  },
+
+  async createRouteBulkTemplate(payload: {
+    route_id?: string | null;
+    name: string;
+    status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+    planned_at?: string | null;
+    completed_at?: string | null;
+    shift_minutes?: number;
+  }) {
+    const row = {
+      id: `rbt-${routeBulkTemplateSeq++}`,
+      route_id: payload.route_id ?? null,
+      name: payload.name,
+      status: payload.status ?? '',
+      planned_at: payload.planned_at ?? null,
+      completed_at: payload.completed_at ?? null,
+      shift_minutes: payload.shift_minutes ?? 0,
+    };
+    mockRouteBulkTemplates = [row, ...mockRouteBulkTemplates].slice(0, 50);
+    return { id: row.id };
+  },
+
+  async deleteRouteBulkTemplate(id: string) {
+    mockRouteBulkTemplates = mockRouteBulkTemplates.filter((item) => item.id !== id);
   },
 
   async createRoute(payload: {

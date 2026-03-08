@@ -1131,6 +1131,71 @@ export const apiClient = {
     return parsePaginatedData<RouteSummary>(response);
   },
 
+  async getRouteBulkTemplates(routeId?: string): Promise<Array<{
+    id: string;
+    route_id?: string | null;
+    name: string;
+    status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+    planned_at?: string | null;
+    completed_at?: string | null;
+    shift_minutes?: number | null;
+  }>> {
+    if (USE_MOCK) return mockApi.getRouteBulkTemplates(routeId) as Promise<Array<{
+      id: string;
+      route_id?: string | null;
+      name: string;
+      status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+      planned_at?: string | null;
+      completed_at?: string | null;
+      shift_minutes?: number | null;
+    }>>;
+    const params = new URLSearchParams();
+    if (routeId) params.set('route_id', routeId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/bulk-templates${suffix}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot load route bulk templates');
+    return (json.data ?? []) as Array<{
+      id: string;
+      route_id?: string | null;
+      name: string;
+      status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+      planned_at?: string | null;
+      completed_at?: string | null;
+      shift_minutes?: number | null;
+    }>;
+  },
+
+  async createRouteBulkTemplate(payload: {
+    route_id?: string | null;
+    name: string;
+    status?: '' | 'planned' | 'in_progress' | 'completed' | null;
+    planned_at?: string | null;
+    completed_at?: string | null;
+    shift_minutes?: number;
+  }): Promise<{ id: string }> {
+    if (USE_MOCK) return mockApi.createRouteBulkTemplate(payload) as Promise<{ id: string }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/bulk-templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create route bulk template');
+    return json.data as { id: string };
+  },
+
+  async deleteRouteBulkTemplate(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteRouteBulkTemplate(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/bulk-templates/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json().catch(() => null);
+      throw new Error(json?.error?.message ?? 'Cannot delete route bulk template');
+    }
+  },
+
   async createRoute(payload: {
     hub_id: string;
     code: string;

@@ -1,11 +1,14 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
+
+type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
 
 export function PartnersPage() {
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
@@ -13,8 +16,12 @@ export function PartnersPage() {
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [partnersQuery, setPartnersQuery] = useState('');
   const [partnersSort, setPartnersSort] = useState<'name' | 'updated_desc' | 'updated_asc' | 'editor'>('updated_desc');
+  const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createType, setCreateType] = useState<CreatePartnerType>('');
+  const [createSaving, setCreateSaving] = useState(false);
 
   const [subcontractorName, setSubcontractorName] = useState('');
   const [subcontractorTaxId, setSubcontractorTaxId] = useState('');
@@ -97,8 +104,7 @@ export function PartnersPage() {
   const filteredDrivers = useMemo(() => sortBy(drivers, (row) => `${row.code} ${row.name}`), [drivers, partnersSort, normalizedQuery]);
   const filteredVehicles = useMemo(() => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`), [vehicles, partnersSort, normalizedQuery]);
 
-  const onCreateSubcontractor = async (event: FormEvent) => {
-    event.preventDefault();
+  const createSubcontractor = async () => {
     setMessage('');
     setError('');
     try {
@@ -117,8 +123,7 @@ export function PartnersPage() {
     }
   };
 
-  const onCreateDriver = async (event: FormEvent) => {
-    event.preventDefault();
+  const createDriver = async () => {
     setMessage('');
     setError('');
     try {
@@ -139,8 +144,7 @@ export function PartnersPage() {
     }
   };
 
-  const onCreateVehicle = async (event: FormEvent) => {
-    event.preventDefault();
+  const createVehicle = async () => {
     setMessage('');
     setError('');
     let nextSubcontractorId = vehicleSubcontractorId || '';
@@ -173,6 +177,48 @@ export function PartnersPage() {
       await load();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'No se pudo crear el vehiculo');
+    }
+  };
+
+  const openCreateWizard = () => {
+    setCreateType('');
+    setCreateOpen(true);
+    setCreateSaving(false);
+  };
+
+  const closeCreateWizard = () => {
+    setCreateOpen(false);
+    setCreateSaving(false);
+  };
+
+  const submitCreateNode = async () => {
+    setCreateSaving(true);
+    try {
+      if (createType === 'subcontractor') {
+        if (!subcontractorName.trim() || !subcontractorTaxId.trim()) {
+          setError('Subcontrata requiere nombre y CIF/NIF.');
+          return;
+        }
+        await createSubcontractor();
+      } else if (createType === 'driver') {
+        if (!driverCode.trim() || !driverDni.trim() || !driverName.trim()) {
+          setError('Driver requiere código, DNI/NIE y nombre.');
+          return;
+        }
+        await createDriver();
+      } else if (createType === 'vehicle') {
+        if (!vehicleCode.trim() || !vehiclePlate.trim()) {
+          setError('Vehículo requiere código y matrícula.');
+          return;
+        }
+        await createVehicle();
+      } else {
+        setError('Selecciona qué deseas crear.');
+        return;
+      }
+      closeCreateWizard();
+    } finally {
+      setCreateSaving(false);
     }
   };
 
@@ -326,56 +372,105 @@ export function PartnersPage() {
 
   return (
     <section className="page-grid">
+      <Modal
+        open={createOpen}
+        onClose={closeCreateWizard}
+        title="Crear partner"
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={closeCreateWizard}>Cancelar</Button>
+            <Button type="button" onClick={submitCreateNode} disabled={createSaving}>
+              {createSaving ? 'Creando...' : 'Crear'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="page-grid">
+          <div className="helper">1) Selecciona qué quieres crear</div>
+          <div className="inline-actions">
+            <Button type="button" variant={createType === 'subcontractor' ? 'secondary' : 'outline'} onClick={() => setCreateType('subcontractor')}>Subcontrata</Button>
+            <Button type="button" variant={createType === 'driver' ? 'secondary' : 'outline'} onClick={() => setCreateType('driver')}>Conductor</Button>
+            <Button type="button" variant={createType === 'vehicle' ? 'secondary' : 'outline'} onClick={() => setCreateType('vehicle')}>Vehículo</Button>
+          </div>
+          {createType === 'subcontractor' ? (
+            <div className="form-row">
+              <div><label>Nombre</label><Input value={subcontractorName} onChange={(e) => setSubcontractorName(e.target.value)} placeholder="Eco Partner Málaga" /></div>
+              <div><label>CIF/NIF</label><Input value={subcontractorTaxId} onChange={(e) => setSubcontractorTaxId(e.target.value)} placeholder="B12345678" /></div>
+            </div>
+          ) : null}
+          {createType === 'driver' ? (
+            <div className="form-row">
+              <div><label>Código</label><Input value={driverCode} onChange={(e) => setDriverCode(e.target.value)} placeholder="DRV-001" /></div>
+              <div><label>DNI/NIE</label><Input value={driverDni} onChange={(e) => setDriverDni(e.target.value)} placeholder="12345678Z" /></div>
+              <div><label>Nombre</label><Input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="Nombre completo" /></div>
+              <div>
+                <label>Subcontrata</label>
+                <Select value={driverSubcontractorId} onChange={(e) => setDriverSubcontractorId(e.target.value)}>
+                  <option value="">Sin subcontrata</option>
+                  {subcontractors.map((subcontractor) => (
+                    <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          ) : null}
+          {createType === 'vehicle' ? (
+            <div className="form-row">
+              <div><label>Código</label><Input value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} placeholder="VEH-001" /></div>
+              <div><label>Matrícula</label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} placeholder="1234-ABC" /></div>
+              <div>
+                <label>Subcontrata</label>
+                <Select value={vehicleSubcontractorId} onChange={(e) => setVehicleSubcontractorId(e.target.value)}>
+                  <option value="">Sin subcontrata</option>
+                  {subcontractors.map((subcontractor) => (
+                    <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label>Conductor</label>
+                <Select value={vehicleDriverId} onChange={(e) => setVehicleDriverId(e.target.value)}>
+                  <option value="">Sin driver</option>
+                  {drivers.map((driver) => (
+                    <option key={driver.id} value={driver.id}>{driver.code} - {driver.name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Subcontratas + Drivers + Vehiculos</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="page-grid two">
-            <form className="inline-actions" onSubmit={onCreateSubcontractor}>
-              <Input value={subcontractorName} onChange={(e) => setSubcontractorName(e.target.value)} placeholder="Nueva subcontrata" required />
-              <Input value={subcontractorTaxId} onChange={(e) => setSubcontractorTaxId(e.target.value)} placeholder="CIF/NIF" required />
-              <Button type="submit">Crear subcontrata</Button>
-            </form>
-            <form className="inline-actions" onSubmit={onCreateDriver}>
-              <Input value={driverCode} onChange={(e) => setDriverCode(e.target.value)} placeholder="Codigo driver" required />
-              <Input value={driverDni} onChange={(e) => setDriverDni(e.target.value)} placeholder="DNI/NIE" required />
-              <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="Nombre driver" required />
-              <Select value={driverSubcontractorId} onChange={(e) => setDriverSubcontractorId(e.target.value)}>
-                <option value="">Sin subcontrata</option>
-                {subcontractors.map((subcontractor) => (
-                  <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
-                ))}
-              </Select>
-              <Button type="submit">Crear driver</Button>
-            </form>
-            <form className="inline-actions" onSubmit={onCreateVehicle}>
-              <Input value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} placeholder="Codigo vehiculo" required />
-              <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} placeholder="Matricula" required />
-              <Select value={vehicleSubcontractorId} onChange={(e) => setVehicleSubcontractorId(e.target.value)}>
-                <option value="">Sin subcontrata</option>
-                {subcontractors.map((subcontractor) => (
-                  <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
-                ))}
-              </Select>
-              <Select value={vehicleDriverId} onChange={(e) => setVehicleDriverId(e.target.value)}>
-                <option value="">Sin driver</option>
-                {drivers.map((driver) => (
-                  <option key={driver.id} value={driver.id}>{driver.code} - {driver.name}</option>
-                ))}
-              </Select>
-              <Button type="submit">Crear vehiculo</Button>
-            </form>
-          </div>
           <div className="inline-actions">
-            <Input value={partnersQuery} onChange={(e) => setPartnersQuery(e.target.value)} placeholder="Buscar por nombre/codigo/editor" />
-            <Select value={partnersSort} onChange={(e) => setPartnersSort(e.target.value as 'name' | 'updated_desc' | 'updated_asc' | 'editor')}>
-              <option value="updated_desc">Ultima edicion (reciente)</option>
-              <option value="updated_asc">Ultima edicion (antigua)</option>
-              <option value="editor">Editor</option>
-              <option value="name">Nombre/codigo</option>
-            </Select>
+            <Button type="button" onClick={openCreateWizard}>+ Crear</Button>
+            <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
+              {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+            </Button>
+            <Button type="button" variant="outline" onClick={load}>Recargar</Button>
           </div>
+          {showFilters ? (
+            <div className="filters-panel">
+              <div className="form-row">
+                <div>
+                  <label>Buscar</label>
+                  <Input value={partnersQuery} onChange={(e) => setPartnersQuery(e.target.value)} placeholder="Nombre/código/editor" />
+                </div>
+                <div>
+                  <label>Orden</label>
+                  <Select value={partnersSort} onChange={(e) => setPartnersSort(e.target.value as 'name' | 'updated_desc' | 'updated_asc' | 'editor')}>
+                    <option value="updated_desc">Última edición (reciente)</option>
+                    <option value="updated_asc">Última edición (antigua)</option>
+                    <option value="editor">Editor</option>
+                    <option value="name">Nombre/código</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <h3>Subcontratas</h3>
           <TableWrapper>

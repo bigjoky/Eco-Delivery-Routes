@@ -622,18 +622,32 @@ export function RouteDetailPage() {
   }, [stops]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const rawTemplates = window.localStorage.getItem(routeBulkTemplateStorageKey);
-    if (rawTemplates) {
-      try {
-        const parsed = JSON.parse(rawTemplates) as RouteBulkActionTemplate[];
-        setBulkTemplates(Array.isArray(parsed) ? parsed : []);
-      } catch {
+    let cancelled = false;
+    apiClient.getRouteBulkTemplates(id).then((rows) => {
+      if (cancelled) return;
+      setBulkTemplates(rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        status: (row.status as '' | 'planned' | 'in_progress' | 'completed' | null) ?? '',
+        plannedAt: row.planned_at ?? '',
+        completedAt: row.completed_at ?? '',
+        shiftMinutes: String(row.shift_minutes ?? 0),
+      })));
+    }).catch(() => {
+      if (typeof window === 'undefined' || cancelled) return;
+      const rawTemplates = window.localStorage.getItem(routeBulkTemplateStorageKey);
+      if (rawTemplates) {
+        try {
+          const parsed = JSON.parse(rawTemplates) as RouteBulkActionTemplate[];
+          setBulkTemplates(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setBulkTemplates([]);
+        }
+      } else {
         setBulkTemplates([]);
       }
-    } else {
-      setBulkTemplates([]);
-    }
+    });
+    if (typeof window === 'undefined') return () => {};
     const rawAudit = window.localStorage.getItem(routeOpsAuditStorageKey);
     if (rawAudit) {
       try {
@@ -646,7 +660,10 @@ export function RouteDetailPage() {
       setOpsAudit([]);
     }
     setSelectedBulkTemplateId('');
-  }, [routeBulkTemplateStorageKey, routeOpsAuditStorageKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [id, routeBulkTemplateStorageKey, routeOpsAuditStorageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -658,7 +675,7 @@ export function RouteDetailPage() {
     window.localStorage.setItem(routeOpsAuditStorageKey, JSON.stringify(opsAudit));
   }, [routeOpsAuditStorageKey, opsAudit]);
 
-  const saveBulkTemplate = () => {
+  const saveBulkTemplate = async () => {
     if (!bulkTemplateName.trim()) {
       setError('Define nombre de plantilla para guardar acciones masivas.');
       return;
@@ -672,7 +689,20 @@ export function RouteDetailPage() {
       shiftMinutes: bulkEtaShiftMinutes,
     };
     setBulkTemplates((current) => [template, ...current].slice(0, 20));
-    setSelectedBulkTemplateId(template.id);
+    try {
+      const saved = await apiClient.createRouteBulkTemplate({
+        route_id: id ?? null,
+        name: template.name,
+        status: template.status || null,
+        planned_at: template.plannedAt || null,
+        completed_at: template.completedAt || null,
+        shift_minutes: Number(template.shiftMinutes) || 0,
+      });
+      setBulkTemplates((current) => current.map((item) => (item.id === template.id ? { ...item, id: saved.id } : item)));
+      setSelectedBulkTemplateId(saved.id);
+    } catch {
+      setSelectedBulkTemplateId(template.id);
+    }
     setBulkTemplateName('');
     appendOpsAudit('template.saved', `Plantilla guardada: ${template.name}`);
   };
@@ -690,12 +720,39 @@ export function RouteDetailPage() {
     appendOpsAudit('template.applied', `Plantilla aplicada: ${template.name}`);
   };
 
-  const deleteBulkTemplate = () => {
+  const deleteBulkTemplate = async () => {
     const template = bulkTemplates.find((item) => item.id === selectedBulkTemplateId);
     if (!template) return;
     setBulkTemplates((current) => current.filter((item) => item.id !== selectedBulkTemplateId));
+    try {
+      await apiClient.deleteRouteBulkTemplate(selectedBulkTemplateId);
+    } catch {
+      // fallback local only
+    }
     setSelectedBulkTemplateId('');
     appendOpsAudit('template.deleted', `Plantilla eliminada: ${template.name}`);
+  };
+
+  const exportOpsAuditCsv = () => {
+    if (opsAudit.length === 0) return;
+    const rows = ['timestamp,action,details'];
+    opsAudit.forEach((entry) => {
+      const csvValue = (value: string) => `"${value.replaceAll('"', '""')}"`;
+      rows.push([
+        csvValue(entry.at),
+        csvValue(entry.action),
+        csvValue(entry.details),
+      ].join(','));
+    });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `route_ops_audit_${route?.code ?? id ?? 'route'}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
   };
 
   return (
@@ -1172,6 +1229,11 @@ export function RouteDetailPage() {
           <CardTitle>Auditoría Operativa</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
+              Exportar CSV auditoría
+            </Button>
+          </div>
           {opsAudit.length === 0 ? (
             <div className="helper">Sin eventos aún.</div>
           ) : (
