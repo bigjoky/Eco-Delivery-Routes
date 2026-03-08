@@ -295,6 +295,7 @@ export function ShipmentsPage() {
   const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
   const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
+  const [operatorMode, setOperatorMode] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
@@ -367,6 +368,7 @@ export function ShipmentsPage() {
   const [senderTemplates, setSenderTemplates] = useState<SenderQuickTemplate[]>([]);
   const [selectedSenderTemplateId, setSelectedSenderTemplateId] = useState('');
   const [newSenderTemplateName, setNewSenderTemplateName] = useState('');
+  const operatorDefaultsStorageKey = 'eco_delivery_routes_shipments_operator_defaults';
   const [recentRecipientContacts, setRecentRecipientContacts] = useState<ContactSummary[]>([]);
   const [recentSenderContacts, setRecentSenderContacts] = useState<ContactSummary[]>([]);
   const [recipientUsageMap, setRecipientUsageMap] = useState<Record<string, number>>({});
@@ -789,6 +791,42 @@ export function ShipmentsPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(operatorDefaultsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        enabled: boolean;
+        hubId: string;
+        pointId: string;
+        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
+      }>;
+      if (typeof parsed.enabled === 'boolean') setOperatorMode(parsed.enabled);
+      if (parsed.hubId) setCreateHubId(parsed.hubId);
+      if (parsed.pointId) setCreatePointId(parsed.pointId);
+      if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      operatorDefaultsStorageKey,
+      JSON.stringify({
+        enabled: operatorMode,
+        hubId: createHubId,
+        pointId: createPointId,
+        operation: createOperation,
+        serviceType: createServiceType,
+      })
+    );
+  }, [operatorMode, createHubId, createPointId, createOperation, createServiceType]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     const raw = window.localStorage.getItem(recipientUsageStorageKey);
     if (!raw) return;
     try {
@@ -896,6 +934,41 @@ export function ShipmentsPage() {
     }
     setCreateError('');
     setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
+  };
+
+  const applyOperatorDefaults = () => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(operatorDefaultsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        hubId: string;
+        pointId: string;
+        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
+      }>;
+      if (parsed.hubId) setCreateHubId(parsed.hubId);
+      if (parsed.pointId) setCreatePointId(parsed.pointId);
+      if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
+      setCreateError('');
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveOperatorDefaults = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      operatorDefaultsStorageKey,
+      JSON.stringify({
+        enabled: operatorMode,
+        hubId: createHubId,
+        pointId: createPointId,
+        operation: createOperation,
+        serviceType: createServiceType,
+      })
+    );
   };
 
   const createBlockingChecks = useMemo(() => {
@@ -1372,20 +1445,22 @@ export function ShipmentsPage() {
       setCreateAddressNotes('');
       setCreatePhone('');
       setCreateEmail('');
-      setCreateSenderLegalName('');
-      setCreateSenderDocumentId('');
-      setCreateSenderDocType('DNI');
-      setCreateSenderFirstName('');
-      setCreateSenderLastName('');
-      setCreateSenderStreet('');
-      setCreateSenderNumber('');
-      setCreateSenderPostalCode('');
-      setCreateSenderCity('');
-      setCreateSenderProvince('');
-      setCreateSenderCountry('ES');
-      setCreateSenderAddressNotes('');
-      setCreateSenderPhone('');
-      setCreateSenderEmail('');
+      if (!operatorMode || createOperation === 'shipment') {
+        setCreateSenderLegalName('');
+        setCreateSenderDocumentId('');
+        setCreateSenderDocType('DNI');
+        setCreateSenderFirstName('');
+        setCreateSenderLastName('');
+        setCreateSenderStreet('');
+        setCreateSenderNumber('');
+        setCreateSenderPostalCode('');
+        setCreateSenderCity('');
+        setCreateSenderProvince('');
+        setCreateSenderCountry('ES');
+        setCreateSenderAddressNotes('');
+        setCreateSenderPhone('');
+        setCreateSenderEmail('');
+      }
       setConsigneeLookupPhone('');
       setConsigneeLookupDocument('');
       setSenderLookupPhone('');
@@ -1393,8 +1468,12 @@ export function ShipmentsPage() {
       setRecipientAddressSuggestions([]);
       setSenderAddressSuggestions([]);
       setCreateScheduledAt(new Date().toISOString().slice(0, 10));
-      setCreateOperation('shipment');
-      setCreateServiceType('express_1030');
+      if (!operatorMode) {
+        setCreateOperation('shipment');
+        setCreateServiceType('express_1030');
+        setCreateHubId('');
+        setCreatePointId('');
+      }
       setCreateFieldErrors({});
       await reload(1);
     } catch (exception) {
@@ -2158,12 +2237,38 @@ export function ShipmentsPage() {
             </Button>
           </div>
           <div className="inline-actions">
+            <label htmlFor="shipment-operator-mode">Modo operador (alta repetitiva)</label>
+            <input
+              id="shipment-operator-mode"
+              type="checkbox"
+              checked={operatorMode}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setOperatorMode(enabled);
+                if (enabled) setWizardMode(false);
+              }}
+            />
+            <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
+              Guardar defaults
+            </Button>
+            <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
+              Aplicar defaults
+            </Button>
+          </div>
+          <div className="inline-actions">
             <label htmlFor="shipment-wizard-mode">Asistente paso a paso (beta)</label>
             <input
               id="shipment-wizard-mode"
               type="checkbox"
               checked={wizardMode}
-              onChange={(event) => setWizardMode(event.target.checked)}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                if (operatorMode && enabled) {
+                  setCreateError('Desactiva modo operador para usar asistente.');
+                  return;
+                }
+                setWizardMode(enabled);
+              }}
             />
             {wizardMode ? (
               <>
@@ -2177,6 +2282,11 @@ export function ShipmentsPage() {
               </>
             ) : null}
           </div>
+          {operatorMode ? (
+            <div className="helper">
+              Modo operador activo: se conservan hub/operación/servicio al crear para carga rápida.
+            </div>
+          ) : null}
           {wizardMode ? (
             <div className="helper">
               {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'

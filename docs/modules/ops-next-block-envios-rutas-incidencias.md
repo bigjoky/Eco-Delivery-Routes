@@ -51,6 +51,7 @@
 - Sincronización de plantillas de contacto a backend (`POST /api/v1/contacts`) para reutilización compartida por equipo.
 - Contactos compartidos recientes en modal con aplicación en 1 clic.
 - Priorización por frecuencia de uso (plantillas y contactos recientes).
+- Modo operador en alta de envíos: defaults persistidos de hub/operación/servicio para flujo repetitivo.
 
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).

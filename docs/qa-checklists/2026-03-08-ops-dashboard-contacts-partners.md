@@ -15,6 +15,8 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Validar "Contactos compartidos recientes" y aplicar un contacto en 1 clic.
 - [ ] Guardar plantilla de destinatario y comprobar sincronización en backend (`/api/v1/contacts`).
 - [ ] Repetir el flujo para modal de remitente.
+- [ ] Activar modo operador y validar persistencia de defaults (`hub`, `operación`, `servicio`).
+- [ ] Crear envío en modo operador y validar que no se resetean los defaults de alta.
 - [ ] Validar reglas de servicio:
   - [ ] `business_parcel` bloquea domingo.
   - [ ] `thermo_parcel` bloquea domingo.
