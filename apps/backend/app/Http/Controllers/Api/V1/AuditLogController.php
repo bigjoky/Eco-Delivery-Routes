@@ -84,6 +84,14 @@ class AuditLogController extends Controller
             $query->where('event', 'like', (string) $request->query('event') . '%');
         }
 
+        if ($request->filled('actor')) {
+            $actor = trim((string) $request->query('actor'));
+            $query->where(function ($nested) use ($actor): void {
+                $nested->where('users.name', 'like', "%{$actor}%")
+                    ->orWhere('audit_logs.actor_user_id', $actor);
+            });
+        }
+
         if ($request->filled('date_from')) {
             $query->whereDate('audit_logs.created_at', '>=', (string) $request->query('date_from'));
         }

@@ -369,6 +369,9 @@ paths:
           name: event
           schema: { type: string }
         - in: query
+          name: actor
+          schema: { type: string, description: "Nombre parcial o actor_user_id" }
+        - in: query
           name: date_from
           schema: { type: string, format: date }
         - in: query
@@ -398,6 +401,9 @@ paths:
         - in: query
           name: event
           schema: { type: string }
+        - in: query
+          name: actor
+          schema: { type: string, description: "Nombre parcial o actor_user_id" }
         - in: query
           name: date_from
           schema: { type: string, format: date }

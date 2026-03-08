@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { AuditLogEntry, DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
@@ -20,9 +20,14 @@ export function PartnersPage() {
   const [driverStatusFilter, setDriverStatusFilter] = useState<'' | 'active' | 'inactive' | 'suspended'>('');
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState<'' | 'active' | 'inactive' | 'maintenance'>('');
   const [subcontractorScopeFilter, setSubcontractorScopeFilter] = useState('');
+  const [lastEditorFilter, setLastEditorFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditEventFilter, setAuditEventFilter] = useState('subcontractors.');
+  const [auditActorFilter, setAuditActorFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreatePartnerType>('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -82,6 +87,20 @@ export function PartnersPage() {
       setSubcontractors(subRows);
       setDrivers(driverRows);
       setVehicles(vehicleRows);
+      setAuditLoading(true);
+      try {
+        const auditResult = await apiClient.getAuditLogs({
+          event: auditEventFilter.trim() || undefined,
+          actor: auditActorFilter.trim() || undefined,
+          page: 1,
+          perPage: 30,
+        });
+        setAuditRows(auditResult.data);
+      } catch {
+        setAuditRows([]);
+      } finally {
+        setAuditLoading(false);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el modulo de partners');
     }
@@ -89,7 +108,7 @@ export function PartnersPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [auditEventFilter, auditActorFilter]);
 
   const normalizedQuery = partnersQuery.trim().toLowerCase();
   const sortBy = <T extends { updated_at?: string | null; last_editor_name?: string | null }>(rows: T[], label: (row: T) => string) => {
@@ -109,20 +128,23 @@ export function PartnersPage() {
   };
   const filteredSubcontractors = useMemo(
     () => sortBy(subcontractors, (row) => `${row.legal_name} ${row.tax_id ?? ''}`)
-      .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter),
-    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter]
+      .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter, lastEditorFilter]
   );
   const filteredDrivers = useMemo(
     () => sortBy(drivers, (row) => `${row.code} ${row.name} ${row.dni ?? ''}`)
       .filter((row) => !driverStatusFilter || row.status === driverStatusFilter)
-      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
-    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter]
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter, lastEditorFilter]
   );
   const filteredVehicles = useMemo(
     () => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`)
       .filter((row) => !vehicleStatusFilter || row.status === vehicleStatusFilter)
-      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
-    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter]
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter, lastEditorFilter]
   );
 
   const partnersSummary = useMemo(() => ({
@@ -614,6 +636,14 @@ export function PartnersPage() {
                     <option value="maintenance">maintenance</option>
                   </Select>
                 </div>
+                <div>
+                  <label>Última edición por</label>
+                  <Input
+                    value={lastEditorFilter}
+                    onChange={(e) => setLastEditorFilter(e.target.value)}
+                    placeholder="Nombre editor"
+                  />
+                </div>
               </div>
             </div>
           ) : null}
@@ -906,6 +936,72 @@ export function PartnersPage() {
 
           {message ? <p className="helper">{message}</p> : null}
           {error ? <p className="helper error">{error}</p> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Auditoría partners</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="inline-actions">
+            <Select value={auditEventFilter} onChange={(e) => setAuditEventFilter(e.target.value)}>
+              <option value="">Todos los eventos</option>
+              <option value="subcontractors.">Subcontratas</option>
+              <option value="drivers.">Conductores</option>
+              <option value="vehicles.">Vehículos</option>
+            </Select>
+            <Input
+              value={auditActorFilter}
+              onChange={(e) => setAuditActorFilter(e.target.value)}
+              placeholder="Filtrar por actor"
+            />
+            <Button type="button" variant="outline" onClick={() => { void load(); }}>
+              Actualizar auditoría
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => apiClient.exportAuditLogsCsv({
+                event: auditEventFilter || undefined,
+                actor: auditActorFilter || undefined,
+              })}
+            >
+              Export CSV auditoría
+            </Button>
+          </div>
+          <TableWrapper>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Evento</TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>Detalle</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {auditRows.map((row) => (
+                  <TableRow key={`audit-${row.id}`}>
+                    <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                    <TableCell>{row.event}</TableCell>
+                    <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                    <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                  </TableRow>
+                ))}
+                {!auditRows.length && !auditLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4}>Sin auditoría para el filtro actual.</TableCell>
+                  </TableRow>
+                ) : null}
+                {auditLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4}>Cargando auditoría...</TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </TableWrapper>
         </CardContent>
       </Card>
     </section>

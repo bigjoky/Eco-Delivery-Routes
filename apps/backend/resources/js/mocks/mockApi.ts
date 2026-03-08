@@ -541,6 +541,7 @@ export const mockApi = {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -612,6 +613,33 @@ export const mockApi = {
         },
         created_at: '2026-02-28T10:20:00Z',
       },
+      {
+        id: 7,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'subcontractors.bulk_status_updated',
+        metadata: { ids: ['sc-1'], status: 'suspended', affected_count: 1 },
+        created_at: '2026-03-08T18:50:00Z',
+      },
+      {
+        id: 8,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'drivers.bulk_status_updated',
+        metadata: { ids: ['drv-1'], status: 'active', affected_count: 1 },
+        created_at: '2026-03-08T18:55:00Z',
+      },
+      {
+        id: 9,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'vehicles.bulk_status_updated',
+        metadata: { ids: ['veh-1'], status: 'maintenance', affected_count: 1 },
+        created_at: '2026-03-08T19:00:00Z',
+      },
     ];
     let filtered = rows;
     if (_.resource === 'user') {
@@ -635,6 +663,13 @@ export const mockApi = {
     if (_.event) {
       filtered = filtered.filter((row) => row.event.startsWith(_.event ?? ''));
     }
+    if (_.actor) {
+      const actor = _.actor.toLowerCase();
+      filtered = filtered.filter((row) => (
+        (row.actor_name ?? '').toLowerCase().includes(actor)
+        || (row.actor_user_id ?? '').toLowerCase().includes(actor)
+      ));
+    }
     return filtered;
   },
 
@@ -642,6 +677,7 @@ export const mockApi = {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
   }) {

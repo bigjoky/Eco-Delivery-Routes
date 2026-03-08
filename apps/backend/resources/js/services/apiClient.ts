@@ -405,6 +405,7 @@ export const apiClient = {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -420,6 +421,7 @@ export const apiClient = {
     if (filters.resource) params.set('resource', filters.resource);
     if (filters.id) params.set('id', filters.id);
     if (filters.event) params.set('event', filters.event);
+    if (filters.actor) params.set('actor', filters.actor);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
     if (filters.dateTo) params.set('date_to', filters.dateTo);
     params.set('page', String(page));
@@ -433,6 +435,7 @@ export const apiClient = {
     resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
   }): Promise<void> {
@@ -442,6 +445,7 @@ export const apiClient = {
     if (filters.resource) params.set('resource', filters.resource);
     if (filters.id) params.set('id', filters.id);
     if (filters.event) params.set('event', filters.event);
+    if (filters.actor) params.set('actor', filters.actor);
     if (filters.dateFrom) params.set('date_from', filters.dateFrom);
     if (filters.dateTo) params.set('date_to', filters.dateTo);
 
