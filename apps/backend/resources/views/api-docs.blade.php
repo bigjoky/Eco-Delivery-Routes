@@ -23,7 +23,7 @@
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
     <script>
       window.ui = SwaggerUIBundle({
-        url: '/openapi.yaml',
+        url: '/openapi.yaml?v={{ filemtime(base_path("openapi.yaml")) }}',
         dom_id: '#swagger-ui',
         deepLinking: true,
         displayRequestDuration: true,
