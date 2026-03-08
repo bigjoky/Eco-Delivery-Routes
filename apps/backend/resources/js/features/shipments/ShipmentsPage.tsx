@@ -318,6 +318,7 @@ export function ShipmentsPage() {
   const [bulkStatus, setBulkStatus] = useState('');
   const [bulkHubId, setBulkHubId] = useState('');
   const [bulkScheduledAt, setBulkScheduledAt] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
   const [bulkApplyToFiltered, setBulkApplyToFiltered] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
@@ -355,6 +356,10 @@ export function ShipmentsPage() {
       pageCount: items.length,
     };
   }, [items, meta.total]);
+
+  const activeFiltersCount = useMemo(() => {
+    return [query, status, hubFilter, scheduledFrom, scheduledTo].filter((value) => value !== '').length;
+  }, [query, status, hubFilter, scheduledFrom, scheduledTo]);
 
   const availableIncidentCatalog = useMemo(
     () => incidentCatalog.filter((item) => item.applies_to === 'shipment' || item.applies_to === 'both'),
@@ -2120,24 +2125,35 @@ export function ShipmentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
-          <ShipmentFilters
-            query={query}
-            setQuery={setQuery}
-            status={status}
-            setStatus={setStatus}
-            hubFilter={hubFilter}
-            setHubFilter={setHubFilter}
-            scheduledFrom={scheduledFrom}
-            setScheduledFrom={setScheduledFrom}
-            scheduledTo={scheduledTo}
-            setScheduledTo={setScheduledTo}
-            hubs={hubs}
-            setQuickRange={setQuickRange}
-            clearFilters={clearFilters}
-            canExport={canExport}
-            exportCsv={exportCsv}
-            exportPdf={exportPdf}
-          />
+          <div className="inline-actions">
+            <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
+              {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+            </Button>
+            <span className="helper">Filtros activos: {activeFiltersCount}</span>
+            {activeFiltersCount > 0 ? (
+              <Button type="button" variant="outline" onClick={clearFilters}>Limpiar filtros</Button>
+            ) : null}
+          </div>
+          {showFilters ? (
+            <ShipmentFilters
+              query={query}
+              setQuery={setQuery}
+              status={status}
+              setStatus={setStatus}
+              hubFilter={hubFilter}
+              setHubFilter={setHubFilter}
+              scheduledFrom={scheduledFrom}
+              setScheduledFrom={setScheduledFrom}
+              scheduledTo={scheduledTo}
+              setScheduledTo={setScheduledTo}
+              hubs={hubs}
+              setQuickRange={setQuickRange}
+              clearFilters={clearFilters}
+              canExport={canExport}
+              exportCsv={exportCsv}
+              exportPdf={exportPdf}
+            />
+          ) : null}
           <div className="inline-actions">
             <span className="helper">Columnas export</span>
           {[
