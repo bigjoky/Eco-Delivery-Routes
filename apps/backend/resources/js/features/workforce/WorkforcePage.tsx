@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -9,6 +10,7 @@ import { SubcontractorSummary, WorkforceEmployeeSummary } from '../../core/api/t
 import { apiClient } from '../../services/apiClient';
 
 export function WorkforcePage() {
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<WorkforceEmployeeSummary[]>([]);
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [query, setQuery] = useState('');
@@ -30,15 +32,24 @@ export function WorkforcePage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
 
-  const load = async () => {
+  const load = async (overrides?: {
+    query?: string;
+    statusFilter?: 'all' | 'active' | 'inactive' | 'suspended';
+    typeFilter?: 'all' | 'own' | 'external' | 'contractor';
+    subFilter?: string;
+  }) => {
     setError('');
+    const effectiveQuery = overrides?.query ?? query;
+    const effectiveStatusFilter = overrides?.statusFilter ?? statusFilter;
+    const effectiveTypeFilter = overrides?.typeFilter ?? typeFilter;
+    const effectiveSubFilter = overrides?.subFilter ?? subFilter;
     try {
       const [workforceRows, subcontractorRows] = await Promise.all([
         apiClient.getWorkforce({
-          q: query || undefined,
-          status: statusFilter === 'all' ? undefined : statusFilter,
-          employmentType: typeFilter === 'all' ? undefined : typeFilter,
-          subcontractorId: subFilter || undefined,
+          q: effectiveQuery || undefined,
+          status: effectiveStatusFilter === 'all' ? undefined : effectiveStatusFilter,
+          employmentType: effectiveTypeFilter === 'all' ? undefined : effectiveTypeFilter,
+          subcontractorId: effectiveSubFilter || undefined,
         }),
         apiClient.getSubcontractors({ limit: 100 }),
       ]);
@@ -52,6 +63,25 @@ export function WorkforcePage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    const id = searchParams.get('id') ?? '';
+    const subcontractorIdParam = searchParams.get('subcontractor_id') ?? '';
+    const q = searchParams.get('q') ?? '';
+    const nextQuery = q || id || '';
+    const nextSubFilter = subcontractorIdParam || '';
+    const nextTypeFilter: 'all' | 'own' | 'external' | 'contractor' = subcontractorIdParam ? 'contractor' : typeFilter;
+    if (nextQuery) setQuery(nextQuery);
+    if (subcontractorIdParam) {
+      setSubFilter(subcontractorIdParam);
+      setTypeFilter('contractor');
+    }
+    void load({
+      query: nextQuery || undefined,
+      subFilter: nextSubFilter || undefined,
+      typeFilter: nextTypeFilter,
+    });
+  }, [searchParams]);
 
   const summary = useMemo(() => ({
     total: rows.length,

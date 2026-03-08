@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -11,12 +12,14 @@ import { apiClient } from '../../services/apiClient';
 type ControlType = 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
 
 export function FleetControlsPage() {
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState<VehicleControlSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [vehicleFilter, setVehicleFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | ControlType>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [focusedControlId, setFocusedControlId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -32,15 +35,24 @@ export function FleetControlsPage() {
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  const load = async () => {
+  const load = async (overrides?: {
+    vehicleFilter?: string;
+    typeFilter?: 'all' | ControlType;
+    fromDate?: string;
+    toDate?: string;
+  }) => {
     setError('');
+    const effectiveVehicleFilter = overrides?.vehicleFilter ?? vehicleFilter;
+    const effectiveTypeFilter = overrides?.typeFilter ?? typeFilter;
+    const effectiveFromDate = overrides?.fromDate ?? fromDate;
+    const effectiveToDate = overrides?.toDate ?? toDate;
     try {
       const [controlRows, vehicleRows] = await Promise.all([
         apiClient.getVehicleControls({
-          vehicleId: vehicleFilter || undefined,
-          controlType: typeFilter === 'all' ? undefined : typeFilter,
-          dateFrom: fromDate || undefined,
-          dateTo: toDate || undefined,
+          vehicleId: effectiveVehicleFilter || undefined,
+          controlType: effectiveTypeFilter === 'all' ? undefined : effectiveTypeFilter,
+          dateFrom: effectiveFromDate || undefined,
+          dateTo: effectiveToDate || undefined,
         }),
         apiClient.getVehicles({ limit: 200 }),
       ]);
@@ -56,14 +68,50 @@ export function FleetControlsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    const vehicleIdParam = searchParams.get('vehicle_id') ?? '';
+    const controlTypeParam = searchParams.get('control_type') ?? '';
+    const fromDateParam = searchParams.get('date_from') ?? '';
+    const toDateParam = searchParams.get('date_to') ?? '';
+    const focus = searchParams.get('focus') ?? '';
+    const id = searchParams.get('id') ?? '';
+    const nextTypeFilter = controlTypeParam === 'fuel'
+      || controlTypeParam === 'insurance'
+      || controlTypeParam === 'itv'
+      || controlTypeParam === 'maintenance'
+      || controlTypeParam === 'other'
+      ? controlTypeParam
+      : 'all';
+
+    setVehicleFilter(vehicleIdParam);
+    setTypeFilter(nextTypeFilter);
+    setFromDate(fromDateParam);
+    setToDate(toDateParam);
+    setFocusedControlId(focus === 'control' ? id : '');
+
+    if (vehicleIdParam || controlTypeParam || fromDateParam || toDateParam) {
+      void load({
+        vehicleFilter: vehicleIdParam,
+        typeFilter: nextTypeFilter,
+        fromDate: fromDateParam,
+        toDate: toDateParam,
+      });
+    }
+  }, [searchParams]);
+
+  const visibleRows = useMemo(
+    () => (focusedControlId ? rows.filter((item) => item.id === focusedControlId) : rows),
+    [rows, focusedControlId]
+  );
+
   const summary = useMemo(() => ({
-    total: rows.length,
-    fuel: rows.filter((item) => item.control_type === 'fuel').length,
-    insurance: rows.filter((item) => item.control_type === 'insurance').length,
-    itv: rows.filter((item) => item.control_type === 'itv').length,
-    maintenance: rows.filter((item) => item.control_type === 'maintenance').length,
-    amount: rows.reduce((acc, row) => acc + (Number(row.amount) || 0), 0),
-  }), [rows]);
+    total: visibleRows.length,
+    fuel: visibleRows.filter((item) => item.control_type === 'fuel').length,
+    insurance: visibleRows.filter((item) => item.control_type === 'insurance').length,
+    itv: visibleRows.filter((item) => item.control_type === 'itv').length,
+    maintenance: visibleRows.filter((item) => item.control_type === 'maintenance').length,
+    amount: visibleRows.reduce((acc, row) => acc + (Number(row.amount) || 0), 0),
+  }), [visibleRows]);
 
   const resetForm = () => {
     setEditingId('');
@@ -216,7 +264,7 @@ export function FleetControlsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
+                {visibleRows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.vehicle_code ?? row.vehicle_id}{row.plate_number ? ` (${row.plate_number})` : ''}</TableCell>
                     <TableCell>{row.control_type}</TableCell>
@@ -232,7 +280,7 @@ export function FleetControlsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {rows.length === 0 ? (
+                {visibleRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>Sin datos.</TableCell>
                   </TableRow>

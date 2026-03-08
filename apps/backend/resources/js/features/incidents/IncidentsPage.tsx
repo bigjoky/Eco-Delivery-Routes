@@ -171,6 +171,7 @@ export function IncidentsPage() {
     const priorityParam = searchParams.get('priority') ?? '';
     const slaParam = searchParams.get('sla') ?? '';
     const incidentableParam = searchParams.get('incidentable_id') ?? '';
+    const incidentIdParam = searchParams.get('incident_id') ?? '';
     const searchParam = searchParams.get('q') ?? '';
     const pageParam = Number(searchParams.get('page') ?? '1');
 
@@ -183,6 +184,7 @@ export function IncidentsPage() {
     if (priorityParam) setListPriorityFilter(priorityParam as 'high' | 'medium' | 'low' | '');
     if (slaParam) setListSlaFilter(slaParam as 'on_track' | 'at_risk' | 'breached' | 'resolved' | '');
     if (incidentableParam) setListIncidentableId(incidentableParam);
+    if (incidentIdParam) setListSearch(incidentIdParam);
     if (searchParam) setListSearch(searchParam);
     if (!Number.isNaN(pageParam) && pageParam > 0) setPage(pageParam);
 

@@ -57,6 +57,7 @@ function getEntityLink(row: AuditLogEntry): { to: string; label: string } | null
   const subcontractorId = typeof metadata.subcontractor_id === 'string' ? metadata.subcontractor_id : null;
   const driverId = typeof metadata.driver_id === 'string' ? metadata.driver_id : null;
   const vehicleId = typeof metadata.vehicle_id === 'string' ? metadata.vehicle_id : null;
+  const vehicleControlId = typeof metadata.vehicle_control_id === 'string' ? metadata.vehicle_control_id : null;
   const employeeId = typeof metadata.employee_id === 'string' ? metadata.employee_id : null;
 
   if (settlementId) return { to: `/settlements/${settlementId}`, label: 'Liquidación' };
@@ -65,9 +66,10 @@ function getEntityLink(row: AuditLogEntry): { to: string; label: string } | null
   if (incidentId) return { to: `/incidents?incident_id=${encodeURIComponent(incidentId)}`, label: 'Incidencia' };
   if (userId) return { to: `/users/${userId}`, label: 'Usuario' };
   if (roleId) return { to: `/roles/${roleId}`, label: 'Rol' };
+  if (vehicleControlId) return { to: `/fleet-controls?focus=control&id=${encodeURIComponent(vehicleControlId)}`, label: 'Control flota' };
   if (subcontractorId) return { to: `/partners?focus=subcontractor&id=${encodeURIComponent(subcontractorId)}`, label: 'Subcontrata' };
   if (driverId) return { to: `/partners?focus=driver&id=${encodeURIComponent(driverId)}`, label: 'Conductor' };
-  if (vehicleId) return { to: `/partners?focus=vehicle&id=${encodeURIComponent(vehicleId)}`, label: 'Vehículo' };
+  if (vehicleId) return { to: `/fleet-controls?vehicle_id=${encodeURIComponent(vehicleId)}`, label: 'Vehículo' };
   if (employeeId) return { to: `/workforce?id=${encodeURIComponent(employeeId)}`, label: 'Empleado' };
   return null;
 }

@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -11,6 +12,7 @@ import { apiClient } from '../../services/apiClient';
 type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
 
 export function PartnersPage() {
+  const [searchParams] = useSearchParams();
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
@@ -28,6 +30,8 @@ export function PartnersPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditEventFilter, setAuditEventFilter] = useState('subcontractors.');
   const [auditActorFilter, setAuditActorFilter] = useState('');
+  const [focusedEntityType, setFocusedEntityType] = useState<'' | 'subcontractor' | 'driver' | 'vehicle'>('');
+  const [focusedEntityId, setFocusedEntityId] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreatePartnerType>('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -110,6 +114,41 @@ export function PartnersPage() {
     load();
   }, [auditEventFilter, auditActorFilter]);
 
+  useEffect(() => {
+    const focus = searchParams.get('focus');
+    const id = searchParams.get('id') ?? '';
+    const editor = searchParams.get('editor') ?? '';
+    if (editor) {
+      setLastEditorFilter(editor);
+      setShowFilters(true);
+    }
+    if (!focus || !id) {
+      setFocusedEntityType('');
+      setFocusedEntityId('');
+      return;
+    }
+    setPartnersQuery(id);
+    setShowFilters(true);
+    if (focus === 'subcontractor') {
+      setFocusedEntityType('subcontractor');
+      setFocusedEntityId(id);
+      setSubcontractorScopeFilter(id);
+      setAuditEventFilter('subcontractors.');
+      return;
+    }
+    if (focus === 'driver') {
+      setFocusedEntityType('driver');
+      setFocusedEntityId(id);
+      setAuditEventFilter('drivers.');
+      return;
+    }
+    if (focus === 'vehicle') {
+      setFocusedEntityType('vehicle');
+      setFocusedEntityId(id);
+      setAuditEventFilter('vehicles.');
+    }
+  }, [searchParams]);
+
   const normalizedQuery = partnersQuery.trim().toLowerCase();
   const sortBy = <T extends { updated_at?: string | null; last_editor_name?: string | null }>(rows: T[], label: (row: T) => string) => {
     const mapped = normalizedQuery
@@ -129,22 +168,25 @@ export function PartnersPage() {
   const filteredSubcontractors = useMemo(
     () => sortBy(subcontractors, (row) => `${row.legal_name} ${row.tax_id ?? ''}`)
       .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter)
+      .filter((row) => focusedEntityType !== 'subcontractor' || !focusedEntityId || row.id === focusedEntityId)
       .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
-    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter, lastEditorFilter]
+    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
   const filteredDrivers = useMemo(
     () => sortBy(drivers, (row) => `${row.code} ${row.name} ${row.dni ?? ''}`)
       .filter((row) => !driverStatusFilter || row.status === driverStatusFilter)
       .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => focusedEntityType !== 'driver' || !focusedEntityId || row.id === focusedEntityId)
       .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
-    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter, lastEditorFilter]
+    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
   const filteredVehicles = useMemo(
     () => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`)
       .filter((row) => !vehicleStatusFilter || row.status === vehicleStatusFilter)
       .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => focusedEntityType !== 'vehicle' || !focusedEntityId || row.id === focusedEntityId)
       .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
-    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter, lastEditorFilter]
+    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
 
   const partnersSummary = useMemo(() => ({

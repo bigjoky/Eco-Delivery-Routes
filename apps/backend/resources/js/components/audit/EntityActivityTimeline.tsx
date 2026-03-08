@@ -142,9 +142,13 @@ function entityLinkFromMetadata(metadata: AuditLogEntry['metadata']): { to: stri
   const shipmentId = typeof data.shipment_id === 'string' ? data.shipment_id : null;
   const routeId = typeof data.route_id === 'string' ? data.route_id : null;
   const incidentId = typeof data.incident_id === 'string' ? data.incident_id : null;
+  const vehicleControlId = typeof data.vehicle_control_id === 'string' ? data.vehicle_control_id : null;
+  const vehicleId = typeof data.vehicle_id === 'string' ? data.vehicle_id : null;
   if (shipmentId) return { to: `/shipments/${shipmentId}`, label: 'Envío' };
   if (routeId) return { to: `/routes/${routeId}`, label: 'Ruta' };
   if (incidentId) return { to: `/incidents?incident_id=${encodeURIComponent(incidentId)}`, label: 'Incidencia' };
+  if (vehicleControlId) return { to: `/fleet-controls?focus=control&id=${encodeURIComponent(vehicleControlId)}`, label: 'Control flota' };
+  if (vehicleId) return { to: `/fleet-controls?vehicle_id=${encodeURIComponent(vehicleId)}`, label: 'Vehículo' };
   return null;
 }
 
