@@ -1,20 +1,17 @@
 # Eco Delivery Routes Monorepo
 
-Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
+Base del sistema web/PWA de **Eco Delivery Routes**.
 
 ## Estructura
 
-- `apps/backend`: backend API (Laravel-style) + pruebas.
-- `apps/web`: cliente web React starter.
-- `apps/apple`: apps nativas Apple (`macOS`, `iOS/iPadOS`, `tvOS`) y núcleo compartido.
-- `apps/android`: app Android nativa (Kotlin + Compose).
+- `apps/backend`: backend Laravel + frontend React (Inertia) + PWA.
 - `docs`: ADRs, definición de módulos y arquitectura.
 - `.github/workflows`: CI inicial.
 
 ## Estrategia técnica inicial
 
 - Repositorio: **monorepo modular**.
-- API: REST versionada (`/api/v1`).
+- API: REST versionada (`/api/v1`) + capa web con Inertia.
 - Seguridad: autenticación token + RBAC + auditoría.
 - Módulo inicial MVP: **Autenticación + Usuarios + Roles**.
 
@@ -43,5 +40,5 @@ Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
 ## Checklist CI sugerido
 
 - Backend: `./vendor/bin/phpunit` en `apps/backend`.
-- Web unit: `npm test` en `apps/web`.
-- Web e2e: `npm run e2e` en `apps/web`.
+- Web unit: `npm test` en `apps/backend`.
+- Web build/PWA: `npm run build` en `apps/backend`.
