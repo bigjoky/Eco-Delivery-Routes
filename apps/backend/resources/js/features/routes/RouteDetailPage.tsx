@@ -576,6 +576,45 @@ export function RouteDetailPage() {
     return date.toISOString();
   };
 
+  const localDateTimeNow = () => toLocalDateTime(new Date().toISOString());
+
+  const applyBulkPreset = (preset: 'clear' | 'start_shift' | 'mark_in_progress_now' | 'complete_now' | 'delay_15' | 'delay_30') => {
+    if (preset === 'clear') {
+      setBulkStatus('');
+      setBulkPlannedAt('');
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'start_shift') {
+      setBulkStatus('planned');
+      setBulkPlannedAt(localDateTimeNow());
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'mark_in_progress_now') {
+      setBulkStatus('in_progress');
+      setBulkPlannedAt(localDateTimeNow());
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'complete_now') {
+      setBulkStatus('completed');
+      setBulkCompletedAt(localDateTimeNow());
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'delay_15') {
+      setBulkEtaShiftMinutes('15');
+      return;
+    }
+    if (preset === 'delay_30') {
+      setBulkEtaShiftMinutes('30');
+    }
+  };
+
   const shiftIsoDateTime = (value: string, minutes: number) => {
     const parsed = Date.parse(value);
     if (Number.isNaN(parsed)) return value;
@@ -1119,6 +1158,15 @@ export function RouteDetailPage() {
                 Guardar plantilla
               </Button>
             </div>
+          </div>
+          <div className="inline-actions">
+            <span className="helper">Presets operativos</span>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('start_shift')} disabled={bulkUpdatingStops || bulkDeletingStops}>Inicio turno</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('mark_in_progress_now')} disabled={bulkUpdatingStops || bulkDeletingStops}>En curso ahora</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('complete_now')} disabled={bulkUpdatingStops || bulkDeletingStops}>Cerrar ahora</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('delay_15')} disabled={bulkUpdatingStops || bulkDeletingStops}>Retrasar +15m</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('delay_30')} disabled={bulkUpdatingStops || bulkDeletingStops}>Retrasar +30m</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('clear')} disabled={bulkUpdatingStops || bulkDeletingStops}>Limpiar</Button>
           </div>
           <div className="inline-actions">
             <label htmlFor="bulk-stop-status">Estado masivo</label>

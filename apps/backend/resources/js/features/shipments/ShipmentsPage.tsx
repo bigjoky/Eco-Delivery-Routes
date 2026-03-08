@@ -738,6 +738,74 @@ export function ShipmentsPage() {
     setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
   };
 
+  const createBlockingChecks = useMemo(() => {
+    const checks: string[] = [];
+    if (!createHubId.trim()) checks.push('Selecciona un hub.');
+    if (!createScheduledAt.trim()) checks.push('Define fecha programada.');
+
+    if (createOperation === 'shipment') {
+      if (!createConsigneeDocumentId.trim()) checks.push('Documento de destinatario obligatorio.');
+      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+        checks.push(createConsigneeDocType === 'CIF'
+          ? 'Razon social de destinatario obligatoria.'
+          : 'Nombre y apellidos de destinatario obligatorios.');
+      }
+      if (!createPhone.trim()) checks.push('Telefono de destinatario obligatorio.');
+      if (!createStreet.trim() || !createCity.trim() || !createPostalCode.trim()) {
+        checks.push('Direccion completa de destinatario obligatoria (calle, ciudad, CP).');
+      }
+    }
+
+    if (!createSenderDocumentId.trim()) checks.push('Documento de remitente obligatorio.');
+    if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
+      checks.push(createSenderDocType === 'CIF'
+        ? 'Razon social de remitente obligatoria.'
+        : 'Nombre y apellidos de remitente obligatorios.');
+    }
+    if (createOperation !== 'shipment') {
+      if (!createSenderPhone.trim()) checks.push('Telefono de remitente obligatorio para recogidas.');
+      if (!createSenderStreet.trim() || !createSenderCity.trim() || !createSenderPostalCode.trim()) {
+        checks.push('Direccion completa de remitente obligatoria para recogidas.');
+      }
+    }
+
+    if (createPhone.trim() && !isValidPhone(createPhone)) checks.push('Telefono de destinatario invalido.');
+    if (createSenderPhone.trim() && !isValidPhone(createSenderPhone)) checks.push('Telefono de remitente invalido.');
+    if (createEmail.trim() && !isValidEmail(createEmail)) checks.push('Email de destinatario invalido.');
+    if (createSenderEmail.trim() && !isValidEmail(createSenderEmail)) checks.push('Email de remitente invalido.');
+    if (createPostalCode.trim() && !isValidPostalCode(createCountry, createPostalCode)) checks.push('Codigo postal de destinatario invalido.');
+    if (createSenderPostalCode.trim() && !isValidPostalCode(createSenderCountry, createSenderPostalCode)) checks.push('Codigo postal de remitente invalido.');
+
+    return Array.from(new Set(checks));
+  }, [
+    createHubId,
+    createScheduledAt,
+    createOperation,
+    createConsigneeDocumentId,
+    createConsigneeDocType,
+    createConsignee,
+    createConsigneeFirstName,
+    createConsigneeLastName,
+    createPhone,
+    createStreet,
+    createCity,
+    createPostalCode,
+    createSenderDocumentId,
+    createSenderDocType,
+    createSenderLegalName,
+    createSenderFirstName,
+    createSenderLastName,
+    createSenderPhone,
+    createSenderStreet,
+    createSenderCity,
+    createSenderPostalCode,
+    createEmail,
+    createSenderEmail,
+    createCountry,
+    createSenderCountry,
+  ]);
+  const canCreateShipment = createBlockingChecks.length === 0 && (!wizardMode || wizardStep === 4);
+
   const lookupRecipientContact = async (criteria: { phone?: string; document?: string }) => {
     const phone = criteria.phone?.trim() ?? '';
     const document = criteria.document?.trim() ?? '';
@@ -1872,8 +1940,22 @@ export function ShipmentsPage() {
           ) : null}
 
           {!wizardMode || wizardStep === 4 ? (
+          <div className="filters-panel">
+            <div className="helper">
+              Checklist de alta: {canCreateShipment ? 'lista para crear' : `faltan ${createBlockingChecks.length} validaciones`}
+            </div>
+            {createBlockingChecks.slice(0, 4).map((issue) => (
+              <div key={issue} className="helper error">{issue}</div>
+            ))}
+            {createBlockingChecks.length > 4 ? (
+              <div className="helper">+{createBlockingChecks.length - 4} validaciones adicionales pendientes.</div>
+            ) : null}
+          </div>
+          ) : null}
+
+          {!wizardMode || wizardStep === 4 ? (
           <div className="inline-actions">
-            <Button type="button" onClick={createShipment} disabled={creating}>
+            <Button type="button" onClick={createShipment} disabled={creating || !canCreateShipment}>
               {creating ? 'Creando...' : createOperation === 'shipment' ? 'Crear envio' : 'Crear recogida'}
             </Button>
           </div>

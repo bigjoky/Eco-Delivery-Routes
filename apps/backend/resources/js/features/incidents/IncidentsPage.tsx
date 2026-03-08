@@ -282,6 +282,39 @@ export function IncidentsPage() {
     setPage(1);
   };
 
+  const applyOperationalPreset = (
+    preset: 'sla_breached' | 'open_high_priority' | 'pickup_incidents' | 'mass_data_correction'
+  ) => {
+    if (preset === 'sla_breached') {
+      setResolvedFilter('open');
+      setListSlaFilter('breached');
+      setListPriorityFilter('');
+      setListTypeFilter('');
+      setPage(1);
+      return;
+    }
+    if (preset === 'open_high_priority') {
+      setResolvedFilter('open');
+      setListPriorityFilter('high');
+      setListSlaFilter('');
+      setListTypeFilter('');
+      setPage(1);
+      return;
+    }
+    if (preset === 'pickup_incidents') {
+      setResolvedFilter('open');
+      setListTypeFilter('pickup');
+      setListSlaFilter('');
+      setListPriorityFilter('');
+      setPage(1);
+      return;
+    }
+    setBulkScope('filtered');
+    setBulkResolveReasonCode('DATA_CORRECTION');
+    setBulkResolveReasonDetail('');
+    setBulkResolveNotes('Resueltas masivamente por correccion operativa de datos');
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setCreateError('');
@@ -683,6 +716,21 @@ export function IncidentsPage() {
             </Button>
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
+            </Button>
+          </div>
+          <div className="inline-actions">
+            <span className="helper">Presets operativos</span>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('sla_breached')}>
+              SLA vencido
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('open_high_priority')}>
+              Alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('pickup_incidents')}>
+              Solo pickups
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('mass_data_correction')}>
+              Prep cierre por correccion
             </Button>
           </div>
           {showFilters ? (

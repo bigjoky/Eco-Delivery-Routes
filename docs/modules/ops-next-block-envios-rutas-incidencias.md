@@ -41,3 +41,16 @@
 2. Rutas: edición masiva + planificación.
 3. Incidencias: cierre masivo + filtros SLA.
 4. QA integral + documentación + PR.
+
+## Iteración aplicada (actual)
+
+1. Envíos
+- Checklist de validación previa visible antes de crear.
+- Botón `Crear envío/recogida` bloqueado hasta cumplir validaciones mínimas.
+
+2. Rutas
+- Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).
+
+3. Incidencias
+- Presets operativos de filtros (`SLA vencido`, `alta prioridad`, `solo pickups`).
+- Preset para preparar cierre masivo estructurado por corrección de datos.
