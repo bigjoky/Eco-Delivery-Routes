@@ -79,11 +79,21 @@ export function DashboardPage() {
   const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [period, setPeriod] = useState<'today' | '7d' | '30d'>('7d');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      const now = new Date();
+      const toDate = now.toISOString().slice(0, 10);
+      const fromDateObj = new Date(now);
+      if (period === 'today') fromDateObj.setDate(now.getDate());
+      if (period === '7d') fromDateObj.setDate(now.getDate() - 6);
+      if (period === '30d') fromDateObj.setDate(now.getDate() - 29);
+      const fromDate = fromDateObj.toISOString().slice(0, 10);
+
       const [
         shipmentsTotal,
         shipmentsCreated,
@@ -103,23 +113,23 @@ export function DashboardPage() {
         driverQuality,
         underThresholdRoutes,
       ] = await Promise.all([
-        apiClient.getShipments({ page: 1, perPage: 1 }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'created' }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'out_for_delivery' }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'delivered' }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'incident' }),
-        apiClient.getShipments({ page: 1, perPage: 5, sort: 'created_at', dir: 'desc' }),
-        apiClient.getRoutes({ page: 1, perPage: 1 }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'planned' }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'in_progress' }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'completed' }),
-        apiClient.getRoutes({ page: 1, perPage: 5, sort: 'route_date', dir: 'asc' }),
+        apiClient.getShipments({ page: 1, perPage: 1, scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getShipments({ page: 1, perPage: 1, status: 'created', scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getShipments({ page: 1, perPage: 1, status: 'out_for_delivery', scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getShipments({ page: 1, perPage: 1, status: 'delivered', scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getShipments({ page: 1, perPage: 1, status: 'incident', scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getShipments({ page: 1, perPage: 5, sort: 'created_at', dir: 'desc', scheduledFrom: fromDate, scheduledTo: toDate }),
+        apiClient.getRoutes({ page: 1, perPage: 1, dateFrom: fromDate, dateTo: toDate }),
+        apiClient.getRoutes({ page: 1, perPage: 1, status: 'planned', dateFrom: fromDate, dateTo: toDate }),
+        apiClient.getRoutes({ page: 1, perPage: 1, status: 'in_progress', dateFrom: fromDate, dateTo: toDate }),
+        apiClient.getRoutes({ page: 1, perPage: 1, status: 'completed', dateFrom: fromDate, dateTo: toDate }),
+        apiClient.getRoutes({ page: 1, perPage: 5, sort: 'route_date', dir: 'asc', dateFrom: fromDate, dateTo: toDate }),
         apiClient.getIncidentsBoard(),
         apiClient.getIncidents({ page: 1, perPage: 5, resolved: 'open' }),
         apiClient.getQualityThreshold(),
-        apiClient.getQualitySnapshots({ scopeType: 'route' }),
-        apiClient.getQualitySnapshots({ scopeType: 'driver' }),
-        apiClient.getQualityTopRoutesUnderThreshold({ limit: 5 }),
+        apiClient.getQualitySnapshots({ scopeType: 'route', periodStart: fromDate, periodEnd: toDate }),
+        apiClient.getQualitySnapshots({ scopeType: 'driver', periodStart: fromDate, periodEnd: toDate }),
+        apiClient.getQualityTopRoutesUnderThreshold({ limit: 5, periodStart: fromDate, periodEnd: toDate }),
       ]);
 
       setData({
@@ -154,11 +164,19 @@ export function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = window.setInterval(() => {
+      load();
+    }, 60000);
+    return () => window.clearInterval(interval);
+  }, [autoRefresh, load]);
 
   const qualityBadge = useMemo(() => scoreVariant(data.quality.routeAvg, data.totals.qualityThreshold), [data.quality.routeAvg, data.totals.qualityThreshold]);
 
@@ -167,6 +185,29 @@ export function DashboardPage() {
       <header>
         <h1 className="page-title">Everything at a glance</h1>
         <p className="page-subtitle">Visión operativa unificada de envíos, rutas, incidencias y calidad.</p>
+        <div className="inline-actions" style={{ marginTop: 8 }}>
+          <label htmlFor="dashboard-period">Ventana</label>
+          <select
+            id="dashboard-period"
+            className="select"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value as 'today' | '7d' | '30d')}
+          >
+            <option value="today">Hoy</option>
+            <option value="7d">Últimos 7 días</option>
+            <option value="30d">Últimos 30 días</option>
+          </select>
+          <label htmlFor="dashboard-auto-refresh">Auto-refresh</label>
+          <select
+            id="dashboard-auto-refresh"
+            className="select"
+            value={autoRefresh ? 'on' : 'off'}
+            onChange={(event) => setAutoRefresh(event.target.value === 'on')}
+          >
+            <option value="on">Activo (60s)</option>
+            <option value="off">Desactivado</option>
+          </select>
+        </div>
       </header>
 
       <div className="page-grid four">
