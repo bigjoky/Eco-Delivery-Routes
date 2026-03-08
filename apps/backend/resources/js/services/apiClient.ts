@@ -42,6 +42,9 @@ import {
   DriverSummary,
   DashboardOverview,
   VehicleSummary,
+  WorkforceEmployeeSummary,
+  ComplianceDocumentSummary,
+  VehicleControlSummary,
   ContactSummary,
   AddressSuggestion,
   ShipmentSummary,
@@ -3069,6 +3072,233 @@ export const apiClient = {
     if (!response.ok) {
       const json = await response.json();
       throw new Error(json?.error?.message ?? 'Cannot delete vehicle');
+    }
+  },
+
+  async getWorkforce(filters: {
+    q?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employmentType?: 'own' | 'external' | 'contractor';
+    subcontractorId?: string;
+  } = {}): Promise<WorkforceEmployeeSummary[]> {
+    if (USE_MOCK) return mockApi.getWorkforce(filters) as Promise<WorkforceEmployeeSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.employmentType) params.set('employment_type', filters.employmentType);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/workforce${suffix}`);
+    return parseData<WorkforceEmployeeSummary>(response);
+  },
+
+  async createWorkforce(payload: {
+    code?: string;
+    document_id: string;
+    name: string;
+    employment_type: 'own' | 'external' | 'contractor';
+    subcontractor_id?: string;
+    role_title?: string;
+    phone?: string;
+    email?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    contract_start?: string;
+    contract_end?: string;
+    notes?: string;
+  }): Promise<WorkforceEmployeeSummary> {
+    if (USE_MOCK) return mockApi.createWorkforce(payload) as Promise<WorkforceEmployeeSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/workforce`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create workforce employee'));
+    return json.data as WorkforceEmployeeSummary;
+  },
+
+  async updateWorkforce(id: string, payload: {
+    code?: string;
+    document_id?: string;
+    name?: string;
+    employment_type?: 'own' | 'external' | 'contractor';
+    subcontractor_id?: string | null;
+    role_title?: string;
+    phone?: string;
+    email?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string;
+  }): Promise<WorkforceEmployeeSummary> {
+    if (USE_MOCK) return mockApi.updateWorkforce(id, payload) as Promise<WorkforceEmployeeSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/workforce/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot update workforce employee'));
+    return json.data as WorkforceEmployeeSummary;
+  },
+
+  async deleteWorkforce(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteWorkforce(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/workforce/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(readApiErrorMessage(json, 'Cannot delete workforce employee'));
+    }
+  },
+
+  async getComplianceDocuments(filters: {
+    q?: string;
+    scopeType?: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scopeId?: string;
+    documentType?: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    expiresBefore?: string;
+  } = {}): Promise<ComplianceDocumentSummary[]> {
+    if (USE_MOCK) return mockApi.getComplianceDocuments(filters) as Promise<ComplianceDocumentSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.scopeType) params.set('scope_type', filters.scopeType);
+    if (filters.scopeId) params.set('scope_id', filters.scopeId);
+    if (filters.documentType) params.set('document_type', filters.documentType);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.expiresBefore) params.set('expires_before', filters.expiresBefore);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/compliance-documents${suffix}`);
+    return parseData<ComplianceDocumentSummary>(response);
+  },
+
+  async createComplianceDocument(payload: {
+    scope_type: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scope_id?: string;
+    document_type: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    title: string;
+    reference?: string;
+    issuer?: string;
+    issued_at?: string;
+    expires_at?: string;
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    file_url?: string;
+  }): Promise<ComplianceDocumentSummary> {
+    if (USE_MOCK) return mockApi.createComplianceDocument(payload) as Promise<ComplianceDocumentSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/compliance-documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create compliance document'));
+    return json.data as ComplianceDocumentSummary;
+  },
+
+  async updateComplianceDocument(id: string, payload: {
+    scope_type?: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scope_id?: string | null;
+    document_type?: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    title?: string;
+    reference?: string;
+    issuer?: string;
+    issued_at?: string | null;
+    expires_at?: string | null;
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    file_url?: string | null;
+  }): Promise<ComplianceDocumentSummary> {
+    if (USE_MOCK) return mockApi.updateComplianceDocument(id, payload) as Promise<ComplianceDocumentSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/compliance-documents/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot update compliance document'));
+    return json.data as ComplianceDocumentSummary;
+  },
+
+  async deleteComplianceDocument(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteComplianceDocument(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/compliance-documents/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(readApiErrorMessage(json, 'Cannot delete compliance document'));
+    }
+  },
+
+  async getVehicleControls(filters: {
+    vehicleId?: string;
+    controlType?: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    dateFrom?: string;
+    dateTo?: string;
+  } = {}): Promise<VehicleControlSummary[]> {
+    if (USE_MOCK) return mockApi.getVehicleControls(filters) as Promise<VehicleControlSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.vehicleId) params.set('vehicle_id', filters.vehicleId);
+    if (filters.controlType) params.set('control_type', filters.controlType);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicle-controls${suffix}`);
+    return parseData<VehicleControlSummary>(response);
+  },
+
+  async createVehicleControl(payload: {
+    vehicle_id: string;
+    control_type: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    event_date: string;
+    due_date?: string;
+    amount?: number;
+    odometer_km?: number;
+    provider?: string;
+    reference?: string;
+    notes?: string;
+  }): Promise<VehicleControlSummary> {
+    if (USE_MOCK) return mockApi.createVehicleControl(payload) as Promise<VehicleControlSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicle-controls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create vehicle control'));
+    return json.data as VehicleControlSummary;
+  },
+
+  async updateVehicleControl(id: string, payload: {
+    control_type?: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    event_date?: string;
+    due_date?: string | null;
+    amount?: number | null;
+    odometer_km?: number | null;
+    provider?: string;
+    reference?: string;
+    notes?: string;
+  }): Promise<VehicleControlSummary> {
+    if (USE_MOCK) return mockApi.updateVehicleControl(id, payload) as Promise<VehicleControlSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicle-controls/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot update vehicle control'));
+    return json.data as VehicleControlSummary;
+  },
+
+  async deleteVehicleControl(id: string): Promise<void> {
+    if (USE_MOCK) return mockApi.deleteVehicleControl(id) as Promise<void>;
+    const response = await authorizedFetch(`${API_BASE_URL}/vehicle-controls/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(readApiErrorMessage(json, 'Cannot delete vehicle control'));
     }
   },
 

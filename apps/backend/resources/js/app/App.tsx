@@ -8,9 +8,11 @@ import { apiClient } from '../services/apiClient';
 import { AdvancesPage } from '../features/advances/AdvancesPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { FleetControlsPage } from '../features/fleet/FleetControlsPage';
 import { IncidentsPage } from '../features/incidents/IncidentsPage';
 import { NetworkPage } from '../features/network/NetworkPage';
 import { PartnersPage } from '../features/partners/PartnersPage';
+import { CompliancePage } from '../features/compliance/CompliancePage';
 import { QualityPage } from '../features/quality/QualityPage';
 import { RolesPage } from '../features/roles/RolesPage';
 import { RoleDetailPage } from '../features/roles/RoleDetailPage';
@@ -23,6 +25,7 @@ import { SettlementPreviewPage } from '../features/settlements/SettlementPreview
 import { ShipmentsPage } from '../features/shipments/ShipmentsPage';
 import { ShipmentDetailPage } from '../features/shipments/ShipmentDetailPage';
 import { TariffsPage } from '../features/tariffs/TariffsPage';
+import { WorkforcePage } from '../features/workforce/WorkforcePage';
 import { UsersPage } from '../features/users/UsersPage';
 import { UserDetailPage } from '../features/users/UserDetailPage';
 
@@ -114,6 +117,18 @@ export function App() {
         <Route
           path="/partners"
           element={isAuthenticated && canAccess('partners', roles) ? <PartnersPage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/workforce"
+          element={isAuthenticated && canAccess('workforce', roles) ? <WorkforcePage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/compliance"
+          element={isAuthenticated && canAccess('compliance', roles) ? <CompliancePage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/fleet-controls"
+          element={isAuthenticated && canAccess('fleet', roles) ? <FleetControlsPage /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/tariffs"

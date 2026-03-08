@@ -9,7 +9,10 @@ export type FeatureAccess =
   | 'quality'
   | 'users'
   | 'roles'
-  | 'network';
+  | 'network'
+  | 'workforce'
+  | 'compliance'
+  | 'fleet';
 
 const accessMap: Record<FeatureAccess, string[]> = {
   shipments: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
@@ -23,6 +26,9 @@ const accessMap: Record<FeatureAccess, string[]> = {
   users: ['super_admin', 'operations_manager', 'accountant'],
   roles: ['super_admin', 'operations_manager', 'accountant'],
   network: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator'],
+  workforce: ['super_admin', 'operations_manager', 'traffic_operator', 'accountant'],
+  compliance: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant'],
+  fleet: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant'],
 };
 
 export function canAccess(feature: FeatureAccess, roles: string[]): boolean {
