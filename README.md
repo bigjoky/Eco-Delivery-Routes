@@ -60,6 +60,11 @@ Base del sistema web/PWA de **Eco Delivery Routes**.
 - También puedes configurar por `.env`:
   - `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`
 
+## Troubleshooting DB
+
+- Si aparece `SQLSTATE[HY000]: no such column: remember_token`:
+  - `cd apps/backend && php artisan migrate --force`
+
 ## Checklist CI sugerido
 
 - Backend: `./vendor/bin/phpunit` en `apps/backend`.
