@@ -15,11 +15,10 @@ class EnsureApiDocsAccess
         }
 
         $user = $request->user();
-        if (! $user || ! $user->hasRole('admin')) {
+        if (! $user || ! $user->hasRole('super_admin')) {
             abort(403, 'Forbidden');
         }
 
         return $next($request);
     }
 }
-
