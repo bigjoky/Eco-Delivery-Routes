@@ -1,10 +1,8 @@
 <?php
 
+use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return response()->json([
-        'service' => 'Eco Delivery Routes API',
-        'status' => 'ok',
-    ]);
-});
+Route::get('/{any?}', function () {
+    return Inertia::render('AppShellPage');
+})->where('any', '^(?!api).*$');
