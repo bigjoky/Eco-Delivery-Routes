@@ -75,6 +75,45 @@ class IncidentHttpTest extends TestCase
         ]);
     }
 
+    public function test_incidents_bulk_resolve_updates_open_rows_only(): void
+    {
+        $shipmentCatalog = DB::table('incident_catalog_versions as versions')
+            ->join('incident_catalog_items as items', 'items.version_id', '=', 'versions.id')
+            ->where('versions.is_active', true)
+            ->where('items.is_active', true)
+            ->whereIn('items.applies_to', ['shipment', 'both'])
+            ->select('items.code', 'items.category')
+            ->orderBy('items.code')
+            ->first();
+        $this->assertNotNull($shipmentCatalog);
+
+        $openOne = $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'bulk resolve open one',
+        ])->assertCreated()->json('data.id');
+
+        $openTwo = $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'bulk resolve open two',
+        ])->assertCreated()->json('data.id');
+
+        $this->patchJson('/api/v1/incidents/' . $openTwo . '/resolve')->assertOk();
+
+        $response = $this->postJson('/api/v1/incidents/resolve-bulk', [
+            'incident_ids' => [$openOne, $openTwo],
+            'notes' => 'resolved from bulk',
+        ]);
+        $response->assertOk();
+        $response->assertJsonPath('data.requested_count', 2);
+        $response->assertJsonPath('data.updated_count', 1);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

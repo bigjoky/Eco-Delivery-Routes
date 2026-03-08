@@ -41,6 +41,7 @@ Route::prefix('v1')->group(function () {
         Route::get('driver/me/route', [DriverRouteController::class, 'me']);
         Route::get('dashboard/overview', [DashboardController::class, 'overview']);
         Route::get('dashboard/overview/export.csv', [DashboardController::class, 'exportCsv']);
+        Route::get('dashboard/overview/export.pdf', [DashboardController::class, 'exportPdf']);
 
         Route::get('users', [UserController::class, 'index']);
         Route::post('users', [UserController::class, 'store']);
@@ -128,6 +129,7 @@ Route::prefix('v1')->group(function () {
         Route::get('incidents/board', [IncidentController::class, 'board']);
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
+        Route::post('incidents/resolve-bulk', [IncidentController::class, 'resolveBulk']);
         Route::patch('incidents/{id}/resolve', [IncidentController::class, 'resolve']);
         Route::patch('incidents/{id}/override-sla', [IncidentController::class, 'overrideSla']);
 

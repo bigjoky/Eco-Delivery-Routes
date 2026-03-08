@@ -179,7 +179,11 @@ struct ContentView: View {
                     Text("Sin overview cargado.")
                         .foregroundStyle(.secondary)
                 }
-                Button("Actualizar overview") { Task { await loadDashboardOverview() } }
+                HStack {
+                    Button("Actualizar overview") { Task { await loadDashboardOverview() } }
+                    Button("Exportar CSV") { Task { await exportDashboardOverviewCsv() } }
+                    Button("Exportar PDF") { Task { await exportDashboardOverviewPdf() } }
+                }
             }
             if !dashboardMessage.isEmpty {
                 Section {
@@ -464,6 +468,36 @@ struct ContentView: View {
         } catch {
             dashboardOverview = nil
             dashboardMessage = "No se pudo cargar overview."
+        }
+    }
+
+    private func exportDashboardOverviewCsv() async {
+        do {
+            try await apiClient.exportDashboardOverviewCsv(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
+            dashboardMessage = "Export CSV solicitado."
+        } catch {
+            dashboardMessage = "No se pudo exportar CSV."
+        }
+    }
+
+    private func exportDashboardOverviewPdf() async {
+        do {
+            try await apiClient.exportDashboardOverviewPdf(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
+            dashboardMessage = "Export PDF solicitado."
+        } catch {
+            dashboardMessage = "No se pudo exportar PDF."
         }
     }
 

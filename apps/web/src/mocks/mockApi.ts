@@ -2591,6 +2591,25 @@ export const mockApi = {
     return resolved;
   },
 
+  async resolveIncidentsBulk(ids: string[], notes?: string) {
+    const now = new Date().toISOString();
+    const setIds = new Set(ids);
+    let updatedCount = 0;
+    mockIncidents = mockIncidents.map((item) => {
+      if (!setIds.has(item.id) || item.resolved_at) return item;
+      updatedCount += 1;
+      return {
+        ...item,
+        notes: notes ?? item.notes,
+        resolved_at: now,
+      };
+    });
+    return {
+      requested_count: ids.length,
+      updated_count: updatedCount,
+    };
+  },
+
   async getIncidentCatalog() {
     return [
       { code: 'ABSENT_HOME', name: 'Destinatario ausente', category: 'absent', applies_to: 'shipment' },

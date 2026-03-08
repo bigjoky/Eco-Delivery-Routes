@@ -58,6 +58,8 @@ export function IncidentsPage() {
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [bulkResolving, setBulkResolving] = useState(false);
+  const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -195,6 +197,11 @@ export function IncidentsPage() {
     window.localStorage.setItem(incidentsFilterStorageKey, JSON.stringify(payload));
   }, [resolvedFilter, listTypeFilter, listCategoryFilter, listCatalogFilter, listPriorityFilter, listSlaFilter, listIncidentableId, listSearch]);
 
+  useEffect(() => {
+    const visible = new Set(items.filter((item) => !item.resolved_at).map((item) => item.id));
+    setSelectedIncidentIds((prev) => prev.filter((id) => visible.has(id)));
+  }, [items]);
+
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
     [catalog, incidentableType]
@@ -249,6 +256,31 @@ export function IncidentsPage() {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
     } finally {
       setResolvingId(null);
+    }
+  };
+
+  const toggleSelectedIncident = (id: string, checked: boolean) => {
+    setSelectedIncidentIds((prev) => {
+      if (checked) return Array.from(new Set([...prev, id]));
+      return prev.filter((value) => value !== id);
+    });
+  };
+
+  const onResolveSelected = async () => {
+    if (selectedIncidentIds.length === 0) {
+      setResolveError('Selecciona al menos una incidencia abierta.');
+      return;
+    }
+    setBulkResolving(true);
+    setResolveError('');
+    try {
+      await apiClient.resolveIncidentsBulk(selectedIncidentIds, 'Resueltas en lote desde panel web');
+      setSelectedIncidentIds([]);
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo resolver incidencias en lote');
+    } finally {
+      setBulkResolving(false);
     }
   };
 
@@ -450,11 +482,15 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
             </Button>
+            <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || selectedIncidentIds.length === 0}>
+              {bulkResolving ? 'Resolviendo selección...' : `Resolver seleccionadas (${selectedIncidentIds.length})`}
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Sel</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
                   <TableHead>Ref. envio</TableHead>
@@ -470,6 +506,17 @@ export function IncidentsPage() {
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
+                    <TableCell>
+                      {!item.resolved_at ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedIncidentIds.includes(item.id)}
+                          onChange={(event) => toggleSelectedIncident(item.id, event.target.checked)}
+                        />
+                      ) : (
+                        <span>-</span>
+                      )}
+                    </TableCell>
                     <TableCell>{item.incidentable_type}</TableCell>
                     <TableCell>{item.incidentable_id}</TableCell>
                     <TableCell>{item.shipment_reference ?? '-'}</TableCell>
@@ -504,7 +551,7 @@ export function IncidentsPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10}>Sin incidencias para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={11}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

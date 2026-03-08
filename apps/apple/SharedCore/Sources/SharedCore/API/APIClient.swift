@@ -48,6 +48,20 @@ public protocol APIClientProtocol {
         hubId: String?,
         subcontractorId: String?
     ) async throws -> DashboardOverview
+    func exportDashboardOverviewCsv(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws
+    func exportDashboardOverviewPdf(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws
     func routeAssignmentPreview(
         subcontractorId: String?,
         driverId: String?,
@@ -82,6 +96,26 @@ public protocol APIClientProtocol {
 public extension APIClientProtocol {
     func dashboardOverview(period: String?, dateFrom: String?, dateTo: String?) async throws -> DashboardOverview {
         try await dashboardOverview(
+            period: period,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            hubId: nil,
+            subcontractorId: nil
+        )
+    }
+
+    func exportDashboardOverviewCsv(period: String?, dateFrom: String?, dateTo: String?) async throws {
+        try await exportDashboardOverviewCsv(
+            period: period,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            hubId: nil,
+            subcontractorId: nil
+        )
+    }
+
+    func exportDashboardOverviewPdf(period: String?, dateFrom: String?, dateTo: String?) async throws {
+        try await exportDashboardOverviewPdf(
             period: period,
             dateFrom: dateFrom,
             dateTo: dateTo,
@@ -665,6 +699,66 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: url, method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataObjectEnvelope<DashboardOverview>.self, from: data).data
+    }
+
+    public func exportDashboardOverviewCsv(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws {
+        guard let baseURL else {
+            return try await mock.exportDashboardOverviewCsv(
+                period: period,
+                dateFrom: dateFrom,
+                dateTo: dateTo,
+                hubId: hubId,
+                subcontractorId: subcontractorId
+            )
+        }
+        let url = withQueryItems(
+            baseURL.appending(path: "dashboard/overview/export.csv"),
+            queryItems: [
+                URLQueryItem(name: "period", value: period),
+                URLQueryItem(name: "date_from", value: dateFrom),
+                URLQueryItem(name: "date_to", value: dateTo),
+                URLQueryItem(name: "hub_id", value: hubId),
+                URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
+    }
+
+    public func exportDashboardOverviewPdf(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws {
+        guard let baseURL else {
+            return try await mock.exportDashboardOverviewPdf(
+                period: period,
+                dateFrom: dateFrom,
+                dateTo: dateTo,
+                hubId: hubId,
+                subcontractorId: subcontractorId
+            )
+        }
+        let url = withQueryItems(
+            baseURL.appending(path: "dashboard/overview/export.pdf"),
+            queryItems: [
+                URLQueryItem(name: "period", value: period),
+                URLQueryItem(name: "date_from", value: dateFrom),
+                URLQueryItem(name: "date_to", value: dateTo),
+                URLQueryItem(name: "hub_id", value: hubId),
+                URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        _ = try await execute(request)
     }
 
     public func hubs(onlyActive: Bool, includeDeleted: Bool = false) async throws -> [HubSummary] {

@@ -35,6 +35,9 @@ struct ContentView: View {
     @State private var qualityMessage = ""
     @State private var dashboardOverview: DashboardOverview?
     @State private var dashboardMessage = ""
+    @State private var dashboardPeriod = "7d"
+    @State private var dashboardHubID = ""
+    @State private var dashboardSubcontractorID = ""
 
     @State private var hubs: [HubSummary] = []
     @State private var depots: [DepotSummary] = []
@@ -172,8 +175,22 @@ struct ContentView: View {
                         metricCard(title: "Depots/Puntos", value: "\(depots.count)/\(points.count)")
                     }
                 }
-                Button("Actualizar overview") {
-                    Task { await loadDashboardOverview() }
+                HStack {
+                    Picker("Periodo", selection: $dashboardPeriod) {
+                        Text("Hoy").tag("today")
+                        Text("7d").tag("7d")
+                        Text("30d").tag("30d")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                HStack {
+                    TextField("Hub ID (opcional)", text: $dashboardHubID)
+                    TextField("Subcontrata ID (opcional)", text: $dashboardSubcontractorID)
+                }
+                HStack {
+                    Button("Actualizar overview") { Task { await loadDashboardOverview() } }
+                    Button("Exportar CSV") { Task { await exportDashboardOverviewCsv() } }
+                    Button("Exportar PDF") { Task { await exportDashboardOverviewPdf() } }
                 }
                 if !dashboardMessage.isEmpty {
                     Text(dashboardMessage).font(.footnote)
@@ -439,11 +456,47 @@ struct ContentView: View {
 
     private func loadDashboardOverview() async {
         do {
-            dashboardOverview = try await apiClient.dashboardOverview(period: "7d", dateFrom: nil, dateTo: nil)
+            dashboardOverview = try await apiClient.dashboardOverview(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
             dashboardMessage = "Overview actualizado."
         } catch {
             dashboardOverview = nil
             dashboardMessage = "No se pudo cargar overview."
+        }
+    }
+
+    private func exportDashboardOverviewCsv() async {
+        do {
+            try await apiClient.exportDashboardOverviewCsv(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
+            dashboardMessage = "Export CSV solicitado."
+        } catch {
+            dashboardMessage = "No se pudo exportar CSV."
+        }
+    }
+
+    private func exportDashboardOverviewPdf() async {
+        do {
+            try await apiClient.exportDashboardOverviewPdf(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
+            dashboardMessage = "Export PDF solicitado."
+        } catch {
+            dashboardMessage = "No se pudo exportar PDF."
         }
     }
 
