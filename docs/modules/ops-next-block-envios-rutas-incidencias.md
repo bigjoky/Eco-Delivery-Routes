@@ -47,10 +47,16 @@
 1. Envíos
 - Checklist de validación previa visible antes de crear.
 - Botón `Crear envío/recogida` bloqueado hasta cumplir validaciones mínimas.
+- Plantillas rápidas separadas para `destinatario` y `remitente` desde modal (guardar/aplicar/eliminar).
 
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).
+- Asignación inteligente de ruta (sugerencia automática subcontrata/conductor/vehículo válida con preview de conflictos).
 
 3. Incidencias
 - Presets operativos de filtros (`SLA vencido`, `alta prioridad`, `solo pickups`).
 - Preset para preparar cierre masivo estructurado por corrección de datos.
+- Previsualización de impacto en cierre masivo y override SLA (volumen estimado + resumen de cambios).
+
+4. UI
+- Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).

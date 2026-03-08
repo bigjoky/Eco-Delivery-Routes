@@ -51,6 +51,7 @@ export function RouteDetailPage() {
   const [assignmentWarnings, setAssignmentWarnings] = useState<string[]>([]);
   const [recommendedSubcontractorId, setRecommendedSubcontractorId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [smartAssigning, setSmartAssigning] = useState(false);
   const [error, setError] = useState('');
   const [stopType, setStopType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
   const [shipmentQuery, setShipmentQuery] = useState('');
@@ -216,6 +217,69 @@ export function RouteDetailPage() {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la ruta');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const suggestSmartAssignment = async () => {
+    if (!id) return;
+    setSmartAssigning(true);
+    setError('');
+    try {
+      const activeSubcontractors = subcontractors.filter((item) => item.status === 'active');
+      const orderedSubcontractorIds = Array.from(
+        new Set([
+          subcontractorId || null,
+          recommendedSubcontractorId || null,
+          route?.subcontractor_id ?? null,
+          ...activeSubcontractors.map((item) => item.id),
+          null,
+        ])
+      );
+
+      let attempts = 0;
+      const maxAttempts = 40;
+      for (const candidateSubcontractorId of orderedSubcontractorIds) {
+        const candidateDrivers = drivers
+          .filter((driver) => driver.status === 'active')
+          .filter((driver) => !candidateSubcontractorId || driver.subcontractor_id === candidateSubcontractorId)
+          .slice(0, 10);
+        const candidateVehicles = vehicles
+          .filter((vehicle) => vehicle.status === 'active')
+          .filter((vehicle) => !candidateSubcontractorId || vehicle.subcontractor_id === candidateSubcontractorId)
+          .slice(0, 10);
+
+        for (const driver of candidateDrivers) {
+          for (const vehicle of candidateVehicles) {
+            if (vehicle.assigned_driver_id && vehicle.assigned_driver_id !== driver.id) continue;
+            attempts += 1;
+            const preview = await apiClient.previewRouteAssignment({
+              subcontractor_id: candidateSubcontractorId || null,
+              driver_id: driver.id,
+              vehicle_id: vehicle.id,
+              route_id: id,
+              route_date: route?.route_date ?? null,
+            });
+            if (preview.valid) {
+              setSubcontractorId(candidateSubcontractorId || '');
+              setDriverId(driver.id);
+              setVehicleId(vehicle.id);
+              setAssignmentConflicts([]);
+              setAssignmentWarnings((preview.warnings ?? []).map((item) => item.message));
+              setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+              setError('');
+              return;
+            }
+            if (attempts >= maxAttempts) break;
+          }
+          if (attempts >= maxAttempts) break;
+        }
+        if (attempts >= maxAttempts) break;
+      }
+      setError('No se encontro combinacion valida automatica. Ajusta manualmente y guarda.');
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo ejecutar asignacion inteligente');
+    } finally {
+      setSmartAssigning(false);
     }
   };
 
@@ -935,6 +999,9 @@ export function RouteDetailPage() {
             </select>
             <Button type="button" onClick={saveVehicleAssignment} disabled={saving}>
               {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button type="button" variant="outline" onClick={suggestSmartAssignment} disabled={smartAssigning || saving}>
+              {smartAssigning ? 'Buscando...' : 'Asignacion inteligente'}
             </Button>
           </div>
           <div className="helper">

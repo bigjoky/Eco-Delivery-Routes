@@ -127,6 +127,24 @@ export function IncidentsPage() {
     listSearch,
   ]);
 
+  const selectedOpenCount = useMemo(
+    () => items.filter((item) => !item.resolved_at && selectedIncidentIds.includes(item.id)).length,
+    [items, selectedIncidentIds]
+  );
+
+  const bulkTargetEstimate = useMemo(() => {
+    if (bulkScope === 'selected') return selectedOpenCount;
+    return board?.total_open ?? items.filter((item) => !item.resolved_at).length;
+  }, [bulkScope, selectedOpenCount, board?.total_open, items]);
+
+  const bulkImpactSummary = useMemo(() => {
+    const changes: string[] = [];
+    if (bulkOverridePriority) changes.push(`prioridad => ${bulkOverridePriority}`);
+    if (bulkOverrideDueAt.trim()) changes.push(`sla_due_at => ${bulkOverrideDueAt.trim()}`);
+    if (!changes.length) return 'Sin cambios definidos para override SLA.';
+    return `Cambios a aplicar: ${changes.join(' | ')}`;
+  }, [bulkOverridePriority, bulkOverrideDueAt]);
+
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
     incidentableType: listTypeFilter || undefined,
@@ -832,6 +850,9 @@ export function IncidentsPage() {
                 : `Resolver seleccionadas (${selectedIncidentIds.length})`}
             </Button>
           </div>
+          <div className="helper">
+            Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
+          </div>
           <div className="filters-panel">
             <div className="helper">Override SLA masivo</div>
             <div className="form-row">
@@ -865,6 +886,9 @@ export function IncidentsPage() {
               <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
                 Aplicar override SLA
               </Button>
+            </div>
+            <div className="helper">
+              Impacto override masivo: objetivo estimado {bulkTargetEstimate} incidencia(s). {bulkImpactSummary}
             </div>
           </div>
           <TableWrapper>

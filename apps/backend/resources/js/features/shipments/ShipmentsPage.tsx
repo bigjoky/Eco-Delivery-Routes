@@ -205,6 +205,44 @@ type ShipmentQuickTemplate = {
   senderNotes: string;
 };
 
+type RecipientQuickTemplate = {
+  id: string;
+  name: string;
+  docType: 'DNI' | 'NIE' | 'PASSPORT' | 'CIF';
+  documentId: string;
+  legalName: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  street: string;
+  number: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  country: string;
+  notes: string;
+};
+
+type SenderQuickTemplate = {
+  id: string;
+  name: string;
+  docType: 'DNI' | 'NIE' | 'PASSPORT' | 'CIF';
+  documentId: string;
+  legalName: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  street: string;
+  number: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  country: string;
+  notes: string;
+};
+
 export function ShipmentsPage() {
   const [items, setItems] = useState<ShipmentSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
@@ -317,6 +355,14 @@ export function ShipmentsPage() {
   const [shipmentTemplates, setShipmentTemplates] = useState<ShipmentQuickTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [newTemplateName, setNewTemplateName] = useState('');
+  const recipientTemplatesStorageKey = 'eco_delivery_routes_recipient_quick_templates';
+  const senderTemplatesStorageKey = 'eco_delivery_routes_sender_quick_templates';
+  const [recipientTemplates, setRecipientTemplates] = useState<RecipientQuickTemplate[]>([]);
+  const [selectedRecipientTemplateId, setSelectedRecipientTemplateId] = useState('');
+  const [newRecipientTemplateName, setNewRecipientTemplateName] = useState('');
+  const [senderTemplates, setSenderTemplates] = useState<SenderQuickTemplate[]>([]);
+  const [selectedSenderTemplateId, setSelectedSenderTemplateId] = useState('');
+  const [newSenderTemplateName, setNewSenderTemplateName] = useState('');
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const wizardStorageKey = 'eco_delivery_routes_shipments_wizard_state';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
@@ -696,6 +742,40 @@ export function ShipmentsPage() {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(shipmentTemplatesStorageKey, JSON.stringify(shipmentTemplates));
   }, [shipmentTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recipientTemplatesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as RecipientQuickTemplate[];
+      if (Array.isArray(parsed)) setRecipientTemplates(parsed);
+    } catch {
+      setRecipientTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(recipientTemplatesStorageKey, JSON.stringify(recipientTemplates));
+  }, [recipientTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(senderTemplatesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as SenderQuickTemplate[];
+      if (Array.isArray(parsed)) setSenderTemplates(parsed);
+    } catch {
+      setSenderTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(senderTemplatesStorageKey, JSON.stringify(senderTemplates));
+  }, [senderTemplates]);
 
   const validateWizardStep = (step: 1 | 2 | 3 | 4): string | null => {
     if (step === 1) {
@@ -1682,6 +1762,112 @@ export function ShipmentsPage() {
     setSelectedTemplateId('');
   };
 
+  const applyRecipientTemplate = (template: RecipientQuickTemplate) => {
+    setCreateConsigneeDocType(template.docType);
+    setCreateConsigneeDocumentId(template.documentId);
+    setCreateConsignee(template.legalName);
+    setCreateConsigneeFirstName(template.firstName);
+    setCreateConsigneeLastName(template.lastName);
+    setCreatePhone(template.phone);
+    setCreateEmail(template.email);
+    setCreateStreet(template.street);
+    setCreateNumber(template.number);
+    setCreatePostalCode(template.postalCode);
+    setCreateCity(template.city);
+    setCreateProvince(template.province);
+    setCreateCountry(template.country || 'ES');
+    setCreateAddressNotes(template.notes);
+  };
+
+  const saveCurrentRecipientAsTemplate = () => {
+    const name = newRecipientTemplateName.trim();
+    if (!name) {
+      setCreateError('Define nombre de plantilla para destinatario.');
+      return;
+    }
+    const template: RecipientQuickTemplate = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      docType: createConsigneeDocType,
+      documentId: createConsigneeDocumentId,
+      legalName: createConsignee,
+      firstName: createConsigneeFirstName,
+      lastName: createConsigneeLastName,
+      phone: createPhone,
+      email: createEmail,
+      street: createStreet,
+      number: createNumber,
+      postalCode: createPostalCode,
+      city: createCity,
+      province: createProvince,
+      country: createCountry,
+      notes: createAddressNotes,
+    };
+    setRecipientTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
+    setSelectedRecipientTemplateId(template.id);
+    setNewRecipientTemplateName('');
+    setCreateError('');
+  };
+
+  const deleteSelectedRecipientTemplate = () => {
+    if (!selectedRecipientTemplateId) return;
+    setRecipientTemplates((current) => current.filter((item) => item.id !== selectedRecipientTemplateId));
+    setSelectedRecipientTemplateId('');
+  };
+
+  const applySenderTemplate = (template: SenderQuickTemplate) => {
+    setCreateSenderDocType(template.docType);
+    setCreateSenderDocumentId(template.documentId);
+    setCreateSenderLegalName(template.legalName);
+    setCreateSenderFirstName(template.firstName);
+    setCreateSenderLastName(template.lastName);
+    setCreateSenderPhone(template.phone);
+    setCreateSenderEmail(template.email);
+    setCreateSenderStreet(template.street);
+    setCreateSenderNumber(template.number);
+    setCreateSenderPostalCode(template.postalCode);
+    setCreateSenderCity(template.city);
+    setCreateSenderProvince(template.province);
+    setCreateSenderCountry(template.country || 'ES');
+    setCreateSenderAddressNotes(template.notes);
+  };
+
+  const saveCurrentSenderAsTemplate = () => {
+    const name = newSenderTemplateName.trim();
+    if (!name) {
+      setCreateError('Define nombre de plantilla para remitente.');
+      return;
+    }
+    const template: SenderQuickTemplate = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      docType: createSenderDocType,
+      documentId: createSenderDocumentId,
+      legalName: createSenderLegalName,
+      firstName: createSenderFirstName,
+      lastName: createSenderLastName,
+      phone: createSenderPhone,
+      email: createSenderEmail,
+      street: createSenderStreet,
+      number: createSenderNumber,
+      postalCode: createSenderPostalCode,
+      city: createSenderCity,
+      province: createSenderProvince,
+      country: createSenderCountry,
+      notes: createSenderAddressNotes,
+    };
+    setSenderTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
+    setSelectedSenderTemplateId(template.id);
+    setNewSenderTemplateName('');
+    setCreateError('');
+  };
+
+  const deleteSelectedSenderTemplate = () => {
+    if (!selectedSenderTemplateId) return;
+    setSenderTemplates((current) => current.filter((item) => item.id !== selectedSenderTemplateId));
+    setSelectedSenderTemplateId('');
+  };
+
   const downloadImportTemplate = async () => {
     try {
       await apiClient.downloadShipmentsTemplate();
@@ -1973,6 +2159,35 @@ export function ShipmentsPage() {
           </Button>
         }
       >
+        <div className="inline-actions">
+          <label htmlFor="recipient-template-select">Plantilla destinatario</label>
+          <select
+            id="recipient-template-select"
+            value={selectedRecipientTemplateId}
+            onChange={(event) => {
+              const templateId = event.target.value;
+              setSelectedRecipientTemplateId(templateId);
+              const template = recipientTemplates.find((item) => item.id === templateId);
+              if (template) applyRecipientTemplate(template);
+            }}
+          >
+            <option value="">Seleccionar plantilla</option>
+            {recipientTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+          </select>
+          <input
+            value={newRecipientTemplateName}
+            onChange={(event) => setNewRecipientTemplateName(event.target.value)}
+            placeholder="Nombre nueva plantilla"
+          />
+          <Button type="button" variant="outline" onClick={saveCurrentRecipientAsTemplate}>
+            Guardar plantilla
+          </Button>
+          <Button type="button" variant="outline" onClick={deleteSelectedRecipientTemplate} disabled={!selectedRecipientTemplateId}>
+            Eliminar
+          </Button>
+        </div>
         <div className="form-row">
           <label htmlFor="create-shipment-consignee-lookup">Buscar por movil</label>
           <input
@@ -2157,6 +2372,35 @@ export function ShipmentsPage() {
           </Button>
         }
       >
+        <div className="inline-actions">
+          <label htmlFor="sender-template-select">Plantilla remitente</label>
+          <select
+            id="sender-template-select"
+            value={selectedSenderTemplateId}
+            onChange={(event) => {
+              const templateId = event.target.value;
+              setSelectedSenderTemplateId(templateId);
+              const template = senderTemplates.find((item) => item.id === templateId);
+              if (template) applySenderTemplate(template);
+            }}
+          >
+            <option value="">Seleccionar plantilla</option>
+            {senderTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+          </select>
+          <input
+            value={newSenderTemplateName}
+            onChange={(event) => setNewSenderTemplateName(event.target.value)}
+            placeholder="Nombre nueva plantilla"
+          />
+          <Button type="button" variant="outline" onClick={saveCurrentSenderAsTemplate}>
+            Guardar plantilla
+          </Button>
+          <Button type="button" variant="outline" onClick={deleteSelectedSenderTemplate} disabled={!selectedSenderTemplateId}>
+            Eliminar
+          </Button>
+        </div>
         <div className="form-row">
           <label htmlFor="create-sender-lookup">Buscar por movil</label>
           <input

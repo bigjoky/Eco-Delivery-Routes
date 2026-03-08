@@ -299,6 +299,16 @@ a {
   align-items: center;
 }
 
+.inline-actions > label {
+  margin-right: 2px;
+}
+
+.inline-actions > input,
+.inline-actions > select {
+  min-width: 180px;
+  max-width: 280px;
+}
+
 .filters-panel {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -306,6 +316,10 @@ a {
   padding: var(--space-3);
   display: grid;
   gap: var(--space-2);
+}
+
+.filters-panel .inline-actions + .inline-actions {
+  margin-top: 2px;
 }
 
 label {
@@ -340,6 +354,12 @@ label {
 .card-content {
   display: grid;
   gap: var(--space-2);
+}
+
+.card-content > .inline-actions + .filters-panel,
+.card-content > .filters-panel + .inline-actions,
+.card-content > .filters-panel + .filters-panel {
+  margin-top: 2px;
 }
 
 .card-row {
@@ -586,6 +606,7 @@ textarea:focus {
   z-index: 1;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .table-cell {
@@ -594,6 +615,11 @@ textarea:focus {
   font-size: 14px;
   vertical-align: top;
   line-height: 1.4;
+}
+
+.table-cell .inline-actions > input,
+.table-cell .inline-actions > select {
+  min-width: 120px;
 }
 
 .table-row:hover .table-cell {
@@ -619,6 +645,9 @@ textarea:focus {
   border-radius: 10px;
   padding: 10px;
   background: linear-gradient(180deg, #ffffff 0%, var(--surface-muted) 100%);
+  min-height: 74px;
+  display: grid;
+  align-content: center;
 }
 
 .kpi-label {
