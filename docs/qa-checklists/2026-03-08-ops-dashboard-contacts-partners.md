@@ -29,6 +29,12 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Seleccionar vehículos y ejecutar `bulk-status` con motivo estructurado.
 - [ ] Validar en auditoría que se guardan `reason_code`, `reason_detail` y `reason`.
 
+## Incidencias (navegación cruzada)
+
+- [ ] Desde una incidencia de tipo `shipment`, abrir `Ver envío` y validar navegación correcta.
+- [ ] Desde una incidencia, usar `Ref. envío` y validar filtro en listado de envíos.
+- [ ] Desde un envío, abrir `Ver incidencias` y validar filtro por `incidentable_id`.
+
 ## Verificaciones técnicas
 
 - [x] `npm --prefix apps/backend run build`

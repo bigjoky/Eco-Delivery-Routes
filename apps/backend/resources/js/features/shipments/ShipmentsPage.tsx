@@ -3189,6 +3189,9 @@ export function ShipmentsPage() {
                         <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
                           Incidencia
                         </Button>
+                        <Link to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(item.id)}&resolved=open`} className="btn btn-outline">
+                          Ver incidencias
+                        </Link>
                         <Link to={`/shipments/${item.id}`} className="btn btn-outline">
                           Ver
                         </Link>

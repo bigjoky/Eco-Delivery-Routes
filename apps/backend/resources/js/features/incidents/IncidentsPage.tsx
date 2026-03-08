@@ -40,6 +40,13 @@ function formatSlaTimeline(item: IncidentSummary): string {
   return `Vencida hace ${hours}h ${minutes}m`;
 }
 
+function getIncidentEntityHref(item: IncidentSummary): string | null {
+  if (item.incidentable_type === 'shipment') {
+    return `/shipments/${item.incidentable_id}`;
+  }
+  return null;
+}
+
 const bulkResolveReasonOptions = [
   { code: 'DELIVERY_CONFIRMED_EXTERNALLY', label: 'Entrega confirmada externamente' },
   { code: 'CUSTOMER_RESCHEDULED', label: 'Cliente reprogramado' },
@@ -924,9 +931,19 @@ export function IncidentsPage() {
                       )}
                     </TableCell>
                     <TableCell>{item.id}</TableCell>
-                    <TableCell>{item.incidentable_type}</TableCell>
-                    <TableCell>{item.incidentable_id}</TableCell>
-                    <TableCell>{item.shipment_reference ?? '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.incidentable_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {getIncidentEntityHref(item) ? (
+                        <Link to={getIncidentEntityHref(item) as string}>{item.incidentable_id}</Link>
+                      ) : item.incidentable_id}
+                    </TableCell>
+                    <TableCell>
+                      {item.shipment_reference ? (
+                        <Link to={`/shipments?q=${encodeURIComponent(item.shipment_reference)}`}>{item.shipment_reference}</Link>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
                     <TableCell>
                       <Badge variant={categoryVariant(item.category)} title={`Categoria: ${item.category}`}>
@@ -951,6 +968,9 @@ export function IncidentsPage() {
                             <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>Escalar alta</Button>
                           ) : null}
                           <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>Ajustar SLA</Button>
+                          {item.incidentable_type === 'shipment' ? (
+                            <Link to={`/shipments/${item.incidentable_id}`} className="btn btn-outline">Ver envío</Link>
+                          ) : null}
                         </div>
                       )}
                     </TableCell>

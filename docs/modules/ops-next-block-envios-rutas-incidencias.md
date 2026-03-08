@@ -61,6 +61,7 @@
 - Presets operativos de filtros (`SLA vencido`, `alta prioridad`, `solo pickups`).
 - Preset para preparar cierre masivo estructurado por corrección de datos.
 - Previsualización de impacto en cierre masivo y override SLA (volumen estimado + resumen de cambios).
+- Navegación cruzada con envíos: desde incidencia a envío y desde envío a incidencias del envío.
 
 4. UI
 - Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).
