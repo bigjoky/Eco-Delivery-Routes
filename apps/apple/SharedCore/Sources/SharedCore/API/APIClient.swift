@@ -41,6 +41,13 @@ public protocol APIClientProtocol {
     func qualityThresholdAlertSettings() async throws -> QualityThresholdAlertSettings
     func qualityThresholdHistory(dateFrom: String?, dateTo: String?) async throws -> [QualityThresholdHistoryEntry]
     func qualityThresholdAlertTopScopes(dateFrom: String?, dateTo: String?, limit: Int?) async throws -> [QualityThresholdAlertTopScope]
+    func dashboardOverview(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws -> DashboardOverview
     func routeAssignmentPreview(
         subcontractorId: String?,
         driverId: String?,
@@ -73,6 +80,16 @@ public protocol APIClientProtocol {
 }
 
 public extension APIClientProtocol {
+    func dashboardOverview(period: String?, dateFrom: String?, dateTo: String?) async throws -> DashboardOverview {
+        try await dashboardOverview(
+            period: period,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            hubId: nil,
+            subcontractorId: nil
+        )
+    }
+
     func hubs(onlyActive: Bool) async throws -> [HubSummary] {
         try await hubs(onlyActive: onlyActive, includeDeleted: false)
     }
@@ -616,6 +633,38 @@ public final class APIClient: APIClientProtocol {
         let request = authorizedRequest(url: baseURL.appending(path: "routes/assignment/publish-policy"), method: "GET")
         let data = try await execute(request)
         return try JSONDecoder().decode(DataObjectEnvelope<RouteAssignmentPublishPolicy>.self, from: data).data
+    }
+
+    public func dashboardOverview(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws -> DashboardOverview {
+        guard let baseURL else {
+            return try await mock.dashboardOverview(
+                period: period,
+                dateFrom: dateFrom,
+                dateTo: dateTo,
+                hubId: hubId,
+                subcontractorId: subcontractorId
+            )
+        }
+
+        let url = withQueryItems(
+            baseURL.appending(path: "dashboard/overview"),
+            queryItems: [
+                URLQueryItem(name: "period", value: period),
+                URLQueryItem(name: "date_from", value: dateFrom),
+                URLQueryItem(name: "date_to", value: dateTo),
+                URLQueryItem(name: "hub_id", value: hubId),
+                URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+            ]
+        )
+        let request = authorizedRequest(url: url, method: "GET")
+        let data = try await execute(request)
+        return try JSONDecoder().decode(DataObjectEnvelope<DashboardOverview>.self, from: data).data
     }
 
     public func hubs(onlyActive: Bool, includeDeleted: Bool = false) async throws -> [HubSummary] {

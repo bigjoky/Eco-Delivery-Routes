@@ -4,7 +4,8 @@ import { cn } from '../../lib/cn';
 import { canAccess } from '../../core/auth/access';
 
 const menu = [
-  { to: '/', label: 'Login', feature: null },
+  { to: '/login', label: 'Login', feature: null },
+  { to: '/dashboard', label: 'Dashboard', feature: null },
   { to: '/shipments', label: 'Envios', feature: 'shipments' },
   { to: '/routes', label: 'Rutas', feature: 'routes' },
   { to: '/routes/board', label: 'Rutas Live', feature: 'routes' },
@@ -24,6 +25,7 @@ const sections = [
   {
     label: 'Operativa',
     items: [
+      '/dashboard',
       '/shipments',
       '/routes',
       '/routes/board',
@@ -48,7 +50,7 @@ export function AppShell({ children, roles, isAuthenticated }: PropsWithChildren
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
   const visibleMenu = menu.filter((item) => {
-    if (item.to === '/' && isAuthenticated) return false;
+    if (item.to === '/login' && isAuthenticated) return false;
     if (!item.feature) return true;
     if (!isAuthenticated) return false;
     if (isMock && roles.length === 0) return true;

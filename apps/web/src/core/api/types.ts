@@ -354,6 +354,84 @@ export type QualityThresholdAlertTopScope = {
   alerts_count: number;
 };
 
+export type DashboardOverview = {
+  period: {
+    from: string;
+    to: string;
+    preset: 'today' | '7d' | '30d' | 'custom';
+  };
+  filters: {
+    hub_id?: string | null;
+    subcontractor_id?: string | null;
+  };
+  totals: {
+    shipments: number;
+    routes: number;
+    incidents_open: number;
+    quality_threshold: number;
+  };
+  shipments_by_status: {
+    created: number;
+    out_for_delivery: number;
+    delivered: number;
+    incident: number;
+  };
+  routes_by_status: {
+    planned: number;
+    in_progress: number;
+    completed: number;
+  };
+  quality: {
+    route_avg: number;
+    driver_avg: number;
+    below_threshold_routes: number;
+  };
+  trends: {
+    shipments: Array<{ date: string; total: number; delivered: number; incident: number }>;
+    routes: Array<{ date: string; total: number; completed: number }>;
+    incidents: Array<{ date: string; open: number; resolved: number }>;
+    quality: Array<{ date: string; route_avg: number }>;
+  };
+  sla: {
+    on_track: number;
+    at_risk: number;
+    breached: number;
+    resolved: number;
+  };
+  recent: {
+    routes: RouteSummary[];
+    shipments: ShipmentSummary[];
+    incidents: IncidentSummary[];
+  };
+  productivity_by_hub: Array<{
+    hub_id: string;
+    hub_code: string;
+    hub_name: string;
+    routes_total: number;
+    routes_completed: number;
+    planned_stops: number;
+    completed_stops: number;
+    completion_ratio: number;
+  }>;
+  productivity_by_route: Array<{
+    route_id: string;
+    route_code: string;
+    route_date: string;
+    status: string;
+    planned_stops: number;
+    completed_stops: number;
+    completion_ratio: number;
+  }>;
+  alerts: Array<{
+    id: string;
+    severity: 'high' | 'medium' | 'low';
+    title: string;
+    message: string;
+    href: string;
+    count: number;
+  }>;
+};
+
 export type ShipmentsImportResult = {
   dry_run: boolean;
   created_count: number;

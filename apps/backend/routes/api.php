@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Ops\AdvanceController;
 use App\Http\Controllers\Api\V1\Ops\AddressSuggestionController;
 use App\Http\Controllers\Api\V1\Ops\ContactController;
+use App\Http\Controllers\Api\V1\Ops\DashboardController;
 use App\Http\Controllers\Api\V1\Ops\DepotController;
 use App\Http\Controllers\Api\V1\Ops\DriverRouteController;
 use App\Http\Controllers\Api\V1\Ops\HubController;
@@ -38,6 +39,8 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('driver/me/route', [DriverRouteController::class, 'me']);
+        Route::get('dashboard/overview', [DashboardController::class, 'overview']);
+        Route::get('dashboard/overview/export.csv', [DashboardController::class, 'exportCsv']);
 
         Route::get('users', [UserController::class, 'index']);
         Route::post('users', [UserController::class, 'store']);

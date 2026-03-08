@@ -40,6 +40,7 @@ import {
   SubcontractorSummary,
   PointSummary,
   DriverSummary,
+  DashboardOverview,
   VehicleSummary,
   ContactSummary,
   AddressSuggestion,
@@ -1317,6 +1318,61 @@ export const apiClient = {
       headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
     });
     return parseData<QualitySnapshot>(response);
+  },
+
+  async getDashboardOverview(filters: {
+    period?: 'today' | '7d' | '30d';
+    dateFrom?: string;
+    dateTo?: string;
+    hubId?: string;
+    subcontractorId?: string;
+  } = {}): Promise<DashboardOverview> {
+    if (USE_MOCK) {
+      return mockApi.getDashboardOverview(filters) as Promise<DashboardOverview>;
+    }
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/dashboard/overview${suffix}`);
+    const json = await response.json();
+    if (!response.ok) {
+      throw new Error(json?.error?.message ?? 'Cannot load dashboard overview');
+    }
+    return json.data as DashboardOverview;
+  },
+
+  async exportDashboardOverviewCsv(filters: {
+    period?: 'today' | '7d' | '30d';
+    dateFrom?: string;
+    dateTo?: string;
+    hubId?: string;
+    subcontractorId?: string;
+  } = {}): Promise<void> {
+    if (USE_MOCK) return;
+    const params = new URLSearchParams();
+    if (filters.period) params.set('period', filters.period);
+    if (filters.dateFrom) params.set('date_from', filters.dateFrom);
+    if (filters.dateTo) params.set('date_to', filters.dateTo);
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.subcontractorId) params.set('subcontractor_id', filters.subcontractorId);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/dashboard/overview/export.csv${suffix}`);
+    if (!response.ok) {
+      throw new Error('Cannot export dashboard CSV');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'dashboard_overview.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   },
 
   async getQualityTopRoutesUnderThreshold(filters: {

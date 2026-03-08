@@ -1,8 +1,10 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
-import com.ecodeliveryroutes.core.model.AuthProfile
 import com.ecodeliveryroutes.core.model.AddressSuggestion
+import com.ecodeliveryroutes.core.model.AuthProfile
+import com.ecodeliveryroutes.core.model.DashboardAlert
+import com.ecodeliveryroutes.core.model.DashboardOverview
 import com.ecodeliveryroutes.core.model.DepotSummary
 import com.ecodeliveryroutes.core.model.HubSummary
 import com.ecodeliveryroutes.core.model.PointSummary
@@ -289,6 +291,93 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
                 )
             }
         }.getOrDefault(mockQualityRouteSnapshots())
+    }
+
+    suspend fun dashboardOverview(
+        period: String = "7d",
+        hubId: String? = null,
+        subcontractorId: String? = null
+    ): DashboardOverview = withContext(Dispatchers.IO) {
+        if (baseUrl == null) {
+            return@withContext DashboardOverview(
+                periodFrom = "2026-03-01",
+                periodTo = "2026-03-08",
+                shipments = 124,
+                routes = 18,
+                incidentsOpen = 7,
+                qualityThreshold = 95.0,
+                routeQualityAvg = 94.7,
+                alerts = listOf(
+                    DashboardAlert("incidents-open", "high", "Incidencias abiertas", "Hay incidencias pendientes.", "/incidents?resolved=open", 7),
+                    DashboardAlert("quality-below-threshold", "medium", "Rutas bajo umbral", "Revisar KPI por ruta.", "/quality?scopeType=route", 5)
+                ),
+                shipmentTrend = listOf(12, 15, 18, 16, 20, 19, 17),
+                routeTrend = listOf(4, 5, 3, 6, 5, 7, 6),
+                incidentTrend = listOf(3, 2, 4, 3, 2, 3, 1)
+            )
+        }
+
+        runCatching {
+            val query = buildList {
+                add("period=$period")
+                if (!hubId.isNullOrBlank()) add("hub_id=$hubId")
+                if (!subcontractorId.isNullOrBlank()) add("subcontractor_id=$subcontractorId")
+            }.joinToString("&")
+            val payload = authedGet("$baseUrl/dashboard/overview?$query")
+            val data = JSONObject(payload).optJSONObject("data") ?: JSONObject()
+            val periodObj = data.optJSONObject("period") ?: JSONObject()
+            val totalsObj = data.optJSONObject("totals") ?: JSONObject()
+            val qualityObj = data.optJSONObject("quality") ?: JSONObject()
+            val alerts = data.optJSONArray("alerts") ?: JSONArray()
+            val trends = data.optJSONObject("trends") ?: JSONObject()
+            val shipmentTrend = trends.optJSONArray("shipments") ?: JSONArray()
+            val routeTrend = trends.optJSONArray("routes") ?: JSONArray()
+            val incidentTrend = trends.optJSONArray("incidents") ?: JSONArray()
+
+            DashboardOverview(
+                periodFrom = periodObj.optString("from"),
+                periodTo = periodObj.optString("to"),
+                shipments = totalsObj.optInt("shipments"),
+                routes = totalsObj.optInt("routes"),
+                incidentsOpen = totalsObj.optInt("incidents_open"),
+                qualityThreshold = totalsObj.optDouble("quality_threshold"),
+                routeQualityAvg = qualityObj.optDouble("route_avg"),
+                alerts = (0 until alerts.length()).map { index ->
+                    val item = alerts.optJSONObject(index) ?: JSONObject()
+                    DashboardAlert(
+                        id = item.optString("id"),
+                        severity = item.optString("severity"),
+                        title = item.optString("title"),
+                        message = item.optString("message"),
+                        href = item.optString("href"),
+                        count = item.optInt("count")
+                    )
+                },
+                shipmentTrend = (0 until shipmentTrend.length()).map { index ->
+                    shipmentTrend.optJSONObject(index)?.optInt("total") ?: 0
+                },
+                routeTrend = (0 until routeTrend.length()).map { index ->
+                    routeTrend.optJSONObject(index)?.optInt("total") ?: 0
+                },
+                incidentTrend = (0 until incidentTrend.length()).map { index ->
+                    incidentTrend.optJSONObject(index)?.optInt("open") ?: 0
+                }
+            )
+        }.getOrElse {
+            DashboardOverview(
+                periodFrom = "",
+                periodTo = "",
+                shipments = 0,
+                routes = 0,
+                incidentsOpen = 0,
+                qualityThreshold = 95.0,
+                routeQualityAvg = 0.0,
+                alerts = emptyList(),
+                shipmentTrend = emptyList(),
+                routeTrend = emptyList(),
+                incidentTrend = emptyList()
+            )
+        }
     }
 
     suspend fun qualityRouteBreakdown(routeId: String, granularity: String = "month"): QualityBreakdown = withContext(Dispatchers.IO) {

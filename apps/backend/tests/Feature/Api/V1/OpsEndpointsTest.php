@@ -13,6 +13,7 @@ class OpsEndpointsTest extends TestCase
 
         $this->assertIsString($contents);
         $this->assertStringContainsString("Route::get('driver/me/route'", $contents);
+        $this->assertStringContainsString("Route::get('dashboard/overview'", $contents);
         $this->assertStringContainsString("Route::get('audit-logs'", $contents);
         $this->assertStringContainsString("Route::get('audit-logs/export.csv'", $contents);
         $this->assertStringContainsString("Route::get('tariffs'", $contents);
@@ -146,6 +147,7 @@ class OpsEndpointsTest extends TestCase
         $this->assertStringContainsString("incident_catalog_items", $incidentContents);
         $this->assertStringContainsString("incident_catalog_versions", $incidentContents);
         $this->assertStringContainsString("driver/me/route", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
+        $this->assertStringContainsString("/dashboard/overview:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/audit-logs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/audit-logs/export.csv:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));
         $this->assertStringContainsString("/hubs:", file_get_contents(dirname(__DIR__, 4) . '/openapi.yaml'));

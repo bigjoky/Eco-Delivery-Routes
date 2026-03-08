@@ -1,214 +1,57 @@
 import SharedCore
 import SwiftUI
-import UniformTypeIdentifiers
-import Foundation
-import AppKit
-
-private struct RouteManifestAPIResponse: Decodable {
-    let data: RouteManifestPayload
-}
-
-private struct RouteManifestPayload: Decodable {
-    let route: RouteManifestRoute
-    let totals: RouteManifestTotalsPayload
-    let stops: [RouteManifestStop]
-    let generatedAt: String
-
-    enum CodingKeys: String, CodingKey {
-        case route
-        case totals
-        case stops
-        case generatedAt = "generated_at"
-    }
-}
-
-private struct RouteManifestRoute: Decodable {
-    let id: String
-    let code: String
-    let routeDate: String
-    let status: String
-    let driverCode: String?
-    let vehicleCode: String?
-    let manifestNotes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case code
-        case routeDate = "route_date"
-        case status
-        case driverCode = "driver_code"
-        case vehicleCode = "vehicle_code"
-        case manifestNotes = "manifest_notes"
-    }
-}
-
-private struct RouteManifestTotalsPayload: Decodable {
-    let stops: Int
-    let deliveries: Int
-    let pickups: Int
-    let completed: Int
-}
-
-private struct RouteManifestStop: Decodable {
-    let id: String
-    let sequence: Int
-    let stopType: String
-    let reference: String?
-    let entityId: String
-    let status: String
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case sequence
-        case stopType = "stop_type"
-        case reference
-        case entityId = "entity_id"
-        case status
-    }
-}
-
-private struct RouteManifestRow: Identifiable {
-    let id: String
-    let sequence: Int
-    let stopType: String
-    let reference: String
-    let status: String
-}
-
-private struct RouteManifestTotals {
-    let stops: Int
-    let deliveries: Int
-    let pickups: Int
-    let completed: Int
-    let manifestNotes: String?
-}
 
 struct ContentView: View {
     private enum Section: String, CaseIterable, Identifiable {
+        case dashboard = "Dashboard"
         case operations = "Operativa"
-        case network = "Red"
         case quality = "Calidad"
-        case advances = "Anticipos"
-        case tariffs = "Tarifas"
-        case settlements = "Liquidaciones"
-        case users = "Usuarios"
+        case network = "Red"
+        case account = "Cuenta"
 
         var id: String { rawValue }
-
-        var systemImage: String {
-            switch self {
-            case .operations: "shippingbox"
-            case .network: "point.3.connected.trianglepath.dotted"
-            case .quality: "chart.bar"
-            case .advances: "eurosign.circle"
-            case .tariffs: "list.bullet.clipboard"
-            case .settlements: "doc.plaintext"
-            case .users: "person.3"
-            }
-        }
     }
 
     @EnvironmentObject private var authSession: AuthSession
     let apiClient: APIClientProtocol
 
-    @State private var selectedSection: Section? = .operations
+    @State private var selectedSection: Section? = .dashboard
+
+    @State private var email = ""
+    @State private var password = ""
+    @State private var authMessage = "Inicia sesion para usar el panel."
+    @State private var authLoading = false
+
+    @State private var me: User?
+    @State private var routeDate = Self.todayISODate()
     @State private var routeStops: [DriverStop] = []
-    @State private var selectedStopId: String?
-    @State private var routeDateFilter: String = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
-    }()
-    @State private var routeStatusFilter: String = ""
-    @State private var routeQuality: [QualitySnapshot] = []
-    @State private var selectedQualityRouteId: String?
-    @State private var selectedRouteBreakdown: QualityRouteBreakdown?
-    @State private var subcontractorQuality: [QualitySnapshot] = []
-    @State private var selectedSubcontractorId: String?
-    @State private var selectedSubcontractorBreakdown: QualitySubcontractorBreakdown?
-    @State private var breakdownGranularity: String = "month"
-    @State private var qualityPeriodStart: String = ""
-    @State private var qualityPeriodEnd: String = ""
-    @State private var qualityAlertThresholdText: String = "95"
-    @State private var qualityThresholdSource: String = "default"
-    @State private var qualityThresholdScopeType: String = "user"
-    @State private var qualityThresholdScopeId: String = ""
-    @State private var qualityThresholdBeforeValue: Double?
-    @State private var qualityThresholdAfterValue: Double?
-    @State private var qualityThresholdLargeDeltaCount: Int = 0
-    @State private var qualityThresholdTopScopes: [QualityThresholdAlertTopScope] = []
-    @State private var qualityThresholdAlertWindowHours: Int = 24
-    @State private var qualityThresholdDeltaTrigger: Double = 5
-    @State private var canManageQualityThreshold: Bool = false
-    @State private var qualityThresholdMessage: String = ""
-    @State private var advances: [AdvanceSummary] = []
-    @State private var tariffs: [TariffSummary] = []
-    @State private var settlements: [SettlementSummary] = []
-    @State private var users: [User] = []
-    @State private var userStatusFilter: String = ""
+    @State private var selectedStopID: String?
+    @State private var scanCode = ""
+    @State private var podSignature = ""
+    @State private var operationsMessage = ""
+
+    @State private var qualityScope = "route"
+    @State private var qualityRows: [QualitySnapshot] = []
+    @State private var qualityMessage = ""
+    @State private var dashboardOverview: DashboardOverview?
+    @State private var dashboardMessage = ""
+
     @State private var hubs: [HubSummary] = []
     @State private var depots: [DepotSummary] = []
     @State private var points: [PointSummary] = []
-    @State private var networkIncludeDeleted: Bool = false
-    @State private var networkMessage: String = ""
-    @State private var networkHubName: String = ""
-    @State private var networkHubCity: String = ""
-    @State private var networkHubEditId: String = ""
-    @State private var networkHubEditName: String = ""
-    @State private var networkHubEditCity: String = ""
-    @State private var networkDepotHubId: String = ""
-    @State private var networkDepotName: String = ""
-    @State private var networkDepotCity: String = ""
-    @State private var networkDepotEditId: String = ""
-    @State private var networkDepotEditName: String = ""
-    @State private var networkDepotEditCity: String = ""
-    @State private var networkPointHubId: String = ""
-    @State private var networkPointDepotId: String = ""
-    @State private var networkPointName: String = ""
-    @State private var networkPointCity: String = ""
-    @State private var networkPointEditId: String = ""
-    @State private var networkPointEditName: String = ""
-    @State private var networkPointEditCity: String = ""
-    @State private var roleCodes: [String] = []
-
-    @State private var scanCode: String = ""
-    @State private var operationalMessage: String = "Recepcion lista"
-    @State private var advancesMessage: String = ""
-    @State private var usersMessage: String = ""
-    @State private var email: String = "admin@eco.local"
-    @State private var password: String = "password123"
-    @State private var loginMessage: String = "No autenticado"
-    @State private var manifestRouteId: String = ""
-    @State private var manifestRouteCode: String = "-"
-    @State private var manifestRouteDate: String = "-"
-    @State private var manifestTotals: RouteManifestTotals = RouteManifestTotals(stops: 0, deliveries: 0, pickups: 0, completed: 0, manifestNotes: nil)
-    @State private var manifestRows: [RouteManifestRow] = []
-    @State private var manifestLoading: Bool = false
-    @State private var manifestError: String?
-    @State private var showImportPicker: Bool = false
-    @State private var importFileUrl: URL?
-    @State private var importDryRun: Bool = true
-    @State private var importResult: ShipmentsImportResult?
-    @State private var importMessage: String = ""
-    @State private var importWarnings: [String] = []
-    @State private var importRunning: Bool = false
-
-    private var availableSections: [Section] {
-        let allowedNetworkRoles = Set(["super_admin", "operations_manager", "warehouse_manager", "traffic_manager"])
-        let canAccessNetwork = !Set(roleCodes).isDisjoint(with: allowedNetworkRoles)
-        return Section.allCases.filter { section in
-            section != .network || canAccessNetwork
-        }
-    }
+    @State private var networkMessage = ""
+    @State private var newHubName = ""
+    @State private var newHubCity = ""
+    @State private var newDepotHubID = ""
+    @State private var newDepotName = ""
+    @State private var newDepotCity = ""
+    @State private var newPointHubID = ""
+    @State private var newPointDepotID = ""
+    @State private var newPointName = ""
+    @State private var newPointCity = ""
 
     private var selectedStop: DriverStop? {
-        routeStops.first(where: { $0.id == selectedStopId }) ?? routeStops.first
-    }
-
-    private var qualityAlertThreshold: Double {
-        Double(qualityAlertThresholdText) ?? 95
+        routeStops.first(where: { $0.id == selectedStopID }) ?? routeStops.first
     }
 
     var body: some View {
@@ -216,1334 +59,476 @@ struct ContentView: View {
             if authSession.token == nil {
                 loginView
             } else {
-                NavigationSplitView {
-                    List(availableSections, selection: $selectedSection) { section in
-                        Label(section.rawValue, systemImage: section.systemImage)
-                            .tag(section)
-                    }
-                    .navigationTitle("Eco Delivery")
-                } detail: {
-                    switch selectedSection ?? .operations {
-                    case .operations:
-                        operationsTab
-                    case .network:
-                        networkTab
-                    case .quality:
-                        qualityTab
-                    case .advances:
-                        advancesTab
-                    case .tariffs:
-                        tariffsTab
-                    case .settlements:
-                        settlementsTab
-                    case .users:
-                        usersTab
-                    }
-                }
-                .toolbar {
-                    Button("Cerrar sesion") {
-                        Task { await logout() }
-                    }
-                }
+                mainView
             }
         }
-        .task {
-            await refreshAll()
+        .task(id: authSession.token?.token) {
+            apiClient.setAuthToken(authSession.token?.token)
+            guard authSession.token != nil else { return }
+            await bootstrap()
         }
     }
 
     private var loginView: some View {
-        VStack(spacing: 12) {
-            Image("Logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-            Text("Warehouse / Traffic Login")
-                .font(.headline)
-            TextField("Email", text: $email)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 320)
-            SecureField("Password", text: $password)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 320)
-            Button("Entrar") {
-                Task { await login() }
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.08, green: 0.12, blue: 0.20), Color(red: 0.10, green: 0.24, blue: 0.30)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Text("Eco Delivery Routes")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                TextField("Email", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+
+                Button(authLoading ? "Entrando..." : "Entrar") {
+                    Task { await login() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(authLoading || email.isEmpty || password.isEmpty)
+
+                Text(authMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.85))
             }
-            .disabled(email.isEmpty || password.isEmpty)
-            Text(loginMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .padding(22)
+            .frame(width: 420)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
-    private var operationsTab: some View {
-        HStack(spacing: 0) {
-            List(routeStops) { stop in
-                VStack(alignment: .leading) {
-                    Text("\(selectedStop?.id == stop.id ? "[*]" : "[ ]") #\(stop.sequence) \(stop.stopType)")
-                    Text(stop.reference).font(.caption)
-                    Text(stop.status).font(.caption2).foregroundStyle(.secondary)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedStopId = stop.id
-                }
+    private var mainView: some View {
+        NavigationSplitView {
+            List(Section.allCases, selection: $selectedSection) { section in
+                Text(section.rawValue)
+                    .tag(section)
             }
-            .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
+            .navigationTitle("Eco Delivery")
+        } detail: {
+            switch selectedSection ?? .dashboard {
+            case .dashboard:
+                dashboardView
+            case .operations:
+                operationsView
+            case .quality:
+                qualityView
+            case .network:
+                networkView
+            case .account:
+                accountView
+            }
+        }
+        .toolbar {
+            Button("Refrescar") {
+                Task { await bootstrap() }
+            }
+        }
+    }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Recepcion / Scan masivo")
-                    .font(.title3)
-                TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDateFilter)
-                TextField("Estado ruta (opcional)", text: $routeStatusFilter)
-                Text("Parada activa: \(selectedStop?.reference ?? "-")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Codigo de escaneo", text: $scanCode)
-                Button("Registrar scan") {
-                    Task {
-                        guard let target = selectedStop else { return }
-                        do {
-                            try await apiClient.registerScan(
-                                trackableType: target.entityType,
-                                trackableId: target.entityId,
-                                scanCode: scanCode
-                            )
-                            operationalMessage = "Scan registrado en hub"
-                        } catch {
-                            operationalMessage = "Error de scan"
+    private var dashboardView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Resumen operativo")
+                    .font(.title2.weight(.semibold))
+                if let overview = dashboardOverview {
+                    HStack(spacing: 12) {
+                        metricCard(title: "Envíos", value: "\(overview.totals.shipments)")
+                        metricCard(title: "Rutas", value: "\(overview.totals.routes)")
+                        metricCard(title: "Incidencias", value: "\(overview.totals.incidentsOpen)")
+                        metricCard(title: "SLA Breached", value: "\(overview.sla.breached)")
+                    }
+                    Text("Calidad rutas: \(overview.quality.routeAvg, format: .number.precision(.fractionLength(2)))% · Umbral \(overview.totals.qualityThreshold, format: .number.precision(.fractionLength(2)))%")
+                        .foregroundStyle(.secondary)
+                    GroupBox("Tendencia 7d") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            trendRow(title: "Envíos", values: overview.trends.shipments.map(\.total))
+                            trendRow(title: "Rutas", values: overview.trends.routes.map(\.total))
+                            trendRow(title: "Incidencias abiertas", values: overview.trends.incidents.map(\.open))
+                            trendRow(title: "Calidad ruta", values: overview.trends.quality.map { Int($0.routeAvg.rounded()) })
                         }
                     }
+                    if !overview.alerts.isEmpty {
+                        GroupBox("Alertas") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(overview.alerts) { alert in
+                                    Text("• \(alert.title) (\(alert.count))")
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        metricCard(title: "Paradas de ruta", value: "\(routeStops.count)")
+                        metricCard(title: "KPI cargados", value: "\(qualityRows.count)")
+                        metricCard(title: "Hubs", value: "\(hubs.count)")
+                        metricCard(title: "Depots/Puntos", value: "\(depots.count)/\(points.count)")
+                    }
                 }
-                Text(operationalMessage).font(.caption)
-                Button("Recargar manifiesto") {
-                    Task { await loadRoute() }
+                Button("Actualizar overview") {
+                    Task { await loadDashboardOverview() }
                 }
-                Divider()
-                Text("Manifest API (ruta por ID)")
-                    .font(.headline)
-                TextField("Route ID", text: $manifestRouteId)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button(manifestLoading ? "Cargando..." : "Cargar manifest") {
-                    Task { await loadManifestById() }
+                if !dashboardMessage.isEmpty {
+                    Text(dashboardMessage).font(.footnote)
                 }
-                .disabled(manifestLoading || manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Export CSV") {
-                    Task { await exportManifest(format: "csv") }
-                }
-                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Export PDF") {
-                    Task { await exportManifest(format: "pdf") }
-                }
-                .disabled(manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if let manifestError {
-                    Text(manifestError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-                Text("\(manifestRouteCode) | \(manifestRouteDate)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("Stops: \(manifestTotals.stops) · Deliveries: \(manifestTotals.deliveries) · Pickups: \(manifestTotals.pickups) · Completed: \(manifestTotals.completed)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let notes = manifestTotals.manifestNotes, !notes.isEmpty {
-                    Text("Notas: \(notes)")
-                        .font(.caption)
+                if let me {
+                    Text("Sesion: \(me.name) · \(me.email)")
                         .foregroundStyle(.secondary)
                 }
-                if !manifestRows.isEmpty {
-                    List(manifestRows.prefix(6)) { row in
-                        VStack(alignment: .leading) {
-                            Text("#\(row.sequence) \(row.stopType) \(row.reference)")
-                                .font(.caption)
-                            Text(row.status)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxHeight: 180)
-                }
-                Divider()
-                Text("Importar envios CSV")
-                    .font(.headline)
+            }
+            .padding(20)
+        }
+    }
+
+    private var operationsView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Operativa de ruta")
+                    .font(.title2.weight(.semibold))
+
                 HStack {
-                    Button(importFileUrl == nil ? "Seleccionar CSV" : "CSV seleccionado") {
-                        showImportPicker = true
-                    }
-                    Toggle("Dry run", isOn: $importDryRun)
-                        .toggleStyle(.switch)
-                    Button(importRunning ? "Importando..." : "Importar") {
-                        Task { await importShipmentsCsv() }
-                    }
-                    .disabled(importRunning || importFileUrl == nil)
-                    Button("Descargar plantilla") {
-                        Task { await downloadShipmentsTemplate() }
-                    }
+                    TextField("Fecha ruta (YYYY-MM-DD)", text: $routeDate)
+                    Button("Cargar ruta") { Task { await loadRoute() } }
                 }
-                if let importFileUrl {
-                    Text(importFileUrl.lastPathComponent)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if !importMessage.isEmpty {
-                    Text(importMessage)
-                        .font(.caption)
-                        .foregroundStyle(importMessage.contains("Error") ? .red : .secondary)
-                }
-                if let importResult {
-                    Text("Creados: \(importResult.createdCount) · Errores: \(importResult.errorCount)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if !importWarnings.isEmpty {
-                        Text("Avisos: \(importWarnings.joined(separator: ", "))")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                    }
-                    if !importResult.rows.isEmpty {
-                        List(importResult.rows.prefix(5)) { row in
-                            VStack(alignment: .leading) {
-                                Text("Fila \(row.row): \(row.reference ?? "-")")
-                                    .font(.caption)
-                                Text(row.status)
-                                    .font(.caption2)
-                                    .foregroundStyle(row.status == "error" ? .red : .secondary)
-                                if let errors = row.errors, !errors.isEmpty {
-                                    Text(errors.joined(separator: ", "))
-                                        .font(.caption2)
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 160)
-                    }
-                }
-                Spacer()
-            }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .navigationTitle("Manifiesto")
-        .fileImporter(
-            isPresented: $showImportPicker,
-            allowedContentTypes: [UTType.commaSeparatedText],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                importFileUrl = urls.first
-            case .failure:
-                importMessage = "Error seleccionando CSV"
-            }
-        }
-    }
 
-    private var advancesTab: some View {
-        NavigationStack {
-            List(advances) { advance in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(advance.subcontractorName ?? advance.subcontractorId)
-                        .font(.headline)
-                    Text("\(formatCents(advance.amountCents, currency: advance.currency)) · \(advance.status)")
-                        .font(.subheadline)
-                    Text("Solicitud: \(advance.requestDate)")
-                        .font(.caption)
+                if routeStops.isEmpty {
+                    Text("Sin paradas disponibles.")
                         .foregroundStyle(.secondary)
-                    if let reason = advance.reason, !reason.isEmpty {
-                        Text(reason)
-                            .font(.caption)
+                } else {
+                    ForEach(routeStops) { stop in
+                        Button {
+                            selectedStopID = stop.id
+                        } label: {
+                            HStack {
+                                Text("#\(stop.sequence) \(stop.reference)")
+                                Spacer()
+                                Text(stop.status).foregroundStyle(.secondary)
+                            }
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedStop?.id == stop.id ? Color.teal.opacity(0.2) : Color.gray.opacity(0.08))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                GroupBox("Acciones") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Parada activa: \(selectedStop?.reference ?? "-")")
                             .foregroundStyle(.secondary)
-                    }
-                    if advance.status == "requested" {
-                        Button("Aprobar") {
-                            Task { await approveAdvance(id: advance.id) }
+                        HStack {
+                            TextField("Codigo scan", text: $scanCode)
+                            Button("Registrar scan") { Task { await registerScan() } }
+                                .disabled(selectedStop == nil || scanCode.isEmpty)
+                        }
+                        HStack {
+                            TextField("Firma POD", text: $podSignature)
+                            Button("Registrar POD") { Task { await registerPod() } }
+                                .disabled(selectedStop == nil || podSignature.isEmpty)
                         }
                     }
+                    .padding(8)
                 }
-                .padding(.vertical, 4)
-            }
-            .navigationTitle("Anticipos")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadAdvances() }
+
+                if !operationsMessage.isEmpty {
+                    Text(operationsMessage).font(.footnote)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if !advancesMessage.isEmpty {
-                    Text(advancesMessage)
-                        .font(.caption)
-                        .padding(8)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding()
-                }
-            }
+            .padding(20)
         }
     }
 
-    private var networkTab: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Mostrar archivados", isOn: $networkIncludeDeleted)
-                        .onChange(of: networkIncludeDeleted) { _, _ in
-                            Task { await loadNetworkNodes() }
-                        }
-
-                    if !networkMessage.isEmpty {
-                        Text(networkMessage)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    GroupBox("Crear Hub") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Nombre hub", text: $networkHubName)
-                            TextField("Ciudad", text: $networkHubCity)
-                            Button("Crear hub") {
-                                Task {
-                                    do {
-                                        _ = try await apiClient.createHub(name: networkHubName, city: networkHubCity)
-                                        networkHubName = ""
-                                        networkHubCity = ""
-                                        networkMessage = "Hub creado"
-                                        await loadNetworkNodes()
-                                    } catch {
-                                        networkMessage = "Error creando hub"
-                                    }
-                                }
-                            }
-                            .disabled(networkHubName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || networkHubCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-
-                    Text("Hubs").font(.headline)
-                    ForEach(hubs) { item in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(item.code) · \(item.name)")
-                                Text(item.city ?? "-")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if item.deletedAt == nil {
-                                Button("Editar") {
-                                    networkHubEditId = item.id
-                                    networkHubEditName = item.name
-                                    networkHubEditCity = item.city ?? ""
-                                }
-                                Button("Archivar") {
-                                    Task {
-                                        do {
-                                            try await apiClient.archiveHub(id: item.id)
-                                            networkMessage = "Hub archivado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error archivando hub"
-                                        }
-                                    }
-                                }
-                            } else {
-                                Button("Restaurar") {
-                                    Task {
-                                        do {
-                                            _ = try await apiClient.restoreHub(id: item.id)
-                                            networkMessage = "Hub restaurado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error restaurando hub"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !networkHubEditId.isEmpty {
-                        GroupBox("Editar Hub") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField("Nombre", text: $networkHubEditName)
-                                TextField("Ciudad", text: $networkHubEditCity)
-                                HStack {
-                                    Button("Guardar") {
-                                        Task {
-                                            do {
-                                                _ = try await apiClient.updateHub(
-                                                    id: networkHubEditId,
-                                                    name: networkHubEditName,
-                                                    city: networkHubEditCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkHubEditCity
-                                                )
-                                                networkHubEditId = ""
-                                                networkMessage = "Hub actualizado"
-                                                await loadNetworkNodes()
-                                            } catch {
-                                                networkMessage = "Error actualizando hub"
-                                            }
-                                        }
-                                    }
-                                    Button("Cancelar") { networkHubEditId = "" }
-                                }
-                            }
-                        }
-                    }
-
-                    GroupBox("Crear Depot") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Hub ID", text: $networkDepotHubId)
-                            TextField("Nombre depot", text: $networkDepotName)
-                            TextField("Ciudad (opcional)", text: $networkDepotCity)
-                            Button("Crear depot") {
-                                Task {
-                                    do {
-                                        _ = try await apiClient.createDepot(
-                                            hubId: networkDepotHubId,
-                                            name: networkDepotName,
-                                            city: networkDepotCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkDepotCity
-                                        )
-                                        networkDepotName = ""
-                                        networkDepotCity = ""
-                                        networkMessage = "Depot creado"
-                                        await loadNetworkNodes()
-                                    } catch {
-                                        networkMessage = "Error creando depot"
-                                    }
-                                }
-                            }
-                            .disabled(networkDepotHubId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || networkDepotName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-
-                    Text("Depots").font(.headline)
-                    ForEach(depots) { item in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(item.code) · \(item.name)")
-                                Text("Hub \(item.hubId) · \(item.city ?? "-")")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if item.deletedAt == nil {
-                                Button("Editar") {
-                                    networkDepotEditId = item.id
-                                    networkDepotEditName = item.name
-                                    networkDepotEditCity = item.city ?? ""
-                                }
-                                Button("Archivar") {
-                                    Task {
-                                        do {
-                                            try await apiClient.archiveDepot(id: item.id)
-                                            networkMessage = "Depot archivado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error archivando depot"
-                                        }
-                                    }
-                                }
-                            } else {
-                                Button("Restaurar") {
-                                    Task {
-                                        do {
-                                            _ = try await apiClient.restoreDepot(id: item.id)
-                                            networkMessage = "Depot restaurado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error restaurando depot"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !networkDepotEditId.isEmpty {
-                        GroupBox("Editar Depot") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField("Nombre", text: $networkDepotEditName)
-                                TextField("Ciudad", text: $networkDepotEditCity)
-                                HStack {
-                                    Button("Guardar") {
-                                        Task {
-                                            do {
-                                                _ = try await apiClient.updateDepot(
-                                                    id: networkDepotEditId,
-                                                    name: networkDepotEditName,
-                                                    city: networkDepotEditCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkDepotEditCity
-                                                )
-                                                networkDepotEditId = ""
-                                                networkMessage = "Depot actualizado"
-                                                await loadNetworkNodes()
-                                            } catch {
-                                                networkMessage = "Error actualizando depot"
-                                            }
-                                        }
-                                    }
-                                    Button("Cancelar") { networkDepotEditId = "" }
-                                }
-                            }
-                        }
-                    }
-
-                    GroupBox("Crear Punto") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Hub ID", text: $networkPointHubId)
-                            TextField("Depot ID (opcional)", text: $networkPointDepotId)
-                            TextField("Nombre punto", text: $networkPointName)
-                            TextField("Ciudad (opcional)", text: $networkPointCity)
-                            Button("Crear punto") {
-                                Task {
-                                    do {
-                                        _ = try await apiClient.createPoint(
-                                            hubId: networkPointHubId,
-                                            depotId: networkPointDepotId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkPointDepotId,
-                                            name: networkPointName,
-                                            city: networkPointCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkPointCity
-                                        )
-                                        networkPointName = ""
-                                        networkPointCity = ""
-                                        networkPointDepotId = ""
-                                        networkMessage = "Punto creado"
-                                        await loadNetworkNodes()
-                                    } catch {
-                                        networkMessage = "Error creando punto"
-                                    }
-                                }
-                            }
-                            .disabled(networkPointHubId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || networkPointName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-
-                    Text("Puntos").font(.headline)
-                    ForEach(points) { item in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(item.code) · \(item.name)")
-                                Text("Hub \(item.hubId) · Depot \(item.depotId ?? "-") · \(item.city ?? "-")")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if item.deletedAt == nil {
-                                Button("Editar") {
-                                    networkPointEditId = item.id
-                                    networkPointEditName = item.name
-                                    networkPointEditCity = item.city ?? ""
-                                }
-                                Button("Archivar") {
-                                    Task {
-                                        do {
-                                            try await apiClient.archivePoint(id: item.id)
-                                            networkMessage = "Punto archivado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error archivando punto"
-                                        }
-                                    }
-                                }
-                            } else {
-                                Button("Restaurar") {
-                                    Task {
-                                        do {
-                                            _ = try await apiClient.restorePoint(id: item.id)
-                                            networkMessage = "Punto restaurado"
-                                            await loadNetworkNodes()
-                                        } catch {
-                                            networkMessage = "Error restaurando punto"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !networkPointEditId.isEmpty {
-                        GroupBox("Editar Punto") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField("Nombre", text: $networkPointEditName)
-                                TextField("Ciudad", text: $networkPointEditCity)
-                                HStack {
-                                    Button("Guardar") {
-                                        Task {
-                                            do {
-                                                _ = try await apiClient.updatePoint(
-                                                    id: networkPointEditId,
-                                                    name: networkPointEditName,
-                                                    city: networkPointEditCity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : networkPointEditCity
-                                                )
-                                                networkPointEditId = ""
-                                                networkMessage = "Punto actualizado"
-                                                await loadNetworkNodes()
-                                            } catch {
-                                                networkMessage = "Error actualizando punto"
-                                            }
-                                        }
-                                    }
-                                    Button("Cancelar") { networkPointEditId = "" }
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Red Operativa")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadNetworkNodes() }
-                }
-            }
-        }
-    }
-
-    private var usersTab: some View {
-        NavigationStack {
+    private var qualityView: some View {
+        ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("Estado", selection: $userStatusFilter) {
-                    Text("Todos").tag("")
-                    Text("active").tag("active")
-                    Text("pending").tag("pending")
-                    Text("suspended").tag("suspended")
+                Text("KPI Calidad")
+                    .font(.title2.weight(.semibold))
+                Picker("Scope", selection: $qualityScope) {
+                    Text("Ruta").tag("route")
+                    Text("Conductor").tag("driver")
+                    Text("Subcontrata").tag("subcontractor")
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: userStatusFilter) { _, _ in
-                    Task { await loadUsers() }
+                Button("Actualizar KPI") { Task { await loadQuality() } }
+
+                if !qualityMessage.isEmpty {
+                    Text(qualityMessage).font(.footnote)
                 }
 
-                List(users) { user in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(user.name).font(.headline)
-                        Text("\(user.email) · \(user.status)").font(.subheadline)
-                        Text(user.roles.map(\.code).joined(separator: ", "))
+                ForEach(qualityRows) { row in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(row.scopeLabel ?? row.scopeId).font(.headline)
+                        Text("Score: \(row.serviceQualityScore, format: .number.precision(.fractionLength(2)))%")
+                        ProgressView(value: min(max(row.serviceQualityScore / 100, 0), 1))
+                            .tint(row.serviceQualityScore >= 95 ? .green : .orange)
+                        Text("Completados: \(row.deliveredCompleted + row.pickupsCompleted)/\(row.assignedWithAttempt)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 2)
-                }
-
-                if !usersMessage.isEmpty {
-                    Text(usersMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.08)))
                 }
             }
-            .padding()
-            .navigationTitle("Usuarios")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadUsers() }
+            .padding(20)
+        }
+    }
+
+    private var networkView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Red operativa")
+                    .font(.title2.weight(.semibold))
+                Button("Recargar red") { Task { await loadNetwork() } }
+
+                GroupBox("Crear Hub") {
+                    VStack(spacing: 8) {
+                        TextField("Nombre hub", text: $newHubName)
+                        TextField("Ciudad hub", text: $newHubCity)
+                        Button("Crear hub") { Task { await createHub() } }
+                            .disabled(newHubName.isEmpty)
+                    }
+                    .padding(8)
+                }
+
+                GroupBox("Crear Depot") {
+                    VStack(spacing: 8) {
+                        TextField("Hub ID", text: $newDepotHubID)
+                        TextField("Nombre depot", text: $newDepotName)
+                        TextField("Ciudad depot", text: $newDepotCity)
+                        Button("Crear depot") { Task { await createDepot() } }
+                            .disabled(newDepotHubID.isEmpty || newDepotName.isEmpty)
+                    }
+                    .padding(8)
+                }
+
+                GroupBox("Crear Punto") {
+                    VStack(spacing: 8) {
+                        TextField("Hub ID", text: $newPointHubID)
+                        TextField("Depot ID (opcional)", text: $newPointDepotID)
+                        TextField("Nombre punto", text: $newPointName)
+                        TextField("Ciudad punto", text: $newPointCity)
+                        Button("Crear punto") { Task { await createPoint() } }
+                            .disabled(newPointHubID.isEmpty || newPointName.isEmpty)
+                    }
+                    .padding(8)
+                }
+
+                Text("Hubs: \(hubs.count) · Depots: \(depots.count) · Puntos: \(points.count)")
+                    .font(.subheadline)
+                if !networkMessage.isEmpty {
+                    Text(networkMessage).font(.footnote)
+                }
+            }
+            .padding(20)
+        }
+    }
+
+    private var accountView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Cuenta")
+                .font(.title2.weight(.semibold))
+            Text(me?.name ?? "Sin usuario")
+            Text(me?.email ?? "-")
+                .foregroundStyle(.secondary)
+            if let roles = me?.roles, !roles.isEmpty {
+                Text("Roles: \(roles.map(\.code).joined(separator: ", "))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Button("Cerrar sesion", role: .destructive) {
+                Task { await logout() }
+            }
+            Spacer()
+        }
+        .padding(20)
+    }
+
+    private func metricCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.headline)
+            Text(value).font(.title2.weight(.semibold))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.10)))
+    }
+
+    private func trendRow(title: String, values: [Int]) -> some View {
+        let maxValue = max(values.max() ?? 1, 1)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.teal.opacity(0.8))
+                        .frame(width: 12, height: CGFloat(max(6, Int((Double(value) / Double(maxValue)) * 40))))
                 }
             }
         }
     }
 
-    private var qualityTab: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextField("Periodo inicio (YYYY-MM-DD)", text: $qualityPeriodStart)
-                        TextField("Periodo fin (YYYY-MM-DD)", text: $qualityPeriodEnd)
-                        TextField("Umbral alerta (%)", text: $qualityAlertThresholdText)
-                        Picker("Scope", selection: $qualityThresholdScopeType) {
-                            Text("Usuario").tag("user")
-                            Text("Rol").tag("role")
-                            Text("Global").tag("global")
-                        }
-                        .pickerStyle(.segmented)
-                        if qualityThresholdScopeType != "global" {
-                            TextField(
-                                qualityThresholdScopeType == "role"
-                                    ? "Scope ID (code rol, ej: driver)"
-                                    : "Scope ID usuario (vacío = usuario actual)",
-                                text: $qualityThresholdScopeId
-                            )
-                        }
-                        HStack(spacing: 8) {
-                            Text("Fuente umbral: \(qualityThresholdSource)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            if !qualityThresholdScopeId.isEmpty {
-                                Text("· Scope: \(qualityThresholdScopeId)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Button("Guardar umbral") {
-                                Task { await saveQualityThreshold() }
-                            }
-                            .disabled(!canManageQualityThreshold)
-                        }
-                        if !qualityThresholdMessage.isEmpty {
-                            Text(qualityThresholdMessage)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if let before = qualityThresholdBeforeValue, let after = qualityThresholdAfterValue {
-                            HStack(spacing: 8) {
-                                Text(String(format: "%.2f%% → %.2f%%", before, after))
-                                    .font(.caption)
-                                Text(thresholdTrendLabel(before: before, after: after))
-                                    .font(.caption2)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(thresholdTrendColor(before: before, after: after).opacity(0.18))
-                                    .foregroundStyle(thresholdTrendColor(before: before, after: after))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            Text("Alertas delta (ultimas \(qualityThresholdAlertWindowHours)h): \(qualityThresholdLargeDeltaCount)")
-                                .font(.caption)
-                                .foregroundStyle(qualityThresholdLargeDeltaCount > 0 ? .red : .secondary)
-                            Text("Trigger: ±\(qualityThresholdDeltaTrigger, specifier: "%.2f")")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        if !qualityThresholdTopScopes.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Top scopes alertas delta")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                ForEach(qualityThresholdTopScopes.prefix(5)) { scope in
-                                    Text("\(scope.scopeType) · \(scope.scopeLabel ?? scope.scopeId ?? "-"): \(scope.alertsCount)")
-                                        .font(.caption2)
-                                }
-                            }
-                        }
-                    }
-
-                    let routeAlerts = routeQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
-                    let subcontractorAlerts = subcontractorQuality.filter { $0.serviceQualityScore < qualityAlertThreshold }
-                    if !routeAlerts.isEmpty || !subcontractorAlerts.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Alertas KPI < \(qualityAlertThreshold, specifier: "%.2f")%")
-                                .font(.headline)
-                            ForEach(routeAlerts.prefix(5)) { snapshot in
-                                Text("Ruta \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
-                                    .foregroundStyle(.red)
-                            }
-                            ForEach(subcontractorAlerts.prefix(5)) { snapshot in
-                                Text("Subcontrata \(snapshot.scopeLabel ?? snapshot.scopeId): \(snapshot.serviceQualityScore, specifier: "%.2f")%")
-                                    .foregroundStyle(.red)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-
-                    List(routeQuality) { snapshot in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(snapshot.scopeLabel ?? snapshot.scopeId)
-                                    .font(.headline)
-                                Spacer()
-                                Button("Detalle") {
-                                    selectedQualityRouteId = snapshot.scopeId
-                                    Task { await loadRouteBreakdown(routeId: snapshot.scopeId) }
-                                }
-                            }
-                            Text("Score: \(snapshot.serviceQualityScore, specifier: "%.2f")%")
-                                .font(.subheadline)
-                            Text("Periodo: \(snapshot.periodStart) - \(snapshot.periodEnd)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .frame(minHeight: 260)
-
-                    List(subcontractorQuality) { snapshot in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(snapshot.scopeLabel ?? snapshot.scopeId)
-                                    .font(.headline)
-                                Spacer()
-                                Button("Detalle subcontrata") {
-                                    selectedSubcontractorId = snapshot.scopeId
-                                    Task { await loadSubcontractorBreakdown(subcontractorId: snapshot.scopeId) }
-                                }
-                            }
-                            Text("Score: \(snapshot.serviceQualityScore, specifier: "%.2f")%")
-                                .font(.subheadline)
-                            Text("Periodo: \(snapshot.periodStart) - \(snapshot.periodEnd)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("Completados: \(snapshot.deliveredCompleted + snapshot.pickupsCompleted)/\(snapshot.assignedWithAttempt)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .frame(minHeight: 220)
-
-                    if let breakdown = selectedRouteBreakdown {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Desglose ruta \(breakdown.routeCode ?? breakdown.routeId)")
-                                .font(.headline)
-                            Text("Score agregado: \(breakdown.serviceQualityScore, specifier: "%.2f")%")
-                            Text("Snapshots: \(breakdown.snapshotsCount)")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                            Picker("Granularidad", selection: $breakdownGranularity) {
-                                Text("Mensual").tag("month")
-                                Text("Semanal").tag("week")
-                            }
-                            .pickerStyle(.segmented)
-                            .onChange(of: breakdownGranularity) { _, _ in
-                                guard let selectedQualityRouteId else { return }
-                                Task {
-                                    await loadRouteBreakdown(routeId: selectedQualityRouteId)
-                                    if let selectedSubcontractorId {
-                                        await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
-                                    }
-                                }
-                            }
-                            Text("Asignados: \(breakdown.components.assignedWithAttempt)")
-                            Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
-                            Text("Fallidas: \(breakdown.components.failedCount) · Ausencias: \(breakdown.components.absentCount) · Reintentos: \(breakdown.components.retryCount)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack {
-                                Button("Exportar CSV") {
-                                    guard let selectedQualityRouteId else { return }
-                                    Task {
-                                        try? await apiClient.exportQualityRouteBreakdownCsv(
-                                            routeId: selectedQualityRouteId,
-                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-                                            granularity: breakdownGranularity
-                                        )
-                                    }
-                                }
-                                Button("Exportar PDF") {
-                                    guard let selectedQualityRouteId else { return }
-                                    Task {
-                                        try? await apiClient.exportQualityRouteBreakdownPdf(
-                                            routeId: selectedQualityRouteId,
-                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-                                            granularity: breakdownGranularity
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        Text(selectedQualityRouteId == nil ? "Selecciona una ruta para ver el desglose KPI." : "Sin desglose disponible para esta ruta.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal)
-                    }
-
-                    if let breakdown = selectedSubcontractorBreakdown {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Desglose subcontrata \(breakdown.subcontractorCode ?? breakdown.subcontractorId)")
-                                .font(.headline)
-                            Text("Score agregado: \(breakdown.serviceQualityScore, specifier: "%.2f")%")
-                            Text("Snapshots: \(breakdown.snapshotsCount)")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
-                            Text("Asignados: \(breakdown.components.assignedWithAttempt)")
-                            Text("Completados (entrega + recogida): \(breakdown.components.completedTotal)")
-                            Text("Fallidas: \(breakdown.components.failedCount) · Ausencias: \(breakdown.components.absentCount) · Reintentos: \(breakdown.components.retryCount)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack {
-                                Button("Exportar CSV subcontrata") {
-                                    guard let selectedSubcontractorId else { return }
-                                    Task {
-                                        try? await apiClient.exportQualitySubcontractorBreakdownCsv(
-                                            subcontractorId: selectedSubcontractorId,
-                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-                                            granularity: breakdownGranularity
-                                        )
-                                    }
-                                }
-                                Button("Exportar PDF subcontrata") {
-                                    guard let selectedSubcontractorId else { return }
-                                    Task {
-                                        try? await apiClient.exportQualitySubcontractorBreakdownPdf(
-                                            subcontractorId: selectedSubcontractorId,
-                                            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-                                            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-                                            granularity: breakdownGranularity
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        Text(selectedSubcontractorId == nil ? "Selecciona una subcontrata para ver el desglose KPI." : "Sin desglose disponible para esta subcontrata.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal)
-                    }
-                }
-            }
-            .navigationTitle("Calidad")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadRouteQuality() }
-                }
-            }
-        }
-    }
-
-    private var tariffsTab: some View {
-        NavigationStack {
-            List(tariffs) { tariff in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tariff.serviceType)
-                        .font(.headline)
-                    Text(formatCents(tariff.amountCents, currency: tariff.currency))
-                        .font(.subheadline)
-                    Text("Validez: \(tariff.validFrom) - \(tariff.validTo ?? "abierta")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-            .navigationTitle("Tarifas")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadTariffs() }
-                }
-            }
-        }
-    }
-
-    private var settlementsTab: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    List(settlements) { settlement in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(settlement.subcontractorName ?? settlement.subcontractorId)
-                                .font(.headline)
-                            Text("Estado: \(settlement.status)")
-                                .font(.subheadline)
-                            Text("Periodo: \(settlement.periodStart) - \(settlement.periodEnd)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("Neto: \(formatCents(settlement.netAmountCents, currency: settlement.currency))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .frame(minHeight: 260)
-
-                    WarehouseReconciliationWidget()
-                        .frame(minHeight: 280)
-                        .background(.thinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-            .navigationTitle("Liquidaciones")
-            .toolbar {
-                Button("Recargar") {
-                    Task { await loadSettlements() }
-                }
-            }
-        }
-    }
-
-    private func refreshAll() async {
-        apiClient.setAuthToken(authSession.token?.token)
-        guard authSession.token != nil else { return }
-        await loadAuthProfile()
-        if selectedSection == .network && !availableSections.contains(.network) {
-            selectedSection = .operations
-        }
-        await loadQualityThreshold()
-        await loadQualityThresholdAlerts()
-        if availableSections.contains(.network) {
-            await loadNetworkNodes()
-        } else {
-            hubs = []
-            depots = []
-            points = []
-            networkMessage = ""
-        }
+    private func bootstrap() async {
+        await loadProfile()
+        await loadDashboardOverview()
         await loadRoute()
-        await loadManifestById()
-        await loadRouteQuality()
-        await loadAdvances()
-        await loadTariffs()
-        await loadSettlements()
-        await loadUsers()
-    }
-
-    private func loadAuthProfile() async {
-        do {
-            let me = try await apiClient.me()
-            roleCodes = me.roles.map(\.code)
-        } catch {
-            roleCodes = []
-        }
-    }
-
-    private func loadNetworkNodes() async {
-        do {
-            let loadedHubs = try await apiClient.hubs(onlyActive: false, includeDeleted: networkIncludeDeleted)
-            let loadedDepots = try await apiClient.depots(hubId: nil, includeDeleted: networkIncludeDeleted)
-            let loadedPoints = try await apiClient.points(hubId: nil, depotId: nil, includeDeleted: networkIncludeDeleted)
-            hubs = loadedHubs
-            depots = loadedDepots
-            points = loadedPoints
-            if networkDepotHubId.isEmpty {
-                networkDepotHubId = loadedHubs.first?.id ?? ""
-            }
-            if networkPointHubId.isEmpty {
-                networkPointHubId = loadedHubs.first?.id ?? ""
-            }
-        } catch {
-            networkMessage = "No se pudo cargar red operativa"
-        }
-    }
-
-    private func loadRoute() async {
-        let payload = try? await apiClient.myRoute(
-            routeDate: routeDateFilter.isEmpty ? nil : routeDateFilter,
-            status: routeStatusFilter.isEmpty ? nil : routeStatusFilter
-        )
-        routeStops = payload?.stops ?? []
-        selectedStopId = routeStops.first?.id
-        if manifestRouteId.isEmpty, let routeId = payload?.route?.id {
-            manifestRouteId = routeId
-        }
-    }
-
-    private func loadManifestById() async {
-        let trimmedRouteId = manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedRouteId.isEmpty else { return }
-        guard let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] else {
-            manifestError = "API_BASE_URL no configurado"
-            return
-        }
-        guard let url = URL(string: "\(baseURL)/routes/\(trimmedRouteId)/manifest") else {
-            manifestError = "URL invalida"
-            return
-        }
-
-        manifestLoading = true
-        manifestError = nil
-        defer { manifestLoading = false }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token = authSession.token?.token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                manifestError = "Error HTTP al cargar manifest"
-                return
-            }
-            let decoded = try JSONDecoder().decode(RouteManifestAPIResponse.self, from: data).data
-            manifestRouteCode = decoded.route.code
-            manifestRouteDate = decoded.route.routeDate
-            manifestTotals = RouteManifestTotals(
-                stops: decoded.totals.stops,
-                deliveries: decoded.totals.deliveries,
-                pickups: decoded.totals.pickups,
-                completed: decoded.totals.completed,
-                manifestNotes: decoded.route.manifestNotes
-            )
-            manifestRows = decoded.stops.map {
-                RouteManifestRow(
-                    id: $0.id,
-                    sequence: $0.sequence,
-                    stopType: $0.stopType,
-                    reference: $0.reference ?? $0.entityId,
-                    status: $0.status
-                )
-            }
-        } catch {
-            manifestError = "No se pudo cargar manifest"
-        }
-    }
-
-    private func exportManifest(format: String) async {
-        let trimmedRouteId = manifestRouteId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedRouteId.isEmpty else { return }
-        guard let baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] else {
-            manifestError = "API_BASE_URL no configurado"
-            return
-        }
-        guard let url = URL(string: "\(baseURL)/routes/\(trimmedRouteId)/manifest/export.\(format)") else {
-            manifestError = "URL invalida"
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        if let token = authSession.token?.token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                manifestError = "Error HTTP al exportar manifest"
-                return
-            }
-
-            await MainActor.run {
-                let panel = NSSavePanel()
-                panel.nameFieldStringValue = "route_manifest_\(trimmedRouteId).\(format)"
-                panel.canCreateDirectories = true
-                panel.begin { response in
-                    guard response == .OK, let target = panel.url else { return }
-                    do {
-                        try data.write(to: target)
-                    } catch {
-                        manifestError = "No se pudo guardar el archivo"
-                    }
-                }
-            }
-        } catch {
-            manifestError = "No se pudo exportar manifest"
-        }
-    }
-
-    private func importShipmentsCsv() async {
-        guard let importFileUrl else {
-            importMessage = "Selecciona un CSV primero"
-            return
-        }
-        importRunning = true
-        importMessage = ""
-        do {
-            let result = try await apiClient.importShipmentsCsv(fileUrl: importFileUrl, dryRun: importDryRun)
-            importResult = result
-            importWarnings = result.warnings
-            importMessage = result.dryRun ? "Dry run completado" : "Importacion completada"
-        } catch {
-            importMessage = "Error importando CSV"
-        }
-        importRunning = false
-    }
-
-    private func downloadShipmentsTemplate() async {
-        do {
-            let data = try await apiClient.downloadShipmentsTemplate()
-            await MainActor.run {
-                let panel = NSSavePanel()
-                panel.nameFieldStringValue = "shipments_import_template.csv"
-                panel.canCreateDirectories = true
-                panel.begin { response in
-                    guard response == .OK, let target = panel.url else { return }
-                    do {
-                        try data.write(to: target)
-                        importMessage = "Plantilla guardada"
-                    } catch {
-                        importMessage = "No se pudo guardar la plantilla"
-                    }
-                }
-            }
-        } catch {
-            importMessage = "Error descargando plantilla"
-        }
-    }
-
-    private func loadRouteQuality() async {
-        routeQuality = (try? await apiClient.qualitySnapshots(scopeType: "route")) ?? []
-        subcontractorQuality = (try? await apiClient.qualitySnapshots(scopeType: "subcontractor")) ?? []
-        if selectedQualityRouteId == nil {
-            selectedQualityRouteId = routeQuality.first?.scopeId
-        }
-        if let selectedQualityRouteId {
-            await loadRouteBreakdown(routeId: selectedQualityRouteId)
-        }
-        if selectedSubcontractorId == nil {
-            selectedSubcontractorId = subcontractorQuality.first?.scopeId
-        }
-        if let selectedSubcontractorId {
-            await loadSubcontractorBreakdown(subcontractorId: selectedSubcontractorId)
-        }
-    }
-
-    private func loadQualityThreshold() async {
-        guard let config = try? await apiClient.qualityThreshold() else { return }
-        qualityAlertThresholdText = String(format: "%.2f", config.threshold)
-        qualityThresholdBeforeValue = config.threshold
-        qualityThresholdAfterValue = config.threshold
-        qualityThresholdSource = config.sourceType
-        qualityThresholdScopeType = config.sourceType == "default" ? "user" : config.sourceType
-        qualityThresholdScopeId = config.sourceId ?? ""
-        canManageQualityThreshold = config.canManage ?? false
-    }
-
-    private func saveQualityThreshold() async {
-        guard let threshold = Double(qualityAlertThresholdText) else {
-            qualityThresholdMessage = "Umbral invalido"
-            return
-        }
-
-        do {
-            let beforeValue = Double(qualityAlertThresholdText)
-            let scopeType = qualityThresholdScopeType
-            let scopeId = scopeType == "global"
-                ? nil
-                : (qualityThresholdScopeId.isEmpty ? nil : qualityThresholdScopeId)
-            let updated = try await apiClient.updateQualityThreshold(
-                threshold: threshold,
-                scopeType: scopeType,
-                scopeId: scopeId
-            )
-            qualityAlertThresholdText = String(format: "%.2f", updated.threshold)
-            qualityThresholdBeforeValue = beforeValue
-            qualityThresholdAfterValue = updated.threshold
-            qualityThresholdSource = updated.sourceType
-            qualityThresholdScopeId = updated.sourceId ?? qualityThresholdScopeId
-            canManageQualityThreshold = updated.canManage ?? canManageQualityThreshold
-            qualityThresholdMessage = "Umbral guardado"
-            await loadQualityThresholdAlerts()
-        } catch {
-            qualityThresholdMessage = "No se pudo guardar el umbral"
-        }
-    }
-
-    private func loadQualityThresholdAlerts() async {
-        let dateFormatter = DateFormatter()
-        dateFormatter.calendar = Calendar(identifier: .gregorian)
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let settings = try? await apiClient.qualityThresholdAlertSettings()
-        let windowHours = settings?.windowHours ?? 24
-        qualityThresholdAlertWindowHours = windowHours
-        qualityThresholdDeltaTrigger = settings?.largeDeltaThreshold ?? 5
-
-        let now = Date()
-        let fromDate = Calendar(identifier: .gregorian).date(byAdding: .hour, value: -windowHours, to: now) ?? now
-        let dateFrom = dateFormatter.string(from: fromDate)
-        let dateTo = dateFormatter.string(from: now)
-
-        let history = (try? await apiClient.qualityThresholdHistory(dateFrom: dateFrom, dateTo: dateTo)) ?? []
-        qualityThresholdLargeDeltaCount = history.filter { $0.event == "quality.threshold.alert.large_delta" }.count
-        qualityThresholdTopScopes = (try? await apiClient.qualityThresholdAlertTopScopes(dateFrom: dateFrom, dateTo: dateTo, limit: 5)) ?? []
-    }
-
-    private func loadRouteBreakdown(routeId: String) async {
-        selectedRouteBreakdown = try? await apiClient.qualityRouteBreakdown(
-            routeId: routeId,
-            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-            granularity: breakdownGranularity
-        )
-    }
-
-    private func loadSubcontractorBreakdown(subcontractorId: String) async {
-        selectedSubcontractorBreakdown = try? await apiClient.qualitySubcontractorBreakdown(
-            subcontractorId: subcontractorId,
-            periodStart: qualityPeriodStart.isEmpty ? nil : qualityPeriodStart,
-            periodEnd: qualityPeriodEnd.isEmpty ? nil : qualityPeriodEnd,
-            granularity: breakdownGranularity
-        )
-    }
-
-    private func loadAdvances() async {
-        do {
-            advances = try await apiClient.advances(status: nil, period: nil, page: 1, perPage: 50).data
-        } catch {
-            advances = []
-            advancesMessage = "No se pudieron cargar anticipos"
-        }
-    }
-
-    private func loadTariffs() async {
-        tariffs = (try? await apiClient.tariffs(serviceType: nil)) ?? []
-    }
-
-    private func loadSettlements() async {
-        settlements = (try? await apiClient.settlements(status: nil, period: nil, page: 1, perPage: 50).data) ?? []
-    }
-
-    private func loadUsers() async {
-        do {
-            users = try await apiClient.users(
-                status: userStatusFilter.isEmpty ? nil : userStatusFilter,
-                page: 1,
-                perPage: 100
-            ).data
-            usersMessage = ""
-        } catch {
-            users = []
-            usersMessage = "No se pudieron cargar usuarios"
-        }
-    }
-
-    private func approveAdvance(id: String) async {
-        do {
-            _ = try await apiClient.approveAdvance(id: id)
-            advancesMessage = "Anticipo aprobado"
-            await loadAdvances()
-        } catch {
-            advancesMessage = "No se pudo aprobar el anticipo"
-        }
-    }
-
-    private func formatCents(_ cents: Int, currency: String) -> String {
-        let amount = Double(cents) / 100.0
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        return formatter.string(from: NSNumber(value: amount)) ?? "\(amount) \(currency)"
-    }
-
-    private func thresholdTrendLabel(before: Double, after: Double) -> String {
-        if after > before { return "SUBE" }
-        if after < before { return "BAJA" }
-        return "IGUAL"
-    }
-
-    private func thresholdTrendColor(before: Double, after: Double) -> Color {
-        if after > before { return .green }
-        if after < before { return .orange }
-        return .secondary
+        await loadQuality()
+        await loadNetwork()
     }
 
     private func login() async {
+        authLoading = true
+        defer { authLoading = false }
         do {
             let token = try await apiClient.login(email: email, password: password)
             authSession.updateToken(token)
-            apiClient.setAuthToken(token.token)
-            loginMessage = "Sesion activa"
-            await refreshAll()
+            authMessage = "Sesion iniciada."
         } catch {
-            loginMessage = "Error de login"
+            authMessage = "No se pudo iniciar sesion."
         }
     }
 
     private func logout() async {
         await apiClient.logout()
         authSession.updateToken(nil)
-        apiClient.setAuthToken(nil)
-        loginMessage = "No autenticado"
+        routeStops = []
+        qualityRows = []
+        hubs = []
+        depots = []
+        points = []
+    }
+
+    private func loadProfile() async {
+        do {
+            me = try await apiClient.me()
+        } catch {
+            operationsMessage = "No se pudo cargar perfil."
+        }
+    }
+
+    private func loadRoute() async {
+        do {
+            let payload = try await apiClient.myRoute(routeDate: routeDate, status: nil)
+            routeStops = payload.stops
+            selectedStopID = routeStops.first?.id
+            operationsMessage = "Ruta cargada."
+        } catch {
+            operationsMessage = "No se pudo cargar la ruta."
+        }
+    }
+
+    private func loadQuality() async {
+        do {
+            qualityRows = try await apiClient.qualitySnapshots(scopeType: qualityScope)
+            qualityMessage = "KPI actualizado."
+        } catch {
+            qualityRows = []
+            qualityMessage = "No se pudo cargar KPI."
+        }
+    }
+
+    private func loadDashboardOverview() async {
+        do {
+            dashboardOverview = try await apiClient.dashboardOverview(period: "7d", dateFrom: nil, dateTo: nil)
+            dashboardMessage = "Overview actualizado."
+        } catch {
+            dashboardOverview = nil
+            dashboardMessage = "No se pudo cargar overview."
+        }
+    }
+
+    private func loadNetwork() async {
+        do {
+            async let hubsResult = apiClient.hubs(onlyActive: true, includeDeleted: false)
+            async let depotsResult = apiClient.depots(hubId: nil, includeDeleted: false)
+            async let pointsResult = apiClient.points(hubId: nil, depotId: nil, includeDeleted: false)
+            hubs = try await hubsResult
+            depots = try await depotsResult
+            points = try await pointsResult
+            networkMessage = "Red actualizada."
+        } catch {
+            hubs = []
+            depots = []
+            points = []
+            networkMessage = "No se pudo cargar red."
+        }
+    }
+
+    private func registerScan() async {
+        guard let stop = selectedStop else { return }
+        do {
+            try await apiClient.registerScan(trackableType: stop.entityType, trackableId: stop.entityId, scanCode: scanCode)
+            operationsMessage = "Scan registrado."
+            scanCode = ""
+        } catch {
+            operationsMessage = "Error registrando scan."
+        }
+    }
+
+    private func registerPod() async {
+        guard let stop = selectedStop else { return }
+        do {
+            try await apiClient.registerPod(evidenceType: stop.entityType, evidenceId: stop.entityId, signatureName: podSignature)
+            operationsMessage = "POD registrado."
+            podSignature = ""
+        } catch {
+            operationsMessage = "Error registrando POD."
+        }
+    }
+
+    private func createHub() async {
+        do {
+            _ = try await apiClient.createHub(name: newHubName, city: newHubCity)
+            newHubName = ""
+            newHubCity = ""
+            await loadNetwork()
+        } catch {
+            networkMessage = "No se pudo crear hub."
+        }
+    }
+
+    private func createDepot() async {
+        do {
+            _ = try await apiClient.createDepot(hubId: newDepotHubID, name: newDepotName, city: newDepotCity)
+            newDepotName = ""
+            newDepotCity = ""
+            await loadNetwork()
+        } catch {
+            networkMessage = "No se pudo crear depot."
+        }
+    }
+
+    private func createPoint() async {
+        do {
+            let depotID = newPointDepotID.isEmpty ? nil : newPointDepotID
+            _ = try await apiClient.createPoint(hubId: newPointHubID, depotId: depotID, name: newPointName, city: newPointCity)
+            newPointName = ""
+            newPointCity = ""
+            await loadNetwork()
+        } catch {
+            networkMessage = "No se pudo crear punto."
+        }
+    }
+
+    private static func todayISODate() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 }
 
 #Preview {
     ContentView(apiClient: APIClient(baseURL: nil))
+        .environmentObject(AuthSession())
 }

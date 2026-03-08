@@ -16,7 +16,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (sessionStore.isAuthenticated()) {
-      navigate('/shipments', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [navigate]);
 
@@ -27,7 +27,7 @@ export function LoginPage() {
     try {
       const result = await apiClient.login({ email, password });
       setMessage(result.message);
-      navigate('/shipments', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (submitError) {
       const nextError = submitError instanceof Error ? submitError.message : 'No se ha podido iniciar sesion';
       setError(nextError);
