@@ -306,6 +306,30 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /dashboard/overview/export.csv:
+    get:
+      tags: [Dashboard]
+      summary: Exportar overview agregado a CSV
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, enum: [today, 7d, 30d], default: 7d }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: hub_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: CSV export }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /audit-logs:
     get:
       tags: [Audit]

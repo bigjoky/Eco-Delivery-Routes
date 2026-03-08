@@ -404,7 +404,13 @@ public final class MockAPIClient {
         ].prefix(max(1, min(limit ?? 5, 100))))
     }
 
-    public func dashboardOverview(period: String?, dateFrom: String?, dateTo: String?) async throws -> DashboardOverview {
+    public func dashboardOverview(
+        period: String?,
+        dateFrom: String?,
+        dateTo: String?,
+        hubId: String?,
+        subcontractorId: String?
+    ) async throws -> DashboardOverview {
         let now = Date()
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -414,7 +420,7 @@ public final class MockAPIClient {
 
         return DashboardOverview(
             period: DashboardPeriod(from: from, to: to, preset: resolvedPreset),
-            filters: DashboardFilters(hubId: nil, subcontractorId: nil),
+            filters: DashboardFilters(hubId: hubId, subcontractorId: subcontractorId),
             totals: DashboardTotals(shipments: 124, routes: 18, incidentsOpen: 7, qualityThreshold: 95),
             shipmentsByStatus: DashboardShipmentsByStatus(created: 22, outForDelivery: 31, delivered: 65, incident: 6),
             routesByStatus: DashboardRoutesByStatus(planned: 6, inProgress: 8, completed: 4),

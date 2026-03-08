@@ -81,6 +81,14 @@ class DashboardOverviewHttpTest extends TestCase
         }
     }
 
+    public function test_dashboard_overview_export_csv_returns_file(): void
+    {
+        $response = $this->get('/api/v1/dashboard/overview/export.csv?period=7d');
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $this->assertStringContainsString('section,metric,value', $response->streamedContent());
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

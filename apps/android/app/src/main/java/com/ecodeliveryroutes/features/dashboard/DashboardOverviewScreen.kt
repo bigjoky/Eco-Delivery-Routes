@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ecodeliveryroutes.core.model.DashboardOverview
@@ -47,15 +48,21 @@ fun DashboardOverviewScreen(
     }
 
     Column(
-        modifier = Modifier.padding(16.dp),
+        modifier = Modifier
+            .padding(16.dp)
+            .testTag("dashboard_overview_root"),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Everything at a glance", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Everything at a glance",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.testTag("dashboard_overview_title")
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { period.value = "today" }) { Text("Hoy") }
             Button(onClick = { period.value = "7d" }) { Text("7d") }
             Button(onClick = { period.value = "30d" }) { Text("30d") }
-            Button(onClick = { onOpenDriverRoute() }) { Text("Mi ruta") }
+            Button(onClick = { onOpenDriverRoute() }, modifier = Modifier.testTag("dashboard_open_route")) { Text("Mi ruta") }
         }
         OutlinedTextField(
             value = hubId.value,

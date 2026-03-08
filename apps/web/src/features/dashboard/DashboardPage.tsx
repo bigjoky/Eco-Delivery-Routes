@@ -141,6 +141,17 @@ export function DashboardPage() {
             <option value="off">Sin auto-refresh</option>
           </select>
           <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar'}</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => apiClient.exportDashboardOverviewCsv({
+              period,
+              hubId: hubId || undefined,
+              subcontractorId: subcontractorId || undefined,
+            })}
+          >
+            Exportar CSV
+          </Button>
         </div>
       </header>
 

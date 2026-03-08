@@ -44,6 +44,9 @@ struct ContentView: View {
     @State private var pointsCount = 0
     @State private var dashboardOverview: DashboardOverview?
     @State private var dashboardMessage = ""
+    @State private var dashboardPeriod = "7d"
+    @State private var dashboardHubID = ""
+    @State private var dashboardSubcontractorID = ""
 
     private let serviceTypes = [
         "express_1030",
@@ -130,6 +133,13 @@ struct ContentView: View {
     private var overviewTab: some View {
         List {
             Section("Everything at a glance") {
+                Picker("Periodo", selection: $dashboardPeriod) {
+                    Text("Hoy").tag("today")
+                    Text("7 días").tag("7d")
+                    Text("30 días").tag("30d")
+                }
+                TextField("Hub ID (opcional)", text: $dashboardHubID)
+                TextField("Subcontrata ID (opcional)", text: $dashboardSubcontractorID)
                 if let overview = dashboardOverview {
                     Text("Periodo: \(overview.period.from) · \(overview.period.to)")
                         .font(.caption)
@@ -443,7 +453,13 @@ struct ContentView: View {
 
     private func loadDashboardOverview() async {
         do {
-            dashboardOverview = try await apiClient.dashboardOverview(period: "7d", dateFrom: nil, dateTo: nil)
+            dashboardOverview = try await apiClient.dashboardOverview(
+                period: dashboardPeriod,
+                dateFrom: nil,
+                dateTo: nil,
+                hubId: dashboardHubID.isEmpty ? nil : dashboardHubID,
+                subcontractorId: dashboardSubcontractorID.isEmpty ? nil : dashboardSubcontractorID
+            )
             dashboardMessage = "Overview actualizado."
         } catch {
             dashboardOverview = nil

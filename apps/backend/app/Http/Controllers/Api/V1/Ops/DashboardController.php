@@ -53,6 +53,85 @@ class DashboardController extends Controller
         return response()->json(['data' => $payload]);
     }
 
+    public function exportCsv(Request $request)
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$this->canReadDashboard($actor)) {
+            return $this->forbidden();
+        }
+
+        $periodPreset = (string) $request->query('period', '7d');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+        $hubId = $request->query('hub_id');
+        $subcontractorId = $request->query('subcontractor_id');
+        [$from, $to, $preset] = $this->resolvePeriod(
+            is_string($dateFrom) ? $dateFrom : null,
+            is_string($dateTo) ? $dateTo : null,
+            $periodPreset
+        );
+
+        $payload = $this->buildPayload(
+            from: $from,
+            to: $to,
+            preset: $preset,
+            hubId: is_string($hubId) && $hubId !== '' ? $hubId : null,
+            subcontractorId: is_string($subcontractorId) && $subcontractorId !== '' ? $subcontractorId : null
+        );
+
+        $filename = sprintf('dashboard_overview_%s_%s.csv', $from, $to);
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        return response()->stream(function () use ($payload): void {
+            $stream = fopen('php://output', 'w');
+            if ($stream === false) {
+                return;
+            }
+
+            fputcsv($stream, ['section', 'metric', 'value']);
+            fputcsv($stream, ['period', 'from', $payload['period']['from'] ?? '']);
+            fputcsv($stream, ['period', 'to', $payload['period']['to'] ?? '']);
+            fputcsv($stream, ['period', 'preset', $payload['period']['preset'] ?? '']);
+            fputcsv($stream, ['filters', 'hub_id', $payload['filters']['hub_id'] ?? '']);
+            fputcsv($stream, ['filters', 'subcontractor_id', $payload['filters']['subcontractor_id'] ?? '']);
+
+            foreach (($payload['totals'] ?? []) as $metric => $value) {
+                fputcsv($stream, ['totals', (string) $metric, is_scalar($value) ? (string) $value : json_encode($value)]);
+            }
+            foreach (($payload['sla'] ?? []) as $metric => $value) {
+                fputcsv($stream, ['sla', (string) $metric, is_scalar($value) ? (string) $value : json_encode($value)]);
+            }
+            foreach (($payload['shipments_by_status'] ?? []) as $metric => $value) {
+                fputcsv($stream, ['shipments_by_status', (string) $metric, is_scalar($value) ? (string) $value : json_encode($value)]);
+            }
+            foreach (($payload['routes_by_status'] ?? []) as $metric => $value) {
+                fputcsv($stream, ['routes_by_status', (string) $metric, is_scalar($value) ? (string) $value : json_encode($value)]);
+            }
+            foreach (($payload['quality'] ?? []) as $metric => $value) {
+                fputcsv($stream, ['quality', (string) $metric, is_scalar($value) ? (string) $value : json_encode($value)]);
+            }
+
+            foreach (($payload['trends']['shipments'] ?? []) as $index => $row) {
+                fputcsv($stream, ['trends.shipments', (string) $index, json_encode($row)]);
+            }
+            foreach (($payload['trends']['routes'] ?? []) as $index => $row) {
+                fputcsv($stream, ['trends.routes', (string) $index, json_encode($row)]);
+            }
+            foreach (($payload['trends']['incidents'] ?? []) as $index => $row) {
+                fputcsv($stream, ['trends.incidents', (string) $index, json_encode($row)]);
+            }
+            foreach (($payload['trends']['quality'] ?? []) as $index => $row) {
+                fputcsv($stream, ['trends.quality', (string) $index, json_encode($row)]);
+            }
+
+            fclose($stream);
+        }, 200, $headers);
+    }
+
     private function buildPayload(
         string $from,
         string $to,

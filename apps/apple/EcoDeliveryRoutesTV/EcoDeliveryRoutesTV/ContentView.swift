@@ -6,6 +6,9 @@ struct ContentView: View {
 
     @State private var snapshot = TVDashboardSnapshot.empty
     @State private var lastRefresh = "Sin refresco"
+    @State private var period = "7d"
+    @State private var hubID = ProcessInfo.processInfo.environment["TV_HUB_ID"] ?? ""
+    @State private var subcontractorID = ProcessInfo.processInfo.environment["TV_SUBCONTRACTOR_ID"] ?? ""
 
     var body: some View {
         ZStack {
@@ -39,6 +42,17 @@ struct ContentView: View {
                         metricCard("Subcontratas", value: "\(snapshot.subcontractorRows.count)")
                         metricCard("Umbral KPI", value: "\(formatPercent(snapshot.threshold))%")
                         metricCard("Nodos red", value: "\(snapshot.hubsCount)/\(snapshot.depotsCount)/\(snapshot.pointsCount)")
+                    }
+                    HStack(spacing: 12) {
+                        Button("Hoy") { period = "today" }
+                            .buttonStyle(.borderedProminent)
+                        Button("7d") { period = "7d" }
+                            .buttonStyle(.bordered)
+                        Button("30d") { period = "30d" }
+                            .buttonStyle(.bordered)
+                        Spacer()
+                        Text("Hub: \(hubID.isEmpty ? "Todos" : hubID)")
+                        Text("Subcontrata: \(subcontractorID.isEmpty ? "Todas" : subcontractorID)")
                     }
 
                     HStack(alignment: .top, spacing: 14) {
@@ -111,7 +125,11 @@ struct ContentView: View {
 
     private func startPolling() async {
         while !Task.isCancelled {
-            snapshot = await monitorService.loadSnapshot()
+            snapshot = await monitorService.loadSnapshot(
+                period: period,
+                hubId: hubID.isEmpty ? nil : hubID,
+                subcontractorId: subcontractorID.isEmpty ? nil : subcontractorID
+            )
             let formatter = DateFormatter()
             formatter.timeStyle = .medium
             formatter.dateStyle = .none
@@ -228,7 +246,7 @@ final class TVMonitorService {
         token = ProcessInfo.processInfo.environment["API_TOKEN"]
     }
 
-    func loadSnapshot() async -> TVDashboardSnapshot {
+    func loadSnapshot(period: String = "7d", hubId: String? = nil, subcontractorId: String? = nil) async -> TVDashboardSnapshot {
         guard let baseURL = normalizedBaseURL() else {
             return mockSnapshot(status: "Sin API_BASE_URL configurada")
         }
@@ -236,13 +254,18 @@ final class TVMonitorService {
         await ensureAuthenticated(baseURL: baseURL)
 
         do {
-            async let overview = fetchOverview(baseURL: baseURL)
-            async let routesDTO = fetchQuality(baseURL: baseURL, scope: "route")
-            async let driversDTO = fetchQuality(baseURL: baseURL, scope: "driver")
-            async let subcontractorsDTO = fetchQuality(baseURL: baseURL, scope: "subcontractor")
+            async let overview = fetchOverview(
+                baseURL: baseURL,
+                period: period,
+                hubId: hubId,
+                subcontractorId: subcontractorId
+            )
+            async let routesDTO = fetchQuality(baseURL: baseURL, scope: "route", hubId: hubId, subcontractorId: subcontractorId)
+            async let driversDTO = fetchQuality(baseURL: baseURL, scope: "driver", hubId: hubId, subcontractorId: subcontractorId)
+            async let subcontractorsDTO = fetchQuality(baseURL: baseURL, scope: "subcontractor", hubId: hubId, subcontractorId: subcontractorId)
             async let hubsCount = fetchRowsCount(baseURL: baseURL, path: "hubs?only_active=1&include_deleted=0")
-            async let depotsCount = fetchRowsCount(baseURL: baseURL, path: "depots?include_deleted=0")
-            async let pointsCount = fetchRowsCount(baseURL: baseURL, path: "points?include_deleted=0")
+            async let depotsCount = fetchRowsCount(baseURL: baseURL, path: "depots?include_deleted=0\(hubId != nil ? "&hub_id=\(hubId!)" : "")")
+            async let pointsCount = fetchRowsCount(baseURL: baseURL, path: "points?include_deleted=0\(hubId != nil ? "&hub_id=\(hubId!)" : "")")
 
             let overviewDTO = try await overview
             let routes = mapRows(try await routesDTO)
@@ -303,8 +326,16 @@ final class TVMonitorService {
         }
     }
 
-    private func fetchQuality(baseURL: String, scope: String) async throws -> [QualityRowDTO] {
-        guard let url = URL(string: "\(baseURL)/kpis/quality?scope_type=\(scope)") else { return [] }
+    private func fetchQuality(baseURL: String, scope: String, hubId: String?, subcontractorId: String?) async throws -> [QualityRowDTO] {
+        var queryItems = [
+            URLQueryItem(name: "scope_type", value: scope),
+            URLQueryItem(name: "hub_id", value: hubId),
+            URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+        ]
+        queryItems.removeAll(where: { $0.value == nil || $0.value?.isEmpty == true })
+        var components = URLComponents(string: "\(baseURL)/kpis/quality")
+        components?.queryItems = queryItems
+        guard let url = components?.url else { return [] }
         let data = try await authorizedGet(url: url, baseURL: baseURL)
         return try JSONDecoder().decode(DataEnvelope<QualityRowDTO>.self, from: data).data
     }
@@ -315,8 +346,14 @@ final class TVMonitorService {
         return try JSONDecoder().decode(DataObjectEnvelope<ThresholdDTO>.self, from: data).data.threshold
     }
 
-    private func fetchOverview(baseURL: String) async throws -> DashboardOverviewDTO {
-        guard let url = URL(string: "\(baseURL)/dashboard/overview?period=7d") else {
+    private func fetchOverview(baseURL: String, period: String, hubId: String?, subcontractorId: String?) async throws -> DashboardOverviewDTO {
+        var components = URLComponents(string: "\(baseURL)/dashboard/overview")
+        components?.queryItems = [
+            URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "hub_id", value: hubId),
+            URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+        ].filter { $0.value != nil && $0.value?.isEmpty == false }
+        guard let url = components?.url else {
             throw URLError(.badURL)
         }
         let data = try await authorizedGet(url: url, baseURL: baseURL)
