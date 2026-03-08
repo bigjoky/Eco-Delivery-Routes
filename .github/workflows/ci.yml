@@ -26,6 +26,8 @@ jobs:
   vitest:
     name: vitest
     runs-on: ubuntu-latest
+    env:
+      LARAVEL_BYPASS_ENV_CHECK: 1
     defaults:
       run:
         working-directory: apps/backend
