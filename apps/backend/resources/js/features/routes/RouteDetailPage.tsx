@@ -46,6 +46,8 @@ export function RouteDetailPage() {
   const [bulkShipmentIds, setBulkShipmentIds] = useState<string[]>([]);
   const [bulkPickupIds, setBulkPickupIds] = useState<string[]>([]);
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [selectedStopIds, setSelectedStopIds] = useState<string[]>([]);
+  const [bulkDeletingStops, setBulkDeletingStops] = useState(false);
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
   const [manifestNotes, setManifestNotes] = useState('');
@@ -337,6 +339,33 @@ export function RouteDetailPage() {
     }
   };
 
+  const deleteSelectedStops = async () => {
+    if (!id) return;
+    if (selectedStopIds.length === 0) {
+      setError('Selecciona al menos una parada para eliminar.');
+      return;
+    }
+    const confirmed = window.confirm(`Eliminar ${selectedStopIds.length} paradas seleccionadas?`);
+    if (!confirmed) return;
+
+    setBulkDeletingStops(true);
+    setError('');
+    try {
+      let updatedStops = stops;
+      for (const stopId of selectedStopIds) {
+        updatedStops = await apiClient.deleteRouteStop(id, stopId);
+      }
+      setStops(updatedStops);
+      setSelectedStopIds([]);
+      void refreshManifest(id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo eliminar paradas en bloque');
+      apiClient.getRouteStops(id).then(setStops).catch(() => {});
+    } finally {
+      setBulkDeletingStops(false);
+    }
+  };
+
   const undoDeleteStop = async () => {
     if (!id || !lastDeletedStop) return;
     setUndoDeleting(true);
@@ -454,6 +483,11 @@ export function RouteDetailPage() {
       setRecalculatingEta(false);
     }
   };
+
+  useEffect(() => {
+    const visible = new Set(stops.map((stop) => stop.id));
+    setSelectedStopIds((current) => current.filter((id) => visible.has(id)));
+  }, [stops]);
 
   return (
     <section className="page-grid">
@@ -648,10 +682,38 @@ export function RouteDetailPage() {
               {recalculatingEta ? 'Recalculando ETA...' : 'Recalcular ETA'}
             </Button>
           </div>
+          <div className="inline-actions">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedStopIds(stops.map((stop) => stop.id))}
+              disabled={stops.length === 0 || bulkDeletingStops}
+            >
+              Seleccionar todo
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedStopIds([])}
+              disabled={selectedStopIds.length === 0 || bulkDeletingStops}
+            >
+              Limpiar seleccion
+            </Button>
+            <span className="helper">Seleccionadas: {selectedStopIds.length}</span>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={deleteSelectedStops}
+              disabled={selectedStopIds.length === 0 || bulkDeletingStops}
+            >
+              {bulkDeletingStops ? 'Eliminando...' : 'Eliminar seleccionadas'}
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Sel</TableHead>
                   <TableHead>Secuencia</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
@@ -674,6 +736,21 @@ export function RouteDetailPage() {
                       setDraggingStopId(null);
                     }}
                   >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedStopIds.includes(stop.id)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setSelectedStopIds((current) => (
+                            checked
+                              ? Array.from(new Set([...current, stop.id]))
+                              : current.filter((id) => id !== stop.id)
+                          ));
+                        }}
+                        disabled={bulkDeletingStops}
+                      />
+                    </TableCell>
                     <TableCell>
                       <input
                         type="number"

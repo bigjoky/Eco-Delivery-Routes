@@ -61,6 +61,7 @@ export function IncidentsPage() {
   const [bulkResolving, setBulkResolving] = useState(false);
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
+  const [bulkResolveNotes, setBulkResolveNotes] = useState('Resueltas en lote desde panel web');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -295,12 +296,16 @@ export function IncidentsPage() {
       setResolveError('Selecciona al menos una incidencia abierta.');
       return;
     }
+    if (!bulkResolveNotes.trim()) {
+      setResolveError('Define una nota de resolucion para el cierre masivo.');
+      return;
+    }
     setBulkResolving(true);
     setResolveError('');
     try {
       await apiClient.resolveIncidentsBulk(
         selectedIncidentIds,
-        'Resueltas en lote desde panel web',
+        bulkResolveNotes.trim(),
         {
           applyToFiltered: bulkScope === 'filtered',
           filters: bulkScope === 'filtered' ? {
@@ -579,6 +584,11 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={selectOpenInPage}>
               Seleccionar abiertas (página)
             </Button>
+            <Input
+              value={bulkResolveNotes}
+              onChange={(event) => setBulkResolveNotes(event.target.value)}
+              placeholder="Nota de resolucion masiva"
+            />
             <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || (bulkScope === 'selected' && selectedIncidentIds.length === 0)}>
               {bulkResolving ? 'Resolviendo...' : bulkScope === 'filtered'
                 ? 'Resolver abiertas del filtro'

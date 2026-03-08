@@ -889,6 +889,17 @@ export function ShipmentsPage() {
     if (!createSenderDocumentId.trim()) {
       nextErrors.senderDocument = 'Documento remitente obligatorio.';
     }
+    if (createOperation !== 'shipment') {
+      if (!createSenderPhone.trim()) {
+        nextErrors.senderPhone = 'Telefono remitente obligatorio para recogidas.';
+      }
+      if (!createSenderStreet.trim()) {
+        nextErrors.senderStreet = 'La calle del remitente es obligatoria para recogidas.';
+      }
+      if (!createSenderCity.trim()) {
+        nextErrors.senderCity = 'La ciudad del remitente es obligatoria para recogidas.';
+      }
+    }
     if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
       if (createSenderDocType === 'CIF') {
         nextErrors.senderName = 'Razon social obligatoria.';
