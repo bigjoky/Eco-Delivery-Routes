@@ -9,7 +9,7 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { IncidentCatalogItem, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 function categoryVariant(category: IncidentSummary['category']): 'warning' | 'destructive' | 'secondary' | 'outline' {
   if (category === 'failed') return 'destructive';
@@ -486,6 +486,11 @@ export function IncidentsPage() {
 
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">Incidencias</span>
+      </div>
       <Modal
         open={resolveTarget !== null}
         title={`Resolver incidencia · ${resolveTarget?.reference ?? resolveTarget?.id ?? ''}`}
