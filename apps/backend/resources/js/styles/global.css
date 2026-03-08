@@ -99,6 +99,25 @@ a {
   margin-top: 12px;
 }
 
+.sidebar-more {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-more summary {
+  list-style: none;
+}
+
+.sidebar-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-more-items {
+  display: grid;
+  gap: 6px;
+  padding-left: 8px;
+}
+
 .sidebar-group-title {
   font-size: 11px;
   text-transform: uppercase;

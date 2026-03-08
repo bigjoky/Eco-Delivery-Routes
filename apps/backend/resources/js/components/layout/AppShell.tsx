@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import type { PropsWithChildren } from 'react';
+import { useState, type PropsWithChildren } from 'react';
 import { cn } from '../../lib/cn';
 import { canAccess } from '../../core/auth/access';
 
@@ -48,7 +48,7 @@ const sections = [
   },
   {
     label: 'Administracion',
-    items: ['/users', '/roles', '/audit'],
+    items: ['/users', '/roles'],
   },
 ];
 
@@ -64,6 +64,7 @@ export function AppShell({
   currentUser?: { name: string; email?: string } | null;
   onLogout?: () => Promise<void> | void;
 }>) {
+  const [showAdminMore, setShowAdminMore] = useState(false);
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
@@ -76,6 +77,7 @@ export function AppShell({
     return canAccess(item.feature, roles);
   });
   const activeItem = visibleMenu.find((item) => location.pathname === item.to) ?? visibleMenu[0];
+  const auditItem = visibleMenu.find((item) => item.to === '/audit');
 
   return (
     <div className="app-shell">
@@ -100,6 +102,19 @@ export function AppShell({
                     {item.label}
                   </NavLink>
                 ))}
+                {section.label === 'Administracion' && auditItem ? (
+                  <details className="sidebar-more" open={showAdminMore} onToggle={(event) => setShowAdminMore((event.currentTarget as HTMLDetailsElement).open)}>
+                    <summary className="sidebar-link">Más</summary>
+                    <div className="sidebar-more-items">
+                      <NavLink
+                        to={auditItem.to}
+                        className={({ isActive }) => cn('sidebar-link', isActive && 'sidebar-link-active')}
+                      >
+                        {auditItem.label}
+                      </NavLink>
+                    </div>
+                  </details>
+                ) : null}
               </div>
             );
           })}

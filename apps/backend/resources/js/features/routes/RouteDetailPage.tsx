@@ -86,6 +86,7 @@ export function RouteDetailPage() {
   const [selectedBulkTemplateName, setSelectedBulkTemplateName] = useState('');
   const [bulkTemplates, setBulkTemplates] = useState<RouteBulkActionTemplate[]>([]);
   const [opsAudit, setOpsAudit] = useState<RouteOpsAuditItem[]>([]);
+  const [showAudit, setShowAudit] = useState(false);
   const routeBulkTemplateStorageKey = `eco_delivery_routes_route_bulk_templates_${id ?? 'global'}`;
   const routeOpsAuditStorageKey = `eco_delivery_routes_route_ops_audit_${id ?? 'global'}`;
 
@@ -1301,46 +1302,60 @@ export function RouteDetailPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Auditoría Operativa</CardTitle>
+          <CardTitle>Auditoría</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
-              Exportar CSV auditoría
-            </Button>
-          </div>
-          {opsAudit.length === 0 ? (
-            <div className="helper">Sin eventos aún.</div>
-          ) : (
-            <TableWrapper>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Acción</TableHead>
-                    <TableHead>Detalle</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {opsAudit.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{toLocalDateTime(entry.at)}</TableCell>
-                      <TableCell>{entry.action}</TableCell>
-                      <TableCell>{entry.details}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableWrapper>
-          )}
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
         </CardContent>
       </Card>
-      <EntityActivityTimeline
-        title="Actividad de ruta (auditoría persistida)"
-        resource="route"
-        entityId={id}
-        eventPrefix="route."
-      />
+      {showAudit ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Auditoría Operativa</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
+                  Exportar CSV auditoría
+                </Button>
+              </div>
+              {opsAudit.length === 0 ? (
+                <div className="helper">Sin eventos aún.</div>
+              ) : (
+                <TableWrapper>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acción</TableHead>
+                        <TableHead>Detalle</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {opsAudit.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{toLocalDateTime(entry.at)}</TableCell>
+                          <TableCell>{entry.action}</TableCell>
+                          <TableCell>{entry.details}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+              )}
+            </CardContent>
+          </Card>
+          <EntityActivityTimeline
+            title="Actividad de ruta (auditoría persistida)"
+            resource="route"
+            entityId={id}
+            eventPrefix="route."
+          />
+        </>
+      ) : null}
     </section>
   );
 }

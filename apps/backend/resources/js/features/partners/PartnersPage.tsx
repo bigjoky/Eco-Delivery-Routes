@@ -32,6 +32,7 @@ export function PartnersPage() {
   const [auditActorFilter, setAuditActorFilter] = useState('');
   const [focusedEntityType, setFocusedEntityType] = useState<'' | 'subcontractor' | 'driver' | 'vehicle'>('');
   const [focusedEntityId, setFocusedEntityId] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreatePartnerType>('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -988,69 +989,81 @@ export function PartnersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Auditoría partners</CardTitle>
+          <CardTitle>Auditoría</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <Select value={auditEventFilter} onChange={(e) => setAuditEventFilter(e.target.value)}>
-              <option value="">Todos los eventos</option>
-              <option value="subcontractors.">Subcontratas</option>
-              <option value="drivers.">Conductores</option>
-              <option value="vehicles.">Vehículos</option>
-            </Select>
-            <Input
-              value={auditActorFilter}
-              onChange={(e) => setAuditActorFilter(e.target.value)}
-              placeholder="Filtrar por actor"
-            />
-            <Button type="button" variant="outline" onClick={() => { void load(); }}>
-              Actualizar auditoría
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => apiClient.exportAuditLogsCsv({
-                event: auditEventFilter || undefined,
-                actor: auditActorFilter || undefined,
-              })}
-            >
-              Export CSV auditoría
-            </Button>
-          </div>
-          <TableWrapper>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Evento</TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>Detalle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {auditRows.map((row) => (
-                  <TableRow key={`audit-${row.id}`}>
-                    <TableCell>{formatDateTime(row.created_at)}</TableCell>
-                    <TableCell>{row.event}</TableCell>
-                    <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
-                    <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
-                  </TableRow>
-                ))}
-                {!auditRows.length && !auditLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4}>Sin auditoría para el filtro actual.</TableCell>
-                  </TableRow>
-                ) : null}
-                {auditLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4}>Cargando auditoría...</TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </TableWrapper>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
         </CardContent>
       </Card>
+      {showAudit ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Auditoría partners</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="inline-actions">
+              <Select value={auditEventFilter} onChange={(e) => setAuditEventFilter(e.target.value)}>
+                <option value="">Todos los eventos</option>
+                <option value="subcontractors.">Subcontratas</option>
+                <option value="drivers.">Conductores</option>
+                <option value="vehicles.">Vehículos</option>
+              </Select>
+              <Input
+                value={auditActorFilter}
+                onChange={(e) => setAuditActorFilter(e.target.value)}
+                placeholder="Filtrar por actor"
+              />
+              <Button type="button" variant="outline" onClick={() => { void load(); }}>
+                Actualizar auditoría
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => apiClient.exportAuditLogsCsv({
+                  event: auditEventFilter || undefined,
+                  actor: auditActorFilter || undefined,
+                })}
+              >
+                Export CSV auditoría
+              </Button>
+            </div>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditRows.map((row) => (
+                    <TableRow key={`audit-${row.id}`}>
+                      <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                      <TableCell>{row.event}</TableCell>
+                      <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                      <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!auditRows.length && !auditLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Sin auditoría para el filtro actual.</TableCell>
+                    </TableRow>
+                  ) : null}
+                  {auditLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Cargando auditoría...</TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

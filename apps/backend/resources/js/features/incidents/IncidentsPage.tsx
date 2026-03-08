@@ -93,6 +93,7 @@ export function IncidentsPage() {
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
 
   const incidentSummary = useMemo(() => {
     const openCount = items.filter((item) => !item.resolved_at).length;
@@ -904,28 +905,43 @@ export function IncidentsPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Actividad de incidencia</CardTitle>
-          <CardDescription>Timeline auditado de acciones sobre una incidencia concreta.</CardDescription>
+          <CardTitle>Auditoría</CardTitle>
+          <CardDescription>Acceso bajo demanda al timeline auditado.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <Select value={activityIncidentId} onChange={(event) => setActivityIncidentId(event.target.value)}>
-              <option value="">Selecciona incidencia</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.catalog_code} · {item.incidentable_id} · {item.id.slice(0, 8)}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
         </CardContent>
       </Card>
-      <EntityActivityTimeline
-        title="Auditoría de incidencia seleccionada"
-        resource="incident"
-        entityId={activityIncidentId || undefined}
-        eventPrefix="incidents."
-      />
+      {showAudit ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Actividad de incidencia</CardTitle>
+              <CardDescription>Timeline auditado de acciones sobre una incidencia concreta.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="inline-actions">
+                <Select value={activityIncidentId} onChange={(event) => setActivityIncidentId(event.target.value)}>
+                  <option value="">Selecciona incidencia</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.catalog_code} · {item.incidentable_id} · {item.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+          <EntityActivityTimeline
+            title="Auditoría de incidencia seleccionada"
+            resource="incident"
+            entityId={activityIncidentId || undefined}
+            eventPrefix="incidents."
+          />
+        </>
+      ) : null}
     </section>
   );
 }

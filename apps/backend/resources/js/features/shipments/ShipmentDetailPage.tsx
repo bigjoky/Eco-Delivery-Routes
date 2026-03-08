@@ -45,6 +45,7 @@ export function ShipmentDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -297,12 +298,24 @@ export function ShipmentDetailPage() {
           </TableWrapper>
         </CardContent>
       </Card>
-      <EntityActivityTimeline
-        title="Actividad del envío"
-        resource="shipment"
-        entityId={shipment?.id ?? id}
-        eventPrefix="shipments."
-      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Auditoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
+        </CardContent>
+      </Card>
+      {showAudit ? (
+        <EntityActivityTimeline
+          title="Actividad del envío"
+          resource="shipment"
+          entityId={shipment?.id ?? id}
+          eventPrefix="shipments."
+        />
+      ) : null}
     </section>
   );
 }
