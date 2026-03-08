@@ -282,6 +282,24 @@ paths:
                 $ref: '#/components/schemas/DriverRouteMeResponse'
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /dashboard/overview:
+    get:
+      tags: [Dashboard]
+      summary: Vista agregada operativa con alertas y productividad
+      parameters:
+        - in: query
+          name: period
+          schema: { type: string, enum: [today, 7d, 30d], default: 7d }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /audit-logs:
     get:
       tags: [Audit]

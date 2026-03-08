@@ -4,70 +4,20 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import type { IncidentSummary, QualitySnapshot, RouteSummary, ShipmentSummary } from '../../core/api/types';
+import type { DashboardOverview } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
-type DashboardData = {
-  totals: {
-    shipments: number;
-    routes: number;
-    incidentsOpen: number;
-    qualityThreshold: number;
-  };
-  shipmentsByStatus: {
-    created: number;
-    outForDelivery: number;
-    delivered: number;
-    incident: number;
-  };
-  routesByStatus: {
-    planned: number;
-    inProgress: number;
-    completed: number;
-  };
-  quality: {
-    routeAvg: number;
-    driverAvg: number;
-    belowThresholdRoutes: number;
-  };
-  upcomingRoutes: RouteSummary[];
-  recentShipments: ShipmentSummary[];
-  recentIncidents: IncidentSummary[];
+const initialOverview: DashboardOverview = {
+  period: { from: '', to: '', preset: '7d' },
+  totals: { shipments: 0, routes: 0, incidents_open: 0, quality_threshold: 95 },
+  shipments_by_status: { created: 0, out_for_delivery: 0, delivered: 0, incident: 0 },
+  routes_by_status: { planned: 0, in_progress: 0, completed: 0 },
+  quality: { route_avg: 0, driver_avg: 0, below_threshold_routes: 0 },
+  recent: { routes: [], shipments: [], incidents: [] },
+  productivity_by_hub: [],
+  productivity_by_route: [],
+  alerts: [],
 };
-
-const initialData: DashboardData = {
-  totals: {
-    shipments: 0,
-    routes: 0,
-    incidentsOpen: 0,
-    qualityThreshold: 95,
-  },
-  shipmentsByStatus: {
-    created: 0,
-    outForDelivery: 0,
-    delivered: 0,
-    incident: 0,
-  },
-  routesByStatus: {
-    planned: 0,
-    inProgress: 0,
-    completed: 0,
-  },
-  quality: {
-    routeAvg: 0,
-    driverAvg: 0,
-    belowThresholdRoutes: 0,
-  },
-  upcomingRoutes: [],
-  recentShipments: [],
-  recentIncidents: [],
-};
-
-function averageScore(snapshots: QualitySnapshot[]): number {
-  if (snapshots.length === 0) return 0;
-  const total = snapshots.reduce((acc, item) => acc + Number(item.service_quality_score || 0), 0);
-  return Number((total / snapshots.length).toFixed(2));
-}
 
 function scoreVariant(score: number, threshold: number): 'success' | 'warning' | 'destructive' {
   if (score >= threshold) return 'success';
@@ -75,8 +25,14 @@ function scoreVariant(score: number, threshold: number): 'success' | 'warning' |
   return 'destructive';
 }
 
+function alertVariant(severity: 'high' | 'medium' | 'low'): 'destructive' | 'warning' | 'secondary' {
+  if (severity === 'high') return 'destructive';
+  if (severity === 'medium') return 'warning';
+  return 'secondary';
+}
+
 export function DashboardPage() {
-  const [data, setData] = useState<DashboardData>(initialData);
+  const [overview, setOverview] = useState<DashboardOverview>(initialOverview);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [period, setPeriod] = useState<'today' | '7d' | '30d'>('7d');
@@ -86,79 +42,8 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const now = new Date();
-      const toDate = now.toISOString().slice(0, 10);
-      const fromDateObj = new Date(now);
-      if (period === 'today') fromDateObj.setDate(now.getDate());
-      if (period === '7d') fromDateObj.setDate(now.getDate() - 6);
-      if (period === '30d') fromDateObj.setDate(now.getDate() - 29);
-      const fromDate = fromDateObj.toISOString().slice(0, 10);
-
-      const [
-        shipmentsTotal,
-        shipmentsCreated,
-        shipmentsOut,
-        shipmentsDelivered,
-        shipmentsIncident,
-        recentShipments,
-        routesTotal,
-        routesPlanned,
-        routesInProgress,
-        routesCompleted,
-        upcomingRoutes,
-        incidentsBoard,
-        recentIncidents,
-        qualityThreshold,
-        routeQuality,
-        driverQuality,
-        underThresholdRoutes,
-      ] = await Promise.all([
-        apiClient.getShipments({ page: 1, perPage: 1, scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'created', scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'out_for_delivery', scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'delivered', scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getShipments({ page: 1, perPage: 1, status: 'incident', scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getShipments({ page: 1, perPage: 5, sort: 'created_at', dir: 'desc', scheduledFrom: fromDate, scheduledTo: toDate }),
-        apiClient.getRoutes({ page: 1, perPage: 1, dateFrom: fromDate, dateTo: toDate }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'planned', dateFrom: fromDate, dateTo: toDate }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'in_progress', dateFrom: fromDate, dateTo: toDate }),
-        apiClient.getRoutes({ page: 1, perPage: 1, status: 'completed', dateFrom: fromDate, dateTo: toDate }),
-        apiClient.getRoutes({ page: 1, perPage: 5, sort: 'route_date', dir: 'asc', dateFrom: fromDate, dateTo: toDate }),
-        apiClient.getIncidentsBoard(),
-        apiClient.getIncidents({ page: 1, perPage: 5, resolved: 'open' }),
-        apiClient.getQualityThreshold(),
-        apiClient.getQualitySnapshots({ scopeType: 'route', periodStart: fromDate, periodEnd: toDate }),
-        apiClient.getQualitySnapshots({ scopeType: 'driver', periodStart: fromDate, periodEnd: toDate }),
-        apiClient.getQualityTopRoutesUnderThreshold({ limit: 5, periodStart: fromDate, periodEnd: toDate }),
-      ]);
-
-      setData({
-        totals: {
-          shipments: shipmentsTotal.meta.total,
-          routes: routesTotal.meta.total,
-          incidentsOpen: incidentsBoard.total_open,
-          qualityThreshold: qualityThreshold.threshold,
-        },
-        shipmentsByStatus: {
-          created: shipmentsCreated.meta.total,
-          outForDelivery: shipmentsOut.meta.total,
-          delivered: shipmentsDelivered.meta.total,
-          incident: shipmentsIncident.meta.total,
-        },
-        routesByStatus: {
-          planned: routesPlanned.meta.total,
-          inProgress: routesInProgress.meta.total,
-          completed: routesCompleted.meta.total,
-        },
-        quality: {
-          routeAvg: averageScore(routeQuality),
-          driverAvg: averageScore(driverQuality),
-          belowThresholdRoutes: underThresholdRoutes.meta.count ?? underThresholdRoutes.data.length,
-        },
-        upcomingRoutes: upcomingRoutes.data,
-        recentShipments: recentShipments.data,
-        recentIncidents: recentIncidents.data,
-      });
+      const data = await apiClient.getDashboardOverview({ period });
+      setOverview(data);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo cargar el dashboard');
     } finally {
@@ -172,23 +57,26 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = window.setInterval(() => {
-      load();
-    }, 60000);
+    const interval = window.setInterval(() => load(), 60000);
     return () => window.clearInterval(interval);
   }, [autoRefresh, load]);
 
-  const qualityBadge = useMemo(() => scoreVariant(data.quality.routeAvg, data.totals.qualityThreshold), [data.quality.routeAvg, data.totals.qualityThreshold]);
+  const routeQualityVariant = useMemo(
+    () => scoreVariant(overview.quality.route_avg, overview.totals.quality_threshold),
+    [overview.quality.route_avg, overview.totals.quality_threshold]
+  );
 
   return (
-    <section className="page-grid">
-      <header>
-        <h1 className="page-title">Everything at a glance</h1>
-        <p className="page-subtitle">Visión operativa unificada de envíos, rutas, incidencias y calidad.</p>
-        <div className="inline-actions" style={{ marginTop: 8 }}>
-          <label htmlFor="dashboard-period">Ventana</label>
+    <section className="page-grid dashboard-shell">
+      <header className="dashboard-header">
+        <div>
+          <h1 className="page-title">Everything at a glance</h1>
+          <p className="page-subtitle">
+            Estado operativo global entre {overview.period.from || '-'} y {overview.period.to || '-'}.
+          </p>
+        </div>
+        <div className="dashboard-controls">
           <select
-            id="dashboard-period"
             className="select"
             value={period}
             onChange={(event) => setPeriod(event.target.value as 'today' | '7d' | '30d')}
@@ -197,65 +85,73 @@ export function DashboardPage() {
             <option value="7d">Últimos 7 días</option>
             <option value="30d">Últimos 30 días</option>
           </select>
-          <label htmlFor="dashboard-auto-refresh">Auto-refresh</label>
           <select
-            id="dashboard-auto-refresh"
             className="select"
             value={autoRefresh ? 'on' : 'off'}
             onChange={(event) => setAutoRefresh(event.target.value === 'on')}
           >
-            <option value="on">Activo (60s)</option>
-            <option value="off">Desactivado</option>
+            <option value="on">Auto-refresh 60s</option>
+            <option value="off">Sin auto-refresh</option>
           </select>
+          <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar'}</Button>
         </div>
       </header>
+
+      {overview.alerts.length > 0 && (
+        <div className="dashboard-alert-grid">
+          {overview.alerts.map((alert) => (
+            <Link key={alert.id} className="dashboard-alert-card" to={alert.href}>
+              <div className="dashboard-alert-top">
+                <Badge variant={alertVariant(alert.severity)}>{alert.severity.toUpperCase()}</Badge>
+                <span className="dashboard-alert-count">{alert.count}</span>
+              </div>
+              <div className="dashboard-alert-title">{alert.title}</div>
+              <div className="helper">{alert.message}</div>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="page-grid four">
         <Card>
           <CardHeader>
-            <CardDescription>Envios totales</CardDescription>
-            <CardTitle>{data.totals.shipments}</CardTitle>
+            <CardDescription>Envíos</CardDescription>
+            <CardTitle>{overview.totals.shipments}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="helper">Created: {data.shipmentsByStatus.created}</div>
-            <div className="helper">Out for delivery: {data.shipmentsByStatus.outForDelivery}</div>
-            <div className="helper">Delivered: {data.shipmentsByStatus.delivered}</div>
+            <div className="helper">Created: {overview.shipments_by_status.created}</div>
+            <div className="helper">Out: {overview.shipments_by_status.out_for_delivery}</div>
+            <div className="helper">Delivered: {overview.shipments_by_status.delivered}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
-            <CardDescription>Rutas activas</CardDescription>
-            <CardTitle>{data.totals.routes}</CardTitle>
+            <CardDescription>Rutas</CardDescription>
+            <CardTitle>{overview.totals.routes}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="helper">Planned: {data.routesByStatus.planned}</div>
-            <div className="helper">In progress: {data.routesByStatus.inProgress}</div>
-            <div className="helper">Completed: {data.routesByStatus.completed}</div>
+            <div className="helper">Planned: {overview.routes_by_status.planned}</div>
+            <div className="helper">In progress: {overview.routes_by_status.in_progress}</div>
+            <div className="helper">Completed: {overview.routes_by_status.completed}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardDescription>Incidencias abiertas</CardDescription>
-            <CardTitle>{data.totals.incidentsOpen}</CardTitle>
+            <CardTitle>{overview.totals.incidents_open}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="helper">Prioriza SLA y bloqueos de reparto.</div>
-            <Link className="helper" to="/incidents">Ir a incidencias</Link>
+            <Link className="helper" to="/incidents?resolved=open">Ver incidencias abiertas</Link>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
-            <CardDescription>KPI calidad rutas</CardDescription>
-            <CardTitle>{data.quality.routeAvg.toFixed(2)}%</CardTitle>
+            <CardDescription>Calidad por ruta</CardDescription>
+            <CardTitle>{overview.quality.route_avg.toFixed(2)}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={qualityBadge}>
-              Umbral {data.totals.qualityThreshold.toFixed(2)}%
-            </Badge>
-            <div className="helper">Bajo umbral: {data.quality.belowThresholdRoutes}</div>
+            <Badge variant={routeQualityVariant}>Umbral {overview.totals.quality_threshold.toFixed(2)}%</Badge>
+            <div className="helper">Rutas bajo umbral: {overview.quality.below_threshold_routes}</div>
           </CardContent>
         </Card>
       </div>
@@ -263,14 +159,12 @@ export function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>Acceso directo a los flujos críticos del día.</CardDescription>
         </CardHeader>
         <CardContent className="inline-actions">
-          <Link to="/shipments" className="btn btn-outline">Gestionar envíos</Link>
-          <Link to="/routes" className="btn btn-outline">Planificar rutas</Link>
-          <Link to="/incidents" className="btn btn-outline">Resolver incidencias</Link>
-          <Link to="/quality" className="btn btn-outline">Analizar calidad</Link>
-          <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar ahora'}</Button>
+          <Link to="/shipments" className="btn btn-outline">Envíos</Link>
+          <Link to="/routes" className="btn btn-outline">Rutas</Link>
+          <Link to="/incidents" className="btn btn-outline">Incidencias</Link>
+          <Link to="/quality" className="btn btn-outline">KPI Calidad</Link>
         </CardContent>
       </Card>
 
@@ -279,31 +173,30 @@ export function DashboardPage() {
       <div className="page-grid two">
         <Card>
           <CardHeader>
-            <CardTitle>Próximas rutas</CardTitle>
+            <CardTitle>Productividad por hub</CardTitle>
+            <CardDescription>Completadas vs planificadas por paradas.</CardDescription>
           </CardHeader>
           <CardContent>
             <TableWrapper>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Codigo</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Hub</TableHead>
+                    <TableHead>Rutas</TableHead>
                     <TableHead>Paradas</TableHead>
+                    <TableHead>Ratio</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.upcomingRoutes.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4}>Sin rutas disponibles</TableCell>
-                    </TableRow>
+                  {overview.productivity_by_hub.length === 0 && (
+                    <TableRow><TableCell colSpan={4}>Sin datos</TableCell></TableRow>
                   )}
-                  {data.upcomingRoutes.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell><Link to={`/routes/${item.id}`}>{item.code}</Link></TableCell>
-                      <TableCell>{item.route_date}</TableCell>
-                      <TableCell>{item.status}</TableCell>
-                      <TableCell>{item.stops_count ?? 0}</TableCell>
+                  {overview.productivity_by_hub.map((row) => (
+                    <TableRow key={row.hub_id}>
+                      <TableCell>{row.hub_code} · {row.hub_name}</TableCell>
+                      <TableCell>{row.routes_completed}/{row.routes_total}</TableCell>
+                      <TableCell>{row.completed_stops}/{row.planned_stops}</TableCell>
+                      <TableCell>{row.completion_ratio.toFixed(2)}%</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -314,35 +207,30 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Incidencias recientes</CardTitle>
+            <CardTitle>Productividad por ruta</CardTitle>
+            <CardDescription>Control de ejecución de paradas.</CardDescription>
           </CardHeader>
           <CardContent>
             <TableWrapper>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>SLA</TableHead>
+                    <TableHead>Ruta</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Paradas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.recentIncidents.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4}>Sin incidencias abiertas</TableCell>
-                    </TableRow>
+                  {overview.productivity_by_route.length === 0 && (
+                    <TableRow><TableCell colSpan={4}>Sin datos</TableCell></TableRow>
                   )}
-                  {data.recentIncidents.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.id}</TableCell>
-                      <TableCell>{item.incidentable_type}</TableCell>
-                      <TableCell>
-                        <Badge variant={item.category === 'failed' ? 'destructive' : item.category === 'absent' ? 'warning' : 'secondary'}>
-                          {item.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{item.sla_status ?? '-'}</TableCell>
+                  {overview.productivity_by_route.map((row) => (
+                    <TableRow key={row.route_id}>
+                      <TableCell><Link to={`/routes/${row.route_id}`}>{row.route_code}</Link></TableCell>
+                      <TableCell>{row.route_date}</TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell>{row.completed_stops}/{row.planned_stops} ({row.completion_ratio.toFixed(2)}%)</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -352,42 +240,60 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Envíos recientes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TableWrapper>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Referencia</TableHead>
-                  <TableHead>Externa</TableHead>
-                  <TableHead>Destinatario</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Servicio</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.recentShipments.length === 0 && (
+      <div className="page-grid two">
+        <Card>
+          <CardHeader><CardTitle>Rutas recientes</CardTitle></CardHeader>
+          <CardContent>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5}>Sin envíos</TableCell>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Estado</TableHead>
                   </TableRow>
-                )}
-                {data.recentShipments.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell><Link to={`/shipments/${item.id}`}>{item.reference}</Link></TableCell>
-                    <TableCell>{item.external_reference ?? '-'}</TableCell>
-                    <TableCell>{item.consignee_name ?? '-'}</TableCell>
-                    <TableCell>{item.status}</TableCell>
-                    <TableCell>{item.service_type ?? '-'}</TableCell>
+                </TableHeader>
+                <TableBody>
+                  {overview.recent.routes.length === 0 && <TableRow><TableCell colSpan={3}>Sin rutas</TableCell></TableRow>}
+                  {overview.recent.routes.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell><Link to={`/routes/${item.id}`}>{item.code}</Link></TableCell>
+                      <TableCell>{item.route_date}</TableCell>
+                      <TableCell>{item.status}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Envíos recientes</CardTitle></CardHeader>
+          <CardContent>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Referencia</TableHead>
+                    <TableHead>Destinatario</TableHead>
+                    <TableHead>Estado</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableWrapper>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {overview.recent.shipments.length === 0 && <TableRow><TableCell colSpan={3}>Sin envíos</TableCell></TableRow>}
+                  {overview.recent.shipments.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell><Link to={`/shipments/${item.id}`}>{item.reference}</Link></TableCell>
+                      <TableCell>{item.consignee_name ?? '-'}</TableCell>
+                      <TableCell>{item.status}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          </CardContent>
+        </Card>
+      </div>
     </section>
   );
 }
