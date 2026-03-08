@@ -363,6 +363,7 @@ export function ShipmentsPage() {
   const [importJob, setImportJob] = useState<ShipmentImportJob | null>(null);
   const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [selectedShipmentIds, setSelectedShipmentIds] = useState<string[]>([]);
@@ -2492,6 +2493,7 @@ export function ShipmentsPage() {
                       <div>
                         <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
                       </div>
+                      <div className="helper">ID: {item.id}</div>
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
                     </TableCell>
                     <TableCell>
@@ -2740,6 +2742,18 @@ export function ShipmentsPage() {
       </Card>
     ) : null}
       {canImport ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="page-title">Auditoría</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+              {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+      {canImport && showAudit ? (
         <Card>
           <CardHeader>
             <CardTitle className="page-title">Auditoria envios</CardTitle>

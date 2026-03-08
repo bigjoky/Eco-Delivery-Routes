@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -85,6 +86,7 @@ export function RouteDetailPage() {
   const [selectedBulkTemplateName, setSelectedBulkTemplateName] = useState('');
   const [bulkTemplates, setBulkTemplates] = useState<RouteBulkActionTemplate[]>([]);
   const [opsAudit, setOpsAudit] = useState<RouteOpsAuditItem[]>([]);
+  const [showAudit, setShowAudit] = useState(false);
   const routeBulkTemplateStorageKey = `eco_delivery_routes_route_bulk_templates_${id ?? 'global'}`;
   const routeOpsAuditStorageKey = `eco_delivery_routes_route_ops_audit_${id ?? 'global'}`;
 
@@ -845,6 +847,20 @@ export function RouteDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="inline-actions">
+            <Link to="/dashboard" className="helper">Dashboard</Link>
+            <span className="helper">/</span>
+            <Link to="/routes" className="btn btn-outline">Rutas</Link>
+            {route?.subcontractor_id ? (
+              <Link to={`/partners?focus=subcontractor&id=${encodeURIComponent(route.subcontractor_id)}`} className="btn btn-outline">Subcontrata</Link>
+            ) : null}
+            {route?.driver_id ? (
+              <Link to={`/partners?focus=driver&id=${encodeURIComponent(route.driver_id)}`} className="btn btn-outline">Conductor</Link>
+            ) : null}
+            {route?.vehicle_id ? (
+              <Link to={`/fleet-controls?vehicle_id=${encodeURIComponent(route.vehicle_id)}`} className="btn btn-outline">Flota</Link>
+            ) : null}
+          </div>
+          <div className="inline-actions">
             <label htmlFor="route-subcontractor">Subcontrata</label>
             <select id="route-subcontractor" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
               <option value="">Sin asignar</option>
@@ -884,6 +900,7 @@ export function RouteDetailPage() {
           </div>
           <div className="helper">
             Ruta: {route?.code ?? id}
+            {' | '}ID: {route?.id ?? id}
             {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
             {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
           </div>
@@ -1285,40 +1302,60 @@ export function RouteDetailPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Auditoría Operativa</CardTitle>
+          <CardTitle>Auditoría</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
-              Exportar CSV auditoría
-            </Button>
-          </div>
-          {opsAudit.length === 0 ? (
-            <div className="helper">Sin eventos aún.</div>
-          ) : (
-            <TableWrapper>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Acción</TableHead>
-                    <TableHead>Detalle</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {opsAudit.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{toLocalDateTime(entry.at)}</TableCell>
-                      <TableCell>{entry.action}</TableCell>
-                      <TableCell>{entry.details}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableWrapper>
-          )}
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
         </CardContent>
       </Card>
+      {showAudit ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Auditoría Operativa</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
+                  Exportar CSV auditoría
+                </Button>
+              </div>
+              {opsAudit.length === 0 ? (
+                <div className="helper">Sin eventos aún.</div>
+              ) : (
+                <TableWrapper>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Acción</TableHead>
+                        <TableHead>Detalle</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {opsAudit.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{toLocalDateTime(entry.at)}</TableCell>
+                          <TableCell>{entry.action}</TableCell>
+                          <TableCell>{entry.details}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableWrapper>
+              )}
+            </CardContent>
+          </Card>
+          <EntityActivityTimeline
+            title="Actividad de ruta (auditoría persistida)"
+            resource="route"
+            entityId={id}
+            eventPrefix="route."
+          />
+        </>
+      ) : null}
     </section>
   );
 }

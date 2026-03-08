@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -8,7 +9,7 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { IncidentCatalogItem, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 function categoryVariant(category: IncidentSummary['category']): 'warning' | 'destructive' | 'secondary' | 'outline' {
   if (category === 'failed') return 'destructive';
@@ -91,6 +92,8 @@ export function IncidentsPage() {
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
+  const [activityIncidentId, setActivityIncidentId] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
 
   const incidentSummary = useMemo(() => {
     const openCount = items.filter((item) => !item.resolved_at).length;
@@ -169,6 +172,7 @@ export function IncidentsPage() {
     const priorityParam = searchParams.get('priority') ?? '';
     const slaParam = searchParams.get('sla') ?? '';
     const incidentableParam = searchParams.get('incidentable_id') ?? '';
+    const incidentIdParam = searchParams.get('incident_id') ?? '';
     const searchParam = searchParams.get('q') ?? '';
     const pageParam = Number(searchParams.get('page') ?? '1');
 
@@ -181,6 +185,7 @@ export function IncidentsPage() {
     if (priorityParam) setListPriorityFilter(priorityParam as 'high' | 'medium' | 'low' | '');
     if (slaParam) setListSlaFilter(slaParam as 'on_track' | 'at_risk' | 'breached' | 'resolved' | '');
     if (incidentableParam) setListIncidentableId(incidentableParam);
+    if (incidentIdParam) setListSearch(incidentIdParam);
     if (searchParam) setListSearch(searchParam);
     if (!Number.isNaN(pageParam) && pageParam > 0) setPage(pageParam);
 
@@ -249,6 +254,16 @@ export function IncidentsPage() {
     const visible = new Set(items.filter((item) => !item.resolved_at).map((item) => item.id));
     setSelectedIncidentIds((prev) => prev.filter((id) => visible.has(id)));
   }, [items]);
+
+  useEffect(() => {
+    if (!items.length) {
+      setActivityIncidentId('');
+      return;
+    }
+    if (!activityIncidentId || !items.some((item) => item.id === activityIncidentId)) {
+      setActivityIncidentId(items[0].id);
+    }
+  }, [items, activityIncidentId]);
 
   const availableCatalog = useMemo(
     () => catalog.filter((item) => item.applies_to === incidentableType || item.applies_to === 'both'),
@@ -472,6 +487,11 @@ export function IncidentsPage() {
 
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">Incidencias</span>
+      </div>
       <Modal
         open={resolveTarget !== null}
         title={`Resolver incidencia · ${resolveTarget?.reference ?? resolveTarget?.id ?? ''}`}
@@ -804,6 +824,7 @@ export function IncidentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Sel</TableHead>
+                  <TableHead>Incidencia ID</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Referencia</TableHead>
                   <TableHead>Ref. envio</TableHead>
@@ -830,6 +851,7 @@ export function IncidentsPage() {
                         <span>-</span>
                       )}
                     </TableCell>
+                    <TableCell>{item.id}</TableCell>
                     <TableCell>{item.incidentable_type}</TableCell>
                     <TableCell>{item.incidentable_id}</TableCell>
                     <TableCell>{item.shipment_reference ?? '-'}</TableCell>
@@ -864,7 +886,7 @@ export function IncidentsPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11}>Sin incidencias para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={12}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
@@ -881,6 +903,45 @@ export function IncidentsPage() {
           </div>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Auditoría</CardTitle>
+          <CardDescription>Acceso bajo demanda al timeline auditado.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
+        </CardContent>
+      </Card>
+      {showAudit ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Actividad de incidencia</CardTitle>
+              <CardDescription>Timeline auditado de acciones sobre una incidencia concreta.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="inline-actions">
+                <Select value={activityIncidentId} onChange={(event) => setActivityIncidentId(event.target.value)}>
+                  <option value="">Selecciona incidencia</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.catalog_code} · {item.incidentable_id} · {item.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+          <EntityActivityTimeline
+            title="Auditoría de incidencia seleccionada"
+            resource="incident"
+            entityId={activityIncidentId || undefined}
+            eventPrefix="incidents."
+          />
+        </>
+      ) : null}
     </section>
   );
 }

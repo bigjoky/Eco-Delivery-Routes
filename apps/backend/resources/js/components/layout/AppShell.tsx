@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import type { PropsWithChildren } from 'react';
+import { useState, type PropsWithChildren } from 'react';
 import { cn } from '../../lib/cn';
 import { canAccess } from '../../core/auth/access';
 
@@ -12,6 +12,9 @@ const menu = [
   { to: '/incidents', label: 'Incidencias', feature: 'incidents' },
   { to: '/network', label: 'Red Operativa', feature: 'network' },
   { to: '/partners', label: 'Partners', feature: 'partners' },
+  { to: '/workforce', label: 'Personal', feature: 'workforce' },
+  { to: '/compliance', label: 'CAE y Documentos', feature: 'compliance' },
+  { to: '/fleet-controls', label: 'Control de Flota', feature: 'fleet' },
   { to: '/tariffs', label: 'Tarifas', feature: 'tariffs' },
   { to: '/advances', label: 'Anticipos', feature: 'advances' },
   { to: '/settlements', label: 'Liquidaciones', feature: 'settlements' },
@@ -19,6 +22,7 @@ const menu = [
   { to: '/quality', label: 'KPI Calidad', feature: 'quality' },
   { to: '/users', label: 'Usuarios', feature: 'users' },
   { to: '/roles', label: 'Roles', feature: 'roles' },
+  { to: '/audit', label: 'Auditoria', feature: 'audit' },
 ];
 
 const sections = [
@@ -32,6 +36,9 @@ const sections = [
       '/incidents',
       '/network',
       '/partners',
+      '/workforce',
+      '/compliance',
+      '/fleet-controls',
       '/tariffs',
       '/advances',
       '/settlements',
@@ -57,6 +64,7 @@ export function AppShell({
   currentUser?: { name: string; email?: string } | null;
   onLogout?: () => Promise<void> | void;
 }>) {
+  const [showAdminMore, setShowAdminMore] = useState(false);
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
@@ -69,6 +77,7 @@ export function AppShell({
     return canAccess(item.feature, roles);
   });
   const activeItem = visibleMenu.find((item) => location.pathname === item.to) ?? visibleMenu[0];
+  const auditItem = visibleMenu.find((item) => item.to === '/audit');
 
   return (
     <div className="app-shell">
@@ -93,6 +102,19 @@ export function AppShell({
                     {item.label}
                   </NavLink>
                 ))}
+                {section.label === 'Administracion' && auditItem ? (
+                  <details className="sidebar-more" open={showAdminMore} onToggle={(event) => setShowAdminMore((event.currentTarget as HTMLDetailsElement).open)}>
+                    <summary className="sidebar-link">Más</summary>
+                    <div className="sidebar-more-items">
+                      <NavLink
+                        to={auditItem.to}
+                        className={({ isActive }) => cn('sidebar-link', isActive && 'sidebar-link-active')}
+                      >
+                        {auditItem.label}
+                      </NavLink>
+                    </div>
+                  </details>
+                ) : null}
               </div>
             );
           })}

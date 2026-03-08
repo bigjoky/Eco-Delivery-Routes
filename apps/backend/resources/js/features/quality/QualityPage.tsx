@@ -296,6 +296,11 @@ export function QualityPage() {
   if (qualityLoadError) {
     return (
       <section className="page-grid">
+        <div className="inline-actions">
+          <Link to="/dashboard" className="helper">Dashboard</Link>
+          <span className="helper">/</span>
+          <span className="helper">KPI Calidad</span>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="page-title">KPI Calidad</CardTitle>
@@ -378,6 +383,11 @@ export function QualityPage() {
 
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">KPI Calidad</span>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Calidad de Servicio</CardTitle>
@@ -853,29 +863,38 @@ export function QualityPage() {
                     <TableCell>{item.delivered_completed + item.pickups_completed}</TableCell>
                     <TableCell>
                       {item.scope_type === 'route' ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setSelectedRouteId(item.scope_id)}
-                        >
-                          Ver detalle ruta
-                        </Button>
+                        <div className="inline-actions">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setSelectedRouteId(item.scope_id)}
+                          >
+                            Ver detalle ruta
+                          </Button>
+                          <Link to={`/routes/${item.scope_id}`} className="btn btn-outline">Abrir ruta</Link>
+                        </div>
                       ) : item.scope_type === 'driver' ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setSelectedDriverId(item.scope_id)}
-                        >
-                          Ver detalle conductor
-                        </Button>
+                        <div className="inline-actions">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setSelectedDriverId(item.scope_id)}
+                          >
+                            Ver detalle conductor
+                          </Button>
+                          <Link to={`/partners?focus=driver&id=${encodeURIComponent(item.scope_id)}`} className="btn btn-outline">Abrir partner</Link>
+                        </div>
                       ) : item.scope_type === 'subcontractor' ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setSelectedSubcontractorBreakdownId(item.scope_id)}
-                        >
-                          Ver detalle subcontrata
-                        </Button>
+                        <div className="inline-actions">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setSelectedSubcontractorBreakdownId(item.scope_id)}
+                          >
+                            Ver detalle subcontrata
+                          </Button>
+                          <Link to={`/partners?focus=subcontractor&id=${encodeURIComponent(item.scope_id)}`} className="btn btn-outline">Abrir partner</Link>
+                        </div>
                       ) : (
                         '-'
                       )}

@@ -15,6 +15,7 @@ export function UserDetailPage() {
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -99,11 +100,6 @@ export function UserDetailPage() {
                 <div className="kpi-item"><div className="kpi-label">Estado</div><div className="kpi-value">{user.status}</div></div>
                 <div className="kpi-item"><div className="kpi-label">Roles</div><div className="kpi-value">{(user.roles ?? []).map((r) => r.code).join(', ') || '-'}</div></div>
               </div>
-              <Input
-                value={auditEventFilter}
-                onChange={(event) => setAuditEventFilter(event.target.value)}
-                placeholder="Filtro evento (ej: user.)"
-              />
               <div className="inline-actions">
                 <Button type="button" variant="outline" onClick={onSuspend}>Suspender</Button>
                 <Button type="button" variant="outline" onClick={onReactivate}>Reactivar</Button>
@@ -114,29 +110,41 @@ export function UserDetailPage() {
                   type="password"
                 />
                 <Button type="button" onClick={onResetPassword}>Reset password</Button>
+                <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+                  {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+                </Button>
               </div>
-              <TableWrapper>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Evento</TableHead>
-                      <TableHead>Actor</TableHead>
-                      <TableHead>Metadata</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {auditRows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>{row.created_at}</TableCell>
-                        <TableCell>{row.event}</TableCell>
-                        <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
-                        <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableWrapper>
+              {showAudit ? (
+                <>
+                  <Input
+                    value={auditEventFilter}
+                    onChange={(event) => setAuditEventFilter(event.target.value)}
+                    placeholder="Filtro evento (ej: user.)"
+                  />
+                  <TableWrapper>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Evento</TableHead>
+                          <TableHead>Actor</TableHead>
+                          <TableHead>Metadata</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell>{row.created_at}</TableCell>
+                            <TableCell>{row.event}</TableCell>
+                            <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                            <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableWrapper>
+                </>
+              ) : null}
             </div>
           )}
           {message && <p className="helper">{message}</p>}

@@ -361,13 +361,16 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role, subcontractor, driver, vehicle, route, shipment, incident, workforce, compliance_document, vehicle_control] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
         - in: query
           name: event
           schema: { type: string }
+        - in: query
+          name: actor
+          schema: { type: string, description: "Nombre parcial o actor_user_id" }
         - in: query
           name: date_from
           schema: { type: string, format: date }
@@ -391,13 +394,16 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role, subcontractor, driver, vehicle, route, shipment, incident, workforce, compliance_document, vehicle_control] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
         - in: query
           name: event
           schema: { type: string }
+        - in: query
+          name: actor
+          schema: { type: string, description: "Nombre parcial o actor_user_id" }
         - in: query
           name: date_from
           schema: { type: string, format: date }
@@ -696,6 +702,28 @@ paths:
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
 
+  /subcontractors/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de subcontratas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, suspended] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /drivers:
     get:
       tags: [Ops]
@@ -777,6 +805,28 @@ paths:
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
 
+  /drivers/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de conductores
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, suspended] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /vehicles:
     get:
       tags: [Ops]
@@ -857,6 +907,299 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: No encontrado }
         '409': { description: Conflicto por recursos vinculados }
+
+  /vehicles/bulk-status:
+    post:
+      tags: [Ops]
+      summary: Actualizar estado masivo de vehiculos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, status]
+              properties:
+                ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string, format: uuid }
+                status: { type: string, enum: [active, inactive, maintenance] }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
+  /workforce:
+    get:
+      tags: [Ops]
+      summary: Listar personal propio, externo y de contrata
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, inactive, suspended] }
+        - in: query
+          name: employment_type
+          schema: { type: string, enum: [own, external, contractor] }
+        - in: query
+          name: subcontractor_id
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear empleado de plantilla/externo/contrata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document_id, name, employment_type]
+              properties:
+                code: { type: string, maxLength: 40 }
+                document_id: { type: string, maxLength: 60 }
+                name: { type: string, maxLength: 160 }
+                employment_type: { type: string, enum: [own, external, contractor] }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                role_title: { type: string, maxLength: 120, nullable: true }
+                phone: { type: string, maxLength: 40, nullable: true }
+                email: { type: string, format: email, maxLength: 180, nullable: true }
+                status: { type: string, enum: [active, inactive, suspended] }
+                contract_start: { type: string, format: date, nullable: true }
+                contract_end: { type: string, format: date, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /workforce/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar empleado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string, maxLength: 40 }
+                document_id: { type: string, maxLength: 60 }
+                name: { type: string, maxLength: 160 }
+                employment_type: { type: string, enum: [own, external, contractor] }
+                subcontractor_id: { type: string, format: uuid, nullable: true }
+                role_title: { type: string, maxLength: 120, nullable: true }
+                phone: { type: string, maxLength: 40, nullable: true }
+                email: { type: string, format: email, maxLength: 180, nullable: true }
+                status: { type: string, enum: [active, inactive, suspended] }
+                contract_start: { type: string, format: date, nullable: true }
+                contract_end: { type: string, format: date, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar empleado
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /compliance-documents:
+    get:
+      tags: [Ops]
+      summary: Listar documentación CAE y documental
+      parameters:
+        - in: query
+          name: scope_type
+          schema: { type: string, enum: [company, subcontractor, employee, driver, vehicle, operation] }
+        - in: query
+          name: scope_id
+          schema: { type: string }
+        - in: query
+          name: document_type
+          schema: { type: string, enum: [cae, insurance, itv, contract, training, license, prevention, other] }
+        - in: query
+          name: status
+          schema: { type: string, enum: [valid, expiring, expired, pending] }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: expires_before
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear documento CAE/documental
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope_type, document_type, title]
+              properties:
+                scope_type: { type: string, enum: [company, subcontractor, employee, driver, vehicle, operation] }
+                scope_id: { type: string, nullable: true }
+                document_type: { type: string, enum: [cae, insurance, itv, contract, training, license, prevention, other] }
+                title: { type: string, maxLength: 180 }
+                reference: { type: string, maxLength: 80, nullable: true }
+                issuer: { type: string, maxLength: 160, nullable: true }
+                issued_at: { type: string, format: date, nullable: true }
+                expires_at: { type: string, format: date, nullable: true }
+                status: { type: string, enum: [valid, expiring, expired, pending] }
+                file_url: { type: string, maxLength: 255, nullable: true }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /compliance-documents/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar documento CAE/documental
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope_type: { type: string, enum: [company, subcontractor, employee, driver, vehicle, operation] }
+                scope_id: { type: string, nullable: true }
+                document_type: { type: string, enum: [cae, insurance, itv, contract, training, license, prevention, other] }
+                title: { type: string, maxLength: 180 }
+                reference: { type: string, maxLength: 80, nullable: true }
+                issuer: { type: string, maxLength: 160, nullable: true }
+                issued_at: { type: string, format: date, nullable: true }
+                expires_at: { type: string, format: date, nullable: true }
+                status: { type: string, enum: [valid, expiring, expired, pending] }
+                file_url: { type: string, maxLength: 255, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar documento CAE/documental
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+
+  /vehicle-controls:
+    get:
+      tags: [Ops]
+      summary: Listar controles de vehículos (repostajes, seguros, itv, mantenimiento)
+      parameters:
+        - in: query
+          name: vehicle_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: control_type
+          schema: { type: string, enum: [fuel, insurance, itv, maintenance, other] }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Ops]
+      summary: Crear control de vehículo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicle_id, control_type, event_date]
+              properties:
+                vehicle_id: { type: string, format: uuid }
+                control_type: { type: string, enum: [fuel, insurance, itv, maintenance, other] }
+                event_date: { type: string, format: date }
+                due_date: { type: string, format: date, nullable: true }
+                amount: { type: number, nullable: true }
+                odometer_km: { type: integer, nullable: true }
+                provider: { type: string, maxLength: 160, nullable: true }
+                reference: { type: string, maxLength: 80, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        '201': { description: Creado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /vehicle-controls/{id}:
+    patch:
+      tags: [Ops]
+      summary: Actualizar control de vehículo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                control_type: { type: string, enum: [fuel, insurance, itv, maintenance, other] }
+                event_date: { type: string, format: date }
+                due_date: { type: string, format: date, nullable: true }
+                amount: { type: number, nullable: true }
+                odometer_km: { type: integer, nullable: true }
+                provider: { type: string, maxLength: 160, nullable: true }
+                reference: { type: string, maxLength: 80, nullable: true }
+                notes: { type: string, nullable: true }
+      responses:
+        '200': { description: Actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
+    delete:
+      tags: [Ops]
+      summary: Eliminar control de vehículo
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Eliminado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No encontrado }
 
   /settlements:
     get:

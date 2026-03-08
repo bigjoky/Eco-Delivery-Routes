@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { AuditLogEntry, DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
 
 export function PartnersPage() {
+  const [searchParams] = useSearchParams();
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
@@ -20,9 +22,17 @@ export function PartnersPage() {
   const [driverStatusFilter, setDriverStatusFilter] = useState<'' | 'active' | 'inactive' | 'suspended'>('');
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState<'' | 'active' | 'inactive' | 'maintenance'>('');
   const [subcontractorScopeFilter, setSubcontractorScopeFilter] = useState('');
+  const [lastEditorFilter, setLastEditorFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [auditRows, setAuditRows] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditEventFilter, setAuditEventFilter] = useState('subcontractors.');
+  const [auditActorFilter, setAuditActorFilter] = useState('');
+  const [focusedEntityType, setFocusedEntityType] = useState<'' | 'subcontractor' | 'driver' | 'vehicle'>('');
+  const [focusedEntityId, setFocusedEntityId] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreatePartnerType>('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -55,6 +65,9 @@ export function PartnersPage() {
   const [editVehicleStatus, setEditVehicleStatus] = useState<'active' | 'inactive' | 'maintenance'>('active');
   const [editVehicleSubcontractorId, setEditVehicleSubcontractorId] = useState('');
   const [editVehicleDriverId, setEditVehicleDriverId] = useState('');
+  const [selectedSubcontractorIds, setSelectedSubcontractorIds] = useState<string[]>([]);
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
   const formatDateTime = (value?: string | null) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -79,6 +92,20 @@ export function PartnersPage() {
       setSubcontractors(subRows);
       setDrivers(driverRows);
       setVehicles(vehicleRows);
+      setAuditLoading(true);
+      try {
+        const auditResult = await apiClient.getAuditLogs({
+          event: auditEventFilter.trim() || undefined,
+          actor: auditActorFilter.trim() || undefined,
+          page: 1,
+          perPage: 30,
+        });
+        setAuditRows(auditResult.data);
+      } catch {
+        setAuditRows([]);
+      } finally {
+        setAuditLoading(false);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el modulo de partners');
     }
@@ -86,7 +113,42 @@ export function PartnersPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [auditEventFilter, auditActorFilter]);
+
+  useEffect(() => {
+    const focus = searchParams.get('focus');
+    const id = searchParams.get('id') ?? '';
+    const editor = searchParams.get('editor') ?? '';
+    if (editor) {
+      setLastEditorFilter(editor);
+      setShowFilters(true);
+    }
+    if (!focus || !id) {
+      setFocusedEntityType('');
+      setFocusedEntityId('');
+      return;
+    }
+    setPartnersQuery(id);
+    setShowFilters(true);
+    if (focus === 'subcontractor') {
+      setFocusedEntityType('subcontractor');
+      setFocusedEntityId(id);
+      setSubcontractorScopeFilter(id);
+      setAuditEventFilter('subcontractors.');
+      return;
+    }
+    if (focus === 'driver') {
+      setFocusedEntityType('driver');
+      setFocusedEntityId(id);
+      setAuditEventFilter('drivers.');
+      return;
+    }
+    if (focus === 'vehicle') {
+      setFocusedEntityType('vehicle');
+      setFocusedEntityId(id);
+      setAuditEventFilter('vehicles.');
+    }
+  }, [searchParams]);
 
   const normalizedQuery = partnersQuery.trim().toLowerCase();
   const sortBy = <T extends { updated_at?: string | null; last_editor_name?: string | null }>(rows: T[], label: (row: T) => string) => {
@@ -106,20 +168,26 @@ export function PartnersPage() {
   };
   const filteredSubcontractors = useMemo(
     () => sortBy(subcontractors, (row) => `${row.legal_name} ${row.tax_id ?? ''}`)
-      .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter),
-    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter]
+      .filter((row) => !subcontractorStatusFilter || row.status === subcontractorStatusFilter)
+      .filter((row) => focusedEntityType !== 'subcontractor' || !focusedEntityId || row.id === focusedEntityId)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [subcontractors, partnersSort, normalizedQuery, subcontractorStatusFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
   const filteredDrivers = useMemo(
     () => sortBy(drivers, (row) => `${row.code} ${row.name} ${row.dni ?? ''}`)
       .filter((row) => !driverStatusFilter || row.status === driverStatusFilter)
-      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
-    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter]
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => focusedEntityType !== 'driver' || !focusedEntityId || row.id === focusedEntityId)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [drivers, partnersSort, normalizedQuery, driverStatusFilter, subcontractorScopeFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
   const filteredVehicles = useMemo(
     () => sortBy(vehicles, (row) => `${row.code} ${row.plate_number ?? ''}`)
       .filter((row) => !vehicleStatusFilter || row.status === vehicleStatusFilter)
-      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter),
-    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter]
+      .filter((row) => !subcontractorScopeFilter || row.subcontractor_id === subcontractorScopeFilter)
+      .filter((row) => focusedEntityType !== 'vehicle' || !focusedEntityId || row.id === focusedEntityId)
+      .filter((row) => !lastEditorFilter || (row.last_editor_name ?? '').toLowerCase().includes(lastEditorFilter.toLowerCase())),
+    [vehicles, partnersSort, normalizedQuery, vehicleStatusFilter, subcontractorScopeFilter, focusedEntityType, focusedEntityId, lastEditorFilter]
   );
 
   const partnersSummary = useMemo(() => ({
@@ -414,8 +482,68 @@ export function PartnersPage() {
     }
   };
 
+  const toggleSelected = (setState: Dispatch<SetStateAction<string[]>>, id: string, checked: boolean) => {
+    setState((current) => (checked ? Array.from(new Set([...current, id])) : current.filter((item) => item !== id)));
+  };
+
+  const bulkUpdateSubcontractors = async (status: 'active' | 'inactive' | 'suspended') => {
+    if (!selectedSubcontractorIds.length) {
+      setError('Selecciona al menos una subcontrata.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateSubcontractorStatus(selectedSubcontractorIds, status);
+      setMessage(`Subcontratas actualizadas (${result.affected_count}).`);
+      setSelectedSubcontractorIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar subcontratas.');
+    }
+  };
+
+  const bulkUpdateDrivers = async (status: 'active' | 'inactive' | 'suspended') => {
+    if (!selectedDriverIds.length) {
+      setError('Selecciona al menos un conductor.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateDriverStatus(selectedDriverIds, status);
+      setMessage(`Conductores actualizados (${result.affected_count}).`);
+      setSelectedDriverIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar conductores.');
+    }
+  };
+
+  const bulkUpdateVehicles = async (status: 'active' | 'inactive' | 'maintenance') => {
+    if (!selectedVehicleIds.length) {
+      setError('Selecciona al menos un vehículo.');
+      return;
+    }
+    setMessage('');
+    setError('');
+    try {
+      const result = await apiClient.bulkUpdateVehicleStatus(selectedVehicleIds, status);
+      setMessage(`Vehículos actualizados (${result.affected_count}).`);
+      setSelectedVehicleIds([]);
+      await load();
+    } catch (bulkError) {
+      setError(bulkError instanceof Error ? bulkError.message : 'No se pudo actualizar vehículos.');
+    }
+  };
+
   return (
     <section className="page-grid">
+      <div className="inline-actions">
+        <Link to="/dashboard" className="helper">Dashboard</Link>
+        <span className="helper">/</span>
+        <span className="helper">Partners</span>
+      </div>
       <Modal
         open={createOpen}
         onClose={closeCreateWizard}
@@ -556,6 +684,14 @@ export function PartnersPage() {
                     <option value="maintenance">maintenance</option>
                   </Select>
                 </div>
+                <div>
+                  <label>Última edición por</label>
+                  <Input
+                    value={lastEditorFilter}
+                    onChange={(e) => setLastEditorFilter(e.target.value)}
+                    placeholder="Nombre editor"
+                  />
+                </div>
               </div>
             </div>
           ) : null}
@@ -579,11 +715,26 @@ export function PartnersPage() {
             >
               Export CSV subcontratas
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateSubcontractors('active'); }}>
+              Activar seleccion ({selectedSubcontractorIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateSubcontractors('suspended'); }}>
+              Suspender seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredSubcontractors.length > 0 && filteredSubcontractors.every((item) => selectedSubcontractorIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedSubcontractorIds(event.target.checked ? filteredSubcontractors.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tax ID</TableHead>
                   <TableHead>Estado</TableHead>
@@ -594,6 +745,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredSubcontractors.map((subcontractor) => (
                   <TableRow key={subcontractor.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedSubcontractorIds.includes(subcontractor.id)}
+                        onChange={(event) => toggleSelected(setSelectedSubcontractorIds, subcontractor.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{subcontractor.legal_name}</TableCell>
                     <TableCell>{subcontractor.tax_id ?? '-'}</TableCell>
                     <TableCell>{subcontractor.status}</TableCell>
@@ -645,11 +803,26 @@ export function PartnersPage() {
             >
               Export CSV conductores
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateDrivers('active'); }}>
+              Activar seleccion ({selectedDriverIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateDrivers('suspended'); }}>
+              Suspender seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredDrivers.length > 0 && filteredDrivers.every((item) => selectedDriverIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedDriverIds(event.target.checked ? filteredDrivers.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>DNI</TableHead>
                   <TableHead>Nombre</TableHead>
@@ -662,6 +835,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredDrivers.map((driver) => (
                   <TableRow key={driver.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedDriverIds.includes(driver.id)}
+                        onChange={(event) => toggleSelected(setSelectedDriverIds, driver.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{driver.code}</TableCell>
                     <TableCell>{driver.dni ?? '-'}</TableCell>
                     <TableCell>{driver.name}</TableCell>
@@ -720,11 +900,26 @@ export function PartnersPage() {
             >
               Export CSV vehículos
             </Button>
+            <Button type="button" variant="secondary" onClick={() => { void bulkUpdateVehicles('active'); }}>
+              Activar seleccion ({selectedVehicleIds.length})
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { void bulkUpdateVehicles('maintenance'); }}>
+              Mantenimiento seleccion
+            </Button>
           </div>
           <TableWrapper>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={filteredVehicles.length > 0 && filteredVehicles.every((item) => selectedVehicleIds.includes(item.id))}
+                      onChange={(event) => {
+                        setSelectedVehicleIds(event.target.checked ? filteredVehicles.map((item) => item.id) : []);
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>Matricula</TableHead>
                   <TableHead>Subcontrata</TableHead>
@@ -737,6 +932,13 @@ export function PartnersPage() {
               <TableBody>
                 {filteredVehicles.map((vehicle) => (
                   <TableRow key={vehicle.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedVehicleIds.includes(vehicle.id)}
+                        onChange={(event) => toggleSelected(setSelectedVehicleIds, vehicle.id, event.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell>{vehicle.code}</TableCell>
                     <TableCell>{vehicle.plate_number ?? '-'}</TableCell>
                     <TableCell>{vehicle.subcontractor_name ?? '-'}</TableCell>
@@ -784,6 +986,84 @@ export function PartnersPage() {
           {error ? <p className="helper error">{error}</p> : null}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Auditoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
+        </CardContent>
+      </Card>
+      {showAudit ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Auditoría partners</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="inline-actions">
+              <Select value={auditEventFilter} onChange={(e) => setAuditEventFilter(e.target.value)}>
+                <option value="">Todos los eventos</option>
+                <option value="subcontractors.">Subcontratas</option>
+                <option value="drivers.">Conductores</option>
+                <option value="vehicles.">Vehículos</option>
+              </Select>
+              <Input
+                value={auditActorFilter}
+                onChange={(e) => setAuditActorFilter(e.target.value)}
+                placeholder="Filtrar por actor"
+              />
+              <Button type="button" variant="outline" onClick={() => { void load(); }}>
+                Actualizar auditoría
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => apiClient.exportAuditLogsCsv({
+                  event: auditEventFilter || undefined,
+                  actor: auditActorFilter || undefined,
+                })}
+              >
+                Export CSV auditoría
+              </Button>
+            </div>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Detalle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditRows.map((row) => (
+                    <TableRow key={`audit-${row.id}`}>
+                      <TableCell>{formatDateTime(row.created_at)}</TableCell>
+                      <TableCell>{row.event}</TableCell>
+                      <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                      <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                    </TableRow>
+                  ))}
+                  {!auditRows.length && !auditLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Sin auditoría para el filtro actual.</TableCell>
+                    </TableRow>
+                  ) : null}
+                  {auditLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4}>Cargando auditoría...</TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

@@ -784,6 +784,58 @@ export type VehicleSummary = {
   last_editor_name?: string | null;
 };
 
+export type WorkforceEmployeeSummary = {
+  id: string;
+  code?: string | null;
+  document_id: string;
+  name: string;
+  employment_type: 'own' | 'external' | 'contractor';
+  subcontractor_id?: string | null;
+  subcontractor_name?: string | null;
+  role_title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  contract_start?: string | null;
+  contract_end?: string | null;
+  notes?: string | null;
+  updated_at?: string | null;
+};
+
+export type ComplianceDocumentSummary = {
+  id: string;
+  scope_type: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+  scope_id?: string | null;
+  document_type: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+  title: string;
+  reference?: string | null;
+  issuer?: string | null;
+  issued_at?: string | null;
+  expires_at?: string | null;
+  status: 'valid' | 'expiring' | 'expired' | 'pending';
+  file_url?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_by_user_id?: string | null;
+  updated_at?: string | null;
+};
+
+export type VehicleControlSummary = {
+  id: string;
+  vehicle_id: string;
+  vehicle_code?: string | null;
+  plate_number?: string | null;
+  control_type: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+  event_date: string;
+  due_date?: string | null;
+  amount?: number | null;
+  odometer_km?: number | null;
+  provider?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  created_by_user_id?: string | null;
+  updated_at?: string | null;
+};
+
 export type LoginResponse = {
   message: string;
   token?: string;

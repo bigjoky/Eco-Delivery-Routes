@@ -283,6 +283,104 @@ let mockPoints: Array<{
   { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', is_active: true, deleted_at: null },
 ];
 let pointSeq = 1;
+let workforceSeq = 1;
+let complianceSeq = 1;
+let vehicleControlSeq = 1;
+let mockWorkforce: Array<{
+  id: string;
+  code?: string | null;
+  document_id: string;
+  name: string;
+  employment_type: 'own' | 'external' | 'contractor';
+  subcontractor_id?: string | null;
+  role_title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  status: 'active' | 'inactive' | 'suspended';
+  contract_start?: string | null;
+  contract_end?: string | null;
+  notes?: string | null;
+  updated_at?: string | null;
+}> = [
+  {
+    id: 'emp-1',
+    code: 'EMP-0001',
+    document_id: '12345678A',
+    name: 'Ana Ruiz',
+    employment_type: 'own',
+    role_title: 'Operadora de trafico',
+    phone: '600111222',
+    status: 'active',
+    updated_at: nowIso(),
+  },
+  {
+    id: 'emp-2',
+    code: 'EMP-0002',
+    document_id: 'B00000001',
+    name: 'Ruta Sur Express SL - Coordinador',
+    employment_type: 'contractor',
+    subcontractor_id: 'sc-1',
+    role_title: 'Coordinacion reparto',
+    phone: '600333444',
+    status: 'active',
+    updated_at: nowIso(),
+  },
+];
+let mockComplianceDocuments: Array<{
+  id: string;
+  scope_type: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+  scope_id?: string | null;
+  document_type: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+  title: string;
+  reference?: string | null;
+  issuer?: string | null;
+  issued_at?: string | null;
+  expires_at?: string | null;
+  status: 'valid' | 'expiring' | 'expired' | 'pending';
+  file_url?: string | null;
+  created_by_user_id?: string | null;
+  updated_at?: string | null;
+}> = [
+  {
+    id: 'doc-1',
+    scope_type: 'subcontractor',
+    scope_id: 'sc-1',
+    document_type: 'cae',
+    title: 'CAE Subcontrata 2026',
+    reference: 'CAE-2026-RSE',
+    issuer: 'Eco Delivery Routes',
+    issued_at: '2026-01-01',
+    expires_at: '2026-12-31',
+    status: 'valid',
+    updated_at: nowIso(),
+  },
+];
+let mockVehicleControls: Array<{
+  id: string;
+  vehicle_id: string;
+  control_type: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+  event_date: string;
+  due_date?: string | null;
+  amount?: number | null;
+  odometer_km?: number | null;
+  provider?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  created_by_user_id?: string | null;
+  updated_at?: string | null;
+}> = [
+  {
+    id: 'vc-1',
+    vehicle_id: 'veh-1',
+    control_type: 'fuel',
+    event_date: '2026-03-07',
+    amount: 92.5,
+    odometer_km: 102340,
+    provider: 'Repsol',
+    reference: 'TKT-9283',
+    updated_at: nowIso(),
+  },
+];
 
 export const mockApi = {
   async login(_: { email: string; password: string }) {
@@ -440,9 +538,10 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -514,6 +613,33 @@ export const mockApi = {
         },
         created_at: '2026-02-28T10:20:00Z',
       },
+      {
+        id: 7,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'subcontractors.bulk_status_updated',
+        metadata: { ids: ['sc-1'], status: 'suspended', affected_count: 1 },
+        created_at: '2026-03-08T18:50:00Z',
+      },
+      {
+        id: 8,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'drivers.bulk_status_updated',
+        metadata: { ids: ['drv-1'], status: 'active', affected_count: 1 },
+        created_at: '2026-03-08T18:55:00Z',
+      },
+      {
+        id: 9,
+        actor_user_id: 'u-1',
+        actor_name: 'Admin Demo',
+        actor_roles: 'super_admin',
+        event: 'vehicles.bulk_status_updated',
+        metadata: { ids: ['veh-1'], status: 'maintenance', affected_count: 1 },
+        created_at: '2026-03-08T19:00:00Z',
+      },
     ];
     let filtered = rows;
     if (_.resource === 'user') {
@@ -534,16 +660,51 @@ export const mockApi = {
         });
       }
     }
+    if (_.resource === 'subcontractor') {
+      filtered = filtered.filter((row) => row.event.startsWith('subcontractors.'));
+    }
+    if (_.resource === 'driver') {
+      filtered = filtered.filter((row) => row.event.startsWith('drivers.'));
+    }
+    if (_.resource === 'vehicle') {
+      filtered = filtered.filter((row) => row.event.startsWith('vehicles.'));
+    }
+    if (_.resource === 'route') {
+      filtered = filtered.filter((row) => row.event.startsWith('routes.'));
+    }
+    if (_.resource === 'shipment') {
+      filtered = filtered.filter((row) => row.event.startsWith('shipments.'));
+    }
+    if (_.resource === 'incident') {
+      filtered = filtered.filter((row) => row.event.startsWith('incidents.'));
+    }
+    if (_.resource === 'workforce') {
+      filtered = filtered.filter((row) => row.event.startsWith('workforce.'));
+    }
+    if (_.resource === 'compliance_document') {
+      filtered = filtered.filter((row) => row.event.startsWith('compliance_documents.'));
+    }
+    if (_.resource === 'vehicle_control') {
+      filtered = filtered.filter((row) => row.event.startsWith('vehicle_controls.'));
+    }
     if (_.event) {
       filtered = filtered.filter((row) => row.event.startsWith(_.event ?? ''));
+    }
+    if (_.actor) {
+      const actor = _.actor.toLowerCase();
+      filtered = filtered.filter((row) => (
+        (row.actor_name ?? '').toLowerCase().includes(actor)
+        || (row.actor_user_id ?? '').toLowerCase().includes(actor)
+      ));
     }
     return filtered;
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
+    actor?: string;
     dateFrom?: string;
     dateTo?: string;
   }) {
@@ -3126,6 +3287,21 @@ export const mockApi = {
     mockSubcontractors = mockSubcontractors.filter((item) => item.id !== id);
   },
 
+  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+    let affected = 0;
+    mockSubcontractors = mockSubcontractors.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
+  },
+
   async getDrivers(filters: { subcontractorId?: string; status?: string; limit?: number }) {
     let rows = [...mockDrivers];
     if (filters.subcontractorId) {
@@ -3196,6 +3372,21 @@ export const mockApi = {
     mockDrivers = mockDrivers.filter((item) => item.id !== id);
   },
 
+  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended') {
+    let affected = 0;
+    mockDrivers = mockDrivers.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
+  },
+
   async getVehicles(filters: { subcontractorId?: string; status?: string; limit?: number }) {
     let rows = [...mockVehicles];
     if (filters.subcontractorId) {
@@ -3264,6 +3455,257 @@ export const mockApi = {
       throw new Error('Vehicle has linked routes and cannot be deleted.');
     }
     mockVehicles = mockVehicles.filter((item) => item.id !== id);
+  },
+
+  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance') {
+    let affected = 0;
+    mockVehicles = mockVehicles.map((item) => {
+      if (!ids.includes(item.id)) return item;
+      affected += 1;
+      return {
+        ...item,
+        status,
+        updated_at: nowIso(),
+        last_editor_name: 'Admin Demo',
+      };
+    });
+    return { affected_count: affected };
+  },
+
+  async getWorkforce(filters: {
+    q?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    employmentType?: 'own' | 'external' | 'contractor';
+    subcontractorId?: string;
+  }) {
+    const query = (filters.q ?? '').trim().toLowerCase();
+    return mockWorkforce
+      .filter((item) => (!filters.status || item.status === filters.status))
+      .filter((item) => (!filters.employmentType || item.employment_type === filters.employmentType))
+      .filter((item) => (!filters.subcontractorId || item.subcontractor_id === filters.subcontractorId))
+      .filter((item) => {
+        if (!query) return true;
+        const haystack = `${item.code ?? ''} ${item.document_id} ${item.name} ${item.email ?? ''}`.toLowerCase();
+        return haystack.includes(query);
+      })
+      .map((item) => ({
+        ...item,
+        subcontractor_name: mockSubcontractors.find((row) => row.id === item.subcontractor_id)?.legal_name ?? null,
+      }));
+  },
+
+  async createWorkforce(payload: {
+    code?: string;
+    document_id: string;
+    name: string;
+    employment_type: 'own' | 'external' | 'contractor';
+    subcontractor_id?: string;
+    role_title?: string;
+    phone?: string;
+    email?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    contract_start?: string;
+    contract_end?: string;
+    notes?: string;
+  }) {
+    const created = {
+      id: `emp-${++workforceSeq}`,
+      code: payload.code ?? `EMP-${String(workforceSeq).padStart(4, '0')}`,
+      document_id: payload.document_id,
+      name: payload.name,
+      employment_type: payload.employment_type,
+      subcontractor_id: payload.subcontractor_id ?? null,
+      role_title: payload.role_title ?? null,
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      status: payload.status ?? 'active',
+      contract_start: payload.contract_start ?? null,
+      contract_end: payload.contract_end ?? null,
+      notes: payload.notes ?? null,
+      updated_at: nowIso(),
+    };
+    mockWorkforce = [created, ...mockWorkforce];
+    return created;
+  },
+
+  async updateWorkforce(id: string, payload: {
+    code?: string;
+    document_id?: string;
+    name?: string;
+    employment_type?: 'own' | 'external' | 'contractor';
+    subcontractor_id?: string | null;
+    role_title?: string;
+    phone?: string;
+    email?: string;
+    status?: 'active' | 'inactive' | 'suspended';
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string;
+  }) {
+    const index = mockWorkforce.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Employee not found');
+    mockWorkforce[index] = {
+      ...mockWorkforce[index],
+      ...payload,
+      updated_at: nowIso(),
+    };
+    return mockWorkforce[index];
+  },
+
+  async deleteWorkforce(id: string) {
+    mockWorkforce = mockWorkforce.filter((item) => item.id !== id);
+  },
+
+  async getComplianceDocuments(filters: {
+    q?: string;
+    scopeType?: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scopeId?: string;
+    documentType?: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    expiresBefore?: string;
+  }) {
+    const query = (filters.q ?? '').trim().toLowerCase();
+    return mockComplianceDocuments
+      .filter((item) => (!filters.scopeType || item.scope_type === filters.scopeType))
+      .filter((item) => (!filters.scopeId || item.scope_id === filters.scopeId))
+      .filter((item) => (!filters.documentType || item.document_type === filters.documentType))
+      .filter((item) => (!filters.status || item.status === filters.status))
+      .filter((item) => {
+        if (!filters.expiresBefore) return true;
+        if (!item.expires_at) return false;
+        return item.expires_at <= filters.expiresBefore;
+      })
+      .filter((item) => {
+        if (!query) return true;
+        const haystack = `${item.title} ${item.reference ?? ''} ${item.issuer ?? ''}`.toLowerCase();
+        return haystack.includes(query);
+      });
+  },
+
+  async createComplianceDocument(payload: {
+    scope_type: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scope_id?: string;
+    document_type: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    title: string;
+    reference?: string;
+    issuer?: string;
+    issued_at?: string;
+    expires_at?: string;
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    file_url?: string;
+  }) {
+    const created = {
+      id: `doc-${++complianceSeq}`,
+      scope_type: payload.scope_type,
+      scope_id: payload.scope_id ?? null,
+      document_type: payload.document_type,
+      title: payload.title,
+      reference: payload.reference ?? null,
+      issuer: payload.issuer ?? null,
+      issued_at: payload.issued_at ?? null,
+      expires_at: payload.expires_at ?? null,
+      status: payload.status ?? 'pending',
+      file_url: payload.file_url ?? null,
+      updated_at: nowIso(),
+    };
+    mockComplianceDocuments = [created, ...mockComplianceDocuments];
+    return created;
+  },
+
+  async updateComplianceDocument(id: string, payload: {
+    scope_type?: 'company' | 'subcontractor' | 'employee' | 'driver' | 'vehicle' | 'operation';
+    scope_id?: string | null;
+    document_type?: 'cae' | 'insurance' | 'itv' | 'contract' | 'training' | 'license' | 'prevention' | 'other';
+    title?: string;
+    reference?: string;
+    issuer?: string;
+    issued_at?: string | null;
+    expires_at?: string | null;
+    status?: 'valid' | 'expiring' | 'expired' | 'pending';
+    file_url?: string | null;
+  }) {
+    const index = mockComplianceDocuments.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Document not found');
+    mockComplianceDocuments[index] = {
+      ...mockComplianceDocuments[index],
+      ...payload,
+      updated_at: nowIso(),
+    };
+    return mockComplianceDocuments[index];
+  },
+
+  async deleteComplianceDocument(id: string) {
+    mockComplianceDocuments = mockComplianceDocuments.filter((item) => item.id !== id);
+  },
+
+  async getVehicleControls(filters: {
+    vehicleId?: string;
+    controlType?: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    return mockVehicleControls
+      .filter((item) => (!filters.vehicleId || item.vehicle_id === filters.vehicleId))
+      .filter((item) => (!filters.controlType || item.control_type === filters.controlType))
+      .filter((item) => (!filters.dateFrom || item.event_date >= filters.dateFrom))
+      .filter((item) => (!filters.dateTo || item.event_date <= filters.dateTo))
+      .map((item) => ({
+        ...item,
+        vehicle_code: mockVehicles.find((row) => row.id === item.vehicle_id)?.code ?? null,
+        plate_number: mockVehicles.find((row) => row.id === item.vehicle_id)?.plate_number ?? null,
+      }));
+  },
+
+  async createVehicleControl(payload: {
+    vehicle_id: string;
+    control_type: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    event_date: string;
+    due_date?: string;
+    amount?: number;
+    odometer_km?: number;
+    provider?: string;
+    reference?: string;
+    notes?: string;
+  }) {
+    const created = {
+      id: `vc-${++vehicleControlSeq}`,
+      vehicle_id: payload.vehicle_id,
+      control_type: payload.control_type,
+      event_date: payload.event_date,
+      due_date: payload.due_date ?? null,
+      amount: payload.amount ?? null,
+      odometer_km: payload.odometer_km ?? null,
+      provider: payload.provider ?? null,
+      reference: payload.reference ?? null,
+      notes: payload.notes ?? null,
+      updated_at: nowIso(),
+    };
+    mockVehicleControls = [created, ...mockVehicleControls];
+    return created;
+  },
+
+  async updateVehicleControl(id: string, payload: {
+    control_type?: 'fuel' | 'insurance' | 'itv' | 'maintenance' | 'other';
+    event_date?: string;
+    due_date?: string | null;
+    amount?: number | null;
+    odometer_km?: number | null;
+    provider?: string;
+    reference?: string;
+    notes?: string;
+  }) {
+    const index = mockVehicleControls.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error('Vehicle control not found');
+    mockVehicleControls[index] = {
+      ...mockVehicleControls[index],
+      ...payload,
+      updated_at: nowIso(),
+    };
+    return mockVehicleControls[index];
+  },
+
+  async deleteVehicleControl(id: string) {
+    mockVehicleControls = mockVehicleControls.filter((item) => item.id !== id);
   },
 
   async getAdvances(_: { subcontractorId?: string; status?: string; period?: string }) {

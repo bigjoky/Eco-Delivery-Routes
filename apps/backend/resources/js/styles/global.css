@@ -12,6 +12,13 @@
   --danger: #b91c1c;
   --warning: #b45309;
   --success: #16a34a;
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
 }
 
 * {
@@ -24,6 +31,8 @@ body {
   color: var(--text);
   font-family: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .sr-only {
@@ -90,6 +99,42 @@ a {
 
 .sidebar-group + .sidebar-group {
   margin-top: 12px;
+}
+
+.sidebar-more {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-more summary {
+  list-style: none;
+  position: relative;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+.sidebar-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-more summary::after {
+  content: '▾';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sidebar-more[open] summary::after {
+  content: '▴';
+}
+
+.sidebar-more-items {
+  display: grid;
+  gap: 6px;
+  padding-left: 8px;
 }
 
 .sidebar-group-title {
@@ -196,6 +241,7 @@ a {
 .topbar-title {
   font-size: 20px;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .topbar-subtitle {
@@ -211,7 +257,7 @@ a {
 
 .app-main {
   display: grid;
-  gap: 14px;
+  gap: var(--space-3);
   padding: 20px 22px 28px;
 }
 
@@ -228,7 +274,7 @@ a {
 
 .page-grid {
   display: grid;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .page-grid.two {
@@ -241,25 +287,25 @@ a {
 
 .form-row {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   align-items: start;
 }
 
 .inline-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
 }
 
 .filters-panel {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--surface-muted);
-  padding: 12px;
+  padding: var(--space-3);
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 label {
@@ -270,9 +316,9 @@ label {
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
-  padding: 16px;
+  padding: var(--space-4);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
@@ -293,7 +339,7 @@ label {
 
 .card-content {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .card-row {
@@ -314,7 +360,7 @@ label {
 .btn {
   height: 37px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
@@ -338,11 +384,17 @@ label {
 .btn-outline {
   border-color: var(--border);
   background: white;
+  color: #334155;
 }
 
 .btn-outline.btn-sort-active {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .btn-destructive {
@@ -363,7 +415,7 @@ label {
   height: 37px;
   width: 100%;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
 }
@@ -373,7 +425,7 @@ select {
   height: 37px;
   width: 100%;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
   font: inherit;
@@ -390,7 +442,7 @@ input[type='checkbox'] {
 
 textarea {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
   padding: 8px 10px;
@@ -510,20 +562,20 @@ textarea:focus {
 .table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: #fff;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 700px;
   background: white;
 }
 
 .table-head {
   text-align: left;
-  padding: 11px 10px;
+  padding: 12px;
   font-size: 12px;
   color: var(--muted);
   background: var(--surface-muted);
@@ -532,17 +584,24 @@ textarea:focus {
   position: sticky;
   top: 0;
   z-index: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .table-cell {
-  padding: 11px 10px;
+  padding: 12px;
   border-bottom: 1px solid #eef2f7;
   font-size: 14px;
   vertical-align: top;
+  line-height: 1.4;
 }
 
 .table-row:hover .table-cell {
   background: #f9fafb;
+}
+
+.table-row:nth-child(even) .table-cell {
+  background: #fcfdff;
 }
 
 .table-row:last-child .table-cell {
@@ -720,6 +779,14 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.toolbar-spaced {
+  margin-top: 12px;
+}
+
+.helper-spaced {
+  margin-top: 6px;
 }
 
 .dashboard-shell {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { EntityActivityTimeline } from '../../components/audit/EntityActivityTimeline';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -44,6 +45,7 @@ export function ShipmentDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [showAudit, setShowAudit] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -88,7 +90,13 @@ export function ShipmentDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="inline-actions">
+            <Link to="/dashboard" className="helper">Dashboard</Link>
+            <span className="helper">/</span>
             <Link to="/shipments" className="btn btn-outline">Volver</Link>
+            {shipment?.route_id ? (
+              <Link to={`/routes/${shipment.route_id}`} className="btn btn-outline">Ir a ruta</Link>
+            ) : null}
+            <Link to={`/incidents?incidentable_id=${encodeURIComponent(id ?? '')}`} className="btn btn-outline">Ver incidencias relacionadas</Link>
             {loading ? <span className="helper">Cargando...</span> : null}
             {error ? <span className="helper">{error}</span> : null}
           </div>
@@ -97,6 +105,7 @@ export function ShipmentDetailPage() {
               <div>
                 <div className="helper">Referencia</div>
                 <div>{shipment.reference}</div>
+                <div className="helper">ID: {shipment.id}</div>
               </div>
               <div>
                 <div className="helper">Referencia externa</div>
@@ -289,6 +298,24 @@ export function ShipmentDetailPage() {
           </TableWrapper>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Auditoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+            {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+          </Button>
+        </CardContent>
+      </Card>
+      {showAudit ? (
+        <EntityActivityTimeline
+          title="Actividad del envío"
+          resource="shipment"
+          entityId={shipment?.id ?? id}
+          eventPrefix="shipments."
+        />
+      ) : null}
     </section>
   );
 }

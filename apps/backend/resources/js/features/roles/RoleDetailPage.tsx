@@ -15,6 +15,7 @@ export function RoleDetailPage() {
   const [auditEventFilter, setAuditEventFilter] = useState('role.');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showAudit, setShowAudit] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -93,34 +94,43 @@ export function RoleDetailPage() {
               </div>
               <Button type="button" onClick={onSavePermissions}>Guardar permisos</Button>
 
-              <h3>Auditoría de permisos</h3>
-              <Input
-                value={auditEventFilter}
-                onChange={(event) => setAuditEventFilter(event.target.value)}
-                placeholder="Filtro evento (ej: role.)"
-              />
-              <TableWrapper>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Evento</TableHead>
-                      <TableHead>Actor</TableHead>
-                      <TableHead>Metadata</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {auditRows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>{row.created_at}</TableCell>
-                        <TableCell>{row.event}</TableCell>
-                        <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
-                        <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableWrapper>
+              <div className="inline-actions">
+                <h3>Auditoría de permisos</h3>
+                <Button type="button" variant="outline" onClick={() => setShowAudit((value) => !value)}>
+                  {showAudit ? 'Ocultar auditoría' : 'Mostrar auditoría'}
+                </Button>
+              </div>
+              {showAudit ? (
+                <>
+                  <Input
+                    value={auditEventFilter}
+                    onChange={(event) => setAuditEventFilter(event.target.value)}
+                    placeholder="Filtro evento (ej: role.)"
+                  />
+                  <TableWrapper>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Evento</TableHead>
+                          <TableHead>Actor</TableHead>
+                          <TableHead>Metadata</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell>{row.created_at}</TableCell>
+                            <TableCell>{row.event}</TableCell>
+                            <TableCell>{row.actor_name ?? row.actor_user_id ?? '-'}</TableCell>
+                            <TableCell>{typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata ?? {})}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableWrapper>
+                </>
+              ) : null}
             </div>
           )}
           {message && <p className="helper">{message}</p>}

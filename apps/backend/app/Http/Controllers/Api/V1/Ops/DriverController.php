@@ -193,4 +193,42 @@ class DriverController extends Controller
             'message' => 'Driver deleted',
         ]);
     }
+
+    public function bulkStatus(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $payload = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['uuid', 'distinct', 'exists:drivers,id'],
+            'status' => ['required', 'in:active,inactive,suspended'],
+        ]);
+
+        $affected = DB::table('drivers')
+            ->whereIn('id', $payload['ids'])
+            ->update([
+                'status' => $payload['status'],
+                'updated_at' => now(),
+            ]);
+
+        $this->auditLogWriter->write($actor->id, 'drivers.bulk_status_updated', [
+            'ids' => $payload['ids'],
+            'status' => $payload['status'],
+            'affected_count' => $affected,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'affected_count' => $affected,
+                'status' => $payload['status'],
+            ],
+            'message' => 'Bulk status updated',
+        ]);
+    }
 }
