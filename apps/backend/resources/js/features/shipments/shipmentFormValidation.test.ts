@@ -3,7 +3,9 @@ import {
   hasRequiredRecipientName,
   hasRequiredSenderName,
   inferDocumentType,
+  isProvinceRequired,
   isValidPostalCode,
+  isServiceDateAllowed,
 } from './shipmentFormValidation';
 
 describe('shipment form validation', () => {
@@ -32,5 +34,17 @@ describe('shipment form validation', () => {
     expect(isValidPostalCode('DE', '10115')).toBe(true);
     expect(isValidPostalCode('DE', '1011')).toBe(false);
     expect(isValidPostalCode('US', '10001')).toBe(true);
+  });
+
+  it('applies conditional province and service window rules', () => {
+    expect(isProvinceRequired('ES')).toBe(true);
+    expect(isProvinceRequired('PT')).toBe(true);
+    expect(isProvinceRequired('DE')).toBe(false);
+
+    expect(isServiceDateAllowed('business_parcel', '2026-03-09')).toBe(true); // Monday
+    expect(isServiceDateAllowed('business_parcel', '2026-03-08')).toBe(false); // Sunday
+    expect(isServiceDateAllowed('thermo_parcel', '2026-03-08')).toBe(false); // Sunday
+    expect(isServiceDateAllowed('thermo_parcel', '2026-03-07')).toBe(true); // Saturday
+    expect(isServiceDateAllowed('express_1030', '2026-03-08')).toBe(true);
   });
 });

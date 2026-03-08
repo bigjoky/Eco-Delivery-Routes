@@ -12,6 +12,8 @@ import {
   hasRequiredRecipientName,
   hasRequiredSenderName,
   inferDocumentType,
+  isProvinceRequired,
+  isServiceDateAllowed,
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
@@ -306,6 +308,7 @@ export function ShipmentsPage() {
     recipientPhone?: string;
     street?: string;
     city?: string;
+    province?: string;
     postalCode?: string;
     phone?: string;
     email?: string;
@@ -314,6 +317,7 @@ export function ShipmentsPage() {
     senderStreet?: string;
     senderPostalCode?: string;
     senderCity?: string;
+    senderProvince?: string;
     senderDocument?: string;
     senderName?: string;
   }>({});
@@ -910,6 +914,9 @@ export function ShipmentsPage() {
       if (!createStreet.trim() || !createCity.trim() || !createPostalCode.trim()) {
         checks.push('Direccion completa de destinatario obligatoria (calle, ciudad, CP).');
       }
+      if (isProvinceRequired(createCountry) && !createProvince.trim()) {
+        checks.push('Provincia de destinatario obligatoria para el país seleccionado.');
+      }
     }
 
     if (!createSenderDocumentId.trim()) checks.push('Documento de remitente obligatorio.');
@@ -923,6 +930,9 @@ export function ShipmentsPage() {
       if (!createSenderStreet.trim() || !createSenderCity.trim() || !createSenderPostalCode.trim()) {
         checks.push('Direccion completa de remitente obligatoria para recogidas.');
       }
+      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+        checks.push('Provincia de remitente obligatoria para el país seleccionado.');
+      }
     }
 
     if (createPhone.trim() && !isValidPhone(createPhone)) checks.push('Telefono de destinatario invalido.');
@@ -931,6 +941,9 @@ export function ShipmentsPage() {
     if (createSenderEmail.trim() && !isValidEmail(createSenderEmail)) checks.push('Email de remitente invalido.');
     if (createPostalCode.trim() && !isValidPostalCode(createCountry, createPostalCode)) checks.push('Codigo postal de destinatario invalido.');
     if (createSenderPostalCode.trim() && !isValidPostalCode(createSenderCountry, createSenderPostalCode)) checks.push('Codigo postal de remitente invalido.');
+    if (createOperation === 'shipment' && createScheduledAt.trim() && !isServiceDateAllowed(createServiceType, createScheduledAt)) {
+      checks.push(`El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`);
+    }
 
     return Array.from(new Set(checks));
   }, [
@@ -1159,6 +1172,7 @@ export function ShipmentsPage() {
       recipientPhone?: string;
       street?: string;
       city?: string;
+      province?: string;
       postalCode?: string;
       phone?: string;
       email?: string;
@@ -1167,6 +1181,7 @@ export function ShipmentsPage() {
       senderStreet?: string;
       senderPostalCode?: string;
       senderCity?: string;
+      senderProvince?: string;
       senderDocument?: string;
       senderName?: string;
     } = {};
@@ -1197,6 +1212,7 @@ export function ShipmentsPage() {
       if (!createStreet.trim()) nextErrors.street = 'La calle del destinatario es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad del destinatario es obligatoria.';
       if (!createPostalCode.trim()) nextErrors.postalCode = 'Codigo postal destinatario obligatorio.';
+      if (isProvinceRequired(createCountry) && !createProvince.trim()) nextErrors.province = 'Provincia destinatario obligatoria.';
     }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
@@ -1240,6 +1256,9 @@ export function ShipmentsPage() {
       if (!createSenderCity.trim()) {
         nextErrors.senderCity = 'La ciudad del remitente es obligatoria para recogidas.';
       }
+      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+        nextErrors.senderProvince = 'Provincia remitente obligatoria para el país seleccionado.';
+      }
     }
     if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
       if (createSenderDocType === 'CIF') {
@@ -1262,6 +1281,9 @@ export function ShipmentsPage() {
           const cutoff = serviceCutoffHour[createServiceType];
           if (scheduledDate.getUTCHours() > cutoff || (scheduledDate.getUTCHours() === cutoff && scheduledDate.getUTCMinutes() > 30)) {
             nextErrors.scheduledAt = `La hora supera la ventana del servicio (${serviceTypeLabel(createServiceType)}).`;
+          }
+          if (!isServiceDateAllowed(createServiceType, createScheduledAt)) {
+            nextErrors.scheduledAt = `El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`;
           }
         }
       }
@@ -2247,6 +2269,12 @@ export function ShipmentsPage() {
                   Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
                 </div>
               ) : null}
+              {createOperation === 'shipment' && createServiceType === 'business_parcel' ? (
+                <div className="helper">Business Parcel: solo L-V.</div>
+              ) : null}
+              {createOperation === 'shipment' && createServiceType === 'thermo_parcel' ? (
+                <div className="helper">Thermo Parcel: L-S (sin domingo).</div>
+              ) : null}
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
           </div>
@@ -2537,6 +2565,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateProvince(event.target.value)}
             placeholder="Malaga"
           />
+          {createFieldErrors.province ? <div className="helper error">{createFieldErrors.province}</div> : null}
           <label htmlFor="create-shipment-country">Pais</label>
           <input
             id="create-shipment-country"
@@ -2760,6 +2789,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderProvince(event.target.value)}
             placeholder="Malaga"
           />
+          {createFieldErrors.senderProvince ? <div className="helper error">{createFieldErrors.senderProvince}</div> : null}
           <label htmlFor="create-sender-country">Pais</label>
           <input
             id="create-sender-country"
