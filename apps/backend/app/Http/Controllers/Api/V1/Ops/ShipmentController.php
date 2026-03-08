@@ -802,6 +802,8 @@ class ShipmentController extends Controller
             'shipment_ids' => $shipmentIds,
             'updates' => $updates,
             'reason' => $payload['reason'],
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
             'apply_to_filtered' => !empty($payload['apply_to_filtered']),
             'count' => count($shipmentIds),
             'changed_rows_count' => count($changeRows),
@@ -847,6 +849,48 @@ class ShipmentController extends Controller
         ]);
     }
 
+    public function bulkUpdatePreviewCsv(Request $request)
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $this->validateBulkShipmentPayload($request, true);
+        $shipmentIds = $this->collectShipmentIdsForBulk($actor, $payload);
+        $rows = DB::table('shipments')
+            ->whereIn('id', $shipmentIds)
+            ->orderBy('reference')
+            ->get(['id', 'reference', 'status', 'hub_id', 'scheduled_at']);
+
+        $csvRows = ['id,reference,status,hub_id,scheduled_at'];
+        foreach ($rows as $row) {
+            $csvRows[] = implode(',', [
+                $this->csvValue((string) $row->id),
+                $this->csvValue((string) $row->reference),
+                $this->csvValue((string) $row->status),
+                $this->csvValue((string) ($row->hub_id ?? '')),
+                $this->csvValue((string) ($row->scheduled_at ?? '')),
+            ]);
+        }
+
+        $this->auditLogWriter->write($actor->id, 'shipments.bulk_update.preview.exported.csv', [
+            'count' => count($shipmentIds),
+            'apply_to_filtered' => (bool) ($payload['apply_to_filtered'] ?? false),
+            'updates' => [
+                'status' => $payload['status'] ?? null,
+                'hub_id' => $payload['hub_id'] ?? null,
+                'scheduled_at' => $payload['scheduled_at'] ?? null,
+            ],
+        ]);
+
+        return response(implode("\n", $csvRows), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="shipments_bulk_update_preview.csv"',
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([
@@ -875,6 +919,8 @@ class ShipmentController extends Controller
             'status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
             'hub_id' => ['nullable', 'uuid', 'exists:hubs,id'],
             'scheduled_at' => ['nullable', 'date'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string', 'max:220'],
             'reason' => $preview ? ['nullable', 'string', 'max:220'] : ['required', 'string', 'max:220'],
         ]);
     }

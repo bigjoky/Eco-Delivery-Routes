@@ -840,6 +840,8 @@ export const apiClient = {
     status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
     hub_id?: string;
     scheduled_at?: string;
+    reason_code?: string;
+    reason_detail?: string;
     reason: string;
   }): Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }> {
     if (USE_MOCK) return mockApi.bulkUpdateShipments(payload) as Promise<{ data: ShipmentSummary[]; meta: { updated_count: number } }>;
@@ -864,6 +866,8 @@ export const apiClient = {
     status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
     hub_id?: string;
     scheduled_at?: string;
+    reason_code?: string;
+    reason_detail?: string;
     reason?: string;
   }): Promise<{
     target_count: number;
@@ -890,6 +894,42 @@ export const apiClient = {
       updates: { status?: string | null; hub_id?: string | null; scheduled_at?: string | null };
       apply_to_filtered: boolean;
     };
+  },
+
+  async exportBulkUpdateShipmentsPreviewCsv(payload: {
+    shipment_ids: string[];
+    apply_to_filtered?: boolean;
+    filter_status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    filter_hub_id?: string;
+    filter_q?: string;
+    filter_scheduled_from?: string;
+    filter_scheduled_to?: string;
+    status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    hub_id?: string;
+    scheduled_at?: string;
+    reason_code?: string;
+    reason_detail?: string;
+    reason?: string;
+  }): Promise<void> {
+    if (USE_MOCK) return;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/bulk-update/preview.csv`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const json = await response.json();
+      throw new Error(readApiErrorMessage(json, 'Cannot export bulk update preview'));
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'shipments_bulk_update_preview.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
   },
 
   async getShipmentDetail(id: string): Promise<ShipmentDetail> {

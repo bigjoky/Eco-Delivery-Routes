@@ -331,6 +331,70 @@ class ShipmentsHttpTest extends TestCase
         $this->assertSame('incident', $metadata['changes'][0]['changes']['status']['after'] ?? null);
     }
 
+    public function test_bulk_update_preview_csv_returns_file(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+        $hubId = (string) DB::table('hubs')->value('id');
+
+        DB::table('shipments')->insert([
+            'id' => (string) Str::uuid(),
+            'hub_id' => $hubId,
+            'reference' => 'SHP-PREVIEW-CSV-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Preview Csv',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v1/shipments/bulk-update/preview.csv', [
+            'apply_to_filtered' => true,
+            'filter_q' => 'SHP-PREVIEW-CSV',
+            'status' => 'incident',
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $response->assertSee('reference,status,hub_id', false);
+    }
+
+    public function test_bulk_update_audit_includes_reason_code_and_detail(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+        $hubId = (string) DB::table('hubs')->value('id');
+        $shipmentId = (string) Str::uuid();
+
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-AUDIT-REASON-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Audit Reason',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/shipments/bulk-update', [
+            'shipment_ids' => [$shipmentId],
+            'status' => 'incident',
+            'reason_code' => 'INCIDENT_CONTAINMENT',
+            'reason_detail' => 'Ajuste por bloqueo operativo',
+            'reason' => 'test audit reason metadata',
+        ])->assertOk();
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'shipments.bulk_updated')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) $audit->metadata, true);
+        $this->assertSame('INCIDENT_CONTAINMENT', $metadata['reason_code'] ?? null);
+        $this->assertSame('Ajuste por bloqueo operativo', $metadata['reason_detail'] ?? null);
+    }
+
     public function test_rejects_scheduled_at_outside_allowed_window(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

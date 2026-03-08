@@ -49,6 +49,14 @@ function serviceTypeLabel(value?: string | null) {
   return labels[value] ?? value;
 }
 
+const bulkShipmentReasonOptions = [
+  { code: 'REPLAN_OPERATION', label: 'Replanificación operativa' },
+  { code: 'CAPACITY_REBALANCE', label: 'Rebalanceo de capacidad' },
+  { code: 'INCIDENT_CONTAINMENT', label: 'Contención de incidencias' },
+  { code: 'ROUTE_OPTIMIZATION', label: 'Optimización de rutas' },
+  { code: 'OTHER', label: 'Otro motivo' },
+] as const;
+
 type ShipmentFiltersProps = {
   query: string;
   setQuery: (value: string) => void;
@@ -363,11 +371,14 @@ export function ShipmentsPage() {
   const [bulkScheduledAt, setBulkScheduledAt] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
+  const [bulkReasonCode, setBulkReasonCode] = useState<(typeof bulkShipmentReasonOptions)[number]['code']>('REPLAN_OPERATION');
+  const [bulkReasonDetail, setBulkReasonDetail] = useState('');
   const [bulkApplyToFiltered, setBulkApplyToFiltered] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [bulkPreviewing, setBulkPreviewing] = useState(false);
   const [bulkPreviewCount, setBulkPreviewCount] = useState<number | null>(null);
   const [bulkPreviewSample, setBulkPreviewSample] = useState<Array<{ id: string; reference: string; status: string }>>([]);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkError, setBulkError] = useState('');
   const [bulkMessage, setBulkMessage] = useState('');
   const [incidentCatalog, setIncidentCatalog] = useState<IncidentCatalogItem[]>([]);
@@ -1216,7 +1227,7 @@ export function ShipmentsPage() {
     setSelectedShipmentIds((current) => Array.from(new Set([...current, ...pageIds])));
   };
 
-  const applyBulkUpdate = async () => {
+  const runBulkUpdate = async () => {
     setBulkError('');
     setBulkMessage('');
     if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
@@ -1246,12 +1257,16 @@ export function ShipmentsPage() {
         ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
         ...(bulkHubId ? { hub_id: bulkHubId } : {}),
         ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+        reason_code: bulkReasonCode,
+        reason_detail: bulkReasonDetail.trim() || undefined,
         reason: bulkReason.trim(),
       });
       setBulkMessage(`Actualizados ${response.meta.updated_count} envios.`);
       await reload(meta.page || 1);
       setSelectedShipmentIds([]);
       setBulkReason('');
+      setBulkReasonDetail('');
+      setBulkConfirmOpen(false);
     } catch (exception) {
       setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar la actualizacion masiva');
     } finally {
@@ -1259,9 +1274,8 @@ export function ShipmentsPage() {
     }
   };
 
-  const previewBulkUpdate = async () => {
+  const applyBulkUpdate = async () => {
     setBulkError('');
-    setBulkMessage('');
     if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
       setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
       return;
@@ -1269,6 +1283,27 @@ export function ShipmentsPage() {
     if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
       setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
       return;
+    }
+    if (!bulkReason.trim()) {
+      setBulkError('Indica un motivo para auditoria.');
+      return;
+    }
+    const ok = await previewBulkUpdate();
+    if (ok) {
+      setBulkConfirmOpen(true);
+    }
+  };
+
+  const previewBulkUpdate = async (): Promise<boolean> => {
+    setBulkError('');
+    setBulkMessage('');
+    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
+      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
+      return false;
+    }
+    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
+      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
+      return false;
     }
     setBulkPreviewing(true);
     try {
@@ -1285,6 +1320,8 @@ export function ShipmentsPage() {
         ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
         ...(bulkHubId ? { hub_id: bulkHubId } : {}),
         ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+        reason_code: bulkReasonCode,
+        reason_detail: bulkReasonDetail.trim() || undefined,
         reason: bulkReason.trim() || undefined,
       });
       setBulkPreviewCount(preview.target_count);
@@ -1293,10 +1330,37 @@ export function ShipmentsPage() {
         reference: row.reference,
         status: row.status,
       })));
+      return true;
     } catch (exception) {
       setBulkError(exception instanceof Error ? exception.message : 'No se pudo previsualizar la actualización masiva');
+      return false;
     } finally {
       setBulkPreviewing(false);
+    }
+  };
+
+  const exportBulkPreviewCsv = async () => {
+    setBulkError('');
+    try {
+      await apiClient.exportBulkUpdateShipmentsPreviewCsv({
+        shipment_ids: bulkApplyToFiltered ? [] : selectedShipmentIds,
+        apply_to_filtered: bulkApplyToFiltered,
+        ...(bulkApplyToFiltered ? {
+          filter_status: status || undefined,
+          filter_hub_id: hubFilter || undefined,
+          filter_q: query || undefined,
+          filter_scheduled_from: scheduledFrom || undefined,
+          filter_scheduled_to: scheduledTo || undefined,
+        } : {}),
+        ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
+        ...(bulkHubId ? { hub_id: bulkHubId } : {}),
+        ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+        reason_code: bulkReasonCode,
+        reason_detail: bulkReasonDetail.trim() || undefined,
+        reason: bulkReason.trim() || undefined,
+      });
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo exportar preview CSV');
     }
   };
 
@@ -2195,6 +2259,32 @@ export function ShipmentsPage() {
           {incidentError ? <div className="helper error">{incidentError}</div> : null}
         </form>
       </Modal>
+      <Modal
+        open={bulkConfirmOpen}
+        onClose={() => setBulkConfirmOpen(false)}
+        title="Confirmar actualización masiva"
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setBulkConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={runBulkUpdate} disabled={bulkUpdating}>
+              {bulkUpdating ? 'Aplicando...' : 'Confirmar y aplicar'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="page-grid">
+          <div className="helper">
+            Se aplicarán cambios a {bulkPreviewCount ?? bulkTargetCount} envío(s). Motivo: {bulkReasonCode}
+            {bulkReasonDetail.trim() ? ` · ${bulkReasonDetail.trim()}` : ''}.
+          </div>
+          <div className="helper">Nota auditoría: {bulkReason}</div>
+          <div className="helper">
+            Muestra: {bulkPreviewSample.map((row) => `${row.reference}(${row.status})`).join(', ') || '-'}.
+          </div>
+        </div>
+      </Modal>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Envios</CardTitle>
@@ -2262,11 +2352,27 @@ export function ShipmentsPage() {
               onChange={(event) => setBulkReason(event.target.value)}
               placeholder="Ej: Replanificacion operativa"
             />
+            <label htmlFor="bulk-reason-code">Reason code</label>
+            <select id="bulk-reason-code" value={bulkReasonCode} onChange={(event) => setBulkReasonCode(event.target.value as (typeof bulkShipmentReasonOptions)[number]['code'])}>
+              {bulkShipmentReasonOptions.map((item) => (
+                <option key={item.code} value={item.code}>{item.label}</option>
+              ))}
+            </select>
+            <label htmlFor="bulk-reason-detail">Detalle</label>
+            <input
+              id="bulk-reason-detail"
+              value={bulkReasonDetail}
+              onChange={(event) => setBulkReasonDetail(event.target.value)}
+              placeholder="Detalle estructurado opcional"
+            />
             <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
               {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
             </Button>
             <Button type="button" variant="outline" onClick={previewBulkUpdate} disabled={bulkPreviewing}>
               {bulkPreviewing ? 'Previsualizando...' : 'Previsualizar'}
+            </Button>
+            <Button type="button" variant="outline" onClick={exportBulkPreviewCsv}>
+              Export preview CSV
             </Button>
           </div>
           <div className="helper">

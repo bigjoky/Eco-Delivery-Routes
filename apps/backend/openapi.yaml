@@ -1540,6 +1540,42 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { description: Validation error }
 
+  /shipments/bulk-update/preview:
+    post:
+      tags: [Shipments]
+      summary: Previsualizar actualizacion masiva de envios
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateShipmentsRequest'
+      responses:
+        '200': { description: OK }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
+  /shipments/bulk-update/preview.csv:
+    post:
+      tags: [Shipments]
+      summary: Exportar CSV de previsualizacion de actualizacion masiva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateShipmentsRequest'
+      responses:
+        '200':
+          description: CSV generado
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
   /contacts:
     get:
       tags: [Contacts]
@@ -3089,6 +3125,8 @@ components:
           enum: [created, out_for_delivery, delivered, incident]
         hub_id: { type: string, format: uuid }
         scheduled_at: { type: string, format: date-time }
+        reason_code: { type: string, maxLength: 80 }
+        reason_detail: { type: string, maxLength: 220 }
         reason: { type: string, maxLength: 220 }
     CreatePickupRequest:
       type: object

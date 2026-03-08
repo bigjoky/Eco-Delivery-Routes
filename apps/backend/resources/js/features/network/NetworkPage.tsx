@@ -1,11 +1,14 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { DepotSummary, HubSummary, PointSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
+
+type CreateType = '' | 'hub' | 'depot' | 'point';
 
 export function NetworkPage() {
   const [hubs, setHubs] = useState<HubSummary[]>([]);
@@ -18,33 +21,33 @@ export function NetworkPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [hubFilter, setHubFilter] = useState('');
   const [includeDeleted, setIncludeDeleted] = useState(false);
-
-  const [hubName, setHubName] = useState('');
-  const [hubCity, setHubCity] = useState('');
-
-  const [depotHubId, setDepotHubId] = useState('');
-  const [depotName, setDepotName] = useState('');
-  const [depotCity, setDepotCity] = useState('');
-
-  const [pointHubId, setPointHubId] = useState('');
-  const [pointDepotId, setPointDepotId] = useState('');
-  const [pointName, setPointName] = useState('');
-  const [pointCity, setPointCity] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [editingHubId, setEditingHubId] = useState('');
   const [editingHubName, setEditingHubName] = useState('');
   const [editingHubCity, setEditingHubCity] = useState('');
-
   const [editingDepotId, setEditingDepotId] = useState('');
   const [editingDepotName, setEditingDepotName] = useState('');
   const [editingDepotCity, setEditingDepotCity] = useState('');
-
   const [editingPointId, setEditingPointId] = useState('');
   const [editingPointName, setEditingPointName] = useState('');
   const [editingPointCity, setEditingPointCity] = useState('');
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createType, setCreateType] = useState<CreateType>('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createHubName, setCreateHubName] = useState('');
+  const [createHubCity, setCreateHubCity] = useState('');
+  const [createDepotHubId, setCreateDepotHubId] = useState('');
+  const [createDepotName, setCreateDepotName] = useState('');
+  const [createDepotCity, setCreateDepotCity] = useState('');
+  const [createPointHubId, setCreatePointHubId] = useState('');
+  const [createPointDepotId, setCreatePointDepotId] = useState('');
+  const [createPointName, setCreatePointName] = useState('');
+  const [createPointCity, setCreatePointCity] = useState('');
+
   const activeHubs = useMemo(() => hubs.filter((item) => item.is_active), [hubs]);
-  const depotsForPointHub = useMemo(() => depots.filter((item) => item.hub_id === pointHubId), [depots, pointHubId]);
+  const depotsForPointHub = useMemo(() => depots.filter((item) => item.hub_id === createPointHubId), [depots, createPointHubId]);
   const normalizedQuery = query.trim().toLowerCase();
 
   const load = async () => {
@@ -59,8 +62,8 @@ export function NetworkPage() {
       setHubs(hubRows);
       setDepots(depotRows);
       setPoints(pointRows);
-      if (!depotHubId && hubRows[0]?.id) setDepotHubId(hubRows[0].id);
-      if (!pointHubId && hubRows[0]?.id) setPointHubId(hubRows[0].id);
+      if (!createDepotHubId && hubRows[0]?.id) setCreateDepotHubId(hubRows[0].id);
+      if (!createPointHubId && hubRows[0]?.id) setCreatePointHubId(hubRows[0].id);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar red operativa.');
     } finally {
@@ -73,83 +76,87 @@ export function NetworkPage() {
   }, [includeDeleted]);
 
   useEffect(() => {
-    if (!pointHubId) {
-      setPointDepotId('');
+    if (!createPointHubId) {
+      setCreatePointDepotId('');
       return;
     }
-    const firstDepot = depots.find((item) => item.hub_id === pointHubId);
+    const firstDepot = depots.find((item) => item.hub_id === createPointHubId);
     if (!firstDepot) {
-      setPointDepotId('');
+      setCreatePointDepotId('');
       return;
     }
-    if (!pointDepotId || !depots.some((item) => item.id === pointDepotId && item.hub_id === pointHubId)) {
-      setPointDepotId(firstDepot.id);
+    if (!createPointDepotId || !depots.some((item) => item.id === createPointDepotId && item.hub_id === createPointHubId)) {
+      setCreatePointDepotId(firstDepot.id);
     }
-  }, [pointHubId, depots, pointDepotId]);
+  }, [createPointHubId, depots, createPointDepotId]);
 
-  const createHub = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!hubName.trim() || !hubCity.trim()) {
-      setError('Hub requiere nombre y ciudad.');
-      return;
-    }
-    setError('');
-    setMessage('');
-    try {
-      await apiClient.createHub({ name: hubName.trim(), city: hubCity.trim() });
-      setHubName('');
-      setHubCity('');
-      setMessage('Hub creado.');
-      await load();
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo crear hub.');
-    }
+  const resetCreateWizard = (nextType: CreateType = '') => {
+    setCreateType(nextType);
+    setCreateSaving(false);
+    setCreateHubName('');
+    setCreateHubCity('');
+    setCreateDepotName('');
+    setCreateDepotCity('');
+    setCreatePointName('');
+    setCreatePointCity('');
   };
 
-  const createDepot = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!depotHubId || !depotName.trim()) {
-      setError('Depot requiere hub y nombre.');
-      return;
-    }
-    setError('');
-    setMessage('');
-    try {
-      await apiClient.createDepot({
-        hub_id: depotHubId,
-        name: depotName.trim(),
-        city: depotCity.trim() || null,
-      });
-      setDepotName('');
-      setDepotCity('');
-      setMessage('Depot creado.');
-      await load();
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo crear depot.');
-    }
+  const openCreateWizard = (nextType: CreateType = '') => {
+    resetCreateWizard(nextType);
+    setCreateOpen(true);
   };
 
-  const createPoint = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!pointHubId || !pointName.trim()) {
-      setError('Punto requiere hub y nombre.');
-      return;
-    }
+  const closeCreateWizard = () => {
+    setCreateOpen(false);
+    setCreateSaving(false);
+  };
+
+  const submitCreateNode = async () => {
     setError('');
     setMessage('');
+    setCreateSaving(true);
     try {
-      await apiClient.createPoint({
-        hub_id: pointHubId,
-        depot_id: pointDepotId || null,
-        name: pointName.trim(),
-        city: pointCity.trim() || null,
-      });
-      setPointName('');
-      setPointCity('');
-      setMessage('Punto creado.');
+      if (createType === 'hub') {
+        if (!createHubName.trim() || !createHubCity.trim()) {
+          setError('Hub requiere nombre y ciudad.');
+          return;
+        }
+        await apiClient.createHub({ name: createHubName.trim(), city: createHubCity.trim() });
+        setMessage('Hub creado.');
+      } else if (createType === 'depot') {
+        if (!createDepotHubId || !createDepotName.trim()) {
+          setError('Depot requiere hub y nombre.');
+          return;
+        }
+        await apiClient.createDepot({
+          hub_id: createDepotHubId,
+          name: createDepotName.trim(),
+          city: createDepotCity.trim() || null,
+        });
+        setMessage('Depot creado.');
+      } else if (createType === 'point') {
+        if (!createPointHubId || !createPointName.trim()) {
+          setError('Punto requiere hub y nombre.');
+          return;
+        }
+        await apiClient.createPoint({
+          hub_id: createPointHubId,
+          depot_id: createPointDepotId || null,
+          name: createPointName.trim(),
+          city: createPointCity.trim() || null,
+        });
+        setMessage('Punto creado.');
+      } else {
+        setError('Selecciona qué tipo de nodo deseas crear.');
+        return;
+      }
+
+      closeCreateWizard();
       await load();
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'No se pudo crear punto.');
+      setError(createError instanceof Error ? createError.message : 'No se pudo crear nodo.');
+    } finally {
+      setCreateSaving(false);
     }
   };
 
@@ -325,150 +332,169 @@ export function NetworkPage() {
 
   return (
     <div className="page-grid">
+      <Modal
+        open={createOpen}
+        onClose={closeCreateWizard}
+        title="Crear nodo de red"
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={closeCreateWizard}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={submitCreateNode} disabled={createSaving}>
+              {createSaving ? 'Creando...' : 'Crear'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="page-grid">
+          <div className="helper">1) Selecciona tipo de nodo</div>
+          <div className="inline-actions">
+            <Button type="button" variant={createType === 'hub' ? 'secondary' : 'outline'} onClick={() => setCreateType('hub')}>Hub</Button>
+            <Button type="button" variant={createType === 'depot' ? 'secondary' : 'outline'} onClick={() => setCreateType('depot')}>Depot</Button>
+            <Button type="button" variant={createType === 'point' ? 'secondary' : 'outline'} onClick={() => setCreateType('point')}>Punto</Button>
+          </div>
+          {createType === 'hub' ? (
+            <div className="form-row">
+              <div>
+                <label htmlFor="create-node-hub-name">Nombre</label>
+                <Input id="create-node-hub-name" value={createHubName} onChange={(event) => setCreateHubName(event.target.value)} placeholder="Hub Malaga Este" />
+              </div>
+              <div>
+                <label htmlFor="create-node-hub-city">Ciudad</label>
+                <Input id="create-node-hub-city" value={createHubCity} onChange={(event) => setCreateHubCity(event.target.value)} placeholder="Malaga" />
+              </div>
+            </div>
+          ) : null}
+          {createType === 'depot' ? (
+            <div className="form-row">
+              <div>
+                <label htmlFor="create-node-depot-hub">Hub</label>
+                <Select id="create-node-depot-hub" value={createDepotHubId} onChange={(event) => setCreateDepotHubId(event.target.value)}>
+                  <option value="">Selecciona hub</option>
+                  {activeHubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="create-node-depot-name">Nombre</label>
+                <Input id="create-node-depot-name" value={createDepotName} onChange={(event) => setCreateDepotName(event.target.value)} placeholder="Depot Centro" />
+              </div>
+              <div>
+                <label htmlFor="create-node-depot-city">Ciudad</label>
+                <Input id="create-node-depot-city" value={createDepotCity} onChange={(event) => setCreateDepotCity(event.target.value)} placeholder="Malaga" />
+              </div>
+            </div>
+          ) : null}
+          {createType === 'point' ? (
+            <div className="form-row">
+              <div>
+                <label htmlFor="create-node-point-hub">Hub</label>
+                <Select id="create-node-point-hub" value={createPointHubId} onChange={(event) => setCreatePointHubId(event.target.value)}>
+                  <option value="">Selecciona hub</option>
+                  {activeHubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="create-node-point-depot">Depot</label>
+                <Select id="create-node-point-depot" value={createPointDepotId} onChange={(event) => setCreatePointDepotId(event.target.value)}>
+                  <option value="">Sin depot</option>
+                  {depotsForPointHub.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="create-node-point-name">Nombre</label>
+                <Input id="create-node-point-name" value={createPointName} onChange={(event) => setCreatePointName(event.target.value)} placeholder="Punto Zona Norte" />
+              </div>
+              <div>
+                <label htmlFor="create-node-point-city">Ciudad</label>
+                <Input id="create-node-point-city" value={createPointCity} onChange={(event) => setCreatePointCity(event.target.value)} placeholder="Malaga" />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+
       <div className="page-header">
         <h1 className="page-title">Red operativa</h1>
         <div className="page-subtitle">Gestiona hubs, depots y puntos con numeración propia automática.</div>
       </div>
 
       <div className="inline-actions">
+        <Button type="button" className="btn btn-default" onClick={() => openCreateWizard()}>+ Crear</Button>
+        <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
+          {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
+        </Button>
         <Button type="button" className="btn btn-outline" onClick={load} disabled={loading}>{loading ? 'Cargando...' : 'Recargar'}</Button>
       </div>
       {message ? <div className="helper">{message}</div> : null}
-      {error ? <div className="helper">{error}</div> : null}
+      {error ? <div className="helper error">{error}</div> : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Filtros de red operativa</CardTitle>
+          <CardTitle>Crear nodos rápidamente</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="form-row">
-            <div>
-              <label htmlFor="network-query">Buscar</label>
-              <Input
-                id="network-query"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="codigo, nombre o ciudad"
-              />
-            </div>
-            <div>
-              <label htmlFor="network-status">Estado</label>
-              <Select id="network-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
-                <option value="all">Todos</option>
-                <option value="active">Activos</option>
-                <option value="inactive">Inactivos</option>
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="network-hub-filter">Hub</label>
-              <Select id="network-hub-filter" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
-                <option value="">Todos</option>
-                {hubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="network-include-deleted">Archivados</label>
-              <Select
-                id="network-include-deleted"
-                value={includeDeleted ? '1' : '0'}
-                onChange={(event) => setIncludeDeleted(event.target.value === '1')}
-              >
-                <option value="0">Ocultar archivados</option>
-                <option value="1">Mostrar archivados</option>
-              </Select>
-            </div>
+          <div className="inline-actions">
+            <Button type="button" variant="outline" onClick={() => openCreateWizard('hub')}>Nuevo Hub</Button>
+            <Button type="button" variant="outline" onClick={() => openCreateWizard('depot')}>Nuevo Depot</Button>
+            <Button type="button" variant="outline" onClick={() => openCreateWizard('point')}>Nuevo Punto</Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Crear hub</CardTitle>
+          <CardTitle>Resumen de red</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="form-row" onSubmit={createHub}>
-            <div>
-              <label htmlFor="hub-name">Nombre</label>
-              <Input id="hub-name" value={hubName} onChange={(event) => setHubName(event.target.value)} placeholder="Hub Malaga Este" />
-            </div>
-            <div>
-              <label htmlFor="hub-city">Ciudad</label>
-              <Input id="hub-city" value={hubCity} onChange={(event) => setHubCity(event.target.value)} placeholder="Malaga" />
-            </div>
-            <div>
-              <Button type="submit">Crear hub</Button>
-            </div>
-          </form>
+          <div className="kpi-grid">
+            <div className="kpi-item"><div className="kpi-label">Hubs</div><div className="kpi-value">{hubs.length}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Depots</div><div className="kpi-value">{depots.length}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Puntos</div><div className="kpi-value">{points.length}</div></div>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear depot</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="form-row" onSubmit={createDepot}>
-            <div>
-              <label htmlFor="depot-hub">Hub</label>
-              <Select id="depot-hub" value={depotHubId} onChange={(event) => setDepotHubId(event.target.value)}>
-                <option value="">Selecciona hub</option>
-                {activeHubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
-              </Select>
+      {showFilters ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros de red operativa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="form-row">
+              <div>
+                <label htmlFor="network-query">Buscar</label>
+                <Input id="network-query" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="codigo, nombre o ciudad" />
+              </div>
+              <div>
+                <label htmlFor="network-status">Estado</label>
+                <Select id="network-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}>
+                  <option value="all">Todos</option>
+                  <option value="active">Activos</option>
+                  <option value="inactive">Inactivos</option>
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="network-hub-filter">Hub</label>
+                <Select id="network-hub-filter" value={hubFilter} onChange={(event) => setHubFilter(event.target.value)}>
+                  <option value="">Todos</option>
+                  {hubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                </Select>
+              </div>
+              <div>
+                <label htmlFor="network-include-deleted">Archivados</label>
+                <Select id="network-include-deleted" value={includeDeleted ? '1' : '0'} onChange={(event) => setIncludeDeleted(event.target.value === '1')}>
+                  <option value="0">Ocultar archivados</option>
+                  <option value="1">Mostrar archivados</option>
+                </Select>
+              </div>
             </div>
-            <div>
-              <label htmlFor="depot-name">Nombre</label>
-              <Input id="depot-name" value={depotName} onChange={(event) => setDepotName(event.target.value)} placeholder="Depot Centro" />
-            </div>
-            <div>
-              <label htmlFor="depot-city">Ciudad</label>
-              <Input id="depot-city" value={depotCity} onChange={(event) => setDepotCity(event.target.value)} placeholder="Malaga" />
-            </div>
-            <div>
-              <Button type="submit">Crear depot</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Crear punto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="form-row" onSubmit={createPoint}>
-            <div>
-              <label htmlFor="point-hub">Hub</label>
-              <Select id="point-hub" value={pointHubId} onChange={(event) => setPointHubId(event.target.value)}>
-                <option value="">Selecciona hub</option>
-                {activeHubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="point-depot">Depot</label>
-              <Select id="point-depot" value={pointDepotId} onChange={(event) => setPointDepotId(event.target.value)}>
-                <option value="">Sin depot</option>
-                {depotsForPointHub.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <label htmlFor="point-name">Nombre</label>
-              <Input id="point-name" value={pointName} onChange={(event) => setPointName(event.target.value)} placeholder="Punto Zona Norte" />
-            </div>
-            <div>
-              <label htmlFor="point-city">Ciudad</label>
-              <Input id="point-city" value={pointCity} onChange={(event) => setPointCity(event.target.value)} placeholder="Malaga" />
-            </div>
-            <div>
-              <Button type="submit">Crear punto</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Hubs</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Hubs</CardTitle></CardHeader>
         <CardContent>
           <TableWrapper>
             <Table>
@@ -489,13 +515,13 @@ export function NetworkPage() {
                     <TableCell>
                       <div className="inline-actions">
                         {item.deleted_at
-                          ? <Button type="button" className="btn btn-outline" onClick={() => restoreHub(item)}>Restaurar</Button>
+                          ? <Button type="button" variant="outline" onClick={() => restoreHub(item)}>Restaurar</Button>
                           : (
                             <>
                               {editingHubId === item.id
-                                ? <Button type="button" className="btn btn-outline" onClick={saveHub}>Guardar</Button>
-                                : <Button type="button" className="btn btn-outline" onClick={() => startEditHub(item)}>Editar</Button>}
-                              <Button type="button" className="btn btn-outline" onClick={() => removeHub(item)}>Archivar</Button>
+                                ? <Button type="button" variant="outline" onClick={saveHub}>Guardar</Button>
+                                : <Button type="button" variant="outline" onClick={() => startEditHub(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => removeHub(item)}>Archivar</Button>
                             </>
                           )}
                       </div>
@@ -509,9 +535,7 @@ export function NetworkPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Depots</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Depots</CardTitle></CardHeader>
         <CardContent>
           <TableWrapper>
             <Table>
@@ -534,13 +558,13 @@ export function NetworkPage() {
                     <TableCell>
                       <div className="inline-actions">
                         {item.deleted_at
-                          ? <Button type="button" className="btn btn-outline" onClick={() => restoreDepot(item)}>Restaurar</Button>
+                          ? <Button type="button" variant="outline" onClick={() => restoreDepot(item)}>Restaurar</Button>
                           : (
                             <>
                               {editingDepotId === item.id
-                                ? <Button type="button" className="btn btn-outline" onClick={saveDepot}>Guardar</Button>
-                                : <Button type="button" className="btn btn-outline" onClick={() => startEditDepot(item)}>Editar</Button>}
-                              <Button type="button" className="btn btn-outline" onClick={() => removeDepot(item)}>Archivar</Button>
+                                ? <Button type="button" variant="outline" onClick={saveDepot}>Guardar</Button>
+                                : <Button type="button" variant="outline" onClick={() => startEditDepot(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => removeDepot(item)}>Archivar</Button>
                             </>
                           )}
                       </div>
@@ -554,9 +578,7 @@ export function NetworkPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Puntos</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Puntos</CardTitle></CardHeader>
         <CardContent>
           <TableWrapper>
             <Table>
@@ -581,13 +603,13 @@ export function NetworkPage() {
                     <TableCell>
                       <div className="inline-actions">
                         {item.deleted_at
-                          ? <Button type="button" className="btn btn-outline" onClick={() => restorePoint(item)}>Restaurar</Button>
+                          ? <Button type="button" variant="outline" onClick={() => restorePoint(item)}>Restaurar</Button>
                           : (
                             <>
                               {editingPointId === item.id
-                                ? <Button type="button" className="btn btn-outline" onClick={savePoint}>Guardar</Button>
-                                : <Button type="button" className="btn btn-outline" onClick={() => startEditPoint(item)}>Editar</Button>}
-                              <Button type="button" className="btn btn-outline" onClick={() => removePoint(item)}>Archivar</Button>
+                                ? <Button type="button" variant="outline" onClick={savePoint}>Guardar</Button>
+                                : <Button type="button" variant="outline" onClick={() => startEditPoint(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => removePoint(item)}>Archivar</Button>
                             </>
                           )}
                       </div>
