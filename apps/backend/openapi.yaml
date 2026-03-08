@@ -2745,6 +2745,29 @@ paths:
       responses:
         '200': { description: OK }
 
+  /incidents/{id}:
+    patch:
+      tags: [Incidents]
+      summary: Editar incidencia (catalogo/categoria/notas)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                catalog_code: { type: string }
+                category: { type: string, enum: [failed, absent, retry, general] }
+                notes: { type: string, nullable: true }
+      responses:
+        '200': { description: OK }
+        '404': { description: Incident not found }
+
   /incidents/{id}/resolve:
     patch:
       tags: [Incidents]

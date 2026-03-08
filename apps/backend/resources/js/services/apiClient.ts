@@ -2302,6 +2302,28 @@ export const apiClient = {
     return data.data as IncidentSummary;
   },
 
+  async updateIncident(
+    id: string,
+    payload: {
+      catalog_code?: string;
+      category?: 'failed' | 'absent' | 'retry' | 'general';
+      notes?: string | null;
+    }
+  ): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.updateIncident(id, payload) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot update incident');
+    return data.data as IncidentSummary;
+  },
+
   async resolveIncident(
     id: string,
     payload?: string | {

@@ -53,6 +53,16 @@ export function RoutesPage() {
   const [publishPolicyCriticalCodes, setPublishPolicyCriticalCodes] = useState<string[]>(['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY']);
   const [publishPolicyBypassRoles, setPublishPolicyBypassRoles] = useState('super_admin');
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedRouteIds, setSelectedRouteIds] = useState<string[]>([]);
+  const [bulkSubcontractorId, setBulkSubcontractorId] = useState('');
+  const [bulkDriverId, setBulkDriverId] = useState('');
+  const [bulkVehicleId, setBulkVehicleId] = useState('');
+  const [bulkSetUnassigned, setBulkSetUnassigned] = useState(false);
+  const [bulkPreviewWarnings, setBulkPreviewWarnings] = useState<string[]>([]);
+  const [bulkPreviewConflicts, setBulkPreviewConflicts] = useState<string[]>([]);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState('');
+  const [bulkError, setBulkError] = useState('');
 
   const routeSummary = useMemo(() => {
     const counts = items.reduce((acc, item) => {
@@ -191,12 +201,22 @@ export function RoutesPage() {
       .finally(() => setPublishPolicyLoading(false));
   }, []);
 
+  useEffect(() => {
+    setSelectedRouteIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
+
   const filteredDrivers = createSubcontractorId
     ? drivers.filter((item) => !item.subcontractor_id || item.subcontractor_id === createSubcontractorId)
     : drivers;
 
   const filteredVehicles = createSubcontractorId
     ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === createSubcontractorId)
+    : vehicles;
+  const bulkDrivers = bulkSubcontractorId
+    ? drivers.filter((item) => !item.subcontractor_id || item.subcontractor_id === bulkSubcontractorId)
+    : drivers;
+  const bulkVehicles = bulkSubcontractorId
+    ? vehicles.filter((item) => !item.subcontractor_id || item.subcontractor_id === bulkSubcontractorId)
     : vehicles;
   const selectedCreateVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
   const estimatedLoadKg = Math.max(0, Number(estimatedShipmentsCount) || 0) * Math.max(0, Number(estimatedAvgWeightKg) || 0);
@@ -355,6 +375,87 @@ export function RoutesPage() {
     setDateFrom('');
     setDateTo('');
     setMeta((current) => ({ ...current, page: 1 }));
+  };
+
+  const toggleRouteSelection = (routeId: string) => {
+    setSelectedRouteIds((current) => (
+      current.includes(routeId)
+        ? current.filter((id) => id !== routeId)
+        : [...current, routeId]
+    ));
+  };
+
+  const toggleSelectCurrentPage = () => {
+    const pageIds = items.map((item) => item.id);
+    setSelectedRouteIds((current) => {
+      const allSelected = pageIds.every((id) => current.includes(id));
+      if (allSelected) return current.filter((id) => !pageIds.includes(id));
+      return Array.from(new Set([...current, ...pageIds]));
+    });
+  };
+
+  const previewBulkAssignment = async () => {
+    setBulkError('');
+    setBulkMessage('');
+    if (selectedRouteIds.length === 0) {
+      setBulkError('Selecciona al menos una ruta.');
+      return;
+    }
+    if (!bulkSetUnassigned && !bulkSubcontractorId && !bulkDriverId && !bulkVehicleId) {
+      setBulkError('Define una asignación o marca "dejar sin asignar".');
+      return;
+    }
+    try {
+      const preview = await apiClient.previewRouteAssignment({
+        subcontractor_id: bulkSetUnassigned ? null : (bulkSubcontractorId || null),
+        driver_id: bulkSetUnassigned ? null : (bulkDriverId || null),
+        vehicle_id: bulkSetUnassigned ? null : (bulkVehicleId || null),
+      });
+      setBulkPreviewConflicts(preview.conflicts.map((item) => item.message));
+      setBulkPreviewWarnings((preview.warnings ?? []).map((item) => item.message));
+      if (!preview.valid) {
+        setBulkError('La combinación seleccionada tiene conflictos de asignación.');
+        return;
+      }
+      setBulkMessage(`Preview OK para ${selectedRouteIds.length} ruta(s).`);
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo previsualizar la asignación masiva');
+    }
+  };
+
+  const applyBulkAssignment = async () => {
+    setBulkError('');
+    setBulkMessage('');
+    if (selectedRouteIds.length === 0) {
+      setBulkError('Selecciona al menos una ruta.');
+      return;
+    }
+    if (!bulkSetUnassigned && !bulkSubcontractorId && !bulkDriverId && !bulkVehicleId) {
+      setBulkError('Define una asignación o marca "dejar sin asignar".');
+      return;
+    }
+    try {
+      setBulkUpdating(true);
+      const payload = bulkSetUnassigned
+        ? { subcontractor_id: null, driver_id: null, vehicle_id: null }
+        : {
+          subcontractor_id: bulkSubcontractorId || null,
+          driver_id: bulkDriverId || null,
+          vehicle_id: bulkVehicleId || null,
+        };
+
+      for (const routeId of selectedRouteIds) {
+        await apiClient.updateRoute(routeId, payload);
+      }
+
+      setBulkMessage(`Asignación masiva aplicada sobre ${selectedRouteIds.length} ruta(s).`);
+      setSelectedRouteIds([]);
+      await reload(meta.page);
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar la asignación masiva');
+    } finally {
+      setBulkUpdating(false);
+    }
   };
 
   return (
@@ -579,6 +680,77 @@ export function RoutesPage() {
               <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
             ) : null}
           </div>
+          <div className="filters-panel">
+            <div className="inline-actions">
+              <span className="helper">Reasignación masiva</span>
+              <span className="helper">{selectedRouteIds.length} seleccionada(s)</span>
+            </div>
+            <div className="form-row">
+              <div>
+                <label htmlFor="routes-bulk-subcontractor">Subcontrata</label>
+                <select
+                  id="routes-bulk-subcontractor"
+                  value={bulkSubcontractorId}
+                  onChange={(event) => setBulkSubcontractorId(event.target.value)}
+                  disabled={bulkSetUnassigned}
+                >
+                  <option value="">Sin cambio</option>
+                  {subcontractors.map((item) => (
+                    <option key={item.id} value={item.id}>{item.legal_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="routes-bulk-driver">Conductor</label>
+                <select
+                  id="routes-bulk-driver"
+                  value={bulkDriverId}
+                  onChange={(event) => setBulkDriverId(event.target.value)}
+                  disabled={bulkSetUnassigned}
+                >
+                  <option value="">Sin cambio</option>
+                  {bulkDrivers.map((item) => (
+                    <option key={item.id} value={item.id}>{item.code} - {item.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="routes-bulk-vehicle">Vehículo</label>
+                <select
+                  id="routes-bulk-vehicle"
+                  value={bulkVehicleId}
+                  onChange={(event) => setBulkVehicleId(event.target.value)}
+                  disabled={bulkSetUnassigned}
+                >
+                  <option value="">Sin cambio</option>
+                  {bulkVehicles.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.code} {item.plate_number ? `(${item.plate_number})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="inline-actions">
+              <label htmlFor="routes-bulk-unassigned">Dejar sin asignar</label>
+              <input
+                id="routes-bulk-unassigned"
+                type="checkbox"
+                checked={bulkSetUnassigned}
+                onChange={(event) => setBulkSetUnassigned(event.target.checked)}
+              />
+              <Button type="button" variant="outline" onClick={previewBulkAssignment} disabled={bulkUpdating}>
+                Previsualizar
+              </Button>
+              <Button type="button" onClick={applyBulkAssignment} disabled={bulkUpdating}>
+                {bulkUpdating ? 'Aplicando...' : 'Aplicar asignación masiva'}
+              </Button>
+            </div>
+            {bulkPreviewConflicts.length > 0 ? <div className="helper error">{bulkPreviewConflicts.join(' ')}</div> : null}
+            {bulkPreviewWarnings.length > 0 ? <div className="helper">{bulkPreviewWarnings.join(' ')}</div> : null}
+            {bulkError ? <div className="helper error">{bulkError}</div> : null}
+            {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}
+          </div>
           {showFilters ? (
             <div className="filters-panel">
               <div className="form-row">
@@ -664,6 +836,13 @@ export function RoutesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>
+                    <input
+                      type="checkbox"
+                      checked={items.length > 0 && items.every((item) => selectedRouteIds.includes(item.id))}
+                      onChange={toggleSelectCurrentPage}
+                    />
+                  </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Estado</TableHead>
@@ -675,6 +854,13 @@ export function RoutesPage() {
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedRouteIds.includes(item.id)}
+                        onChange={() => toggleRouteSelection(item.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Link to={`/routes/${item.id}`}>{item.code}</Link>
                       <div className="helper">ID: {item.id}</div>
@@ -692,7 +878,7 @@ export function RoutesPage() {
                 ))}
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>Sin rutas para los filtros seleccionados.</TableCell>
+                    <TableCell colSpan={7}>Sin rutas para los filtros seleccionados.</TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>

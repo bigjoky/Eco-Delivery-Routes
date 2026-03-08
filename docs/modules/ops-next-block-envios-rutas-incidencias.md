@@ -56,6 +56,7 @@
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).
 - Asignación inteligente de ruta (sugerencia automática subcontrata/conductor/vehículo válida con preview de conflictos).
+- Reasignación masiva desde listado de rutas (selección múltiple + previsualización + aplicar en lote).
 
 3. Incidencias
 - Presets operativos de filtros (`SLA vencido`, `alta prioridad`, `solo pickups`).
@@ -63,6 +64,7 @@
 - Previsualización de impacto en cierre masivo y override SLA (volumen estimado + resumen de cambios).
 - Navegación cruzada con envíos: desde incidencia a envío y desde envío a incidencias del envío.
 - Override SLA masivo oculto por defecto detrás de toggle para reducir ruido visual.
+- Edición rápida desde detalle de envío (catálogo/categoría/notas) + alta rápida contextual.
 
 4. UI
 - Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).

@@ -2933,6 +2933,28 @@ export const mockApi = {
     return item;
   },
 
+  async updateIncident(
+    id: string,
+    payload: {
+      catalog_code?: string;
+      category?: 'failed' | 'absent' | 'retry' | 'general';
+      notes?: string | null;
+    }
+  ) {
+    const target = mockIncidents.find((item) => item.id === id);
+    if (!target) {
+      throw new Error('Incident not found');
+    }
+    const updated = {
+      ...target,
+      catalog_code: payload.catalog_code ?? target.catalog_code,
+      category: payload.category ?? target.category,
+      notes: payload.notes !== undefined ? payload.notes : target.notes,
+    };
+    mockIncidents = mockIncidents.map((item) => (item.id === id ? updated : item));
+    return updated;
+  },
+
   async resolveIncident(id: string, notes?: string) {
     const now = new Date().toISOString();
     const target = mockIncidents.find((item) => item.id === id);

@@ -223,6 +223,43 @@ class IncidentHttpTest extends TestCase
         $this->assertSame('low', $row->priority_override);
     }
 
+    public function test_incident_can_be_updated_from_detail_flow(): void
+    {
+        $shipmentCatalog = DB::table('incident_catalog_versions as versions')
+            ->join('incident_catalog_items as items', 'items.version_id', '=', 'versions.id')
+            ->where('versions.is_active', true)
+            ->where('items.is_active', true)
+            ->whereIn('items.applies_to', ['shipment', 'both'])
+            ->select('items.code', 'items.category')
+            ->orderBy('items.code')
+            ->first();
+        $this->assertNotNull($shipmentCatalog);
+
+        $incidentId = (string) $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'editable incident',
+        ])->assertCreated()->json('data.id');
+
+        $updated = $this->patchJson('/api/v1/incidents/' . $incidentId, [
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'updated from shipment detail',
+        ]);
+        $updated->assertOk();
+        $updated->assertJsonPath('data.notes', 'updated from shipment detail');
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'incidents.updated')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) $audit->metadata, true);
+        $this->assertSame($incidentId, $metadata['incident_id'] ?? null);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

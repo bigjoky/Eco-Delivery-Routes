@@ -141,6 +141,7 @@ Route::prefix('v1')->group(function () {
         Route::get('incidents/board', [IncidentController::class, 'board']);
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
+        Route::patch('incidents/{id}', [IncidentController::class, 'update']);
         Route::post('incidents/resolve-bulk', [IncidentController::class, 'resolveBulk']);
         Route::post('incidents/override-sla-bulk', [IncidentController::class, 'overrideSlaBulk']);
         Route::patch('incidents/{id}/resolve', [IncidentController::class, 'resolve']);

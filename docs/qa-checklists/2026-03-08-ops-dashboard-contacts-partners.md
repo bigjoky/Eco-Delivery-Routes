@@ -35,6 +35,14 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Desde una incidencia, usar `Ref. envío` y validar filtro en listado de envíos.
 - [ ] Desde un envío, abrir `Ver incidencias` y validar filtro por `incidentable_id`.
 - [ ] Validar que `Override SLA masivo` está oculto por defecto y se despliega con toggle.
+- [ ] Desde detalle de envío, crear incidencia en modal y validar aparición inmediata en tabla.
+- [ ] Desde detalle de envío, editar incidencia abierta en modal y validar persistencia.
+
+## Rutas (reasignación masiva)
+
+- [ ] Seleccionar varias rutas en listado y previsualizar reasignación.
+- [ ] Aplicar reasignación masiva (subcontrata/conductor/vehículo) y validar resultados.
+- [ ] Probar opción `Dejar sin asignar` y validar que limpia asignaciones.
 
 ## Verificaciones técnicas
 

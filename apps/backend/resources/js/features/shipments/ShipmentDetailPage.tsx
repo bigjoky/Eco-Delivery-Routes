@@ -4,8 +4,11 @@ import { EntityActivityTimeline } from '../../components/audit/EntityActivityTim
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
+import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { ShipmentDetail } from '../../core/api/types';
+import { IncidentCatalogItem, IncidentSummary, ShipmentDetail } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
@@ -46,6 +49,16 @@ export function ShipmentDetailPage() {
   const [error, setError] = useState('');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [showAudit, setShowAudit] = useState(false);
+  const [incidentCatalog, setIncidentCatalog] = useState<IncidentCatalogItem[]>([]);
+  const [newIncidentOpen, setNewIncidentOpen] = useState(false);
+  const [newIncidentCode, setNewIncidentCode] = useState('');
+  const [newIncidentCategory, setNewIncidentCategory] = useState<'failed' | 'absent' | 'retry' | 'general'>('general');
+  const [newIncidentNotes, setNewIncidentNotes] = useState('');
+  const [editingIncident, setEditingIncident] = useState<IncidentSummary | null>(null);
+  const [editIncidentCode, setEditIncidentCode] = useState('');
+  const [editIncidentCategory, setEditIncidentCategory] = useState<'failed' | 'absent' | 'retry' | 'general'>('general');
+  const [editIncidentNotes, setEditIncidentNotes] = useState('');
+  const [incidentSaving, setIncidentSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -65,6 +78,16 @@ export function ShipmentDetailPage() {
     load();
   }, [id]);
 
+  useEffect(() => {
+    apiClient.getIncidentCatalog().then((items) => {
+      setIncidentCatalog(items);
+      if (!newIncidentCode && items.length > 0) {
+        setNewIncidentCode(items[0].code);
+        setNewIncidentCategory(items[0].category);
+      }
+    }).catch(() => setIncidentCatalog([]));
+  }, []);
+
   const shipment = detail?.shipment;
 
   const resolveIncident = async (incidentId: string) => {
@@ -79,6 +102,58 @@ export function ShipmentDetailPage() {
       setError(exception instanceof Error ? exception.message : 'No se pudo resolver la incidencia');
     } finally {
       setResolvingId(null);
+    }
+  };
+
+  const shipmentIncidentCatalog = incidentCatalog.filter((item) => item.applies_to === 'shipment' || item.applies_to === 'both');
+
+  const createIncidentFromDetail = async () => {
+    if (!id || !newIncidentCode) return;
+    setIncidentSaving(true);
+    setError('');
+    try {
+      await apiClient.createIncident({
+        incidentable_type: 'shipment',
+        incidentable_id: id,
+        catalog_code: newIncidentCode,
+        category: newIncidentCategory,
+        notes: newIncidentNotes || undefined,
+      });
+      setNewIncidentNotes('');
+      setNewIncidentOpen(false);
+      const refreshed = await apiClient.getShipmentDetail(id);
+      setDetail(refreshed);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo crear la incidencia');
+    } finally {
+      setIncidentSaving(false);
+    }
+  };
+
+  const openEditIncident = (incident: IncidentSummary) => {
+    setEditingIncident(incident);
+    setEditIncidentCode(incident.catalog_code);
+    setEditIncidentCategory(incident.category);
+    setEditIncidentNotes(incident.notes ?? '');
+  };
+
+  const saveEditIncident = async () => {
+    if (!id || !editingIncident) return;
+    setIncidentSaving(true);
+    setError('');
+    try {
+      await apiClient.updateIncident(editingIncident.id, {
+        catalog_code: editIncidentCode,
+        category: editIncidentCategory,
+        notes: editIncidentNotes,
+      });
+      setEditingIncident(null);
+      const refreshed = await apiClient.getShipmentDetail(id);
+      setDetail(refreshed);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la incidencia');
+    } finally {
+      setIncidentSaving(false);
     }
   };
 
@@ -212,6 +287,11 @@ export function ShipmentDetailPage() {
           <CardTitle className="page-title">Incidencias</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="inline-actions">
+            <Button type="button" onClick={() => setNewIncidentOpen(true)}>
+              Nueva incidencia
+            </Button>
+          </div>
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -236,14 +316,23 @@ export function ShipmentDetailPage() {
                       {incident.resolved_at ? (
                         <span className="helper">Resuelta</span>
                       ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={resolvingId === incident.id}
-                          onClick={() => resolveIncident(incident.id)}
-                        >
-                          {resolvingId === incident.id ? 'Resolviendo...' : 'Resolver'}
-                        </Button>
+                        <div className="inline-actions">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => openEditIncident(incident)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={resolvingId === incident.id}
+                            onClick={() => resolveIncident(incident.id)}
+                          >
+                            {resolvingId === incident.id ? 'Resolviendo...' : 'Resolver'}
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -316,6 +405,90 @@ export function ShipmentDetailPage() {
           eventPrefix="shipments."
         />
       ) : null}
+      <Modal
+        open={newIncidentOpen}
+        title="Nueva incidencia del envío"
+        onClose={() => setNewIncidentOpen(false)}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setNewIncidentOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={createIncidentFromDetail} disabled={incidentSaving || !newIncidentCode}>
+              {incidentSaving ? 'Guardando...' : 'Crear incidencia'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="form-row">
+          <div>
+            <label htmlFor="detail-incident-catalog">Catálogo</label>
+            <Select
+              id="detail-incident-catalog"
+              value={newIncidentCode}
+              onChange={(event) => {
+                const selected = shipmentIncidentCatalog.find((item) => item.code === event.target.value);
+                setNewIncidentCode(event.target.value);
+                if (selected) setNewIncidentCategory(selected.category);
+              }}
+            >
+              {shipmentIncidentCatalog.map((item) => (
+                <option key={item.code} value={item.code}>{item.code} - {item.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label htmlFor="detail-incident-category">Categoría</label>
+            <Input id="detail-incident-category" value={newIncidentCategory} readOnly />
+          </div>
+          <div>
+            <label htmlFor="detail-incident-notes">Notas</label>
+            <Input id="detail-incident-notes" value={newIncidentNotes} onChange={(event) => setNewIncidentNotes(event.target.value)} placeholder="Detalle operativo" />
+          </div>
+        </div>
+      </Modal>
+      <Modal
+        open={editingIncident !== null}
+        title="Editar incidencia"
+        onClose={() => setEditingIncident(null)}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setEditingIncident(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={saveEditIncident} disabled={incidentSaving || !editingIncident}>
+              {incidentSaving ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="form-row">
+          <div>
+            <label htmlFor="detail-incident-edit-catalog">Catálogo</label>
+            <Select
+              id="detail-incident-edit-catalog"
+              value={editIncidentCode}
+              onChange={(event) => {
+                const selected = shipmentIncidentCatalog.find((item) => item.code === event.target.value);
+                setEditIncidentCode(event.target.value);
+                if (selected) setEditIncidentCategory(selected.category);
+              }}
+            >
+              {shipmentIncidentCatalog.map((item) => (
+                <option key={item.code} value={item.code}>{item.code} - {item.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label htmlFor="detail-incident-edit-category">Categoría</label>
+            <Input id="detail-incident-edit-category" value={editIncidentCategory} readOnly />
+          </div>
+          <div>
+            <label htmlFor="detail-incident-edit-notes">Notas</label>
+            <Input id="detail-incident-edit-notes" value={editIncidentNotes} onChange={(event) => setEditIncidentNotes(event.target.value)} placeholder="Detalle operativo" />
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 }

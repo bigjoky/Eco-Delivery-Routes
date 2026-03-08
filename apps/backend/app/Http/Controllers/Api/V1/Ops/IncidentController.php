@@ -247,6 +247,81 @@ class IncidentController extends Controller
         return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);
     }
 
+    public function update(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.write')) {
+            return $this->forbidden();
+        }
+
+        $incident = DB::table('incidents')->where('id', $id)->first();
+        if (!$incident) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Incident not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'catalog_code' => ['nullable', 'string', 'max:80'],
+            'category' => ['nullable', 'in:failed,absent,retry,general'],
+            'notes' => ['nullable', 'string'],
+        ]);
+        if ($payload === []) {
+            return response()->json(['data' => $incident]);
+        }
+
+        $nextCatalogCode = array_key_exists('catalog_code', $payload) ? $payload['catalog_code'] : $incident->catalog_code;
+        $nextCategory = array_key_exists('category', $payload) ? $payload['category'] : $incident->category;
+        if ($nextCatalogCode !== $incident->catalog_code || $nextCategory !== $incident->category) {
+            $activeVersionId = DB::table('incident_catalog_versions')
+                ->where('is_active', true)
+                ->orderByDesc('active_from')
+                ->value('id');
+            if (!$activeVersionId) {
+                return response()->json([
+                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Active incident catalog not configured.'],
+                ], 422);
+            }
+
+            $catalogItem = DB::table('incident_catalog_items')
+                ->where('version_id', $activeVersionId)
+                ->where('code', $nextCatalogCode)
+                ->where('is_active', true)
+                ->first();
+            if (!$catalogItem) {
+                return response()->json([
+                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Invalid incident catalog code.'],
+                ], 422);
+            }
+            if ($catalogItem->category !== $nextCategory) {
+                return response()->json([
+                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Incident category does not match catalog code.'],
+                ], 422);
+            }
+            if ($catalogItem->applies_to !== 'both' && $catalogItem->applies_to !== $incident->incidentable_type) {
+                return response()->json([
+                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Catalog code not applicable to target type.'],
+                ], 422);
+            }
+        }
+
+        DB::table('incidents')->where('id', $id)->update([
+            'catalog_code' => $nextCatalogCode,
+            'category' => $nextCategory,
+            'notes' => array_key_exists('notes', $payload) ? $payload['notes'] : DB::raw('notes'),
+            'updated_at' => now(),
+        ]);
+        $this->auditLogWriter->write($actor->id, 'incidents.updated', [
+            'incident_id' => $id,
+            'catalog_code' => $nextCatalogCode,
+            'category' => $nextCategory,
+            'notes_updated' => array_key_exists('notes', $payload),
+        ]);
+
+        return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);
+    }
+
     public function resolveBulk(Request $request): JsonResponse
     {
         /** @var User $actor */
