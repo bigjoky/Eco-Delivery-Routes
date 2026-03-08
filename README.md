@@ -51,6 +51,15 @@ Base del sistema web/PWA de **Eco Delivery Routes**.
   - YAML: `http://127.0.0.1:8000/openapi.yaml`
   - Swagger UI: `http://127.0.0.1:8000/api-docs`
 
+## Bootstrap RBAC + Superadmin
+
+- Sincronizar roles/permisos:
+  - `cd apps/backend && php artisan app:rbac:sync`
+- Crear/actualizar superadministrador (permisos absolutos):
+  - `cd apps/backend && php artisan app:super-admin --email=tu@email.com --name=\"Super Administrador\" --password=\"TuPasswordSeguro123!\" --force-password`
+- También puedes configurar por `.env`:
+  - `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`
+
 ## Checklist CI sugerido
 
 - Backend: `./vendor/bin/phpunit` en `apps/backend`.
