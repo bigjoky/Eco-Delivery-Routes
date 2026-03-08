@@ -325,6 +325,10 @@ export function IncidentsPage() {
         selectedIncidentIds,
         composedNotes,
         {
+          code: bulkResolveReasonCode,
+          detail: bulkResolveReasonDetail.trim() || undefined,
+        },
+        {
           applyToFiltered: bulkScope === 'filtered',
           filters: bulkScope === 'filtered' ? {
             incidentableType: listTypeFilter || undefined,

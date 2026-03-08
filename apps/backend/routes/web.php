@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Symfony\Component\Yaml\Yaml;
 
 Route::get('/', function () {
     return redirect()->route('dashboard');
@@ -20,6 +21,22 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::middleware('api.docs.access')->group(function () {
+    Route::get('/openapi.json', function () {
+        $path = base_path('openapi.yaml');
+        abort_unless(File::exists($path), 404);
+
+        $parsed = Yaml::parseFile($path);
+        if (!is_array($parsed)) {
+            abort(500, 'Invalid OpenAPI document.');
+        }
+
+        return response()->json($parsed, 200, [
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
+    });
+
     Route::get('/openapi.yaml', function () {
         $path = base_path('openapi.yaml');
         abort_unless(File::exists($path), 404);

@@ -25,7 +25,11 @@
       const specVersion = "{{ filemtime(base_path('openapi.yaml')) }}";
       const noCacheTs = Date.now();
       window.ui = SwaggerUIBundle({
-        url: `/openapi.yaml?v=${specVersion}&ts=${noCacheTs}`,
+        url: `/openapi.json?v=${specVersion}&ts=${noCacheTs}`,
+        urls: [
+          { url: `/openapi.json?v=${specVersion}&ts=${noCacheTs}`, name: 'OpenAPI JSON (server-side)' },
+          { url: `/openapi.yaml?v=${specVersion}&ts=${noCacheTs}`, name: 'OpenAPI YAML' },
+        ],
         dom_id: '#swagger-ui',
         deepLinking: true,
         displayRequestDuration: true,

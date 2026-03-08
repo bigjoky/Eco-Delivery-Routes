@@ -1,11 +1,11 @@
 :root {
   --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-muted: #f1f5f9;
+  --surface-muted: #f5f7fb;
   --text: #0f172a;
   --muted: #64748b;
   --border: #e2e8f0;
-  --ring: #0f172a;
+  --ring: #1e293b;
   --primary: #0f172a;
   --primary-contrast: #ffffff;
   --secondary: #111827;
@@ -23,7 +23,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 a {
@@ -34,7 +34,7 @@ a {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 264px 1fr;
   gap: 0;
 }
 
@@ -52,9 +52,9 @@ a {
 }
 
 .app-sidebar {
-  background: var(--surface);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-right: 1px solid var(--border);
-  padding: 18px 16px;
+  padding: 18px 14px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -90,22 +90,25 @@ a {
 }
 
 .sidebar-link {
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: 10px;
-  border: 1px solid transparent;
+  border: 1px solid #e9eef5;
   color: #0f172a;
   font-size: 13px;
   font-weight: 600;
+  transition: all 120ms ease;
 }
 
 .sidebar-link:hover {
-  background: #f1f5f9;
+  background: #eef2f8;
+  border-color: #dce5f0;
 }
 
 .sidebar-link-active {
-  background: #0f172a;
+  background: linear-gradient(180deg, #1f2937 0%, #0f172a 100%);
   border-color: #0f172a;
   color: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
 }
 
 .sidebar-footer {
@@ -117,7 +120,7 @@ a {
   background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px;
+  padding: 11px;
 }
 
 .sidebar-user-name {
@@ -147,6 +150,12 @@ a {
   padding: 5px 8px;
   font-size: 12px;
   font-weight: 600;
+  transition: all 120ms ease;
+}
+
+.sidebar-user-link:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
 }
 
 .sidebar-user-button {
@@ -163,9 +172,13 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
 
 .topbar-title {
@@ -186,8 +199,8 @@ a {
 
 .app-main {
   display: grid;
-  gap: 12px;
-  padding: 20px 22px 32px;
+  gap: 14px;
+  padding: 20px 22px 28px;
 }
 
 .page-title {
@@ -216,16 +229,16 @@ a {
 
 .form-row {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   align-items: start;
 }
 
 .inline-actions {
-  display: grid;
+  display: flex;
   gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  align-items: end;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 label {
@@ -236,10 +249,10 @@ label {
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--surface);
   padding: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
 .card-header {
@@ -278,7 +291,7 @@ label {
 }
 
 .btn {
-  height: 36px;
+  height: 37px;
   padding: 0 14px;
   border-radius: 10px;
   border: 1px solid transparent;
@@ -318,12 +331,22 @@ label {
 
 .input,
 .select {
-  height: 36px;
+  height: 37px;
   width: 100%;
   padding: 0 10px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: #fff;
+}
+
+textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
 }
 
 .input,
@@ -343,7 +366,8 @@ label {
 }
 
 .input:focus,
-.select:focus {
+.select:focus,
+textarea:focus {
   outline: 2px solid color-mix(in srgb, var(--ring), white 70%);
   outline-offset: 1px;
 }
@@ -438,6 +462,7 @@ label {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
+  background: #fff;
 }
 
 .table {
@@ -449,16 +474,19 @@ label {
 
 .table-head {
   text-align: left;
-  padding: 10px;
+  padding: 11px 10px;
   font-size: 12px;
   color: var(--muted);
   background: var(--surface-muted);
   border-bottom: 1px solid var(--border);
   font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .table-cell {
-  padding: 10px;
+  padding: 11px 10px;
   border-bottom: 1px solid #eef2f7;
   font-size: 14px;
   vertical-align: top;
@@ -479,10 +507,10 @@ label {
 }
 
 .kpi-item {
-  border: 1px dashed var(--border);
+  border: 1px dashed #d5deea;
   border-radius: 10px;
   padding: 10px;
-  background: var(--surface-muted);
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-muted) 100%);
 }
 
 .kpi-label {
@@ -499,10 +527,12 @@ label {
 .helper {
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.45;
 }
 
 .helper.error {
   color: var(--danger);
+  font-weight: 600;
 }
 
 .table-actions {
@@ -550,6 +580,12 @@ label {
   padding: 12px;
   display: grid;
   gap: 6px;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.dashboard-alert-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
 .dashboard-alert-top {
@@ -599,7 +635,6 @@ label {
   background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
 }
 
-
 @media (max-width: 720px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -626,6 +661,10 @@ label {
 
   .dashboard-header {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-actions {
     align-items: stretch;
   }
 }

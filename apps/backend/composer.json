@@ -8,7 +8,8 @@
     "inertiajs/inertia-laravel": "^2.0",
     "barryvdh/laravel-dompdf": "^3.1",
     "laravel/breeze": "^2.3",
-    "tightenco/ziggy": "^2.0"
+    "tightenco/ziggy": "^2.0",
+    "symfony/yaml": "^7.2"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.0",

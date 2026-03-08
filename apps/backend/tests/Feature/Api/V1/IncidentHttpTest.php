@@ -108,10 +108,15 @@ class IncidentHttpTest extends TestCase
         $response = $this->postJson('/api/v1/incidents/resolve-bulk', [
             'incident_ids' => [$openOne, $openTwo],
             'notes' => 'resolved from bulk',
+            'reason_code' => 'DATA_CORRECTION',
+            'reason_detail' => 'ajuste operativo',
         ]);
         $response->assertOk();
         $response->assertJsonPath('data.requested_count', 2);
         $response->assertJsonPath('data.updated_count', 1);
+        $row = DB::table('incidents')->where('id', $openOne)->first();
+        $this->assertSame('DATA_CORRECTION', $row->resolution_reason_code);
+        $this->assertSame('ajuste operativo', $row->resolution_reason_detail);
     }
 
     public function test_incidents_bulk_resolve_apply_to_filtered_works(): void

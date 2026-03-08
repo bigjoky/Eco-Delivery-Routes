@@ -16,6 +16,7 @@ class ApiDocsAccessTest extends TestCase
     {
         $this->get('/api-docs')->assertForbidden();
         $this->get('/openapi.yaml')->assertForbidden();
+        $this->get('/openapi.json')->assertForbidden();
     }
 
     public function test_non_admin_user_cannot_access_api_docs(): void
@@ -25,6 +26,7 @@ class ApiDocsAccessTest extends TestCase
 
         $this->get('/api-docs')->assertForbidden();
         $this->get('/openapi.yaml')->assertForbidden();
+        $this->get('/openapi.json')->assertForbidden();
     }
 
     public function test_super_admin_can_access_api_docs(): void
@@ -49,5 +51,6 @@ class ApiDocsAccessTest extends TestCase
 
         $this->get('/api-docs')->assertOk();
         $this->get('/openapi.yaml')->assertOk();
+        $this->get('/openapi.json')->assertOk();
     }
 }

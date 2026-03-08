@@ -2098,6 +2098,10 @@ export const apiClient = {
   async resolveIncidentsBulk(
     ids: string[],
     notes?: string,
+    reason?: {
+      code?: string;
+      detail?: string;
+    },
     options?: {
       applyToFiltered?: boolean;
       filters?: {
@@ -2122,6 +2126,8 @@ export const apiClient = {
       body: JSON.stringify({
         incident_ids: ids,
         notes,
+        reason_code: reason?.code,
+        reason_detail: reason?.detail,
         apply_to_filtered: options?.applyToFiltered ? true : false,
         filters: options?.filters ? {
           incidentable_type: options.filters.incidentableType,
