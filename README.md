@@ -1,20 +1,17 @@
 # Eco Delivery Routes Monorepo
 
-Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
+Base del sistema web/PWA de **Eco Delivery Routes**.
 
 ## Estructura
 
-- `apps/backend`: backend API (Laravel-style) + pruebas.
-- `apps/web`: cliente web React starter.
-- `apps/apple`: apps nativas Apple (`macOS`, `iOS/iPadOS`, `tvOS`) y núcleo compartido.
-- `apps/android`: app Android nativa (Kotlin + Compose).
+- `apps/backend`: backend Laravel + frontend React (Inertia) + PWA.
 - `docs`: ADRs, definición de módulos y arquitectura.
 - `.github/workflows`: CI inicial.
 
 ## Estrategia técnica inicial
 
 - Repositorio: **monorepo modular**.
-- API: REST versionada (`/api/v1`).
+- API: REST versionada (`/api/v1`) + capa web con Inertia.
 - Seguridad: autenticación token + RBAC + auditoría.
 - Módulo inicial MVP: **Autenticación + Usuarios + Roles**.
 
@@ -40,8 +37,36 @@ Base inicial del sistema multiplataforma de **Eco Delivery Routes**.
 - Ejecutar desde la raiz:
   - `./scripts/verify_release_envios_rutas.sh`
 
+## Desarrollo local
+
+- Backend/API + Web Inertia (2 terminales):
+  - `cd apps/backend && php artisan serve`
+  - `cd apps/backend && npm run dev`
+- Flujo web:
+  - `http://127.0.0.1:8000/login` (Starter Kit)
+  - `http://127.0.0.1:8000/register` (Starter Kit)
+  - `http://127.0.0.1:8000/dashboard` (Starter Kit)
+  - `http://127.0.0.1:8000/ops` (operativa envios/rutas/incidencias)
+- OpenAPI:
+  - YAML: `http://127.0.0.1:8000/openapi.yaml`
+  - Swagger UI: `http://127.0.0.1:8000/api-docs`
+
+## Bootstrap RBAC + Superadmin
+
+- Sincronizar roles/permisos:
+  - `cd apps/backend && php artisan app:rbac:sync`
+- Crear/actualizar superadministrador (permisos absolutos):
+  - `cd apps/backend && php artisan app:super-admin --email=tu@email.com --name=\"Super Administrador\" --password=\"TuPasswordSeguro123!\" --force-password`
+- También puedes configurar por `.env`:
+  - `SUPER_ADMIN_NAME`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`
+
+## Troubleshooting DB
+
+- Si aparece `SQLSTATE[HY000]: no such column: remember_token`:
+  - `cd apps/backend && php artisan migrate --force`
+
 ## Checklist CI sugerido
 
 - Backend: `./vendor/bin/phpunit` en `apps/backend`.
-- Web unit: `npm test` en `apps/web`.
-- Web e2e: `npm run e2e` en `apps/web`.
+- Web unit: `npm test` en `apps/backend`.
+- Web build/PWA: `npm run build` en `apps/backend`.

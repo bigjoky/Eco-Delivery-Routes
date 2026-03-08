@@ -10,12 +10,17 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
+        $email = (string) env('SUPER_ADMIN_EMAIL', 'admin@eco.local');
+        $name = (string) env('SUPER_ADMIN_NAME', 'Super Admin');
+        $password = (string) env('SUPER_ADMIN_PASSWORD', 'ChangeMe123!');
+
         $user = User::query()->updateOrCreate(
-            ['email' => 'admin@eco.local'],
+            ['email' => $email],
             [
-                'name' => 'Super Admin',
-                'password' => 'password123',
+                'name' => $name,
+                'password' => $password,
                 'status' => 'active',
+                'email_verified_at' => now(),
             ]
         );
 
