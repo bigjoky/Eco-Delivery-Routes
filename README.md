@@ -42,6 +42,11 @@ Base del sistema web/PWA de **Eco Delivery Routes**.
 - Backend/API + Web Inertia (2 terminales):
   - `cd apps/backend && php artisan serve`
   - `cd apps/backend && npm run dev`
+- Flujo web:
+  - `http://127.0.0.1:8000/login` (Starter Kit)
+  - `http://127.0.0.1:8000/register` (Starter Kit)
+  - `http://127.0.0.1:8000/dashboard` (Starter Kit)
+  - `http://127.0.0.1:8000/ops` (operativa envios/rutas/incidencias)
 - OpenAPI:
   - YAML: `http://127.0.0.1:8000/openapi.yaml`
   - Swagger UI: `http://127.0.0.1:8000/api-docs`

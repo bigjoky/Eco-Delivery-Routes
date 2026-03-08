@@ -1,8 +1,23 @@
 <?php
 
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\File;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+Route::get('/', function () {
+    return redirect()->route('dashboard');
+});
+
+Route::get('/dashboard', function () {
+    return Inertia::render('Dashboard');
+})->middleware(['auth'])->name('dashboard');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
 
 Route::get('/openapi.yaml', function () {
     $path = base_path('openapi.yaml');
@@ -13,8 +28,12 @@ Route::get('/openapi.yaml', function () {
     ]);
 });
 
-Route::view('/api-docs', 'api-docs');
+Route::middleware('api.docs.access')->group(function () {
+    Route::view('/api-docs', 'api-docs')->name('api.docs');
+});
 
-Route::get('/{any?}', function () {
+Route::get('/ops/{any?}', function () {
     return Inertia::render('AppShellPage');
-})->where('any', '^(?!api).*$');
+})->where('any', '.*');
+
+require __DIR__.'/auth.php';
