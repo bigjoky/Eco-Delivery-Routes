@@ -55,6 +55,7 @@ export function DashboardPage() {
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,26 +121,9 @@ export function DashboardPage() {
             <option value="7d">Últimos 7 días</option>
             <option value="30d">Últimos 30 días</option>
           </select>
-          <select className="select" value={hubId} onChange={(event) => setHubId(event.target.value)}>
-            <option value="">Todos los hubs</option>
-            {hubs.map((hub) => (
-              <option key={hub.id} value={hub.id}>{hub.code} · {hub.name}</option>
-            ))}
-          </select>
-          <select className="select" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
-            <option value="">Todas las subcontratas</option>
-            {subcontractors.map((partner) => (
-              <option key={partner.id} value={partner.id}>{partner.legal_name}</option>
-            ))}
-          </select>
-          <select
-            className="select"
-            value={autoRefresh ? 'on' : 'off'}
-            onChange={(event) => setAutoRefresh(event.target.value === 'on')}
-          >
-            <option value="on">Auto-refresh 60s</option>
-            <option value="off">Sin auto-refresh</option>
-          </select>
+          <Button type="button" variant="outline" onClick={() => setShowFilters((value) => !value)}>
+            {showFilters ? 'Ocultar filtros' : 'Filtros'}
+          </Button>
           <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar'}</Button>
           <Button
             type="button"
@@ -166,6 +150,40 @@ export function DashboardPage() {
         </div>
       </header>
 
+      {showFilters && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Filtros de visualización</CardTitle>
+            <CardDescription>Acota por hub/subcontrata y comportamiento de auto-refresh.</CardDescription>
+          </CardHeader>
+          <CardContent className="dashboard-filters-grid">
+            <select className="select" value={hubId} onChange={(event) => setHubId(event.target.value)}>
+              <option value="">Todos los hubs</option>
+              {hubs.map((hub) => (
+                <option key={hub.id} value={hub.id}>{hub.code} · {hub.name}</option>
+              ))}
+            </select>
+            <select className="select" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
+              <option value="">Todas las subcontratas</option>
+              {subcontractors.map((partner) => (
+                <option key={partner.id} value={partner.id}>{partner.legal_name}</option>
+              ))}
+            </select>
+            <select
+              className="select"
+              value={autoRefresh ? 'on' : 'off'}
+              onChange={(event) => setAutoRefresh(event.target.value === 'on')}
+            >
+              <option value="on">Auto-refresh 60s</option>
+              <option value="off">Sin auto-refresh</option>
+            </select>
+            <Button type="button" variant="outline" onClick={() => { setHubId(''); setSubcontractorId(''); }}>
+              Limpiar filtros
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {overview.alerts.length > 0 && (
         <div className="dashboard-alert-grid">
           {overview.alerts.map((alert) => (
@@ -181,47 +199,47 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="page-grid four">
-        <Card>
+      <div className="page-grid four dashboard-kpi-grid">
+        <Card className="dashboard-kpi-card">
           <CardHeader>
             <CardDescription>Envíos</CardDescription>
             <CardTitle>{overview.totals.shipments}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="dashboard-kpi-content">
             <div className="helper">Created: {overview.shipments_by_status.created}</div>
             <div className="helper">Out: {overview.shipments_by_status.out_for_delivery}</div>
             <div className="helper">Delivered: {overview.shipments_by_status.delivered}</div>
             <TrendBars values={shipmentTrendValues} max={maxShipmentTrend} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="dashboard-kpi-card">
           <CardHeader>
             <CardDescription>Rutas</CardDescription>
             <CardTitle>{overview.totals.routes}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="dashboard-kpi-content">
             <div className="helper">Planned: {overview.routes_by_status.planned}</div>
             <div className="helper">In progress: {overview.routes_by_status.in_progress}</div>
             <div className="helper">Completed: {overview.routes_by_status.completed}</div>
             <TrendBars values={routeTrendValues} max={maxRouteTrend} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="dashboard-kpi-card">
           <CardHeader>
             <CardDescription>Incidencias abiertas</CardDescription>
             <CardTitle>{overview.totals.incidents_open}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="dashboard-kpi-content">
             <Link className="helper" to="/incidents?resolved=open">Ver incidencias abiertas</Link>
             <TrendBars values={incidentTrendValues} max={maxIncidentTrend} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="dashboard-kpi-card">
           <CardHeader>
             <CardDescription>Calidad por ruta</CardDescription>
             <CardTitle>{overview.quality.route_avg.toFixed(2)}%</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="dashboard-kpi-content">
             <Badge variant={routeQualityVariant}>Umbral {overview.totals.quality_threshold.toFixed(2)}%</Badge>
             <div className="helper">Rutas bajo umbral: {overview.quality.below_threshold_routes}</div>
             <TrendBars values={qualityTrendValues} max={maxQualityTrend} />

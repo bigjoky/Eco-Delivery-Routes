@@ -54,62 +54,7 @@ class IncidentController extends Controller
             return $this->forbidden();
         }
 
-        $query = DB::table('incidents')
-            ->leftJoin('shipments', function ($join) {
-                $join->on('shipments.id', '=', 'incidents.incidentable_id')
-                    ->where('incidents.incidentable_type', '=', 'shipment');
-            })
-            ->orderByDesc('incidents.created_at');
-
-        foreach (['incidentable_type', 'incidentable_id', 'category', 'catalog_code'] as $field) {
-            $value = $request->query($field);
-            if (is_string($value) && $value !== '') {
-                $query->where($field, $value);
-            }
-        }
-
-        $search = $request->query('q');
-        if (is_string($search) && $search !== '') {
-            $like = '%' . str_replace('%', '\\%', $search) . '%';
-            $query->where(function ($inner) use ($like): void {
-                $inner->where('incidents.reference', 'like', $like)
-                    ->orWhere('incidents.incidentable_id', 'like', $like)
-                    ->orWhere('incidents.notes', 'like', $like)
-                    ->orWhere('incidents.catalog_code', 'like', $like)
-                    ->orWhere('shipments.reference', 'like', $like);
-            });
-        }
-
-        $resolved = $request->query('resolved');
-        if (is_string($resolved) && $resolved !== '') {
-            if (in_array(strtolower($resolved), ['1', 'true', 'resolved'], true)) {
-                $query->whereNotNull('resolved_at');
-            }
-            if (in_array(strtolower($resolved), ['0', 'false', 'open'], true)) {
-                $query->whereNull('resolved_at');
-            }
-        }
-
-        $allRows = $query->get([
-                'incidents.*',
-                'shipments.reference as shipment_reference',
-            ]);
-        $rows = $allRows->map(function ($row) {
-            $meta = $this->incidentSlaMeta($row);
-            $row->priority = $meta['priority'];
-            $row->sla_due_at = $meta['sla_due_at'];
-            $row->sla_status = $meta['sla_status'];
-            return $row;
-        });
-
-        $priority = $request->query('priority');
-        if (is_string($priority) && in_array($priority, ['high', 'medium', 'low'], true)) {
-            $rows = $rows->filter(fn ($row) => $row->priority === $priority)->values();
-        }
-        $slaStatus = $request->query('sla_status');
-        if (is_string($slaStatus) && in_array($slaStatus, ['on_track', 'at_risk', 'breached', 'resolved'], true)) {
-            $rows = $rows->filter(fn ($row) => $row->sla_status === $slaStatus)->values();
-        }
+        $rows = $this->filteredIncidentRows($request);
 
         $perPage = (int) $request->query('per_page', 20);
         $perPage = max(1, min($perPage, 100));
@@ -147,7 +92,7 @@ class IncidentController extends Controller
             $query->where('category', $category);
         }
 
-        $rows = $query->get(['id', 'category', 'created_at', 'resolved_at']);
+        $rows = $query->get(['id', 'category', 'priority_override', 'created_at', 'resolved_at', 'sla_due_at_override']);
         $openRows = $rows->filter(fn ($row) => $row->resolved_at === null);
         $priorityRows = $openRows->map(function ($row) {
             $meta = $this->incidentSlaMeta($row);
@@ -296,12 +241,25 @@ class IncidentController extends Controller
         }
 
         $payload = $request->validate([
-            'incident_ids' => ['required', 'array', 'min:1', 'max:200'],
+            'incident_ids' => ['nullable', 'array', 'min:1', 'max:200'],
             'incident_ids.*' => ['uuid'],
+            'apply_to_filtered' => ['nullable', 'boolean'],
+            'filters' => ['nullable', 'array'],
+            'filters.incidentable_type' => ['nullable', 'in:shipment,pickup'],
+            'filters.incidentable_id' => ['nullable', 'uuid'],
+            'filters.category' => ['nullable', 'in:failed,absent,retry,general'],
+            'filters.catalog_code' => ['nullable', 'string', 'max:80'],
+            'filters.q' => ['nullable', 'string', 'max:120'],
+            'filters.priority' => ['nullable', 'in:high,medium,low'],
+            'filters.sla_status' => ['nullable', 'in:on_track,at_risk,breached,resolved'],
+            'filters.resolved' => ['nullable', 'in:open,resolved,0,1'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $ids = array_values(array_unique(array_map('strval', $payload['incident_ids'] ?? [])));
+        $applyToFiltered = (bool) ($payload['apply_to_filtered'] ?? false);
+        $ids = $applyToFiltered
+            ? $this->collectIncidentIdsForFilter((array) ($payload['filters'] ?? []), true)
+            : array_values(array_unique(array_map('strval', $payload['incident_ids'] ?? [])));
         if ($ids === []) {
             return response()->json([
                 'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'incident_ids cannot be empty.'],
@@ -325,6 +283,118 @@ class IncidentController extends Controller
         ]);
     }
 
+    public function overrideSla(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'priority' => ['nullable', 'in:high,medium,low'],
+            'sla_due_at' => ['nullable', 'date'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+        if (!array_key_exists('priority', $payload) && !array_key_exists('sla_due_at', $payload)) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'priority or sla_due_at is required.'],
+            ], 422);
+        }
+
+        $exists = DB::table('incidents')->where('id', $id)->exists();
+        if (!$exists) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Incident not found.'],
+            ], 404);
+        }
+
+        DB::table('incidents')->where('id', $id)->update([
+            'priority_override' => $payload['priority'] ?? DB::raw('priority_override'),
+            'sla_due_at_override' => array_key_exists('sla_due_at', $payload) ? $payload['sla_due_at'] : DB::raw('sla_due_at_override'),
+            'updated_at' => now(),
+        ]);
+
+        Log::info('ops.incident.sla_overridden', [
+            'actor_user_id' => $actor->id,
+            'incident_id' => $id,
+            'priority' => $payload['priority'] ?? null,
+            'sla_due_at' => $payload['sla_due_at'] ?? null,
+            'reason' => $payload['reason'],
+        ]);
+
+        return response()->json(['data' => DB::table('incidents')->where('id', $id)->first()]);
+    }
+
+    public function overrideSlaBulk(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $request->validate([
+            'incident_ids' => ['nullable', 'array', 'min:1', 'max:200'],
+            'incident_ids.*' => ['uuid'],
+            'apply_to_filtered' => ['nullable', 'boolean'],
+            'filters' => ['nullable', 'array'],
+            'filters.incidentable_type' => ['nullable', 'in:shipment,pickup'],
+            'filters.incidentable_id' => ['nullable', 'uuid'],
+            'filters.category' => ['nullable', 'in:failed,absent,retry,general'],
+            'filters.catalog_code' => ['nullable', 'string', 'max:80'],
+            'filters.q' => ['nullable', 'string', 'max:120'],
+            'filters.priority' => ['nullable', 'in:high,medium,low'],
+            'filters.sla_status' => ['nullable', 'in:on_track,at_risk,breached,resolved'],
+            'filters.resolved' => ['nullable', 'in:open,resolved,0,1'],
+            'priority' => ['nullable', 'in:high,medium,low'],
+            'sla_due_at' => ['nullable', 'date'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+        if (!array_key_exists('priority', $payload) && !array_key_exists('sla_due_at', $payload)) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'priority or sla_due_at is required.'],
+            ], 422);
+        }
+
+        $applyToFiltered = (bool) ($payload['apply_to_filtered'] ?? false);
+        $ids = $applyToFiltered
+            ? $this->collectIncidentIdsForFilter((array) ($payload['filters'] ?? []), false)
+            : array_values(array_unique(array_map('strval', $payload['incident_ids'] ?? [])));
+        if ($ids === []) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'incident_ids cannot be empty.'],
+            ], 422);
+        }
+
+        $updatePayload = ['updated_at' => now()];
+        if (array_key_exists('priority', $payload)) {
+            $updatePayload['priority_override'] = $payload['priority'];
+        }
+        if (array_key_exists('sla_due_at', $payload)) {
+            $updatePayload['sla_due_at_override'] = $payload['sla_due_at'];
+        }
+
+        $updated = DB::table('incidents')->whereIn('id', $ids)->update($updatePayload);
+
+        Log::info('ops.incident.sla_overridden.bulk', [
+            'actor_user_id' => $actor->id,
+            'requested_count' => count($ids),
+            'updated_count' => (int) $updated,
+            'priority' => $payload['priority'] ?? null,
+            'sla_due_at' => $payload['sla_due_at'] ?? null,
+            'reason' => $payload['reason'],
+            'apply_to_filtered' => $applyToFiltered,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'requested_count' => count($ids),
+                'updated_count' => (int) $updated,
+            ],
+        ]);
+    }
+
     private function forbidden(): JsonResponse
     {
         return response()->json([
@@ -337,18 +407,30 @@ class IncidentController extends Controller
      */
     private function incidentSlaMeta(object $row): array
     {
-        $priority = match ((string) ($row->category ?? 'general')) {
-            'failed' => 'high',
-            'absent', 'retry' => 'medium',
-            default => 'low',
-        };
-        $slaHours = match ($priority) {
-            'high' => 4,
-            'medium' => 8,
-            default => 24,
-        };
-        $createdAt = strtotime((string) $row->created_at) ?: time();
-        $dueAt = $createdAt + ($slaHours * 3600);
+        $priority = (string) ($row->priority_override ?? '');
+        if ($priority === '') {
+            $priority = match ((string) ($row->category ?? 'general')) {
+                'failed' => 'high',
+                'absent', 'retry' => 'medium',
+                default => 'low',
+            };
+        }
+
+        $dueAt = null;
+        $slaOverride = isset($row->sla_due_at_override) ? (string) $row->sla_due_at_override : '';
+        if ($slaOverride !== '') {
+            $dueAt = strtotime($slaOverride) ?: null;
+        }
+        if ($dueAt === null) {
+            $slaHours = match ($priority) {
+                'high' => 4,
+                'medium' => 8,
+                default => 24,
+            };
+            $createdAt = strtotime((string) $row->created_at) ?: time();
+            $dueAt = $createdAt + ($slaHours * 3600);
+        }
+
         $now = time();
         $slaStatus = 'on_track';
         if (!empty($row->resolved_at)) {
@@ -364,5 +446,96 @@ class IncidentController extends Controller
             'sla_due_at' => date(DATE_ATOM, $dueAt),
             'sla_status' => $slaStatus,
         ];
+    }
+
+    private function filteredIncidentRows(Request $request)
+    {
+        $query = $this->buildIncidentsBaseQuery($request)
+            ->orderByDesc('incidents.created_at');
+
+        $allRows = $query->get([
+            'incidents.*',
+            'shipments.reference as shipment_reference',
+        ]);
+
+        $rows = $allRows->map(function ($row) {
+            $meta = $this->incidentSlaMeta($row);
+            $row->priority = $meta['priority'];
+            $row->sla_due_at = $meta['sla_due_at'];
+            $row->sla_status = $meta['sla_status'];
+            return $row;
+        });
+
+        $priority = $request->query('priority');
+        if (is_string($priority) && in_array($priority, ['high', 'medium', 'low'], true)) {
+            $rows = $rows->filter(fn ($row) => $row->priority === $priority)->values();
+        }
+
+        $slaStatus = $request->query('sla_status');
+        if (is_string($slaStatus) && in_array($slaStatus, ['on_track', 'at_risk', 'breached', 'resolved'], true)) {
+            $rows = $rows->filter(fn ($row) => $row->sla_status === $slaStatus)->values();
+        }
+
+        return $rows;
+    }
+
+    private function buildIncidentsBaseQuery(Request $request)
+    {
+        $query = DB::table('incidents')
+            ->leftJoin('shipments', function ($join) {
+                $join->on('shipments.id', '=', 'incidents.incidentable_id')
+                    ->where('incidents.incidentable_type', '=', 'shipment');
+            });
+
+        foreach (['incidentable_type', 'incidentable_id', 'category', 'catalog_code'] as $field) {
+            $value = $request->query($field);
+            if (is_string($value) && $value !== '') {
+                $query->where($field, $value);
+            }
+        }
+
+        $search = $request->query('q');
+        if (is_string($search) && $search !== '') {
+            $like = '%' . str_replace('%', '\\%', $search) . '%';
+            $query->where(function ($inner) use ($like): void {
+                $inner->where('incidents.reference', 'like', $like)
+                    ->orWhere('incidents.incidentable_id', 'like', $like)
+                    ->orWhere('incidents.notes', 'like', $like)
+                    ->orWhere('incidents.catalog_code', 'like', $like)
+                    ->orWhere('shipments.reference', 'like', $like);
+            });
+        }
+
+        $resolved = $request->query('resolved');
+        if (is_string($resolved) && $resolved !== '') {
+            if (in_array(strtolower($resolved), ['1', 'true', 'resolved'], true)) {
+                $query->whereNotNull('resolved_at');
+            }
+            if (in_array(strtolower($resolved), ['0', 'false', 'open'], true)) {
+                $query->whereNull('resolved_at');
+            }
+        }
+
+        return $query;
+    }
+
+    private function collectIncidentIdsForFilter(array $filters, bool $onlyOpen): array
+    {
+        $request = Request::create('/api/v1/incidents', 'GET', $filters);
+        if ($onlyOpen && !array_key_exists('resolved', $filters)) {
+            $request->query->set('resolved', 'open');
+        }
+
+        $rows = $this->filteredIncidentRows($request);
+        if ($onlyOpen) {
+            $rows = $rows->filter(fn ($row) => empty($row->resolved_at))->values();
+        }
+
+        return $rows
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

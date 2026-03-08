@@ -2296,6 +2296,63 @@ paths:
       responses:
         '200': { description: OK }
 
+  /incidents/{id}/override-sla:
+    patch:
+      tags: [Incidents]
+      summary: Ajustar override de prioridad/SLA para una incidencia
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                priority: { type: string, enum: [high, medium, low] }
+                sla_due_at: { type: string, format: date-time }
+                reason: { type: string }
+      responses:
+        '200': { description: OK }
+        '404': { description: Incident not found }
+
+  /incidents/override-sla-bulk:
+    post:
+      tags: [Incidents]
+      summary: Ajustar override de prioridad/SLA en lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                incident_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                apply_to_filtered: { type: boolean }
+                filters:
+                  type: object
+                  properties:
+                    incidentable_type: { type: string, enum: [shipment, pickup] }
+                    incidentable_id: { type: string, format: uuid }
+                    category: { type: string, enum: [failed, absent, retry, general] }
+                    catalog_code: { type: string }
+                    q: { type: string }
+                    priority: { type: string, enum: [high, medium, low] }
+                    sla_status: { type: string, enum: [on_track, at_risk, breached, resolved] }
+                    resolved: { type: string, enum: [open, resolved, "0", "1"] }
+                priority: { type: string, enum: [high, medium, low] }
+                sla_due_at: { type: string, format: date-time }
+                reason: { type: string }
+      responses:
+        '200': { description: OK }
+
   /kpis/quality:
     get:
       tags: [Quality]

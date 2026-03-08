@@ -237,12 +237,17 @@ final class TVMonitorService {
     private let rawBaseURL: String
     private let apiEmail: String?
     private let apiPassword: String?
+    private let exportDashboardCsvOnBoot: Bool
+    private let exportDashboardPdfOnBoot: Bool
     private var token: String?
+    private var didTriggerBootExports = false
 
     init() {
         rawBaseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? ""
         apiEmail = ProcessInfo.processInfo.environment["API_EMAIL"]
         apiPassword = ProcessInfo.processInfo.environment["API_PASSWORD"]
+        exportDashboardCsvOnBoot = (ProcessInfo.processInfo.environment["TV_EXPORT_DASHBOARD_CSV_ON_BOOT"] ?? "") == "1"
+        exportDashboardPdfOnBoot = (ProcessInfo.processInfo.environment["TV_EXPORT_DASHBOARD_PDF_ON_BOOT"] ?? "") == "1"
         token = ProcessInfo.processInfo.environment["API_TOKEN"]
     }
 
@@ -252,6 +257,7 @@ final class TVMonitorService {
         }
 
         await ensureAuthenticated(baseURL: baseURL)
+        await triggerBootExportsIfNeeded(baseURL: baseURL, period: period, hubId: hubId, subcontractorId: subcontractorId)
 
         do {
             async let overview = fetchOverview(
@@ -365,6 +371,29 @@ final class TVMonitorService {
         let data = try await authorizedGet(url: url, baseURL: baseURL)
         let rows = try JSONDecoder().decode(DataEnvelope<NetworkRowDTO>.self, from: data).data
         return rows.count
+    }
+
+    private func triggerBootExportsIfNeeded(baseURL: String, period: String, hubId: String?, subcontractorId: String?) async {
+        if didTriggerBootExports { return }
+        didTriggerBootExports = true
+
+        if exportDashboardCsvOnBoot {
+            _ = try? await fetchOverviewExport(baseURL: baseURL, period: period, hubId: hubId, subcontractorId: subcontractorId, format: "csv")
+        }
+        if exportDashboardPdfOnBoot {
+            _ = try? await fetchOverviewExport(baseURL: baseURL, period: period, hubId: hubId, subcontractorId: subcontractorId, format: "pdf")
+        }
+    }
+
+    private func fetchOverviewExport(baseURL: String, period: String, hubId: String?, subcontractorId: String?, format: String) async throws -> Data {
+        var components = URLComponents(string: "\(baseURL)/dashboard/overview/export.\(format)")
+        components?.queryItems = [
+            URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "hub_id", value: hubId),
+            URLQueryItem(name: "subcontractor_id", value: subcontractorId),
+        ].filter { $0.value != nil && $0.value?.isEmpty == false }
+        guard let url = components?.url else { throw URLError(.badURL) }
+        return try await authorizedGet(url: url, baseURL: baseURL)
     }
 
     private struct NetworkRowDTO: Decodable {
