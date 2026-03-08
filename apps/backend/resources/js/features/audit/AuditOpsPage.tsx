@@ -162,7 +162,7 @@ export function AuditOpsPage() {
               <Input id="audit-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
             </div>
           </div>
-          <div className="inline-actions" style={{ marginTop: 12 }}>
+          <div className="inline-actions toolbar-spaced">
             <Button type="button" onClick={() => { void runSearch(); }} disabled={loading}>
               {loading ? 'Buscando...' : 'Buscar'}
             </Button>

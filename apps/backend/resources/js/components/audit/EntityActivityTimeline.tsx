@@ -287,7 +287,7 @@ export function EntityActivityTimeline({
             </TableBody>
             </Table>
           </TableWrapper>
-          <div className="inline-actions" style={{ marginTop: 8 }}>
+          <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1 || loading}>
               Anterior
             </Button>

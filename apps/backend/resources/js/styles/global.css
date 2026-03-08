@@ -12,6 +12,13 @@
   --danger: #b91c1c;
   --warning: #b45309;
   --success: #16a34a;
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
 }
 
 * {
@@ -211,7 +218,7 @@ a {
 
 .app-main {
   display: grid;
-  gap: 14px;
+  gap: var(--space-3);
   padding: 20px 22px 28px;
 }
 
@@ -228,7 +235,7 @@ a {
 
 .page-grid {
   display: grid;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .page-grid.two {
@@ -241,25 +248,25 @@ a {
 
 .form-row {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   align-items: start;
 }
 
 .inline-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
 }
 
 .filters-panel {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   background: var(--surface-muted);
-  padding: 12px;
+  padding: var(--space-3);
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 label {
@@ -270,9 +277,9 @@ label {
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   background: var(--surface);
-  padding: 16px;
+  padding: var(--space-4);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
@@ -293,7 +300,7 @@ label {
 
 .card-content {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .card-row {
@@ -314,7 +321,7 @@ label {
 .btn {
   height: 37px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
@@ -363,7 +370,7 @@ label {
   height: 37px;
   width: 100%;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
 }
@@ -373,7 +380,7 @@ select {
   height: 37px;
   width: 100%;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
   font: inherit;
@@ -390,7 +397,7 @@ input[type='checkbox'] {
 
 textarea {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: #fff;
   padding: 8px 10px;
@@ -510,20 +517,20 @@ textarea:focus {
 .table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: #fff;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
+  min-width: 700px;
   background: white;
 }
 
 .table-head {
   text-align: left;
-  padding: 11px 10px;
+  padding: 12px;
   font-size: 12px;
   color: var(--muted);
   background: var(--surface-muted);
@@ -535,7 +542,7 @@ textarea:focus {
 }
 
 .table-cell {
-  padding: 11px 10px;
+  padding: 12px;
   border-bottom: 1px solid #eef2f7;
   font-size: 14px;
   vertical-align: top;
@@ -720,6 +727,14 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.toolbar-spaced {
+  margin-top: 12px;
+}
+
+.helper-spaced {
+  margin-top: 6px;
 }
 
 .dashboard-shell {

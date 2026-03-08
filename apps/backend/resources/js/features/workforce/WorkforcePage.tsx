@@ -193,7 +193,7 @@ export function WorkforcePage() {
             <div className="card-row"><strong>{summary.contractor}</strong><span className="helper">Contrata</span></div>
             <div className="card-row"><strong>{summary.active}</strong><span className="helper">Activos</span></div>
           </div>
-          <div className="inline-actions" style={{ marginTop: 12 }}>
+          <div className="inline-actions toolbar-spaced">
             <Button type="button" onClick={openCreate}>+ Crear empleado</Button>
             <Button type="button" variant="outline" onClick={() => { void load(); }}>Actualizar</Button>
             <Input placeholder="Buscar por nombre, doc o código" value={query} onChange={(event) => setQuery(event.target.value)} />

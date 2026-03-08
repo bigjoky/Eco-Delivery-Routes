@@ -224,8 +224,8 @@ export function FleetControlsPage() {
             <div className="card-row"><strong>{summary.insurance + summary.itv}</strong><span className="helper">Seguros + ITV</span></div>
             <div className="card-row"><strong>{summary.maintenance}</strong><span className="helper">Mantenimientos</span></div>
           </div>
-          <div className="helper" style={{ marginTop: 6 }}>Gasto acumulado mostrado: {summary.amount.toFixed(2)} EUR</div>
-          <div className="inline-actions" style={{ marginTop: 12 }}>
+          <div className="helper helper-spaced">Gasto acumulado mostrado: {summary.amount.toFixed(2)} EUR</div>
+          <div className="inline-actions toolbar-spaced">
             <Button type="button" onClick={openCreate}>+ Nuevo control</Button>
             <Select value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
               <option value="">Vehículo: todos</option>

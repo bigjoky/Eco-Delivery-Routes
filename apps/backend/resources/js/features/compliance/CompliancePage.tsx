@@ -198,7 +198,7 @@ export function CompliancePage() {
             <div className="card-row"><strong>{summary.expiring}</strong><span className="helper">A vencer</span></div>
             <div className="card-row"><strong>{summary.expired}</strong><span className="helper">Caducados</span></div>
           </div>
-          <div className="inline-actions" style={{ marginTop: 12 }}>
+          <div className="inline-actions toolbar-spaced">
             <Button type="button" onClick={openCreate}>+ Nuevo documento</Button>
             <Input placeholder="Buscar título, referencia o emisor" value={query} onChange={(event) => setQuery(event.target.value)} />
             <Select value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value as typeof scopeFilter)}>
