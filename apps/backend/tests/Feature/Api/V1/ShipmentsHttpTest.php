@@ -265,6 +265,19 @@ class ShipmentsHttpTest extends TestCase
             'hub_id' => $hubId,
             'reference' => 'SHP-FUTURE-001',
             'consignee_name' => 'Cliente Futuro',
+            'consignee_document_id' => '12345678Z',
+            'address_street' => 'Calle Mayor',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'country' => 'ES',
+            'consignee_phone' => '+34600111222',
+            'sender_name' => 'Eco Sender',
+            'sender_document_id' => '12345678A',
+            'sender_address_street' => 'Calle Sender',
+            'sender_postal_code' => '29001',
+            'sender_city' => 'Malaga',
+            'sender_country' => 'ES',
+            'service_type' => 'express_1030',
             'scheduled_at' => now()->addDays(365)->toDateTimeString(),
         ];
 
@@ -293,13 +306,38 @@ class ShipmentsHttpTest extends TestCase
             'hub_id' => $hubId,
             'reference' => 'SHP-DUP-001',
             'consignee_name' => 'Cliente Duplicado',
+            'consignee_document_id' => '12345678Z',
+            'address_street' => 'Calle Larios',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'country' => 'ES',
+            'consignee_phone' => '+34600111222',
+            'sender_name' => 'Eco Sender',
             'sender_document_id' => '12345678A',
+            'sender_address_street' => 'Calle Sender',
+            'sender_postal_code' => '29001',
+            'sender_city' => 'Malaga',
+            'sender_country' => 'ES',
             'service_type' => 'express_1030',
         ];
 
         $response = $this->postJson('/api/v1/shipments', $payload);
         $response->assertStatus(201);
         $response->assertJsonMissing(['data' => ['reference' => 'SHP-DUP-001']]);
+    }
+
+    public function test_rejects_shipment_create_when_required_operational_fields_are_missing(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $response = $this->postJson('/api/v1/shipments', [
+            'hub_id' => $hubId,
+            'service_type' => 'express_1030',
+        ]);
+
+        $response->assertStatus(422);
     }
 
     public function test_can_show_shipment_detail_with_tracking_pods_incidents(): void

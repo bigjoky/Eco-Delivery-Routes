@@ -399,6 +399,7 @@ export function ShipmentsPage() {
       pageCount: items.length,
     };
   }, [items, meta.total]);
+  const bulkTargetCount = bulkApplyToFiltered ? shipmentSummary.total : selectedShipmentIds.length;
 
   const activeFiltersCount = useMemo(() => {
     return [query, status, hubFilter, scheduledFrom, scheduledTo].filter((value) => value !== '').length;
@@ -2220,6 +2221,9 @@ export function ShipmentsPage() {
             <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
               {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
             </Button>
+          </div>
+          <div className="helper">
+            Impacto estimado: {bulkTargetCount} envio(s) {bulkApplyToFiltered ? 'del filtro actual' : 'seleccionado(s)'}.
           </div>
           {bulkError ? <div className="helper error">{bulkError}</div> : null}
           {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}

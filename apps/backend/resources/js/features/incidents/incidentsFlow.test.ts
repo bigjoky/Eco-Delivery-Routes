@@ -22,4 +22,21 @@ describe('incidents flow', () => {
     const resolvedList = await apiClient.getIncidents({ resolved: 'resolved' });
     expect(resolvedList.data.some((item) => item.id === created.id)).toBe(true);
   });
+
+  test('supports structured bulk SLA override payload', async () => {
+    const created = await apiClient.createIncident({
+      incidentable_type: 'shipment',
+      incidentable_id: '00000000-0000-0000-0000-000000000102',
+      catalog_code: 'ABSENT_HOME',
+      category: 'absent',
+      notes: 'bulk override target',
+    });
+
+    const result = await apiClient.overrideIncidentSlaBulk({
+      incidentIds: [created.id],
+      priority: 'high',
+      reason: 'bulk override test',
+    });
+    expect(result.requested_count).toBeGreaterThanOrEqual(1);
+  });
 });

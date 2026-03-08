@@ -3,6 +3,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { IncidentCatalogItem, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
@@ -75,6 +76,11 @@ export function IncidentsPage() {
   const [bulkOverridePriority, setBulkOverridePriority] = useState<'' | 'high' | 'medium' | 'low'>('');
   const [bulkOverrideDueAt, setBulkOverrideDueAt] = useState('');
   const [bulkOverrideReason, setBulkOverrideReason] = useState('');
+  const [singleOverrideTarget, setSingleOverrideTarget] = useState<IncidentSummary | null>(null);
+  const [singleOverridePriority, setSingleOverridePriority] = useState<'' | 'high' | 'medium' | 'low'>('');
+  const [singleOverrideDueAt, setSingleOverrideDueAt] = useState('');
+  const [singleOverrideReason, setSingleOverrideReason] = useState('');
+  const [singleOverrideSaving, setSingleOverrideSaving] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -395,30 +401,46 @@ export function IncidentsPage() {
     }
   };
 
-  const onOverrideSla = async (item: IncidentSummary) => {
-    const reason = window.prompt(`Motivo de ajuste SLA para ${item.id}`);
-    if (!reason || reason.trim() === '') return;
-    const priorityInput = window.prompt('Nueva prioridad (high/medium/low). Deja vacio para mantener.', item.priority ?? '');
-    const dueInput = window.prompt('Nuevo SLA due_at ISO (opcional).', item.sla_due_at ?? '');
+  const openSingleOverride = (item: IncidentSummary) => {
+    setSingleOverrideTarget(item);
+    setSingleOverridePriority((item.priority === 'high' || item.priority === 'medium' || item.priority === 'low') ? item.priority : '');
+    setSingleOverrideDueAt(item.sla_due_at ?? '');
+    setSingleOverrideReason('');
+    setResolveError('');
+  };
+
+  const onOverrideSla = async () => {
+    if (!singleOverrideTarget) return;
+    if (!singleOverridePriority && !singleOverrideDueAt.trim()) {
+      setResolveError('Define prioridad o due_at para el ajuste SLA.');
+      return;
+    }
+    if (!singleOverrideReason.trim()) {
+      setResolveError('Define un motivo para el ajuste SLA.');
+      return;
+    }
+    setSingleOverrideSaving(true);
     try {
-      await apiClient.overrideIncidentSla(item.id, {
-        priority: priorityInput === 'high' || priorityInput === 'medium' || priorityInput === 'low' ? priorityInput : undefined,
-        sla_due_at: dueInput && dueInput.trim() !== '' ? dueInput : undefined,
-        reason: reason.trim(),
+      await apiClient.overrideIncidentSla(singleOverrideTarget.id, {
+        priority: singleOverridePriority || undefined,
+        sla_due_at: singleOverrideDueAt.trim() || undefined,
+        reason: singleOverrideReason.trim(),
       });
+      setSingleOverrideTarget(null);
       await reload();
     } catch (exception) {
       setResolveError(exception instanceof Error ? exception.message : 'No se pudo ajustar SLA');
+    } finally {
+      setSingleOverrideSaving(false);
     }
   };
 
   const onEscalatePriority = async (item: IncidentSummary) => {
-    const reason = window.prompt(`Motivo de escalado para ${item.id}`);
-    if (!reason || reason.trim() === '') return;
+    const reason = `Escalado manual desde panel (${new Date().toISOString()})`;
     try {
       await apiClient.overrideIncidentSla(item.id, {
         priority: 'high',
-        reason: reason.trim(),
+        reason,
       });
       await reload();
     } catch (exception) {
@@ -428,6 +450,49 @@ export function IncidentsPage() {
 
   return (
     <section className="page-grid">
+      <Modal
+        open={singleOverrideTarget !== null}
+        title={`Ajustar SLA · ${singleOverrideTarget?.id ?? ''}`}
+        onClose={() => setSingleOverrideTarget(null)}
+        footer={(
+          <>
+            <Button type="button" variant="outline" onClick={() => setSingleOverrideTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={onOverrideSla} disabled={singleOverrideSaving}>
+              {singleOverrideSaving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="form-row">
+          <div>
+            <label>Prioridad</label>
+            <Select value={singleOverridePriority} onChange={(event) => setSingleOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
+              <option value="">Sin cambio</option>
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
+            </Select>
+          </div>
+          <div>
+            <label>SLA due_at (ISO)</label>
+            <Input
+              value={singleOverrideDueAt}
+              onChange={(event) => setSingleOverrideDueAt(event.target.value)}
+              placeholder="2026-03-31T14:00:00Z"
+            />
+          </div>
+          <div>
+            <label>Motivo</label>
+            <Input
+              value={singleOverrideReason}
+              onChange={(event) => setSingleOverrideReason(event.target.value)}
+              placeholder="Motivo del ajuste"
+            />
+          </div>
+        </div>
+      </Modal>
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Registrar Incidencia</CardTitle>
@@ -725,7 +790,7 @@ export function IncidentsPage() {
                           {item.priority !== 'high' ? (
                             <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>Escalar alta</Button>
                           ) : null}
-                          <Button type="button" variant="outline" onClick={() => onOverrideSla(item)}>Ajustar SLA</Button>
+                          <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>Ajustar SLA</Button>
                         </div>
                       )}
                     </TableCell>

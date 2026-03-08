@@ -152,17 +152,17 @@ class ShipmentController extends Controller
         $payload = $request->validate([
             'hub_id' => ['required', 'uuid'],
             'external_reference' => ['nullable', 'string', 'max:80'],
-            'consignee_name' => ['nullable', 'string', 'max:120'],
-            'consignee_document_id' => ['nullable', 'string', 'max:60'],
+            'consignee_name' => ['required', 'string', 'max:120'],
+            'consignee_document_id' => ['required', 'string', 'max:60'],
             'address_line' => ['nullable', 'string', 'max:220'],
-            'address_street' => ['nullable', 'string', 'max:180'],
+            'address_street' => ['required', 'string', 'max:180'],
             'address_number' => ['nullable', 'string', 'max:40'],
-            'postal_code' => ['nullable', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
-            'city' => ['nullable', 'string', 'max:80'],
+            'postal_code' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
+            'city' => ['required', 'string', 'max:80'],
             'province' => ['nullable', 'string', 'max:80'],
-            'country' => ['nullable', 'string', 'max:80'],
+            'country' => ['required', 'string', 'max:80'],
             'address_notes' => ['nullable', 'string', 'max:220'],
-            'consignee_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+            'consignee_phone' => ['required', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
             'consignee_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
             'consignee_email' => ['nullable', 'email', 'max:120'],
             'sender_name' => ['nullable', 'string', 'max:120'],
@@ -172,16 +172,24 @@ class ShipmentController extends Controller
             'sender_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
             'sender_email' => ['nullable', 'email', 'max:120'],
             'sender_address_line' => ['nullable', 'string', 'max:220'],
-            'sender_address_street' => ['nullable', 'string', 'max:180'],
+            'sender_address_street' => ['required', 'string', 'max:180'],
             'sender_address_number' => ['nullable', 'string', 'max:40'],
-            'sender_postal_code' => ['nullable', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
-            'sender_city' => ['nullable', 'string', 'max:80'],
+            'sender_postal_code' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
+            'sender_city' => ['required', 'string', 'max:80'],
             'sender_province' => ['nullable', 'string', 'max:80'],
-            'sender_country' => ['nullable', 'string', 'max:80'],
+            'sender_country' => ['required', 'string', 'max:80'],
             'sender_address_notes' => ['nullable', 'string', 'max:220'],
             'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
             'service_type' => ['required', 'in:express_1030,express_1400,express_1900,economy_parcel,business_parcel,thermo_parcel,delivery'],
         ]);
+        if (
+            $this->normalizeText($payload['sender_name'] ?? null) === null
+            && $this->normalizeText($payload['sender_legal_name'] ?? null) === null
+        ) {
+            return response()->json([
+                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Sender name or legal name is required.'],
+            ], 422);
+        }
 
         $id = (string) Str::uuid();
         $reference = (string) $this->sequenceService->next('shipments');

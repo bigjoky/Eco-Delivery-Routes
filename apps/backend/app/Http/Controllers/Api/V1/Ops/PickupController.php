@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 
 class PickupController extends Controller
 {
@@ -39,9 +40,14 @@ class PickupController extends Controller
             'hub_id' => ['required', 'uuid'],
             'external_reference' => ['nullable', 'string', 'max:80'],
             'pickup_type' => ['required', 'in:NORMAL,RETURN'],
-            'requester_name' => ['nullable', 'string', 'max:120'],
-            'address_line' => ['nullable', 'string', 'max:220'],
-            'scheduled_at' => ['nullable', 'date'],
+            'requester_name' => ['required', 'string', 'max:120'],
+            'address_line' => ['required', 'string', 'max:220'],
+            'scheduled_at' => [
+                'required',
+                'date',
+                'after_or_equal:' . Carbon::now()->subDays(30)->format('Y-m-d H:i:s'),
+                'before_or_equal:' . Carbon::now()->addDays(180)->format('Y-m-d H:i:s'),
+            ],
         ]);
 
         $id = (string) Str::uuid();
