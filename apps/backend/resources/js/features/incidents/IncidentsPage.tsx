@@ -99,6 +99,7 @@ export function IncidentsPage() {
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
+  const [showBulkSlaPanel, setShowBulkSlaPanel] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
   const [showAudit, setShowAudit] = useState(false);
 
@@ -860,44 +861,51 @@ export function IncidentsPage() {
           <div className="helper">
             Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
           </div>
-          <div className="filters-panel">
-            <div className="helper">Override SLA masivo</div>
-            <div className="form-row">
-              <div>
-                <label>Prioridad</label>
-                <Select value={bulkOverridePriority} onChange={(event) => setBulkOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
-                  <option value="">Sin cambio</option>
-                  <option value="high">high</option>
-                  <option value="medium">medium</option>
-                  <option value="low">low</option>
-                </Select>
-              </div>
-              <div>
-                <label>SLA due_at (ISO)</label>
-                <Input
-                  value={bulkOverrideDueAt}
-                  onChange={(event) => setBulkOverrideDueAt(event.target.value)}
-                  placeholder="2026-03-31T14:00:00Z"
-                />
-              </div>
-              <div>
-                <label>Motivo</label>
-                <Input
-                  value={bulkOverrideReason}
-                  onChange={(event) => setBulkOverrideReason(event.target.value)}
-                  placeholder="Motivo del ajuste masivo"
-                />
-              </div>
-            </div>
-            <div className="inline-actions">
-              <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
-                Aplicar override SLA
-              </Button>
-            </div>
-            <div className="helper">
-              Impacto override masivo: objetivo estimado {bulkTargetEstimate} incidencia(s). {bulkImpactSummary}
-            </div>
+          <div className="inline-actions">
+            <Button type="button" variant={showBulkSlaPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkSlaPanel((value) => !value)}>
+              {showBulkSlaPanel ? 'Ocultar override SLA' : 'Mostrar override SLA'}
+            </Button>
           </div>
+          {showBulkSlaPanel ? (
+            <div className="filters-panel">
+              <div className="helper">Override SLA masivo</div>
+              <div className="form-row">
+                <div>
+                  <label>Prioridad</label>
+                  <Select value={bulkOverridePriority} onChange={(event) => setBulkOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
+                    <option value="">Sin cambio</option>
+                    <option value="high">high</option>
+                    <option value="medium">medium</option>
+                    <option value="low">low</option>
+                  </Select>
+                </div>
+                <div>
+                  <label>SLA due_at (ISO)</label>
+                  <Input
+                    value={bulkOverrideDueAt}
+                    onChange={(event) => setBulkOverrideDueAt(event.target.value)}
+                    placeholder="2026-03-31T14:00:00Z"
+                  />
+                </div>
+                <div>
+                  <label>Motivo</label>
+                  <Input
+                    value={bulkOverrideReason}
+                    onChange={(event) => setBulkOverrideReason(event.target.value)}
+                    placeholder="Motivo del ajuste masivo"
+                  />
+                </div>
+              </div>
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
+                  Aplicar override SLA
+                </Button>
+              </div>
+              <div className="helper">
+                Impacto override masivo: objetivo estimado {bulkTargetEstimate} incidencia(s). {bulkImpactSummary}
+              </div>
+            </div>
+          ) : null}
           <TableWrapper>
             <Table>
               <TableHeader>

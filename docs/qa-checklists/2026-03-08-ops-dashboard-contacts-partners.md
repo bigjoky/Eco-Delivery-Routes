@@ -34,6 +34,7 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Desde una incidencia de tipo `shipment`, abrir `Ver envío` y validar navegación correcta.
 - [ ] Desde una incidencia, usar `Ref. envío` y validar filtro en listado de envíos.
 - [ ] Desde un envío, abrir `Ver incidencias` y validar filtro por `incidentable_id`.
+- [ ] Validar que `Override SLA masivo` está oculto por defecto y se despliega con toggle.
 
 ## Verificaciones técnicas
 
