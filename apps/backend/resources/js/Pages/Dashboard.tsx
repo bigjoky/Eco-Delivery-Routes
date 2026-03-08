@@ -48,6 +48,14 @@ export default function Dashboard() {
                                 >
                                     Ver OpenAPI
                                 </Link>
+                                <a
+                                    href="/openapi.yaml"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                >
+                                    Abrir Spec YAML
+                                </a>
                                 <InstallPwaButton />
                             </div>
                         </div>

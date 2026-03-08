@@ -22,8 +22,10 @@
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
     <script>
+      const specVersion = "{{ filemtime(base_path('openapi.yaml')) }}";
+      const noCacheTs = Date.now();
       window.ui = SwaggerUIBundle({
-        url: '/openapi.yaml?v={{ filemtime(base_path("openapi.yaml")) }}',
+        url: `/openapi.yaml?v=${specVersion}&ts=${noCacheTs}`,
         dom_id: '#swagger-ui',
         deepLinking: true,
         displayRequestDuration: true,
