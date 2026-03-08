@@ -73,6 +73,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
+        Route::post('shipments/bulk-update/preview', [ShipmentController::class, 'bulkUpdatePreview']);
         Route::post('shipments/bulk-update', [ShipmentController::class, 'bulkUpdate']);
         Route::post('shipments/{id}/deliver', [ShipmentController::class, 'markDelivered']);
         Route::get('hubs', [HubController::class, 'index']);

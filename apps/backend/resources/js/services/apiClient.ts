@@ -99,6 +99,22 @@ function buildAuthHeaders(extra: Record<string, string> = {}): Record<string, st
   return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
 }
 
+function readApiErrorMessage(json: unknown, fallback: string): string {
+  const payload = json as {
+    error?: { message?: string };
+    message?: string;
+    errors?: Record<string, string[]>;
+  };
+  if (payload?.error?.message) return payload.error.message;
+  if (payload?.message) return payload.message;
+  if (payload?.errors) {
+    const firstField = Object.keys(payload.errors)[0];
+    const firstMessage = firstField ? payload.errors[firstField]?.[0] : undefined;
+    if (firstMessage) return firstMessage;
+  }
+  return fallback;
+}
+
 async function refreshAuthToken(): Promise<string | null> {
   if (USE_MOCK) return sessionStore.getToken();
   if (refreshPromise) return refreshPromise;
@@ -799,7 +815,7 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create shipment');
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create shipment'));
     return json.data as ShipmentSummary;
   },
 
@@ -833,8 +849,47 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot bulk update shipments');
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update shipments'));
     return json as { data: ShipmentSummary[]; meta: { updated_count: number } };
+  },
+
+  async previewBulkUpdateShipments(payload: {
+    shipment_ids: string[];
+    apply_to_filtered?: boolean;
+    filter_status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    filter_hub_id?: string;
+    filter_q?: string;
+    filter_scheduled_from?: string;
+    filter_scheduled_to?: string;
+    status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    hub_id?: string;
+    scheduled_at?: string;
+    reason?: string;
+  }): Promise<{
+    target_count: number;
+    sample: Array<{ id: string; reference: string; status: string; hub_id?: string | null; scheduled_at?: string | null }>;
+    updates: { status?: string | null; hub_id?: string | null; scheduled_at?: string | null };
+    apply_to_filtered: boolean;
+  }> {
+    if (USE_MOCK) return mockApi.previewBulkUpdateShipments(payload) as Promise<{
+      target_count: number;
+      sample: Array<{ id: string; reference: string; status: string; hub_id?: string | null; scheduled_at?: string | null }>;
+      updates: { status?: string | null; hub_id?: string | null; scheduled_at?: string | null };
+      apply_to_filtered: boolean;
+    }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/bulk-update/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot preview bulk update shipments'));
+    return json.data as {
+      target_count: number;
+      sample: Array<{ id: string; reference: string; status: string; hub_id?: string | null; scheduled_at?: string | null }>;
+      updates: { status?: string | null; hub_id?: string | null; scheduled_at?: string | null };
+      apply_to_filtered: boolean;
+    };
   },
 
   async getShipmentDetail(id: string): Promise<ShipmentDetail> {
@@ -999,7 +1054,7 @@ export const apiClient = {
       body: JSON.stringify(payload),
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create pickup');
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create pickup'));
     return json.data as PickupSummary;
   },
 

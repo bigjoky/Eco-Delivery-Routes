@@ -365,6 +365,9 @@ export function ShipmentsPage() {
   const [bulkReason, setBulkReason] = useState('');
   const [bulkApplyToFiltered, setBulkApplyToFiltered] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkPreviewing, setBulkPreviewing] = useState(false);
+  const [bulkPreviewCount, setBulkPreviewCount] = useState<number | null>(null);
+  const [bulkPreviewSample, setBulkPreviewSample] = useState<Array<{ id: string; reference: string; status: string }>>([]);
   const [bulkError, setBulkError] = useState('');
   const [bulkMessage, setBulkMessage] = useState('');
   const [incidentCatalog, setIncidentCatalog] = useState<IncidentCatalogItem[]>([]);
@@ -1253,6 +1256,47 @@ export function ShipmentsPage() {
       setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar la actualizacion masiva');
     } finally {
       setBulkUpdating(false);
+    }
+  };
+
+  const previewBulkUpdate = async () => {
+    setBulkError('');
+    setBulkMessage('');
+    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
+      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
+      return;
+    }
+    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
+      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
+      return;
+    }
+    setBulkPreviewing(true);
+    try {
+      const preview = await apiClient.previewBulkUpdateShipments({
+        shipment_ids: bulkApplyToFiltered ? [] : selectedShipmentIds,
+        apply_to_filtered: bulkApplyToFiltered,
+        ...(bulkApplyToFiltered ? {
+          filter_status: status || undefined,
+          filter_hub_id: hubFilter || undefined,
+          filter_q: query || undefined,
+          filter_scheduled_from: scheduledFrom || undefined,
+          filter_scheduled_to: scheduledTo || undefined,
+        } : {}),
+        ...(bulkStatus ? { status: bulkStatus as 'created' | 'out_for_delivery' | 'delivered' | 'incident' } : {}),
+        ...(bulkHubId ? { hub_id: bulkHubId } : {}),
+        ...(bulkScheduledAt ? { scheduled_at: bulkScheduledAt } : {}),
+        reason: bulkReason.trim() || undefined,
+      });
+      setBulkPreviewCount(preview.target_count);
+      setBulkPreviewSample(preview.sample.map((row) => ({
+        id: row.id,
+        reference: row.reference,
+        status: row.status,
+      })));
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo previsualizar la actualización masiva');
+    } finally {
+      setBulkPreviewing(false);
     }
   };
 
@@ -2221,10 +2265,18 @@ export function ShipmentsPage() {
             <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
               {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
             </Button>
+            <Button type="button" variant="outline" onClick={previewBulkUpdate} disabled={bulkPreviewing}>
+              {bulkPreviewing ? 'Previsualizando...' : 'Previsualizar'}
+            </Button>
           </div>
           <div className="helper">
             Impacto estimado: {bulkTargetCount} envio(s) {bulkApplyToFiltered ? 'del filtro actual' : 'seleccionado(s)'}.
           </div>
+          {bulkPreviewCount !== null ? (
+            <div className="helper">
+              Preview backend: {bulkPreviewCount} objetivo(s). Muestra: {bulkPreviewSample.map((row) => `${row.reference}(${row.status})`).join(', ') || '-'}.
+            </div>
+          ) : null}
           {bulkError ? <div className="helper error">{bulkError}</div> : null}
           {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}
           {actionError ? <div className="helper error">{actionError}</div> : null}

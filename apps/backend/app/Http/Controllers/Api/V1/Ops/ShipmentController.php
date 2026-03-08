@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Validation\ValidationException;
 
 class ShipmentController extends Controller
 {
@@ -734,20 +735,7 @@ class ShipmentController extends Controller
             return $this->forbidden();
         }
 
-        $payload = $request->validate([
-            'shipment_ids' => ['nullable', 'array', 'min:1'],
-            'shipment_ids.*' => ['required', 'uuid'],
-            'apply_to_filtered' => ['nullable', 'boolean'],
-            'filter_status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
-            'filter_hub_id' => ['nullable', 'uuid'],
-            'filter_q' => ['nullable', 'string', 'max:120'],
-            'filter_scheduled_from' => ['nullable', 'date'],
-            'filter_scheduled_to' => ['nullable', 'date'],
-            'status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
-            'hub_id' => ['nullable', 'uuid', 'exists:hubs,id'],
-            'scheduled_at' => ['nullable', 'date'],
-            'reason' => ['required', 'string', 'max:220'],
-        ]);
+        $payload = $this->validateBulkShipmentPayload($request);
 
         $updates = [];
         if (array_key_exists('status', $payload)) {
@@ -768,47 +756,11 @@ class ShipmentController extends Controller
             ], 422);
         }
 
-        $shipmentIds = array_values(array_unique($payload['shipment_ids'] ?? []));
-        if (!empty($payload['apply_to_filtered'])) {
-            $query = $this->baseQueryForActor($actor);
-            if ($query === null) {
-                $shipmentIds = [];
-            } else {
-                if (!empty($payload['filter_status'])) {
-                    $query->where('shipments.status', $payload['filter_status']);
-                }
-                if (!empty($payload['filter_hub_id'])) {
-                    $query->where('shipments.hub_id', $payload['filter_hub_id']);
-                }
-                if (!empty($payload['filter_q'])) {
-                    $like = '%' . str_replace('%', '\\%', (string) $payload['filter_q']) . '%';
-                    $query->where(function ($inner) use ($like): void {
-                        $inner->where('shipments.reference', 'like', $like)
-                            ->orWhere('shipments.external_reference', 'like', $like)
-                            ->orWhere('shipments.id', 'like', $like)
-                            ->orWhere('shipments.consignee_name', 'like', $like);
-                    });
-                }
-                if (!empty($payload['filter_scheduled_from'])) {
-                    $query->whereDate('shipments.scheduled_at', '>=', $payload['filter_scheduled_from']);
-                }
-                if (!empty($payload['filter_scheduled_to'])) {
-                    $query->whereDate('shipments.scheduled_at', '<=', $payload['filter_scheduled_to']);
-                }
-                $shipmentIds = $query->pluck('shipments.id')->all();
-            }
-        } elseif ($shipmentIds === []) {
-            return response()->json([
-                'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'Provide shipment_ids or enable apply_to_filtered.'],
-            ], 422);
-        } else {
-            $existing = DB::table('shipments')->whereIn('id', $shipmentIds)->pluck('id')->all();
-            if (count($existing) !== count($shipmentIds)) {
-                return response()->json([
-                    'error' => ['code' => 'VALIDATION_ERROR', 'message' => 'One or more shipment_ids do not exist.'],
-                ], 422);
-            }
-        }
+        $shipmentIds = $this->collectShipmentIdsForBulk($actor, $payload);
+        $beforeRows = DB::table('shipments')
+            ->whereIn('id', $shipmentIds)
+            ->get(['id', 'status', 'hub_id', 'scheduled_at'])
+            ->keyBy('id');
 
         if ($shipmentIds !== []) {
             DB::table('shipments')
@@ -818,6 +770,33 @@ class ShipmentController extends Controller
                     'updated_at' => now(),
                 ]);
         }
+        $afterRows = DB::table('shipments')
+            ->whereIn('id', $shipmentIds)
+            ->get(['id', 'status', 'hub_id', 'scheduled_at'])
+            ->keyBy('id');
+        $changeRows = [];
+        foreach ($shipmentIds as $shipmentId) {
+            $before = $beforeRows[$shipmentId] ?? null;
+            $after = $afterRows[$shipmentId] ?? null;
+            if (!$before || !$after) {
+                continue;
+            }
+            $diff = [];
+            foreach (['status', 'hub_id', 'scheduled_at'] as $field) {
+                if (($before->{$field} ?? null) !== ($after->{$field} ?? null)) {
+                    $diff[$field] = [
+                        'before' => $before->{$field} ?? null,
+                        'after' => $after->{$field} ?? null,
+                    ];
+                }
+            }
+            if ($diff !== []) {
+                $changeRows[] = [
+                    'shipment_id' => $shipmentId,
+                    'changes' => $diff,
+                ];
+            }
+        }
 
         $this->auditLogWriter->write($actor->id, 'shipments.bulk_updated', [
             'shipment_ids' => $shipmentIds,
@@ -825,12 +804,45 @@ class ShipmentController extends Controller
             'reason' => $payload['reason'],
             'apply_to_filtered' => !empty($payload['apply_to_filtered']),
             'count' => count($shipmentIds),
+            'changed_rows_count' => count($changeRows),
+            'changes' => array_slice($changeRows, 0, 50),
         ]);
 
         return response()->json([
             'data' => DB::table('shipments')->whereIn('id', $shipmentIds)->get()->all(),
             'meta' => [
                 'updated_count' => count($shipmentIds),
+            ],
+        ]);
+    }
+
+    public function bulkUpdatePreview(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.write')) {
+            return $this->forbidden();
+        }
+
+        $payload = $this->validateBulkShipmentPayload($request, true);
+        $shipmentIds = $this->collectShipmentIdsForBulk($actor, $payload);
+        $samples = DB::table('shipments')
+            ->whereIn('id', $shipmentIds)
+            ->orderBy('reference')
+            ->limit(20)
+            ->get(['id', 'reference', 'status', 'hub_id', 'scheduled_at'])
+            ->all();
+
+        return response()->json([
+            'data' => [
+                'target_count' => count($shipmentIds),
+                'sample' => $samples,
+                'updates' => [
+                    'status' => $payload['status'] ?? null,
+                    'hub_id' => $payload['hub_id'] ?? null,
+                    'scheduled_at' => $payload['scheduled_at'] ?? null,
+                ],
+                'apply_to_filtered' => (bool) ($payload['apply_to_filtered'] ?? false),
             ],
         ]);
     }
@@ -847,5 +859,72 @@ class ShipmentController extends Controller
         return response()->json([
             'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => $message],
         ], 404);
+    }
+
+    private function validateBulkShipmentPayload(Request $request, bool $preview = false): array
+    {
+        return $request->validate([
+            'shipment_ids' => ['nullable', 'array', 'min:1'],
+            'shipment_ids.*' => ['required', 'uuid'],
+            'apply_to_filtered' => ['nullable', 'boolean'],
+            'filter_status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
+            'filter_hub_id' => ['nullable', 'uuid'],
+            'filter_q' => ['nullable', 'string', 'max:120'],
+            'filter_scheduled_from' => ['nullable', 'date'],
+            'filter_scheduled_to' => ['nullable', 'date'],
+            'status' => ['nullable', 'in:created,out_for_delivery,delivered,incident'],
+            'hub_id' => ['nullable', 'uuid', 'exists:hubs,id'],
+            'scheduled_at' => ['nullable', 'date'],
+            'reason' => $preview ? ['nullable', 'string', 'max:220'] : ['required', 'string', 'max:220'],
+        ]);
+    }
+
+    /**
+     * @throws ValidationException
+     * @return array<int, string>
+     */
+    private function collectShipmentIdsForBulk(User $actor, array $payload): array
+    {
+        $shipmentIds = array_values(array_unique($payload['shipment_ids'] ?? []));
+        if (!empty($payload['apply_to_filtered'])) {
+            $query = $this->baseQueryForActor($actor);
+            if ($query === null) {
+                return [];
+            }
+            if (!empty($payload['filter_status'])) {
+                $query->where('shipments.status', $payload['filter_status']);
+            }
+            if (!empty($payload['filter_hub_id'])) {
+                $query->where('shipments.hub_id', $payload['filter_hub_id']);
+            }
+            if (!empty($payload['filter_q'])) {
+                $like = '%' . str_replace('%', '\\%', (string) $payload['filter_q']) . '%';
+                $query->where(function ($inner) use ($like): void {
+                    $inner->where('shipments.reference', 'like', $like)
+                        ->orWhere('shipments.external_reference', 'like', $like)
+                        ->orWhere('shipments.id', 'like', $like)
+                        ->orWhere('shipments.consignee_name', 'like', $like);
+                });
+            }
+            if (!empty($payload['filter_scheduled_from'])) {
+                $query->whereDate('shipments.scheduled_at', '>=', $payload['filter_scheduled_from']);
+            }
+            if (!empty($payload['filter_scheduled_to'])) {
+                $query->whereDate('shipments.scheduled_at', '<=', $payload['filter_scheduled_to']);
+            }
+            return $query->pluck('shipments.id')->all();
+        }
+        if ($shipmentIds === []) {
+            throw ValidationException::withMessages([
+                'shipment_ids' => ['Provide shipment_ids or enable apply_to_filtered.'],
+            ]);
+        }
+        $existing = DB::table('shipments')->whereIn('id', $shipmentIds)->pluck('id')->all();
+        if (count($existing) !== count($shipmentIds)) {
+            throw ValidationException::withMessages([
+                'shipment_ids' => ['One or more shipment_ids do not exist.'],
+            ]);
+        }
+        return $shipmentIds;
     }
 }

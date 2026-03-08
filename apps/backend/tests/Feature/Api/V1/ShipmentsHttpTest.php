@@ -255,6 +255,82 @@ class ShipmentsHttpTest extends TestCase
         $this->assertSame('created', DB::table('shipments')->where('id', $shipmentB)->value('status'));
     }
 
+    public function test_bulk_update_preview_returns_target_count_and_sample(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+        $hubId = (string) DB::table('hubs')->value('id');
+
+        DB::table('shipments')->insert([
+            [
+                'id' => (string) Str::uuid(),
+                'hub_id' => $hubId,
+                'reference' => 'SHP-PREVIEW-001',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Preview Uno',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => (string) Str::uuid(),
+                'hub_id' => $hubId,
+                'reference' => 'SHP-PREVIEW-002',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'consignee_name' => 'Preview Dos',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/shipments/bulk-update/preview', [
+            'apply_to_filtered' => true,
+            'filter_q' => 'SHP-PREVIEW',
+            'status' => 'incident',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.target_count', 2);
+        $response->assertJsonPath('data.updates.status', 'incident');
+    }
+
+    public function test_bulk_update_writes_structured_before_after_audit_changes(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+        $hubId = (string) DB::table('hubs')->value('id');
+        $shipmentId = (string) Str::uuid();
+
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-AUDIT-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Audit Uno',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/shipments/bulk-update', [
+            'shipment_ids' => [$shipmentId],
+            'status' => 'incident',
+            'reason' => 'test audit structured changes',
+        ])->assertOk();
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'shipments.bulk_updated')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) $audit->metadata, true);
+        $this->assertSame(1, $metadata['changed_rows_count'] ?? null);
+        $this->assertSame($shipmentId, $metadata['changes'][0]['shipment_id'] ?? null);
+        $this->assertSame('created', $metadata['changes'][0]['changes']['status']['before'] ?? null);
+        $this->assertSame('incident', $metadata['changes'][0]['changes']['status']['after'] ?? null);
+    }
+
     public function test_rejects_scheduled_at_outside_allowed_window(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

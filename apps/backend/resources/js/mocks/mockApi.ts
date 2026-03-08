@@ -1322,6 +1322,55 @@ export const mockApi = {
     };
   },
 
+  async previewBulkUpdateShipments(payload: {
+    shipment_ids: string[];
+    apply_to_filtered?: boolean;
+    filter_status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    filter_hub_id?: string;
+    filter_q?: string;
+    filter_scheduled_from?: string;
+    filter_scheduled_to?: string;
+    status?: 'created' | 'out_for_delivery' | 'delivered' | 'incident';
+    hub_id?: string;
+    scheduled_at?: string;
+    reason?: string;
+  }) {
+    let target = payload.shipment_ids.map((id) => mockShipments.find((row) => row.id === id)).filter((row): row is typeof mockShipments[number] => !!row);
+    if (payload.apply_to_filtered) {
+      target = [...mockShipments];
+      if (payload.filter_status) target = target.filter((row) => row.status === payload.filter_status);
+      if (payload.filter_hub_id) target = target.filter((row) => row.hub_id === payload.filter_hub_id);
+      if (payload.filter_q) {
+        const q = payload.filter_q.toLowerCase();
+        target = target.filter((row) => (
+          row.reference.toLowerCase().includes(q)
+          || (row.external_reference ?? '').toLowerCase().includes(q)
+          || row.id.toLowerCase().includes(q)
+          || (row.consignee_name ?? '').toLowerCase().includes(q)
+        ));
+      }
+      if (payload.filter_scheduled_from) target = target.filter((row) => (row.scheduled_at ?? '') >= `${payload.filter_scheduled_from}T00:00:00`);
+      if (payload.filter_scheduled_to) target = target.filter((row) => (row.scheduled_at ?? '') <= `${payload.filter_scheduled_to}T23:59:59`);
+    }
+
+    return {
+      target_count: target.length,
+      sample: target.slice(0, 20).map((row) => ({
+        id: row.id,
+        reference: row.reference,
+        status: row.status,
+        hub_id: row.hub_id ?? null,
+        scheduled_at: row.scheduled_at ?? null,
+      })),
+      updates: {
+        status: payload.status ?? null,
+        hub_id: payload.hub_id ?? null,
+        scheduled_at: payload.scheduled_at ?? null,
+      },
+      apply_to_filtered: payload.apply_to_filtered === true,
+    };
+  },
+
   async getShipmentDetail(id: string) {
     return {
       shipment: {
