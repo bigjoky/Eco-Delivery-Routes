@@ -1,6 +1,7 @@
 package com.ecodeliveryroutes.core.network
 
 import com.ecodeliveryroutes.BuildConfig
+import com.ecodeliveryroutes.core.model.AddressSuggestion
 import com.ecodeliveryroutes.core.model.AuthProfile
 import com.ecodeliveryroutes.core.model.DashboardAlert
 import com.ecodeliveryroutes.core.model.DashboardOverview
@@ -21,9 +22,17 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
+import java.nio.charset.StandardCharsets
 
 class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf { it.isNotBlank() }) {
+    private val addressSuggestionsCache = mutableMapOf<String, Pair<Long, List<AddressSuggestion>>>()
+
+    companion object {
+        private const val ADDRESS_SUGGESTIONS_TTL_MS = 5 * 60 * 1000L
+    }
+
     suspend fun login(email: String, password: String): String = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext "mock-token"
 
@@ -149,25 +158,93 @@ class ApiClient(private val baseUrl: String? = BuildConfig.API_BASE_URL.takeIf {
         senderDocumentId: String,
         senderPhone: String,
         scheduledAt: String? = null,
-        serviceType: String = "express_1030"
+        serviceType: String = "express_1030",
+        addressStreet: String? = null,
+        addressNumber: String? = null,
+        postalCode: String? = null,
+        city: String? = null,
+        country: String? = null,
+        senderAddressLine: String? = null
     ): Boolean = withContext(Dispatchers.IO) {
         if (baseUrl == null) return@withContext true
         runCatching {
+            val payload = JSONObject()
+                .put("hub_id", hubId)
+                .put("consignee_name", consigneeName)
+                .put("consignee_document_id", consigneeDocumentId)
+                .put("consignee_phone", consigneePhone)
+                .put("sender_name", senderName)
+                .put("sender_document_id", senderDocumentId)
+                .put("sender_phone", senderPhone)
+                .put("scheduled_at", scheduledAt ?: java.time.LocalDate.now().toString())
+                .put("service_type", serviceType)
+            if (!addressStreet.isNullOrBlank()) payload.put("address_street", addressStreet)
+            if (!addressNumber.isNullOrBlank()) payload.put("address_number", addressNumber)
+            if (!postalCode.isNullOrBlank()) payload.put("postal_code", postalCode)
+            if (!city.isNullOrBlank()) payload.put("city", city)
+            if (!country.isNullOrBlank()) payload.put("country", country)
+            if (!senderAddressLine.isNullOrBlank()) payload.put("sender_address_line", senderAddressLine)
             authedPost(
                 "$baseUrl/shipments",
-                JSONObject()
-                    .put("hub_id", hubId)
-                    .put("consignee_name", consigneeName)
-                    .put("consignee_document_id", consigneeDocumentId)
-                    .put("consignee_phone", consigneePhone)
-                    .put("sender_name", senderName)
-                    .put("sender_document_id", senderDocumentId)
-                    .put("sender_phone", senderPhone)
-                    .put("scheduled_at", scheduledAt ?: java.time.LocalDate.now().toString())
-                    .put("service_type", serviceType)
+                payload
             )
             true
         }.getOrDefault(false)
+    }
+
+    suspend fun addressSuggestions(
+        q: String,
+        kind: String,
+        city: String? = null,
+        postalCode: String? = null,
+        limit: Int = 5
+    ): List<AddressSuggestion> = withContext(Dispatchers.IO) {
+        if (q.isBlank()) return@withContext emptyList()
+        if (baseUrl == null) return@withContext emptyList()
+        val cacheKey = listOf(
+            q.trim().lowercase(),
+            kind.trim().lowercase(),
+            city?.trim()?.lowercase() ?: "",
+            postalCode?.trim()?.lowercase() ?: "",
+            limit.coerceIn(1, 25).toString()
+        ).joinToString("|")
+        val now = System.currentTimeMillis()
+        val cached = addressSuggestionsCache[cacheKey]
+        if (cached != null && cached.first > now) {
+            return@withContext cached.second
+        }
+        if (cached != null && cached.first <= now) {
+            addressSuggestionsCache.remove(cacheKey)
+        }
+
+        runCatching {
+            fun enc(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+            val query = buildList {
+                add("q=${enc(q)}")
+                add("kind=${enc(kind)}")
+                if (!city.isNullOrBlank()) add("city=${enc(city)}")
+                if (!postalCode.isNullOrBlank()) add("postal_code=${enc(postalCode)}")
+                add("limit=${limit.coerceIn(1, 25)}")
+            }.joinToString("&")
+            val payload = authedGet("$baseUrl/addresses/suggest?$query")
+            val rows = JSONObject(payload).optJSONArray("data") ?: JSONArray()
+            (0 until rows.length()).map { index ->
+                val item = rows.getJSONObject(index)
+                AddressSuggestion(
+                    source = item.optString("source"),
+                    sourceId = item.optString("source_id"),
+                    addressStreet = item.optString("address_street").ifBlank { null },
+                    addressNumber = item.optString("address_number").ifBlank { null },
+                    postalCode = item.optString("postal_code").ifBlank { null },
+                    city = item.optString("city").ifBlank { null },
+                    province = item.optString("province").ifBlank { null },
+                    country = item.optString("country").ifBlank { null },
+                    addressNotes = item.optString("address_notes").ifBlank { null }
+                )
+            }
+        }.getOrDefault(emptyList()).also { rows ->
+            addressSuggestionsCache[cacheKey] = (now + ADDRESS_SUGGESTIONS_TTL_MS) to rows
+        }
     }
 
     suspend fun registerIncident(

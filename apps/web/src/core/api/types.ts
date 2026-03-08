@@ -87,6 +87,18 @@ export type ContactSummary = {
   kind?: string | null;
 };
 
+export type AddressSuggestion = {
+  source: 'contact' | 'point';
+  source_id: string;
+  address_street?: string | null;
+  address_number?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  address_notes?: string | null;
+};
+
 export type PickupSummary = {
   id: string;
   reference: string;

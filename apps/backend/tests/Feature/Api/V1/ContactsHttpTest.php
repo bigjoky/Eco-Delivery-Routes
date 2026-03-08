@@ -84,6 +84,47 @@ class ContactsHttpTest extends TestCase
         $this->assertCount(1, $response->json('data'));
     }
 
+    public function test_contacts_support_kind_limit_and_exact_ordering(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Sender Exact',
+            'document_id' => 'B77777777',
+            'phone' => '+34950111555',
+            'kind' => 'sender',
+            'created_at' => now(),
+            'updated_at' => now()->subMinute(),
+        ]);
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Sender Similar',
+            'document_id' => 'B77770000',
+            'phone' => '+34950111550',
+            'kind' => 'sender',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('contacts')->insert([
+            'id' => (string) Str::uuid(),
+            'display_name' => 'Recipient Hidden',
+            'document_id' => 'B77779999',
+            'phone' => '+34950111555',
+            'kind' => 'recipient',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/contacts?kind=sender&phone=+34950111555&document_id=B77777777&limit=1');
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.0.display_name', 'Sender Exact')
+            ->assertJsonPath('data.0.kind', 'sender');
+        $this->assertCount(1, $response->json('data'));
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $roleId = DB::table('roles')->where('code', $roleCode)->value('id');

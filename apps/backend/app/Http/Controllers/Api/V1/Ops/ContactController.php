@@ -24,16 +24,31 @@ class ContactController extends Controller
         $phone = $request->query('phone');
         $email = $request->query('email');
         $documentId = $request->query('document_id');
+        $kind = $request->query('kind');
+        $limit = max(1, min((int) $request->query('limit', 50), 100));
         $q = $request->query('q');
+
+        $query->select('contacts.*');
 
         if (is_string($phone) && $phone !== '') {
             $query->where('phone', 'like', '%' . str_replace('%', '\\%', $phone) . '%');
+            $query->selectRaw(
+                "CASE WHEN REPLACE(COALESCE(phone, ''), ' ', '') = REPLACE(?, ' ', '') THEN 0 ELSE 1 END AS phone_exact_rank",
+                [$phone]
+            );
         }
         if (is_string($email) && $email !== '') {
             $query->where('email', 'like', '%' . str_replace('%', '\\%', $email) . '%');
         }
         if (is_string($documentId) && $documentId !== '') {
             $query->where('document_id', 'like', '%' . str_replace('%', '\\%', $documentId) . '%');
+            $query->selectRaw(
+                "CASE WHEN UPPER(COALESCE(document_id, '')) = UPPER(?) THEN 0 ELSE 1 END AS document_exact_rank",
+                [$documentId]
+            );
+        }
+        if (is_string($kind) && in_array($kind, ['sender', 'recipient'], true)) {
+            $query->where('kind', $kind);
         }
         if (is_string($q) && $q !== '') {
             $like = '%' . str_replace('%', '\\%', $q) . '%';
@@ -46,7 +61,14 @@ class ContactController extends Controller
             });
         }
 
-        $rows = $query->orderByDesc('updated_at')->limit(50)->get();
+        if (is_string($phone) && $phone !== '') {
+            $query->orderBy('phone_exact_rank');
+        }
+        if (is_string($documentId) && $documentId !== '') {
+            $query->orderBy('document_exact_rank');
+        }
+
+        $rows = $query->orderByDesc('updated_at')->limit($limit)->get();
 
         return response()->json(['data' => $rows]);
     }

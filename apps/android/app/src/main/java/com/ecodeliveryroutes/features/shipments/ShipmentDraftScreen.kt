@@ -26,6 +26,12 @@ fun ShipmentDraftScreen() {
     val recipientFirstName = remember { mutableStateOf("") }
     val recipientLastName = remember { mutableStateOf("") }
     val recipientPhone = remember { mutableStateOf("") }
+    val recipientStreet = remember { mutableStateOf("") }
+    val recipientNumber = remember { mutableStateOf("") }
+    val recipientPostalCode = remember { mutableStateOf("") }
+    val recipientCity = remember { mutableStateOf("") }
+    val recipientCountry = remember { mutableStateOf("ES") }
+    val recipientSuggestions = remember { mutableStateOf<List<String>>(emptyList()) }
 
     val senderDocType = remember { mutableStateOf("DNI") }
     val senderDocument = remember { mutableStateOf("") }
@@ -33,6 +39,7 @@ fun ShipmentDraftScreen() {
     val senderFirstName = remember { mutableStateOf("") }
     val senderLastName = remember { mutableStateOf("") }
     val senderPhone = remember { mutableStateOf("") }
+    val senderAddressLine = remember { mutableStateOf("") }
 
     val message = remember { mutableStateOf("Completa los campos obligatorios.") }
 
@@ -94,6 +101,71 @@ fun ShipmentDraftScreen() {
             label = { Text("Telefono destinatario") },
             modifier = Modifier.fillMaxWidth()
         )
+        OutlinedTextField(
+            value = recipientStreet.value,
+            onValueChange = { recipientStreet.value = it },
+            label = { Text("Calle destinatario") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = recipientNumber.value,
+            onValueChange = { recipientNumber.value = it },
+            label = { Text("Numero destinatario") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = recipientPostalCode.value,
+            onValueChange = { recipientPostalCode.value = it },
+            label = { Text("Codigo postal destinatario") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = recipientCity.value,
+            onValueChange = { recipientCity.value = it },
+            label = { Text("Ciudad destinatario") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = recipientCountry.value,
+            onValueChange = { recipientCountry.value = it.uppercase() },
+            label = { Text("Pais destinatario (ISO2)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(onClick = {
+            val q = listOf(recipientStreet.value, recipientCity.value, recipientPostalCode.value).joinToString(" ").trim()
+            if (q.isBlank()) {
+                recipientSuggestions.value = emptyList()
+                return@Button
+            }
+            scope.launch {
+                val suggestions = ApiProvider.client.addressSuggestions(
+                    q = q,
+                    kind = "recipient",
+                    city = recipientCity.value.ifBlank { null },
+                    postalCode = recipientPostalCode.value.ifBlank { null },
+                    limit = 5
+                )
+                recipientSuggestions.value = suggestions.map { item ->
+                    listOf(
+                        item.addressStreet ?: "",
+                        item.addressNumber ?: "",
+                        item.postalCode ?: "",
+                        item.city ?: ""
+                    ).joinToString(" ").trim()
+                }
+                val first = suggestions.firstOrNull()
+                if (first != null) {
+                    recipientStreet.value = first.addressStreet ?: recipientStreet.value
+                    recipientNumber.value = first.addressNumber ?: recipientNumber.value
+                    recipientPostalCode.value = first.postalCode ?: recipientPostalCode.value
+                    recipientCity.value = first.city ?: recipientCity.value
+                    recipientCountry.value = first.country ?: recipientCountry.value
+                }
+            }
+        }) { Text("Sugerir direccion destinatario") }
+        recipientSuggestions.value.forEach { suggestion ->
+            Text("• $suggestion")
+        }
 
         Text("Remitente")
         OutlinedTextField(
@@ -138,6 +210,12 @@ fun ShipmentDraftScreen() {
             label = { Text("Telefono remitente") },
             modifier = Modifier.fillMaxWidth()
         )
+        OutlinedTextField(
+            value = senderAddressLine.value,
+            onValueChange = { senderAddressLine.value = it },
+            label = { Text("Direccion remitente") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Button(onClick = {
             val validation = validateDraft(
@@ -152,7 +230,9 @@ fun ShipmentDraftScreen() {
                 senderLegalName = senderLegalName.value,
                 senderFirstName = senderFirstName.value,
                 senderLastName = senderLastName.value,
-                senderPhone = senderPhone.value
+                senderPhone = senderPhone.value,
+                recipientCountry = recipientCountry.value,
+                recipientPostalCode = recipientPostalCode.value
             )
             if (validation != "Borrador valido.") {
                 message.value = validation
@@ -169,7 +249,13 @@ fun ShipmentDraftScreen() {
                     senderName = senderName,
                     senderDocumentId = senderDocument.value.trim(),
                     senderPhone = senderPhone.value.trim(),
-                    serviceType = serviceType.value.trim().ifEmpty { "express_1030" }
+                    serviceType = serviceType.value.trim().ifEmpty { "express_1030" },
+                    addressStreet = recipientStreet.value.trim().ifEmpty { null },
+                    addressNumber = recipientNumber.value.trim().ifEmpty { null },
+                    postalCode = normalizePostalCode(recipientCountry.value, recipientPostalCode.value),
+                    city = recipientCity.value.trim().ifEmpty { null },
+                    country = recipientCountry.value.trim().uppercase().ifEmpty { "ES" },
+                    senderAddressLine = senderAddressLine.value.trim().ifEmpty { null }
                 )
                 message.value = if (created) "Envio creado." else "No se pudo crear el envio."
             }
@@ -202,7 +288,9 @@ private fun validateDraft(
     senderLegalName: String,
     senderFirstName: String,
     senderLastName: String,
-    senderPhone: String
+    senderPhone: String,
+    recipientCountry: String,
+    recipientPostalCode: String
 ): String {
     if (recipientDocument.trim().isEmpty()) return "Documento de destinatario obligatorio."
     if (senderDocument.trim().isEmpty()) return "Documento de remitente obligatorio."
@@ -218,5 +306,28 @@ private fun validateDraft(
     }
     if (recipientPhone.trim().isEmpty()) return "Telefono destinatario obligatorio."
     if (senderPhone.trim().isEmpty()) return "Telefono remitente obligatorio."
+    if (!isValidPostalCode(recipientCountry, recipientPostalCode)) return "Codigo postal destinatario invalido."
     return "Borrador valido."
+}
+
+private fun normalizePostalCode(country: String, postalCode: String): String {
+    val normalizedCountry = country.trim().uppercase()
+    val cleaned = postalCode.trim().uppercase().replace("\\s+".toRegex(), "")
+    if (cleaned.isEmpty()) return ""
+    if (normalizedCountry == "PT") {
+        val digits = cleaned.replace("[^0-9]".toRegex(), "")
+        if (digits.length == 7) return "${digits.substring(0, 4)}-${digits.substring(4)}"
+    }
+    return cleaned
+}
+
+private fun isValidPostalCode(country: String, postalCode: String): Boolean {
+    val normalizedCountry = country.trim().uppercase()
+    val normalizedPostal = normalizePostalCode(normalizedCountry, postalCode)
+    if (normalizedPostal.isEmpty()) return true
+    return when (normalizedCountry) {
+        "ES", "FR", "DE", "IT" -> Regex("^[0-9]{5}$").matches(normalizedPostal)
+        "PT" -> Regex("^[0-9]{4}-?[0-9]{3}$").matches(normalizedPostal)
+        else -> Regex("^[0-9A-Z-]{4,10}$").matches(normalizedPostal)
+    }
 }

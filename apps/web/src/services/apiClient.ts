@@ -43,6 +43,7 @@ import {
   DashboardOverview,
   VehicleSummary,
   ContactSummary,
+  AddressSuggestion,
   ShipmentSummary,
   ShipmentDetail,
   PickupSummary,
@@ -61,6 +62,24 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const normalizedApiBase = (API_BASE_URL ?? '').trim();
 const USE_MOCK = !normalizedApiBase || normalizedApiBase === 'undefined' || normalizedApiBase === 'null';
 let refreshPromise: Promise<string | null> | null = null;
+const addressSuggestionsCache = new Map<string, { expiresAt: number; data: AddressSuggestion[] }>();
+const ADDRESS_SUGGESTIONS_TTL_MS = 5 * 60 * 1000;
+
+function addressSuggestionsKey(filters: {
+  q?: string;
+  kind?: 'sender' | 'recipient';
+  city?: string;
+  postalCode?: string;
+  limit?: number;
+}): string {
+  return JSON.stringify({
+    q: (filters.q ?? '').trim().toLowerCase(),
+    kind: filters.kind ?? '',
+    city: (filters.city ?? '').trim().toLowerCase(),
+    postalCode: (filters.postalCode ?? '').trim().toLowerCase(),
+    limit: filters.limit ?? 10,
+  });
+}
 
 function buildAuthHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = sessionStore.getToken();
@@ -678,6 +697,8 @@ export const apiClient = {
     phone?: string;
     email?: string;
     documentId?: string;
+    kind?: 'sender' | 'recipient';
+    limit?: number;
     q?: string;
   } = {}): Promise<ContactSummary[]> {
     if (USE_MOCK) return mockApi.getContacts(filters) as Promise<ContactSummary[]>;
@@ -685,10 +706,46 @@ export const apiClient = {
     if (filters.phone) params.set('phone', filters.phone);
     if (filters.email) params.set('email', filters.email);
     if (filters.documentId) params.set('document_id', filters.documentId);
+    if (filters.kind) params.set('kind', filters.kind);
+    if (typeof filters.limit === 'number' && filters.limit > 0) params.set('limit', String(filters.limit));
     if (filters.q) params.set('q', filters.q);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
     return parseData<ContactSummary>(response);
+  },
+
+  async getAddressSuggestions(filters: {
+    q?: string;
+    kind?: 'sender' | 'recipient';
+    city?: string;
+    postalCode?: string;
+    limit?: number;
+  } = {}): Promise<AddressSuggestion[]> {
+    const cacheKey = addressSuggestionsKey(filters);
+    const now = Date.now();
+    const cached = addressSuggestionsCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+    if (cached && cached.expiresAt <= now) {
+      addressSuggestionsCache.delete(cacheKey);
+    }
+
+    if (USE_MOCK) return mockApi.getAddressSuggestions(filters) as Promise<AddressSuggestion[]>;
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.kind) params.set('kind', filters.kind);
+    if (filters.city) params.set('city', filters.city);
+    if (filters.postalCode) params.set('postal_code', filters.postalCode);
+    if (typeof filters.limit === 'number' && filters.limit > 0) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/addresses/suggest${suffix}`);
+    const data = await parseData<AddressSuggestion>(response);
+    addressSuggestionsCache.set(cacheKey, {
+      expiresAt: now + ADDRESS_SUGGESTIONS_TTL_MS,
+      data,
+    });
+    return data;
   },
 
   async createShipment(payload: {
