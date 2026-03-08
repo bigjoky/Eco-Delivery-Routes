@@ -22,6 +22,7 @@ const menu = [
   { to: '/quality', label: 'KPI Calidad', feature: 'quality' },
   { to: '/users', label: 'Usuarios', feature: 'users' },
   { to: '/roles', label: 'Roles', feature: 'roles' },
+  { to: '/audit', label: 'Auditoria', feature: 'audit' },
 ];
 
 const sections = [
@@ -47,7 +48,7 @@ const sections = [
   },
   {
     label: 'Administracion',
-    items: ['/users', '/roles'],
+    items: ['/users', '/roles', '/audit'],
   },
 ];
 

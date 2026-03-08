@@ -119,6 +119,33 @@ class AuditLogController extends Controller
                 $query->whereRaw("json_extract(metadata, '$.user_id') = ?", [$id]);
             } elseif ($resource === 'role') {
                 $query->whereRaw("json_extract(metadata, '$.role_id') = ?", [$id]);
+            } elseif ($resource === 'subcontractor') {
+                $query->where(function ($nested) use ($id): void {
+                    $nested->whereRaw("json_extract(metadata, '$.subcontractor_id') = ?", [$id])
+                        ->orWhere('audit_logs.metadata', 'like', '%' . $id . '%');
+                });
+            } elseif ($resource === 'driver') {
+                $query->where(function ($nested) use ($id): void {
+                    $nested->whereRaw("json_extract(metadata, '$.driver_id') = ?", [$id])
+                        ->orWhere('audit_logs.metadata', 'like', '%' . $id . '%');
+                });
+            } elseif ($resource === 'vehicle') {
+                $query->where(function ($nested) use ($id): void {
+                    $nested->whereRaw("json_extract(metadata, '$.vehicle_id') = ?", [$id])
+                        ->orWhere('audit_logs.metadata', 'like', '%' . $id . '%');
+                });
+            } elseif ($resource === 'route') {
+                $query->whereRaw("json_extract(metadata, '$.route_id') = ?", [$id]);
+            } elseif ($resource === 'shipment') {
+                $query->whereRaw("json_extract(metadata, '$.shipment_id') = ?", [$id]);
+            } elseif ($resource === 'incident') {
+                $query->whereRaw("json_extract(metadata, '$.incident_id') = ?", [$id]);
+            } elseif ($resource === 'workforce') {
+                $query->whereRaw("json_extract(metadata, '$.employee_id') = ?", [$id]);
+            } elseif ($resource === 'compliance_document') {
+                $query->whereRaw("json_extract(metadata, '$.document_id') = ?", [$id]);
+            } elseif ($resource === 'vehicle_control') {
+                $query->whereRaw("json_extract(metadata, '$.vehicle_control_id') = ?", [$id]);
             }
         } elseif ($request->filled('resource')) {
             $resource = (string) $request->query('resource');
@@ -128,6 +155,24 @@ class AuditLogController extends Controller
                 $query->where('event', 'like', 'user.%');
             } elseif ($resource === 'role') {
                 $query->where('event', 'like', 'role.%');
+            } elseif ($resource === 'subcontractor') {
+                $query->where('event', 'like', 'subcontractors.%');
+            } elseif ($resource === 'driver') {
+                $query->where('event', 'like', 'drivers.%');
+            } elseif ($resource === 'vehicle') {
+                $query->where('event', 'like', 'vehicles.%');
+            } elseif ($resource === 'route') {
+                $query->where('event', 'like', 'routes.%');
+            } elseif ($resource === 'shipment') {
+                $query->where('event', 'like', 'shipments.%');
+            } elseif ($resource === 'incident') {
+                $query->where('event', 'like', 'incidents.%');
+            } elseif ($resource === 'workforce') {
+                $query->where('event', 'like', 'workforce.%');
+            } elseif ($resource === 'compliance_document') {
+                $query->where('event', 'like', 'compliance_documents.%');
+            } elseif ($resource === 'vehicle_control') {
+                $query->where('event', 'like', 'vehicle_controls.%');
             }
         }
 

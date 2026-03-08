@@ -361,7 +361,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role, subcontractor, driver, vehicle, route, shipment, incident, workforce, compliance_document, vehicle_control] }
         - in: query
           name: id
           schema: { type: string, format: uuid }
@@ -394,7 +394,7 @@ paths:
       parameters:
         - in: query
           name: resource
-          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role] }
+          schema: { type: string, enum: [settlement, adjustment, advance, tariff, quality_threshold, user, role, subcontractor, driver, vehicle, route, shipment, incident, workforce, compliance_document, vehicle_control] }
         - in: query
           name: id
           schema: { type: string, format: uuid }

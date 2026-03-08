@@ -538,7 +538,7 @@ export const mockApi = {
   },
 
   async getAuditLogs(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
     actor?: string;
@@ -660,6 +660,33 @@ export const mockApi = {
         });
       }
     }
+    if (_.resource === 'subcontractor') {
+      filtered = filtered.filter((row) => row.event.startsWith('subcontractors.'));
+    }
+    if (_.resource === 'driver') {
+      filtered = filtered.filter((row) => row.event.startsWith('drivers.'));
+    }
+    if (_.resource === 'vehicle') {
+      filtered = filtered.filter((row) => row.event.startsWith('vehicles.'));
+    }
+    if (_.resource === 'route') {
+      filtered = filtered.filter((row) => row.event.startsWith('routes.'));
+    }
+    if (_.resource === 'shipment') {
+      filtered = filtered.filter((row) => row.event.startsWith('shipments.'));
+    }
+    if (_.resource === 'incident') {
+      filtered = filtered.filter((row) => row.event.startsWith('incidents.'));
+    }
+    if (_.resource === 'workforce') {
+      filtered = filtered.filter((row) => row.event.startsWith('workforce.'));
+    }
+    if (_.resource === 'compliance_document') {
+      filtered = filtered.filter((row) => row.event.startsWith('compliance_documents.'));
+    }
+    if (_.resource === 'vehicle_control') {
+      filtered = filtered.filter((row) => row.event.startsWith('vehicle_controls.'));
+    }
     if (_.event) {
       filtered = filtered.filter((row) => row.event.startsWith(_.event ?? ''));
     }
@@ -674,7 +701,7 @@ export const mockApi = {
   },
 
   async exportAuditLogsCsv(_: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
     actor?: string;

@@ -402,7 +402,7 @@ export const apiClient = {
   },
 
   async getAuditLogs(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
     actor?: string;
@@ -432,7 +432,7 @@ export const apiClient = {
   },
 
   async exportAuditLogsCsv(filters: {
-    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role';
+    resource?: 'settlement' | 'adjustment' | 'advance' | 'tariff' | 'quality_threshold' | 'user' | 'role' | 'subcontractor' | 'driver' | 'vehicle' | 'route' | 'shipment' | 'incident' | 'workforce' | 'compliance_document' | 'vehicle_control';
     id?: string;
     event?: string;
     actor?: string;

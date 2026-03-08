@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
+import { AuditOpsPage } from '../features/audit/AuditOpsPage';
 import { canAccess } from '../core/auth/access';
 import { sessionStore } from '../core/auth/sessionStore';
 import { apiClient } from '../services/apiClient';
@@ -175,6 +176,10 @@ export function App() {
         <Route
           path="/roles/:id"
           element={isAuthenticated && canAccess('roles', roles) ? <RoleDetailPage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/audit"
+          element={isAuthenticated && canAccess('audit', roles) ? <AuditOpsPage /> : <Navigate to="/login" replace />}
         />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
