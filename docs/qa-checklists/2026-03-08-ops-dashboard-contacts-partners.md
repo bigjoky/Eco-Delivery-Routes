@@ -21,6 +21,8 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
   - [ ] `business_parcel` bloquea domingo.
   - [ ] `thermo_parcel` bloquea domingo.
 - [ ] Validar dirección condicional: provincia obligatoria para `ES`, `PT`, `IT`.
+- [ ] Validar en alta de envío que se cargan listados de `hub` y `punto operativo` para usuario operativo.
+- [ ] Validar mensaje de ayuda cuando no hay hubs/puntos visibles.
 
 ## Partners (acciones masivas)
 

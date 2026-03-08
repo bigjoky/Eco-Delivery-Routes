@@ -502,9 +502,7 @@ export const apiClient = {
     if (filters.onlyActive !== undefined) params.set('only_active', filters.onlyActive ? '1' : '0');
     if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
     const suffix = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetch(`${API_BASE_URL}/hubs${suffix}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs${suffix}`);
     return parseData<HubSummary>(response);
   },
 

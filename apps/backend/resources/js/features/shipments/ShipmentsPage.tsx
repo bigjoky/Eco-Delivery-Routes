@@ -261,6 +261,7 @@ export function ShipmentsPage() {
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [hubDepots, setHubDepots] = useState<DepotSummary[]>([]);
   const [hubPoints, setHubPoints] = useState<PointSummary[]>([]);
+  const [networkLoadError, setNetworkLoadError] = useState('');
   const [createHubId, setCreateHubId] = useState('');
   const [createPointId, setCreatePointId] = useState('');
   const [createExternalReference, setCreateExternalReference] = useState('');
@@ -610,8 +611,12 @@ export function ShipmentsPage() {
   useEffect(() => {
     apiClient.getHubs({ onlyActive: true }).then((rows) => {
       setHubs(rows);
+      setNetworkLoadError('');
       if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
-    }).catch(() => setHubs([]));
+    }).catch((exception) => {
+      setHubs([]);
+      setNetworkLoadError(exception instanceof Error ? exception.message : 'No se pudieron cargar hubs.');
+    });
   }, []);
 
   useEffect(() => {
@@ -627,13 +632,15 @@ export function ShipmentsPage() {
     ]).then(([depots, points]) => {
       setHubDepots(depots);
       setHubPoints(points);
+      setNetworkLoadError('');
       if (!points.some((item) => item.id === createPointId)) {
         setCreatePointId('');
       }
-    }).catch(() => {
+    }).catch((exception) => {
       setHubDepots([]);
       setHubPoints([]);
       setCreatePointId('');
+      setNetworkLoadError(exception instanceof Error ? exception.message : 'No se pudieron cargar puntos operativos.');
     });
   }, [createHubId, createPointId]);
 
@@ -2305,6 +2312,8 @@ export function ShipmentsPage() {
                   <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
                 ))}
               </select>
+              {networkLoadError ? <div className="helper error">{networkLoadError}</div> : null}
+              {!networkLoadError && hubs.length === 0 ? <div className="helper">No hay hubs activos visibles para tu usuario.</div> : null}
               {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>
@@ -2313,6 +2322,7 @@ export function ShipmentsPage() {
                 id="create-shipment-point"
                 value={createPointId}
                 onChange={(event) => setCreatePointId(event.target.value)}
+                disabled={!createHubId}
               >
                 <option value="">Sin punto</option>
                 {hubPoints.map((point) => {
@@ -2324,6 +2334,7 @@ export function ShipmentsPage() {
                   );
                 })}
               </select>
+              {createHubId && hubPoints.length === 0 ? <div className="helper">Sin puntos operativos para el hub seleccionado.</div> : null}
             </div>
             <div>
               <label htmlFor="create-shipment-external-ref">Referencia cliente</label>

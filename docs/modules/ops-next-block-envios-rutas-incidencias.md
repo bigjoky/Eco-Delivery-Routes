@@ -52,6 +52,7 @@
 - Contactos compartidos recientes en modal con aplicación en 1 clic.
 - Priorización por frecuencia de uso (plantillas y contactos recientes).
 - Modo operador en alta de envíos: defaults persistidos de hub/operación/servicio para flujo repetitivo.
+- Corregida carga de red operativa en alta: listado de hubs/puntos visible para perfiles con permisos de envíos.
 
 2. Rutas
 - Presets operativos para acciones masivas de paradas (`inicio turno`, `en curso`, `cerrar ahora`, desplazamientos ETA).
