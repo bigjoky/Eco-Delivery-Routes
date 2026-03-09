@@ -968,6 +968,10 @@ textarea:focus {
     white-space: nowrap;
   }
 
+  .sidebar-link-mobile-extra {
+    display: none;
+  }
+
   .sidebar-more summary {
     white-space: nowrap;
   }
