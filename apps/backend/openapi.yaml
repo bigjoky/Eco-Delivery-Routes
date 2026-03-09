@@ -2745,6 +2745,26 @@ paths:
       responses:
         '200': { description: OK }
 
+  /incidents/sla-recommendations:
+    get:
+      tags: [Incidents]
+      summary: Obtener recomendaciones automáticas para gestión SLA
+      responses:
+        '200': { description: OK }
+
+  /incidents/sla-recommendations/{key}/apply:
+    post:
+      tags: [Incidents]
+      summary: Aplicar recomendación SLA predefinida sobre incidencias abiertas
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string, enum: [breached_escalation, at_risk_escalation] }
+      responses:
+        '200': { description: OK }
+        '404': { description: Recommendation not found }
+
   /incidents/{id}:
     patch:
       tags: [Incidents]

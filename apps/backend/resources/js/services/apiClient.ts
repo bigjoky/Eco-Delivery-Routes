@@ -5,6 +5,7 @@ import {
   DepotSummary,
   HubSummary,
   IncidentCatalogItem,
+  IncidentSlaRecommendations,
   IncidentsBoardSummary,
   IncidentSummary,
   LoginResponse,
@@ -2276,6 +2277,27 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot load incidents board');
     return json.data as IncidentsBoardSummary;
+  },
+
+  async getIncidentSlaRecommendations(): Promise<IncidentSlaRecommendations> {
+    if (USE_MOCK) return mockApi.getIncidentSlaRecommendations() as Promise<IncidentSlaRecommendations>;
+    const response = await fetch(`${API_BASE_URL}/incidents/sla-recommendations`, {
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot load SLA recommendations');
+    return json.data as IncidentSlaRecommendations;
+  },
+
+  async applyIncidentSlaRecommendation(key: 'breached_escalation' | 'at_risk_escalation'): Promise<{ requested_count: number; updated_count: number }> {
+    if (USE_MOCK) return mockApi.applyIncidentSlaRecommendation(key) as Promise<{ requested_count: number; updated_count: number }>;
+    const response = await fetch(`${API_BASE_URL}/incidents/sla-recommendations/${encodeURIComponent(key)}/apply`, {
+      method: 'POST',
+      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot apply SLA recommendation');
+    return json.data as { requested_count: number; updated_count: number };
   },
 
   async createIncident(payload: {

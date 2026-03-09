@@ -2915,6 +2915,58 @@ export const mockApi = {
     };
   },
 
+  async getIncidentSlaRecommendations() {
+    const breached = await this.getIncidents({ resolved: 'open', slaStatus: 'breached' });
+    const atRisk = await this.getIncidents({ resolved: 'open', slaStatus: 'at_risk' });
+    return {
+      generated_at: nowIso(),
+      actions: [
+        {
+          key: 'breached_escalation' as const,
+          label: 'Escalar SLA vencido',
+          description: 'Prioriza incidencias vencidas y fija vencimiento corto para contención operativa.',
+          estimated_count: breached.length,
+          recommended_payload: {
+            priority: 'high' as const,
+            sla_due_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+            reason: 'Auto-escalado SLA vencido',
+          },
+        },
+        {
+          key: 'at_risk_escalation' as const,
+          label: 'Escalar SLA en riesgo',
+          description: 'Eleva prioridad y ajusta SLA para prevenir incumplimientos inminentes.',
+          estimated_count: atRisk.length,
+          recommended_payload: {
+            priority: 'high' as const,
+            sla_due_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            reason: 'Auto-escalado SLA en riesgo',
+          },
+        },
+      ],
+    };
+  },
+
+  async applyIncidentSlaRecommendation(key: 'breached_escalation' | 'at_risk_escalation') {
+    if (key === 'breached_escalation') {
+      return this.overrideIncidentSlaBulk({
+        applyToFiltered: true,
+        filters: { resolved: 'open', slaStatus: 'breached' },
+        priority: 'high',
+        slaDueAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        reason: 'Auto-escalado SLA vencido',
+      });
+    }
+
+    return this.overrideIncidentSlaBulk({
+      applyToFiltered: true,
+      filters: { resolved: 'open', slaStatus: 'at_risk' },
+      priority: 'high',
+      slaDueAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      reason: 'Auto-escalado SLA en riesgo',
+    });
+  },
+
   async createIncident(payload: {
     incidentable_type: 'shipment' | 'pickup';
     incidentable_id: string;
