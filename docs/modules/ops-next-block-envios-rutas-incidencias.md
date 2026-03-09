@@ -70,6 +70,7 @@
 4. UI
 - Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).
 - Dashboard: eliminadas acciones rápidas y bloque SLA en una sola fila.
+- Operativa (`envíos`, `rutas`, `incidencias`) con toolbar visual unificada para filtros, presets y acciones masivas.
 
 5. Partners
 - Acciones masivas con motivo estructurado (`reason_code`, `reason_detail`, `reason`) y auditoría enriquecida.

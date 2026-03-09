@@ -726,7 +726,7 @@ export function IncidentsPage() {
             </div>
           </div>
           {resolveError ? <div className="helper error">{resolveError}</div> : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
@@ -744,7 +744,7 @@ export function IncidentsPage() {
               Limpiar filtros
             </Button>
           </div>
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <span className="helper">Presets operativos</span>
             <Button type="button" variant="outline" onClick={() => applyOperationalPreset('sla_breached')}>
               SLA vencido
@@ -827,7 +827,7 @@ export function IncidentsPage() {
               </div>
             </div>
           ) : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
               Modo selección
             </Button>
@@ -861,7 +861,7 @@ export function IncidentsPage() {
           <div className="helper">
             Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
           </div>
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showBulkSlaPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkSlaPanel((value) => !value)}>
               {showBulkSlaPanel ? 'Ocultar override SLA' : 'Mostrar override SLA'}
             </Button>

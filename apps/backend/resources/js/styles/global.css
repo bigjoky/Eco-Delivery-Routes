@@ -299,6 +299,13 @@ a {
   align-items: center;
 }
 
+.ops-toolbar {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 8px 10px;
+}
+
 .inline-actions > label {
   margin-right: 2px;
 }

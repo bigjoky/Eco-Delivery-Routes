@@ -3218,7 +3218,7 @@ export function ShipmentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
@@ -3247,7 +3247,7 @@ export function ShipmentsPage() {
               exportPdf={exportPdf}
             />
           ) : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <span className="helper">Columnas export</span>
           {[
             'reference',
@@ -3280,7 +3280,7 @@ export function ShipmentsPage() {
             </Button>
           </div>
           {exportError ? <div className="helper error">{exportError}</div> : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
             </Button>

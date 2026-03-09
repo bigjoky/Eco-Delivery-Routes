@@ -671,7 +671,7 @@ export function RoutesPage() {
               <div className="kpi-value">{routeSummary.cancelled}</div>
             </div>
           </div>
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
@@ -681,7 +681,7 @@ export function RoutesPage() {
             ) : null}
           </div>
           <div className="filters-panel">
-            <div className="inline-actions">
+            <div className="inline-actions ops-toolbar">
               <span className="helper">Reasignación masiva</span>
               <span className="helper">{selectedRouteIds.length} seleccionada(s)</span>
             </div>
@@ -731,7 +731,7 @@ export function RoutesPage() {
                 </select>
               </div>
             </div>
-            <div className="inline-actions">
+            <div className="inline-actions ops-toolbar">
               <label htmlFor="routes-bulk-unassigned">Dejar sin asignar</label>
               <input
                 id="routes-bulk-unassigned"
@@ -818,7 +818,7 @@ export function RoutesPage() {
                   />
                 </div>
               </div>
-              <div className="inline-actions">
+              <div className="inline-actions ops-toolbar">
                 <span className="helper">Estados rapidos</span>
                 <Button type="button" variant={status === '' ? 'secondary' : 'outline'} onClick={() => setStatus('')}>Todos</Button>
                 <Button type="button" variant={status === 'planned' ? 'secondary' : 'outline'} onClick={() => setStatus('planned')}>Planned</Button>

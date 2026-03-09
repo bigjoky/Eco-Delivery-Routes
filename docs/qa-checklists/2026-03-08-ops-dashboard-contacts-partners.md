@@ -53,3 +53,4 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [x] `./vendor/bin/phpunit --filter=ContactsHttpTest`
 - [x] `./vendor/bin/phpunit --filter=SubcontractorDriverVehicleHttpTest`
 - [x] `./vendor/bin/phpunit --filter=OpsEndpointsTest`
+- [ ] Validar consistencia visual de barras de acción (`ops-toolbar`) en envíos/rutas/incidencias.
