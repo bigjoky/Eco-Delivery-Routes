@@ -139,6 +139,8 @@ Route::prefix('v1')->group(function () {
         Route::post('advances/{id}/approve', [AdvanceController::class, 'approve']);
         Route::get('incidents/catalog', [IncidentController::class, 'catalog']);
         Route::get('incidents/board', [IncidentController::class, 'board']);
+        Route::get('incidents/sla-recommendations', [IncidentController::class, 'slaRecommendations']);
+        Route::post('incidents/sla-recommendations/{key}/apply', [IncidentController::class, 'applySlaRecommendation']);
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
         Route::patch('incidents/{id}', [IncidentController::class, 'update']);

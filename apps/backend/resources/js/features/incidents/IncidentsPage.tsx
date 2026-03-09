@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { IncidentCatalogItem, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
+import { IncidentCatalogItem, IncidentSlaRecommendationAction, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -111,6 +111,8 @@ export function IncidentsPage() {
   const [slaQueueMode, setSlaQueueMode] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
   const [showAudit, setShowAudit] = useState(false);
+  const [slaRecommendations, setSlaRecommendations] = useState<IncidentSlaRecommendationAction[]>([]);
+  const [applyingRecommendationKey, setApplyingRecommendationKey] = useState<string | null>(null);
 
   const incidentSummary = useMemo(() => {
     const openCount = items.filter((item) => !item.resolved_at).length;
@@ -194,8 +196,12 @@ export function IncidentsPage() {
       });
     }).then((summary) => {
       setBoard(summary);
+      return apiClient.getIncidentSlaRecommendations();
+    }).then((recommendations) => {
+      setSlaRecommendations(recommendations.actions ?? []);
     }).catch(() => {
       setBoard(null);
+      setSlaRecommendations([]);
     });
 
   useEffect(() => {
@@ -570,6 +576,20 @@ export function IncidentsPage() {
     }
   };
 
+  const onApplySlaRecommendation = async (action: IncidentSlaRecommendationAction) => {
+    setApplyingRecommendationKey(action.key);
+    setResolveError('');
+    try {
+      const result = await apiClient.applyIncidentSlaRecommendation(action.key);
+      setResolveError(result.updated_count > 0 ? '' : 'No había incidencias abiertas para aplicar la recomendación.');
+      await reload();
+    } catch (exception) {
+      setResolveError(exception instanceof Error ? exception.message : 'No se pudo aplicar la recomendación SLA');
+    } finally {
+      setApplyingRecommendationKey(null);
+    }
+  };
+
   return (
     <section className="page-grid">
       <div className="inline-actions">
@@ -716,6 +736,45 @@ export function IncidentsPage() {
             </div>
             {createError ? <div className="helper error">{createError}</div> : null}
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Automatización SLA</CardTitle>
+          <CardDescription>Recomendaciones para reducir incidencias en riesgo y vencidas.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="page-grid">
+            {slaRecommendations.length === 0 ? (
+              <div className="helper">No hay recomendaciones SLA disponibles.</div>
+            ) : (
+              slaRecommendations.map((action) => (
+                <div key={action.key} className="card">
+                  <div className="inline-actions" style={{ justifyContent: 'space-between', width: '100%' }}>
+                    <div>
+                      <div className="kpi-label">{action.label}</div>
+                      <div className="helper">{action.description}</div>
+                    </div>
+                    <Badge variant="outline">Objetivo {action.estimated_count}</Badge>
+                  </div>
+                  <div className="helper">
+                    Recomendado: prioridad <strong>{action.recommended_payload.priority}</strong> · due_at {action.recommended_payload.sla_due_at}
+                  </div>
+                  <div className="inline-actions">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { void onApplySlaRecommendation(action); }}
+                      disabled={applyingRecommendationKey !== null}
+                    >
+                      {applyingRecommendationKey === action.key ? 'Aplicando...' : 'Aplicar recomendación'}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

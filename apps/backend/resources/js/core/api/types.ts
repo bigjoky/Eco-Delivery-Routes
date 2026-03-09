@@ -552,19 +552,21 @@ export type IncidentSummary = {
   resolved_at?: string | null;
 };
 
-export type IncidentsBoardSummary = {
-  total_open: number;
-  total_resolved: number;
-  by_priority: {
-    high: number;
-    medium: number;
-    low: number;
+export type IncidentSlaRecommendationAction = {
+  key: 'breached_escalation' | 'at_risk_escalation';
+  label: string;
+  description: string;
+  estimated_count: number;
+  recommended_payload: {
+    priority: 'high' | 'medium' | 'low';
+    sla_due_at: string;
+    reason: string;
   };
-  by_sla_status: {
-    on_track: number;
-    at_risk: number;
-    breached: number;
-  };
+};
+
+export type IncidentSlaRecommendations = {
+  generated_at: string;
+  actions: IncidentSlaRecommendationAction[];
 };
 
 export type IncidentCatalogItem = {

@@ -260,6 +260,59 @@ class IncidentHttpTest extends TestCase
         $this->assertSame($incidentId, $metadata['incident_id'] ?? null);
     }
 
+    public function test_incident_sla_recommendations_can_be_listed_and_applied(): void
+    {
+        $shipmentCatalog = DB::table('incident_catalog_versions as versions')
+            ->join('incident_catalog_items as items', 'items.version_id', '=', 'versions.id')
+            ->where('versions.is_active', true)
+            ->where('items.is_active', true)
+            ->whereIn('items.applies_to', ['shipment', 'both'])
+            ->select('items.code', 'items.category')
+            ->orderBy('items.code')
+            ->first();
+        $this->assertNotNull($shipmentCatalog);
+
+        $id = (string) $this->postJson('/api/v1/incidents', [
+            'incidentable_type' => 'shipment',
+            'incidentable_id' => (string) Str::uuid(),
+            'catalog_code' => $shipmentCatalog->code,
+            'category' => $shipmentCatalog->category,
+            'notes' => 'sla recommendation target',
+        ])->assertCreated()->json('data.id');
+
+        DB::table('incidents')->where('id', $id)->update([
+            'created_at' => now()->subHours(10),
+            'updated_at' => now()->subHours(10),
+        ]);
+
+        $recommendations = $this->getJson('/api/v1/incidents/sla-recommendations');
+        $recommendations->assertOk();
+        $recommendations->assertJsonStructure([
+            'data' => [
+                'generated_at',
+                'actions' => [
+                    ['key', 'label', 'description', 'estimated_count', 'recommended_payload' => ['priority', 'sla_due_at', 'reason']],
+                ],
+            ],
+        ]);
+
+        $apply = $this->postJson('/api/v1/incidents/sla-recommendations/breached_escalation/apply');
+        $apply->assertOk();
+        $apply->assertJsonPath('data.updated_count', 1);
+
+        $updated = DB::table('incidents')->where('id', $id)->first();
+        $this->assertSame('high', $updated->priority_override);
+        $this->assertNotNull($updated->sla_due_at_override);
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'incidents.sla_recommendation.applied')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) $audit->metadata, true);
+        $this->assertSame('breached_escalation', $metadata['recommendation_key'] ?? null);
+    }
+
     private function authenticateAsAdmin(): void
     {
         /** @var \App\Models\User|null $user */

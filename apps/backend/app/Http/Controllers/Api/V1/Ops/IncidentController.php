@@ -124,6 +124,123 @@ class IncidentController extends Controller
         ]);
     }
 
+    public function slaRecommendations(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.read')) {
+            return $this->forbidden();
+        }
+
+        $breachedIds = $this->collectIncidentIdsForFilter([
+            'resolved' => 'open',
+            'sla_status' => 'breached',
+        ], true);
+
+        $atRiskIds = $this->collectIncidentIdsForFilter([
+            'resolved' => 'open',
+            'sla_status' => 'at_risk',
+        ], true);
+
+        $actions = [
+            [
+                'key' => 'breached_escalation',
+                'label' => 'Escalar SLA vencido',
+                'description' => 'Prioriza incidencias vencidas y fija vencimiento corto para contención operativa.',
+                'estimated_count' => count($breachedIds),
+                'recommended_payload' => [
+                    'priority' => 'high',
+                    'sla_due_at' => now()->addMinutes(30)->toAtomString(),
+                    'reason' => 'Auto-escalado SLA vencido',
+                ],
+            ],
+            [
+                'key' => 'at_risk_escalation',
+                'label' => 'Escalar SLA en riesgo',
+                'description' => 'Eleva prioridad y ajusta SLA para prevenir incumplimientos inminentes.',
+                'estimated_count' => count($atRiskIds),
+                'recommended_payload' => [
+                    'priority' => 'high',
+                    'sla_due_at' => now()->addMinutes(60)->toAtomString(),
+                    'reason' => 'Auto-escalado SLA en riesgo',
+                ],
+            ],
+        ];
+
+        return response()->json([
+            'data' => [
+                'generated_at' => now()->toAtomString(),
+                'actions' => $actions,
+            ],
+        ]);
+    }
+
+    public function applySlaRecommendation(Request $request, string $key): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('incidents.write')) {
+            return $this->forbidden();
+        }
+
+        $plan = match ($key) {
+            'breached_escalation' => [
+                'filters' => ['resolved' => 'open', 'sla_status' => 'breached'],
+                'priority' => 'high',
+                'sla_due_at' => now()->addMinutes(30)->toAtomString(),
+                'reason' => 'Auto-escalado SLA vencido',
+            ],
+            'at_risk_escalation' => [
+                'filters' => ['resolved' => 'open', 'sla_status' => 'at_risk'],
+                'priority' => 'high',
+                'sla_due_at' => now()->addMinutes(60)->toAtomString(),
+                'reason' => 'Auto-escalado SLA en riesgo',
+            ],
+            default => null,
+        };
+
+        if ($plan === null) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'SLA recommendation not found.'],
+            ], 404);
+        }
+
+        $ids = $this->collectIncidentIdsForFilter($plan['filters'], true);
+        if ($ids === []) {
+            return response()->json([
+                'data' => [
+                    'requested_count' => 0,
+                    'updated_count' => 0,
+                ],
+            ]);
+        }
+
+        $updated = DB::table('incidents')
+            ->whereIn('id', $ids)
+            ->whereNull('resolved_at')
+            ->update([
+                'priority_override' => $plan['priority'],
+                'sla_due_at_override' => $plan['sla_due_at'],
+                'updated_at' => now(),
+            ]);
+
+        $this->auditLogWriter->write($actor->id, 'incidents.sla_recommendation.applied', [
+            'recommendation_key' => $key,
+            'requested_count' => count($ids),
+            'updated_count' => (int) $updated,
+            'priority' => $plan['priority'],
+            'sla_due_at' => $plan['sla_due_at'],
+            'reason' => $plan['reason'],
+        ]);
+
+        return response()->json([
+            'data' => [
+                'requested_count' => count($ids),
+                'updated_count' => (int) $updated,
+            ],
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $start = microtime(true);
