@@ -181,7 +181,7 @@ export function RoutesPage() {
   }, [status, hubFilter, subcontractorFilter, query, dateFrom, dateTo]);
 
   useEffect(() => {
-    apiClient.getHubs({ onlyActive: true }).then((rows) => {
+    apiClient.getHubs({ onlyActive: false }).then((rows) => {
       setHubs(rows);
       if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
     }).catch(() => setHubs([]));

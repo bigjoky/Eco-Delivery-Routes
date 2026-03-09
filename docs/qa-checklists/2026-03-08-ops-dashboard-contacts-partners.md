@@ -23,6 +23,7 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Validar dirección condicional: provincia obligatoria para `ES`, `PT`, `IT`.
 - [ ] Validar en alta de envío que se cargan listados de `hub` y `punto operativo` para usuario operativo.
 - [ ] Validar mensaje de ayuda cuando no hay hubs/puntos visibles.
+- [ ] Validar que con rol `super_admin` se puede crear y visualizar hubs/depots/points sin bloqueo de permisos.
 
 ## Partners (acciones masivas)
 
@@ -56,3 +57,5 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [x] `./vendor/bin/phpunit --filter=SubcontractorDriverVehicleHttpTest`
 - [x] `./vendor/bin/phpunit --filter=OpsEndpointsTest`
 - [ ] Validar consistencia visual de barras de acción (`ops-toolbar`) en envíos/rutas/incidencias.
+- [ ] Validar responsive operativo en móvil (sidebar, topbar, tablas y KPIs).
+- [ ] Validar favicon nuevo en app, PWA y API docs tras hard refresh.

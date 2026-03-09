@@ -73,6 +73,12 @@
 - Refinado global para consistencia visual de formularios, paneles y tablas (alineación y proporciones homogéneas).
 - Dashboard: eliminadas acciones rápidas y bloque SLA en una sola fila.
 - Operativa (`envíos`, `rutas`, `incidencias`) con toolbar visual unificada para filtros, presets y acciones masivas.
+- Sidebar inferior simplificada (sin botón redundante `Operativa`) y mejoras responsive para mobile-first operativo.
+- Favicon generado desde logo corporativo (`favicon.svg`, `favicon-32`, `favicon-192`, `favicon-512`) y enlazado en web/PWA/API docs.
+
+5. Seguridad y acceso
+- `super_admin`/`admin` con bypass global de permisos para evitar bloqueos tras ampliaciones de RBAC.
+- Refuerzo de lectura de red operativa para flujos de alta (hubs/depots/points) desde envíos/rutas.
 
 5. Partners
 - Acciones masivas con motivo estructurado (`reason_code`, `reason_detail`, `reason`) y auditoría enriquecida.

@@ -609,7 +609,7 @@ export function ShipmentsPage() {
   }, [canImport]);
 
   useEffect(() => {
-    apiClient.getHubs({ onlyActive: true }).then((rows) => {
+    apiClient.getHubs({ onlyActive: false }).then((rows) => {
       setHubs(rows);
       setNetworkLoadError('');
       if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
@@ -2313,7 +2313,7 @@ export function ShipmentsPage() {
                 ))}
               </select>
               {networkLoadError ? <div className="helper error">{networkLoadError}</div> : null}
-              {!networkLoadError && hubs.length === 0 ? <div className="helper">No hay hubs activos visibles para tu usuario.</div> : null}
+              {!networkLoadError && hubs.length === 0 ? <div className="helper">No hay hubs visibles para tu usuario.</div> : null}
               {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>

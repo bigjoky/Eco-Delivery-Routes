@@ -97,6 +97,30 @@ class RbacAccessHttpTest extends TestCase
         $this->getJson('/api/v1/points')->assertOk();
     }
 
+    public function test_super_admin_role_bypasses_permission_checks_for_network_write(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Super Admin Bypass',
+            'email' => 'superadmin.bypass.' . substr((string) Str::uuid(), 0, 8) . '@eco.local',
+            'password' => Hash::make('password123'),
+            'status' => 'active',
+        ]);
+
+        $roleId = DB::table('roles')->where('code', 'super_admin')->value('id');
+        $this->assertNotNull($roleId);
+        DB::table('user_roles')->insert([
+            'user_id' => $user->id,
+            'role_id' => (string) $roleId,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+        $response = $this->postJson('/api/v1/hubs', [
+            'name' => 'Hub Bypass',
+            'city' => 'Malaga',
+        ]);
+        $response->assertCreated();
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

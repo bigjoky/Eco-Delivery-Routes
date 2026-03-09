@@ -928,6 +928,85 @@ textarea:focus {
   background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
 }
 
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .sidebar-nav {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .sidebar-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .sidebar-group + .sidebar-group {
+    margin-top: 0;
+  }
+
+  .sidebar-group-title {
+    display: none;
+  }
+
+  .sidebar-link {
+    white-space: nowrap;
+  }
+
+  .sidebar-more summary {
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    padding-top: 8px;
+  }
+
+  .sidebar-user-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .topbar {
+    padding: 12px 14px;
+  }
+
+  .topbar-subtitle {
+    display: none;
+  }
+
+  .app-main {
+    padding: 14px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .table {
+    min-width: 620px;
+  }
+
+  .kpi-grid,
+  .dashboard-alert-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 720px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -962,8 +1041,20 @@ textarea:focus {
     overflow-x: auto;
   }
 
+  .sidebar-user-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .inline-actions {
     align-items: stretch;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .table {
+    min-width: 540px;
   }
 
   .guest-card {

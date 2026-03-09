@@ -124,7 +124,6 @@ export function AppShell({
             <div className="sidebar-user-name">{currentUser?.name ?? 'Operador'}</div>
             <div className="sidebar-user-email">{currentUser?.email ?? 'Sesion activa'}</div>
             <div className="sidebar-user-actions">
-              <a href="/ops" className="sidebar-user-link">Operativa</a>
               {canAccessOpenApi ? (
                 <a href="/api-docs" className="sidebar-user-link">OpenAPI</a>
               ) : null}

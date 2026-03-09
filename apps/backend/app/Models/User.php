@@ -38,6 +38,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function hasPermission(string $permissionCode): bool
     {
+        if ($this->hasRole('super_admin') || $this->hasRole('admin')) {
+            return true;
+        }
+
         return DB::table('user_roles')
             ->join('role_permissions', 'user_roles.role_id', '=', 'role_permissions.role_id')
             ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
