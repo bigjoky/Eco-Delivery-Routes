@@ -7,6 +7,39 @@ import { createRoot } from 'react-dom/client';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+const routeTable: Record<string, string> = {
+    dashboard: '/dashboard',
+    login: '/login',
+    register: '/register',
+    logout: '/logout',
+    'profile.edit': '/profile',
+    'profile.update': '/profile',
+    'profile.destroy': '/profile',
+    'verification.send': '/email/verification-notification',
+    'password.request': '/forgot-password',
+    'password.email': '/forgot-password',
+    'password.store': '/reset-password',
+    'password.update': '/password',
+    'password.confirm': '/confirm-password',
+};
+
+if (typeof globalThis !== 'undefined' && typeof (globalThis as { route?: unknown }).route !== 'function') {
+    (globalThis as {
+        route: (name: string, params?: Record<string, string | number | boolean>, absolute?: boolean) => string;
+    }).route = (name: string, params: Record<string, string | number | boolean> = {}, absolute = false) => {
+        const basePath = routeTable[name] ?? `/${name.replace(/\./g, '/')}`;
+        const search = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            search.set(key, String(value));
+        });
+        const withQuery = search.toString() ? `${basePath}?${search.toString()}` : basePath;
+        if (!absolute || typeof window === 'undefined') {
+            return withQuery;
+        }
+        return `${window.location.origin}${withQuery}`;
+    };
+}
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => undefined);
