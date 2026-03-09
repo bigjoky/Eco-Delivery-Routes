@@ -39,12 +39,14 @@ Rama: `codex/ops-next-envios-rutas-incidencias`
 - [ ] Validar que `Override SLA masivo` está oculto por defecto y se despliega con toggle.
 - [ ] Desde detalle de envío, crear incidencia en modal y validar aparición inmediata en tabla.
 - [ ] Desde detalle de envío, editar incidencia abierta en modal y validar persistencia.
+- [ ] Activar `Cola SLA` y validar orden por urgencia + selección rápida de `SLA vencido`.
 
 ## Rutas (reasignación masiva)
 
 - [ ] Seleccionar varias rutas en listado y previsualizar reasignación.
 - [ ] Aplicar reasignación masiva (subcontrata/conductor/vehículo) y validar resultados.
 - [ ] Probar opción `Dejar sin asignar` y validar que limpia asignaciones.
+- [ ] Aplicar estado masivo (`planned/in_progress/completed`) sobre rutas seleccionadas.
 
 ## Verificaciones técnicas
 

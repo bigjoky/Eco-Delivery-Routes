@@ -47,6 +47,14 @@ function getIncidentEntityHref(item: IncidentSummary): string | null {
   return null;
 }
 
+function getIncidentSlaPriority(item: IncidentSummary): number {
+  if (item.resolved_at) return 5;
+  if (item.sla_status === 'breached') return 0;
+  if (item.sla_status === 'at_risk') return 1;
+  if (item.sla_status === 'on_track') return 2;
+  return 3;
+}
+
 const bulkResolveReasonOptions = [
   { code: 'DELIVERY_CONFIRMED_EXTERNALLY', label: 'Entrega confirmada externamente' },
   { code: 'CUSTOMER_RESCHEDULED', label: 'Cliente reprogramado' },
@@ -100,6 +108,7 @@ export function IncidentsPage() {
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
   const [showBulkSlaPanel, setShowBulkSlaPanel] = useState(false);
+  const [slaQueueMode, setSlaQueueMode] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
   const [showAudit, setShowAudit] = useState(false);
 
@@ -152,6 +161,18 @@ export function IncidentsPage() {
     if (!changes.length) return 'Sin cambios definidos para override SLA.';
     return `Cambios a aplicar: ${changes.join(' | ')}`;
   }, [bulkOverridePriority, bulkOverrideDueAt]);
+
+  const displayedItems = useMemo(() => {
+    if (!slaQueueMode) return items;
+    return items.slice().sort((a, b) => {
+      const left = getIncidentSlaPriority(a);
+      const right = getIncidentSlaPriority(b);
+      if (left !== right) return left - right;
+      const leftDue = a.sla_due_at ? new Date(a.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightDue = b.sla_due_at ? new Date(b.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      return leftDue - rightDue;
+    });
+  }, [items, slaQueueMode]);
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
@@ -461,6 +482,11 @@ export function IncidentsPage() {
     setSelectedIncidentIds(items.filter((item) => !item.resolved_at).map((item) => item.id));
   };
 
+  const selectBreachedInPage = () => {
+    setBulkScope('selected');
+    setSelectedIncidentIds(items.filter((item) => !item.resolved_at && item.sla_status === 'breached').map((item) => item.id));
+  };
+
   const onBulkOverrideSla = async () => {
     if (!bulkOverridePriority && !bulkOverrideDueAt.trim()) {
       setResolveError('Define prioridad o due_at para el ajuste SLA masivo.');
@@ -743,6 +769,13 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
             </Button>
+            <Button
+              type="button"
+              variant={slaQueueMode ? 'secondary' : 'outline'}
+              onClick={() => setSlaQueueMode((value) => !value)}
+            >
+              {slaQueueMode ? 'Vista normal' : 'Cola SLA'}
+            </Button>
           </div>
           <div className="inline-actions ops-toolbar">
             <span className="helper">Presets operativos</span>
@@ -837,6 +870,9 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={selectOpenInPage}>
               Seleccionar abiertas (página)
             </Button>
+            <Button type="button" variant="outline" onClick={selectBreachedInPage}>
+              Seleccionar SLA vencido
+            </Button>
             <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
               {bulkResolveReasonOptions.map((item) => (
                 <option key={item.code} value={item.code}>{item.label}</option>
@@ -925,7 +961,7 @@ export function IncidentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
+                {displayedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
                       {!item.resolved_at ? (
@@ -984,7 +1020,7 @@ export function IncidentsPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {items.length === 0 ? (
+                {displayedItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={12}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>

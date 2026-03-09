@@ -61,6 +61,7 @@ export function RoutesPage() {
   const [bulkPreviewWarnings, setBulkPreviewWarnings] = useState<string[]>([]);
   const [bulkPreviewConflicts, setBulkPreviewConflicts] = useState<string[]>([]);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<'' | 'planned' | 'in_progress' | 'completed'>('');
   const [bulkMessage, setBulkMessage] = useState('');
   const [bulkError, setBulkError] = useState('');
 
@@ -458,6 +459,41 @@ export function RoutesPage() {
     }
   };
 
+  const applyBulkStatus = async () => {
+    setBulkError('');
+    setBulkMessage('');
+    if (!bulkStatus) {
+      setBulkError('Selecciona un estado masivo para rutas.');
+      return;
+    }
+    if (selectedRouteIds.length === 0) {
+      setBulkError('Selecciona al menos una ruta.');
+      return;
+    }
+    let updatedCount = 0;
+    try {
+      setBulkUpdating(true);
+      for (const routeId of selectedRouteIds) {
+        try {
+          await apiClient.updateRoute(routeId, { status: bulkStatus });
+          updatedCount += 1;
+        } catch {
+          // Continue best-effort in batch mode
+        }
+      }
+      if (updatedCount === 0) {
+        setBulkError('No se pudo actualizar estado en rutas seleccionadas.');
+      } else {
+        setBulkMessage(`Estado "${bulkStatus}" aplicado en ${updatedCount}/${selectedRouteIds.length} ruta(s).`);
+      }
+      await reload(meta.page);
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo aplicar estado masivo');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -744,6 +780,22 @@ export function RoutesPage() {
               </Button>
               <Button type="button" onClick={applyBulkAssignment} disabled={bulkUpdating}>
                 {bulkUpdating ? 'Aplicando...' : 'Aplicar asignación masiva'}
+              </Button>
+            </div>
+            <div className="inline-actions ops-toolbar">
+              <label htmlFor="routes-bulk-status">Estado masivo</label>
+              <select
+                id="routes-bulk-status"
+                value={bulkStatus}
+                onChange={(event) => setBulkStatus(event.target.value as '' | 'planned' | 'in_progress' | 'completed')}
+              >
+                <option value="">Sin cambio</option>
+                <option value="planned">planned</option>
+                <option value="in_progress">in_progress</option>
+                <option value="completed">completed</option>
+              </select>
+              <Button type="button" variant="outline" onClick={applyBulkStatus} disabled={bulkUpdating || !bulkStatus}>
+                Aplicar estado masivo
               </Button>
             </div>
             {bulkPreviewConflicts.length > 0 ? <div className="helper error">{bulkPreviewConflicts.join(' ')}</div> : null}
