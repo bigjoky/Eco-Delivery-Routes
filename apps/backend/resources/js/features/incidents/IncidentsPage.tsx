@@ -40,6 +40,21 @@ function formatSlaTimeline(item: IncidentSummary): string {
   return `Vencida hace ${hours}h ${minutes}m`;
 }
 
+function getIncidentEntityHref(item: IncidentSummary): string | null {
+  if (item.incidentable_type === 'shipment') {
+    return `/shipments/${item.incidentable_id}`;
+  }
+  return null;
+}
+
+function getIncidentSlaPriority(item: IncidentSummary): number {
+  if (item.resolved_at) return 5;
+  if (item.sla_status === 'breached') return 0;
+  if (item.sla_status === 'at_risk') return 1;
+  if (item.sla_status === 'on_track') return 2;
+  return 3;
+}
+
 const bulkResolveReasonOptions = [
   { code: 'DELIVERY_CONFIRMED_EXTERNALLY', label: 'Entrega confirmada externamente' },
   { code: 'CUSTOMER_RESCHEDULED', label: 'Cliente reprogramado' },
@@ -92,6 +107,8 @@ export function IncidentsPage() {
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
+  const [showBulkSlaPanel, setShowBulkSlaPanel] = useState(false);
+  const [slaQueueMode, setSlaQueueMode] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
   const [showAudit, setShowAudit] = useState(false);
 
@@ -126,6 +143,36 @@ export function IncidentsPage() {
     listIncidentableId,
     listSearch,
   ]);
+
+  const selectedOpenCount = useMemo(
+    () => items.filter((item) => !item.resolved_at && selectedIncidentIds.includes(item.id)).length,
+    [items, selectedIncidentIds]
+  );
+
+  const bulkTargetEstimate = useMemo(() => {
+    if (bulkScope === 'selected') return selectedOpenCount;
+    return board?.total_open ?? items.filter((item) => !item.resolved_at).length;
+  }, [bulkScope, selectedOpenCount, board?.total_open, items]);
+
+  const bulkImpactSummary = useMemo(() => {
+    const changes: string[] = [];
+    if (bulkOverridePriority) changes.push(`prioridad => ${bulkOverridePriority}`);
+    if (bulkOverrideDueAt.trim()) changes.push(`sla_due_at => ${bulkOverrideDueAt.trim()}`);
+    if (!changes.length) return 'Sin cambios definidos para override SLA.';
+    return `Cambios a aplicar: ${changes.join(' | ')}`;
+  }, [bulkOverridePriority, bulkOverrideDueAt]);
+
+  const displayedItems = useMemo(() => {
+    if (!slaQueueMode) return items;
+    return items.slice().sort((a, b) => {
+      const left = getIncidentSlaPriority(a);
+      const right = getIncidentSlaPriority(b);
+      if (left !== right) return left - right;
+      const leftDue = a.sla_due_at ? new Date(a.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const rightDue = b.sla_due_at ? new Date(b.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+      return leftDue - rightDue;
+    });
+  }, [items, slaQueueMode]);
 
   const reload = () => apiClient.getIncidents({
     resolved: resolvedFilter || undefined,
@@ -282,6 +329,39 @@ export function IncidentsPage() {
     setPage(1);
   };
 
+  const applyOperationalPreset = (
+    preset: 'sla_breached' | 'open_high_priority' | 'pickup_incidents' | 'mass_data_correction'
+  ) => {
+    if (preset === 'sla_breached') {
+      setResolvedFilter('open');
+      setListSlaFilter('breached');
+      setListPriorityFilter('');
+      setListTypeFilter('');
+      setPage(1);
+      return;
+    }
+    if (preset === 'open_high_priority') {
+      setResolvedFilter('open');
+      setListPriorityFilter('high');
+      setListSlaFilter('');
+      setListTypeFilter('');
+      setPage(1);
+      return;
+    }
+    if (preset === 'pickup_incidents') {
+      setResolvedFilter('open');
+      setListTypeFilter('pickup');
+      setListSlaFilter('');
+      setListPriorityFilter('');
+      setPage(1);
+      return;
+    }
+    setBulkScope('filtered');
+    setBulkResolveReasonCode('DATA_CORRECTION');
+    setBulkResolveReasonDetail('');
+    setBulkResolveNotes('Resueltas masivamente por correccion operativa de datos');
+  };
+
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setCreateError('');
@@ -400,6 +480,11 @@ export function IncidentsPage() {
   const selectOpenInPage = () => {
     setBulkScope('selected');
     setSelectedIncidentIds(items.filter((item) => !item.resolved_at).map((item) => item.id));
+  };
+
+  const selectBreachedInPage = () => {
+    setBulkScope('selected');
+    setSelectedIncidentIds(items.filter((item) => !item.resolved_at && item.sla_status === 'breached').map((item) => item.id));
   };
 
   const onBulkOverrideSla = async () => {
@@ -667,7 +752,7 @@ export function IncidentsPage() {
             </div>
           </div>
           {resolveError ? <div className="helper error">{resolveError}</div> : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
@@ -683,6 +768,28 @@ export function IncidentsPage() {
             </Button>
             <Button type="button" variant="outline" onClick={clearFilters}>
               Limpiar filtros
+            </Button>
+            <Button
+              type="button"
+              variant={slaQueueMode ? 'secondary' : 'outline'}
+              onClick={() => setSlaQueueMode((value) => !value)}
+            >
+              {slaQueueMode ? 'Vista normal' : 'Cola SLA'}
+            </Button>
+          </div>
+          <div className="inline-actions ops-toolbar">
+            <span className="helper">Presets operativos</span>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('sla_breached')}>
+              SLA vencido
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('open_high_priority')}>
+              Alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('pickup_incidents')}>
+              Solo pickups
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyOperationalPreset('mass_data_correction')}>
+              Prep cierre por correccion
             </Button>
           </div>
           {showFilters ? (
@@ -753,7 +860,7 @@ export function IncidentsPage() {
               </div>
             </div>
           ) : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
               Modo selección
             </Button>
@@ -762,6 +869,9 @@ export function IncidentsPage() {
             </Button>
             <Button type="button" variant="outline" onClick={selectOpenInPage}>
               Seleccionar abiertas (página)
+            </Button>
+            <Button type="button" variant="outline" onClick={selectBreachedInPage}>
+              Seleccionar SLA vencido
             </Button>
             <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
               {bulkResolveReasonOptions.map((item) => (
@@ -784,41 +894,54 @@ export function IncidentsPage() {
                 : `Resolver seleccionadas (${selectedIncidentIds.length})`}
             </Button>
           </div>
-          <div className="filters-panel">
-            <div className="helper">Override SLA masivo</div>
-            <div className="form-row">
-              <div>
-                <label>Prioridad</label>
-                <Select value={bulkOverridePriority} onChange={(event) => setBulkOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
-                  <option value="">Sin cambio</option>
-                  <option value="high">high</option>
-                  <option value="medium">medium</option>
-                  <option value="low">low</option>
-                </Select>
-              </div>
-              <div>
-                <label>SLA due_at (ISO)</label>
-                <Input
-                  value={bulkOverrideDueAt}
-                  onChange={(event) => setBulkOverrideDueAt(event.target.value)}
-                  placeholder="2026-03-31T14:00:00Z"
-                />
-              </div>
-              <div>
-                <label>Motivo</label>
-                <Input
-                  value={bulkOverrideReason}
-                  onChange={(event) => setBulkOverrideReason(event.target.value)}
-                  placeholder="Motivo del ajuste masivo"
-                />
-              </div>
-            </div>
-            <div className="inline-actions">
-              <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
-                Aplicar override SLA
-              </Button>
-            </div>
+          <div className="helper">
+            Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
           </div>
+          <div className="inline-actions ops-toolbar">
+            <Button type="button" variant={showBulkSlaPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkSlaPanel((value) => !value)}>
+              {showBulkSlaPanel ? 'Ocultar override SLA' : 'Mostrar override SLA'}
+            </Button>
+          </div>
+          {showBulkSlaPanel ? (
+            <div className="filters-panel">
+              <div className="helper">Override SLA masivo</div>
+              <div className="form-row">
+                <div>
+                  <label>Prioridad</label>
+                  <Select value={bulkOverridePriority} onChange={(event) => setBulkOverridePriority(event.target.value as '' | 'high' | 'medium' | 'low')}>
+                    <option value="">Sin cambio</option>
+                    <option value="high">high</option>
+                    <option value="medium">medium</option>
+                    <option value="low">low</option>
+                  </Select>
+                </div>
+                <div>
+                  <label>SLA due_at (ISO)</label>
+                  <Input
+                    value={bulkOverrideDueAt}
+                    onChange={(event) => setBulkOverrideDueAt(event.target.value)}
+                    placeholder="2026-03-31T14:00:00Z"
+                  />
+                </div>
+                <div>
+                  <label>Motivo</label>
+                  <Input
+                    value={bulkOverrideReason}
+                    onChange={(event) => setBulkOverrideReason(event.target.value)}
+                    placeholder="Motivo del ajuste masivo"
+                  />
+                </div>
+              </div>
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={onBulkOverrideSla} disabled={bulkScope === 'selected' && selectedIncidentIds.length === 0}>
+                  Aplicar override SLA
+                </Button>
+              </div>
+              <div className="helper">
+                Impacto override masivo: objetivo estimado {bulkTargetEstimate} incidencia(s). {bulkImpactSummary}
+              </div>
+            </div>
+          ) : null}
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -838,7 +961,7 @@ export function IncidentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
+                {displayedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
                       {!item.resolved_at ? (
@@ -852,9 +975,19 @@ export function IncidentsPage() {
                       )}
                     </TableCell>
                     <TableCell>{item.id}</TableCell>
-                    <TableCell>{item.incidentable_type}</TableCell>
-                    <TableCell>{item.incidentable_id}</TableCell>
-                    <TableCell>{item.shipment_reference ?? '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.incidentable_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {getIncidentEntityHref(item) ? (
+                        <Link to={getIncidentEntityHref(item) as string}>{item.incidentable_id}</Link>
+                      ) : item.incidentable_id}
+                    </TableCell>
+                    <TableCell>
+                      {item.shipment_reference ? (
+                        <Link to={`/shipments?q=${encodeURIComponent(item.shipment_reference)}`}>{item.shipment_reference}</Link>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
                     <TableCell>
                       <Badge variant={categoryVariant(item.category)} title={`Categoria: ${item.category}`}>
@@ -879,12 +1012,15 @@ export function IncidentsPage() {
                             <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>Escalar alta</Button>
                           ) : null}
                           <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>Ajustar SLA</Button>
+                          {item.incidentable_type === 'shipment' ? (
+                            <Link to={`/shipments/${item.incidentable_id}`} className="btn btn-outline">Ver envío</Link>
+                          ) : null}
                         </div>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
-                {items.length === 0 ? (
+                {displayedItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={12}>Sin incidencias para los filtros seleccionados.</TableCell>
                   </TableRow>

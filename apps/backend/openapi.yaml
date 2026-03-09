@@ -719,6 +719,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, suspended] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -822,6 +825,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, suspended] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -925,6 +931,9 @@ paths:
                   minItems: 1
                   items: { type: string, format: uuid }
                 status: { type: string, enum: [active, inactive, maintenance] }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+                reason: { type: string }
       responses:
         '200': { description: Actualizado }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -1936,6 +1945,38 @@ paths:
       responses:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Contacts]
+      summary: Crear o actualizar contacto compartido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  enum: [sender, recipient, both]
+                display_name: { type: string }
+                legal_name: { type: string }
+                document_id: { type: string }
+                phone: { type: string }
+                phone_alt: { type: string }
+                email: { type: string, format: email }
+                address_line: { type: string }
+                address_street: { type: string }
+                address_number: { type: string }
+                postal_code: { type: string }
+                city: { type: string }
+                province: { type: string }
+                country: { type: string }
+                address_notes: { type: string }
+      responses:
+        '201': { description: Creado/actualizado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
 
   /hubs/{id}:
     patch:
@@ -2703,6 +2744,29 @@ paths:
           schema: { type: string, enum: [failed, absent, retry, general] }
       responses:
         '200': { description: OK }
+
+  /incidents/{id}:
+    patch:
+      tags: [Incidents]
+      summary: Editar incidencia (catalogo/categoria/notas)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                catalog_code: { type: string }
+                category: { type: string, enum: [failed, absent, retry, general] }
+                notes: { type: string, nullable: true }
+      responses:
+        '200': { description: OK }
+        '404': { description: Incident not found }
 
   /incidents/{id}/resolve:
     patch:

@@ -209,6 +209,9 @@ class VehicleController extends Controller
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['uuid', 'distinct', 'exists:vehicles,id'],
             'status' => ['required', 'in:active,inactive,maintenance'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string', 'max:220'],
+            'reason' => ['nullable', 'string', 'max:220'],
         ]);
 
         $affected = DB::table('vehicles')
@@ -222,6 +225,9 @@ class VehicleController extends Controller
             'ids' => $payload['ids'],
             'status' => $payload['status'],
             'affected_count' => $affected,
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
+            'reason' => $payload['reason'] ?? null,
         ]);
 
         return response()->json([

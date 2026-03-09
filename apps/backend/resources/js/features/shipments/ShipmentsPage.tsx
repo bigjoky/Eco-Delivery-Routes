@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
-import { AuditLogEntry, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
 import {
   hasRequiredRecipientName,
   hasRequiredSenderName,
   inferDocumentType,
+  isProvinceRequired,
+  isServiceDateAllowed,
   isValidEmail,
   isValidPhone,
   isValidPostalCode,
@@ -205,6 +207,44 @@ type ShipmentQuickTemplate = {
   senderNotes: string;
 };
 
+type RecipientQuickTemplate = {
+  id: string;
+  name: string;
+  docType: 'DNI' | 'NIE' | 'PASSPORT' | 'CIF';
+  documentId: string;
+  legalName: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  street: string;
+  number: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  country: string;
+  notes: string;
+};
+
+type SenderQuickTemplate = {
+  id: string;
+  name: string;
+  docType: 'DNI' | 'NIE' | 'PASSPORT' | 'CIF';
+  documentId: string;
+  legalName: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  street: string;
+  number: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  country: string;
+  notes: string;
+};
+
 export function ShipmentsPage() {
   const [items, setItems] = useState<ShipmentSummary[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, per_page: 10, total: 0, last_page: 0 });
@@ -221,6 +261,7 @@ export function ShipmentsPage() {
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [hubDepots, setHubDepots] = useState<DepotSummary[]>([]);
   const [hubPoints, setHubPoints] = useState<PointSummary[]>([]);
+  const [networkLoadError, setNetworkLoadError] = useState('');
   const [createHubId, setCreateHubId] = useState('');
   const [createPointId, setCreatePointId] = useState('');
   const [createExternalReference, setCreateExternalReference] = useState('');
@@ -255,6 +296,7 @@ export function ShipmentsPage() {
   const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
   const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
+  const [operatorMode, setOperatorMode] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
   const [recipientModalOpen, setRecipientModalOpen] = useState(false);
@@ -268,6 +310,7 @@ export function ShipmentsPage() {
     recipientPhone?: string;
     street?: string;
     city?: string;
+    province?: string;
     postalCode?: string;
     phone?: string;
     email?: string;
@@ -276,6 +319,7 @@ export function ShipmentsPage() {
     senderStreet?: string;
     senderPostalCode?: string;
     senderCity?: string;
+    senderProvince?: string;
     senderDocument?: string;
     senderName?: string;
   }>({});
@@ -317,6 +361,21 @@ export function ShipmentsPage() {
   const [shipmentTemplates, setShipmentTemplates] = useState<ShipmentQuickTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [newTemplateName, setNewTemplateName] = useState('');
+  const recipientTemplatesStorageKey = 'eco_delivery_routes_recipient_quick_templates';
+  const senderTemplatesStorageKey = 'eco_delivery_routes_sender_quick_templates';
+  const [recipientTemplates, setRecipientTemplates] = useState<RecipientQuickTemplate[]>([]);
+  const [selectedRecipientTemplateId, setSelectedRecipientTemplateId] = useState('');
+  const [newRecipientTemplateName, setNewRecipientTemplateName] = useState('');
+  const [senderTemplates, setSenderTemplates] = useState<SenderQuickTemplate[]>([]);
+  const [selectedSenderTemplateId, setSelectedSenderTemplateId] = useState('');
+  const [newSenderTemplateName, setNewSenderTemplateName] = useState('');
+  const operatorDefaultsStorageKey = 'eco_delivery_routes_shipments_operator_defaults';
+  const [recentRecipientContacts, setRecentRecipientContacts] = useState<ContactSummary[]>([]);
+  const [recentSenderContacts, setRecentSenderContacts] = useState<ContactSummary[]>([]);
+  const [recipientUsageMap, setRecipientUsageMap] = useState<Record<string, number>>({});
+  const [senderUsageMap, setSenderUsageMap] = useState<Record<string, number>>({});
+  const recipientUsageStorageKey = 'eco_delivery_routes_recipient_usage_v1';
+  const senderUsageStorageKey = 'eco_delivery_routes_sender_usage_v1';
   const exportColumnsStorageKey = 'eco_delivery_routes_shipments_export_columns';
   const wizardStorageKey = 'eco_delivery_routes_shipments_wizard_state';
   const [consigneeLookupPhone, setConsigneeLookupPhone] = useState('');
@@ -550,10 +609,14 @@ export function ShipmentsPage() {
   }, [canImport]);
 
   useEffect(() => {
-    apiClient.getHubs({ onlyActive: true }).then((rows) => {
+    apiClient.getHubs({ onlyActive: false }).then((rows) => {
       setHubs(rows);
+      setNetworkLoadError('');
       if (!createHubId && rows.length > 0) setCreateHubId(rows[0].id);
-    }).catch(() => setHubs([]));
+    }).catch((exception) => {
+      setHubs([]);
+      setNetworkLoadError(exception instanceof Error ? exception.message : 'No se pudieron cargar hubs.');
+    });
   }, []);
 
   useEffect(() => {
@@ -569,13 +632,15 @@ export function ShipmentsPage() {
     ]).then(([depots, points]) => {
       setHubDepots(depots);
       setHubPoints(points);
+      setNetworkLoadError('');
       if (!points.some((item) => item.id === createPointId)) {
         setCreatePointId('');
       }
-    }).catch(() => {
+    }).catch((exception) => {
       setHubDepots([]);
       setHubPoints([]);
       setCreatePointId('');
+      setNetworkLoadError(exception instanceof Error ? exception.message : 'No se pudieron cargar puntos operativos.');
     });
   }, [createHubId, createPointId]);
 
@@ -697,6 +762,146 @@ export function ShipmentsPage() {
     window.localStorage.setItem(shipmentTemplatesStorageKey, JSON.stringify(shipmentTemplates));
   }, [shipmentTemplates]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recipientTemplatesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as RecipientQuickTemplate[];
+      if (Array.isArray(parsed)) setRecipientTemplates(parsed);
+    } catch {
+      setRecipientTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(recipientTemplatesStorageKey, JSON.stringify(recipientTemplates));
+  }, [recipientTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(senderTemplatesStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as SenderQuickTemplate[];
+      if (Array.isArray(parsed)) setSenderTemplates(parsed);
+    } catch {
+      setSenderTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(senderTemplatesStorageKey, JSON.stringify(senderTemplates));
+  }, [senderTemplates]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(operatorDefaultsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        enabled: boolean;
+        hubId: string;
+        pointId: string;
+        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
+      }>;
+      if (typeof parsed.enabled === 'boolean') setOperatorMode(parsed.enabled);
+      if (parsed.hubId) setCreateHubId(parsed.hubId);
+      if (parsed.pointId) setCreatePointId(parsed.pointId);
+      if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      operatorDefaultsStorageKey,
+      JSON.stringify({
+        enabled: operatorMode,
+        hubId: createHubId,
+        pointId: createPointId,
+        operation: createOperation,
+        serviceType: createServiceType,
+      })
+    );
+  }, [operatorMode, createHubId, createPointId, createOperation, createServiceType]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(recipientUsageStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') setRecipientUsageMap(parsed);
+    } catch {
+      setRecipientUsageMap({});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(recipientUsageStorageKey, JSON.stringify(recipientUsageMap));
+  }, [recipientUsageMap]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(senderUsageStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      if (parsed && typeof parsed === 'object') setSenderUsageMap(parsed);
+    } catch {
+      setSenderUsageMap({});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(senderUsageStorageKey, JSON.stringify(senderUsageMap));
+  }, [senderUsageMap]);
+
+  const bumpUsage = (setter: Dispatch<SetStateAction<Record<string, number>>>, key: string) => {
+    if (!key) return;
+    setter((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
+  };
+
+  const rankedRecipientTemplates = useMemo(
+    () => recipientTemplates.slice().sort((a, b) => (recipientUsageMap[`tpl:${b.id}`] ?? 0) - (recipientUsageMap[`tpl:${a.id}`] ?? 0)),
+    [recipientTemplates, recipientUsageMap]
+  );
+  const rankedSenderTemplates = useMemo(
+    () => senderTemplates.slice().sort((a, b) => (senderUsageMap[`tpl:${b.id}`] ?? 0) - (senderUsageMap[`tpl:${a.id}`] ?? 0)),
+    [senderTemplates, senderUsageMap]
+  );
+  const rankedRecentRecipientContacts = useMemo(
+    () => recentRecipientContacts.slice().sort((a, b) => (recipientUsageMap[`contact:${b.id}`] ?? 0) - (recipientUsageMap[`contact:${a.id}`] ?? 0)),
+    [recentRecipientContacts, recipientUsageMap]
+  );
+  const rankedRecentSenderContacts = useMemo(
+    () => recentSenderContacts.slice().sort((a, b) => (senderUsageMap[`contact:${b.id}`] ?? 0) - (senderUsageMap[`contact:${a.id}`] ?? 0)),
+    [recentSenderContacts, senderUsageMap]
+  );
+
+  useEffect(() => {
+    if (!recipientModalOpen) return;
+    apiClient.getContacts({ kind: 'recipient', limit: 8 })
+      .then((rows) => setRecentRecipientContacts(rows))
+      .catch(() => setRecentRecipientContacts([]));
+  }, [recipientModalOpen]);
+
+  useEffect(() => {
+    if (!senderModalOpen) return;
+    apiClient.getContacts({ kind: 'sender', limit: 8 })
+      .then((rows) => setRecentSenderContacts(rows))
+      .catch(() => setRecentSenderContacts([]));
+  }, [senderModalOpen]);
+
   const validateWizardStep = (step: 1 | 2 | 3 | 4): string | null => {
     if (step === 1) {
       if (!createHubId.trim()) return 'Selecciona hub en Paso 1.';
@@ -737,6 +942,118 @@ export function ShipmentsPage() {
     setCreateError('');
     setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
   };
+
+  const applyOperatorDefaults = () => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(operatorDefaultsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Partial<{
+        hubId: string;
+        pointId: string;
+        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
+      }>;
+      if (parsed.hubId) setCreateHubId(parsed.hubId);
+      if (parsed.pointId) setCreatePointId(parsed.pointId);
+      if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
+      setCreateError('');
+    } catch {
+      // ignore
+    }
+  };
+
+  const saveOperatorDefaults = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      operatorDefaultsStorageKey,
+      JSON.stringify({
+        enabled: operatorMode,
+        hubId: createHubId,
+        pointId: createPointId,
+        operation: createOperation,
+        serviceType: createServiceType,
+      })
+    );
+  };
+
+  const createBlockingChecks = useMemo(() => {
+    const checks: string[] = [];
+    if (!createHubId.trim()) checks.push('Selecciona un hub.');
+    if (!createScheduledAt.trim()) checks.push('Define fecha programada.');
+
+    if (createOperation === 'shipment') {
+      if (!createConsigneeDocumentId.trim()) checks.push('Documento de destinatario obligatorio.');
+      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+        checks.push(createConsigneeDocType === 'CIF'
+          ? 'Razon social de destinatario obligatoria.'
+          : 'Nombre y apellidos de destinatario obligatorios.');
+      }
+      if (!createPhone.trim()) checks.push('Telefono de destinatario obligatorio.');
+      if (!createStreet.trim() || !createCity.trim() || !createPostalCode.trim()) {
+        checks.push('Direccion completa de destinatario obligatoria (calle, ciudad, CP).');
+      }
+      if (isProvinceRequired(createCountry) && !createProvince.trim()) {
+        checks.push('Provincia de destinatario obligatoria para el país seleccionado.');
+      }
+    }
+
+    if (!createSenderDocumentId.trim()) checks.push('Documento de remitente obligatorio.');
+    if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
+      checks.push(createSenderDocType === 'CIF'
+        ? 'Razon social de remitente obligatoria.'
+        : 'Nombre y apellidos de remitente obligatorios.');
+    }
+    if (createOperation !== 'shipment') {
+      if (!createSenderPhone.trim()) checks.push('Telefono de remitente obligatorio para recogidas.');
+      if (!createSenderStreet.trim() || !createSenderCity.trim() || !createSenderPostalCode.trim()) {
+        checks.push('Direccion completa de remitente obligatoria para recogidas.');
+      }
+      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+        checks.push('Provincia de remitente obligatoria para el país seleccionado.');
+      }
+    }
+
+    if (createPhone.trim() && !isValidPhone(createPhone)) checks.push('Telefono de destinatario invalido.');
+    if (createSenderPhone.trim() && !isValidPhone(createSenderPhone)) checks.push('Telefono de remitente invalido.');
+    if (createEmail.trim() && !isValidEmail(createEmail)) checks.push('Email de destinatario invalido.');
+    if (createSenderEmail.trim() && !isValidEmail(createSenderEmail)) checks.push('Email de remitente invalido.');
+    if (createPostalCode.trim() && !isValidPostalCode(createCountry, createPostalCode)) checks.push('Codigo postal de destinatario invalido.');
+    if (createSenderPostalCode.trim() && !isValidPostalCode(createSenderCountry, createSenderPostalCode)) checks.push('Codigo postal de remitente invalido.');
+    if (createOperation === 'shipment' && createScheduledAt.trim() && !isServiceDateAllowed(createServiceType, createScheduledAt)) {
+      checks.push(`El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`);
+    }
+
+    return Array.from(new Set(checks));
+  }, [
+    createHubId,
+    createScheduledAt,
+    createOperation,
+    createConsigneeDocumentId,
+    createConsigneeDocType,
+    createConsignee,
+    createConsigneeFirstName,
+    createConsigneeLastName,
+    createPhone,
+    createStreet,
+    createCity,
+    createPostalCode,
+    createSenderDocumentId,
+    createSenderDocType,
+    createSenderLegalName,
+    createSenderFirstName,
+    createSenderLastName,
+    createSenderPhone,
+    createSenderStreet,
+    createSenderCity,
+    createSenderPostalCode,
+    createEmail,
+    createSenderEmail,
+    createCountry,
+    createSenderCountry,
+  ]);
+  const canCreateShipment = createBlockingChecks.length === 0 && (!wizardMode || wizardStep === 4);
 
   const lookupRecipientContact = async (criteria: { phone?: string; document?: string }) => {
     const phone = criteria.phone?.trim() ?? '';
@@ -935,6 +1252,7 @@ export function ShipmentsPage() {
       recipientPhone?: string;
       street?: string;
       city?: string;
+      province?: string;
       postalCode?: string;
       phone?: string;
       email?: string;
@@ -943,6 +1261,7 @@ export function ShipmentsPage() {
       senderStreet?: string;
       senderPostalCode?: string;
       senderCity?: string;
+      senderProvince?: string;
       senderDocument?: string;
       senderName?: string;
     } = {};
@@ -973,6 +1292,7 @@ export function ShipmentsPage() {
       if (!createStreet.trim()) nextErrors.street = 'La calle del destinatario es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad del destinatario es obligatoria.';
       if (!createPostalCode.trim()) nextErrors.postalCode = 'Codigo postal destinatario obligatorio.';
+      if (isProvinceRequired(createCountry) && !createProvince.trim()) nextErrors.province = 'Provincia destinatario obligatoria.';
     }
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
@@ -1016,6 +1336,9 @@ export function ShipmentsPage() {
       if (!createSenderCity.trim()) {
         nextErrors.senderCity = 'La ciudad del remitente es obligatoria para recogidas.';
       }
+      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+        nextErrors.senderProvince = 'Provincia remitente obligatoria para el país seleccionado.';
+      }
     }
     if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
       if (createSenderDocType === 'CIF') {
@@ -1038,6 +1361,9 @@ export function ShipmentsPage() {
           const cutoff = serviceCutoffHour[createServiceType];
           if (scheduledDate.getUTCHours() > cutoff || (scheduledDate.getUTCHours() === cutoff && scheduledDate.getUTCMinutes() > 30)) {
             nextErrors.scheduledAt = `La hora supera la ventana del servicio (${serviceTypeLabel(createServiceType)}).`;
+          }
+          if (!isServiceDateAllowed(createServiceType, createScheduledAt)) {
+            nextErrors.scheduledAt = `El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`;
           }
         }
       }
@@ -1126,20 +1452,22 @@ export function ShipmentsPage() {
       setCreateAddressNotes('');
       setCreatePhone('');
       setCreateEmail('');
-      setCreateSenderLegalName('');
-      setCreateSenderDocumentId('');
-      setCreateSenderDocType('DNI');
-      setCreateSenderFirstName('');
-      setCreateSenderLastName('');
-      setCreateSenderStreet('');
-      setCreateSenderNumber('');
-      setCreateSenderPostalCode('');
-      setCreateSenderCity('');
-      setCreateSenderProvince('');
-      setCreateSenderCountry('ES');
-      setCreateSenderAddressNotes('');
-      setCreateSenderPhone('');
-      setCreateSenderEmail('');
+      if (!operatorMode || createOperation === 'shipment') {
+        setCreateSenderLegalName('');
+        setCreateSenderDocumentId('');
+        setCreateSenderDocType('DNI');
+        setCreateSenderFirstName('');
+        setCreateSenderLastName('');
+        setCreateSenderStreet('');
+        setCreateSenderNumber('');
+        setCreateSenderPostalCode('');
+        setCreateSenderCity('');
+        setCreateSenderProvince('');
+        setCreateSenderCountry('ES');
+        setCreateSenderAddressNotes('');
+        setCreateSenderPhone('');
+        setCreateSenderEmail('');
+      }
       setConsigneeLookupPhone('');
       setConsigneeLookupDocument('');
       setSenderLookupPhone('');
@@ -1147,8 +1475,12 @@ export function ShipmentsPage() {
       setRecipientAddressSuggestions([]);
       setSenderAddressSuggestions([]);
       setCreateScheduledAt(new Date().toISOString().slice(0, 10));
-      setCreateOperation('shipment');
-      setCreateServiceType('express_1030');
+      if (!operatorMode) {
+        setCreateOperation('shipment');
+        setCreateServiceType('express_1030');
+        setCreateHubId('');
+        setCreatePointId('');
+      }
       setCreateFieldErrors({});
       await reload(1);
     } catch (exception) {
@@ -1614,6 +1946,216 @@ export function ShipmentsPage() {
     setSelectedTemplateId('');
   };
 
+  const applyRecipientTemplate = (template: RecipientQuickTemplate) => {
+    setCreateConsigneeDocType(template.docType);
+    setCreateConsigneeDocumentId(template.documentId);
+    setCreateConsignee(template.legalName);
+    setCreateConsigneeFirstName(template.firstName);
+    setCreateConsigneeLastName(template.lastName);
+    setCreatePhone(template.phone);
+    setCreateEmail(template.email);
+    setCreateStreet(template.street);
+    setCreateNumber(template.number);
+    setCreatePostalCode(template.postalCode);
+    setCreateCity(template.city);
+    setCreateProvince(template.province);
+    setCreateCountry(template.country || 'ES');
+    setCreateAddressNotes(template.notes);
+    bumpUsage(setRecipientUsageMap, `tpl:${template.id}`);
+  };
+
+  const applyRecipientContact = (contact: ContactSummary) => {
+    const docId = (contact.document_id ?? '').trim();
+    const inferredDocType = inferDocumentType(docId, createConsigneeDocType);
+    setCreateConsigneeDocType(inferredDocType);
+    setCreateConsigneeDocumentId(docId);
+    if (inferredDocType === 'CIF') {
+      setCreateConsignee(contact.legal_name ?? contact.display_name ?? '');
+      setCreateConsigneeFirstName('');
+      setCreateConsigneeLastName('');
+    } else {
+      const fullName = (contact.display_name ?? '').trim();
+      const parts = fullName.split(' ').filter(Boolean);
+      setCreateConsigneeFirstName(parts.shift() ?? '');
+      setCreateConsigneeLastName(parts.join(' '));
+      setCreateConsignee('');
+    }
+    setCreatePhone(contact.phone ?? '');
+    setCreateEmail(contact.email ?? '');
+    setCreateStreet(contact.address_street ?? '');
+    setCreateNumber(contact.address_number ?? '');
+    setCreatePostalCode(contact.postal_code ?? '');
+    setCreateCity(contact.city ?? '');
+    setCreateProvince(contact.province ?? '');
+    setCreateCountry(contact.country ?? 'ES');
+    setCreateAddressNotes(contact.address_notes ?? '');
+    bumpUsage(setRecipientUsageMap, `contact:${contact.id}`);
+  };
+
+  const saveCurrentRecipientAsTemplate = () => {
+    const name = newRecipientTemplateName.trim();
+    if (!name) {
+      setCreateError('Define nombre de plantilla para destinatario.');
+      return;
+    }
+    const template: RecipientQuickTemplate = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      docType: createConsigneeDocType,
+      documentId: createConsigneeDocumentId,
+      legalName: createConsignee,
+      firstName: createConsigneeFirstName,
+      lastName: createConsigneeLastName,
+      phone: createPhone,
+      email: createEmail,
+      street: createStreet,
+      number: createNumber,
+      postalCode: createPostalCode,
+      city: createCity,
+      province: createProvince,
+      country: createCountry,
+      notes: createAddressNotes,
+    };
+    setRecipientTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
+    setSelectedRecipientTemplateId(template.id);
+    bumpUsage(setRecipientUsageMap, `tpl:${template.id}`);
+    setNewRecipientTemplateName('');
+    setCreateError('');
+
+    const displayName = template.docType === 'CIF'
+      ? template.legalName
+      : [template.firstName, template.lastName].filter((value) => value.trim() !== '').join(' ');
+    void apiClient.createContact({
+      kind: 'recipient',
+      display_name: displayName || null,
+      legal_name: template.docType === 'CIF' ? template.legalName || null : null,
+      document_id: template.documentId || null,
+      phone: template.phone || null,
+      email: template.email || null,
+      address_line: [template.street, template.number, template.postalCode, template.city].filter((value) => value.trim() !== '').join(' ') || null,
+      address_street: template.street || null,
+      address_number: template.number || null,
+      postal_code: template.postalCode || null,
+      city: template.city || null,
+      province: template.province || null,
+      country: template.country || null,
+      address_notes: template.notes || null,
+    }).catch(() => {
+      // local template remains available even if server sync fails
+    });
+  };
+
+  const deleteSelectedRecipientTemplate = () => {
+    if (!selectedRecipientTemplateId) return;
+    setRecipientTemplates((current) => current.filter((item) => item.id !== selectedRecipientTemplateId));
+    setSelectedRecipientTemplateId('');
+  };
+
+  const applySenderTemplate = (template: SenderQuickTemplate) => {
+    setCreateSenderDocType(template.docType);
+    setCreateSenderDocumentId(template.documentId);
+    setCreateSenderLegalName(template.legalName);
+    setCreateSenderFirstName(template.firstName);
+    setCreateSenderLastName(template.lastName);
+    setCreateSenderPhone(template.phone);
+    setCreateSenderEmail(template.email);
+    setCreateSenderStreet(template.street);
+    setCreateSenderNumber(template.number);
+    setCreateSenderPostalCode(template.postalCode);
+    setCreateSenderCity(template.city);
+    setCreateSenderProvince(template.province);
+    setCreateSenderCountry(template.country || 'ES');
+    setCreateSenderAddressNotes(template.notes);
+    bumpUsage(setSenderUsageMap, `tpl:${template.id}`);
+  };
+
+  const applySenderContact = (contact: ContactSummary) => {
+    const docId = (contact.document_id ?? '').trim();
+    const inferredDocType = inferDocumentType(docId, createSenderDocType);
+    setCreateSenderDocType(inferredDocType);
+    setCreateSenderDocumentId(docId);
+    if (inferredDocType === 'CIF') {
+      setCreateSenderLegalName(contact.legal_name ?? contact.display_name ?? '');
+      setCreateSenderFirstName('');
+      setCreateSenderLastName('');
+    } else {
+      const fullName = (contact.display_name ?? '').trim();
+      const parts = fullName.split(' ').filter(Boolean);
+      setCreateSenderFirstName(parts.shift() ?? '');
+      setCreateSenderLastName(parts.join(' '));
+      setCreateSenderLegalName('');
+    }
+    setCreateSenderPhone(contact.phone ?? '');
+    setCreateSenderEmail(contact.email ?? '');
+    setCreateSenderStreet(contact.address_street ?? '');
+    setCreateSenderNumber(contact.address_number ?? '');
+    setCreateSenderPostalCode(contact.postal_code ?? '');
+    setCreateSenderCity(contact.city ?? '');
+    setCreateSenderProvince(contact.province ?? '');
+    setCreateSenderCountry(contact.country ?? 'ES');
+    setCreateSenderAddressNotes(contact.address_notes ?? '');
+    bumpUsage(setSenderUsageMap, `contact:${contact.id}`);
+  };
+
+  const saveCurrentSenderAsTemplate = () => {
+    const name = newSenderTemplateName.trim();
+    if (!name) {
+      setCreateError('Define nombre de plantilla para remitente.');
+      return;
+    }
+    const template: SenderQuickTemplate = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      docType: createSenderDocType,
+      documentId: createSenderDocumentId,
+      legalName: createSenderLegalName,
+      firstName: createSenderFirstName,
+      lastName: createSenderLastName,
+      phone: createSenderPhone,
+      email: createSenderEmail,
+      street: createSenderStreet,
+      number: createSenderNumber,
+      postalCode: createSenderPostalCode,
+      city: createSenderCity,
+      province: createSenderProvince,
+      country: createSenderCountry,
+      notes: createSenderAddressNotes,
+    };
+    setSenderTemplates((current) => [template, ...current.filter((item) => item.name !== name)].slice(0, 30));
+    setSelectedSenderTemplateId(template.id);
+    bumpUsage(setSenderUsageMap, `tpl:${template.id}`);
+    setNewSenderTemplateName('');
+    setCreateError('');
+
+    const displayName = template.docType === 'CIF'
+      ? template.legalName
+      : [template.firstName, template.lastName].filter((value) => value.trim() !== '').join(' ');
+    void apiClient.createContact({
+      kind: 'sender',
+      display_name: displayName || null,
+      legal_name: template.docType === 'CIF' ? template.legalName || null : null,
+      document_id: template.documentId || null,
+      phone: template.phone || null,
+      email: template.email || null,
+      address_line: [template.street, template.number, template.postalCode, template.city].filter((value) => value.trim() !== '').join(' ') || null,
+      address_street: template.street || null,
+      address_number: template.number || null,
+      postal_code: template.postalCode || null,
+      city: template.city || null,
+      province: template.province || null,
+      country: template.country || null,
+      address_notes: template.notes || null,
+    }).catch(() => {
+      // local template remains available even if server sync fails
+    });
+  };
+
+  const deleteSelectedSenderTemplate = () => {
+    if (!selectedSenderTemplateId) return;
+    setSenderTemplates((current) => current.filter((item) => item.id !== selectedSenderTemplateId));
+    setSelectedSenderTemplateId('');
+  };
+
   const downloadImportTemplate = async () => {
     try {
       await apiClient.downloadShipmentsTemplate();
@@ -1702,12 +2244,38 @@ export function ShipmentsPage() {
             </Button>
           </div>
           <div className="inline-actions">
+            <label htmlFor="shipment-operator-mode">Modo operador (alta repetitiva)</label>
+            <input
+              id="shipment-operator-mode"
+              type="checkbox"
+              checked={operatorMode}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setOperatorMode(enabled);
+                if (enabled) setWizardMode(false);
+              }}
+            />
+            <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
+              Guardar defaults
+            </Button>
+            <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
+              Aplicar defaults
+            </Button>
+          </div>
+          <div className="inline-actions">
             <label htmlFor="shipment-wizard-mode">Asistente paso a paso (beta)</label>
             <input
               id="shipment-wizard-mode"
               type="checkbox"
               checked={wizardMode}
-              onChange={(event) => setWizardMode(event.target.checked)}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                if (operatorMode && enabled) {
+                  setCreateError('Desactiva modo operador para usar asistente.');
+                  return;
+                }
+                setWizardMode(enabled);
+              }}
             />
             {wizardMode ? (
               <>
@@ -1721,6 +2289,11 @@ export function ShipmentsPage() {
               </>
             ) : null}
           </div>
+          {operatorMode ? (
+            <div className="helper">
+              Modo operador activo: se conservan hub/operación/servicio al crear para carga rápida.
+            </div>
+          ) : null}
           {wizardMode ? (
             <div className="helper">
               {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'
@@ -1739,6 +2312,8 @@ export function ShipmentsPage() {
                   <option key={hub.id} value={hub.id}>{hub.code} - {hub.name}</option>
                 ))}
               </select>
+              {networkLoadError ? <div className="helper error">{networkLoadError}</div> : null}
+              {!networkLoadError && hubs.length === 0 ? <div className="helper">No hay hubs visibles para tu usuario.</div> : null}
               {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>
@@ -1747,6 +2322,7 @@ export function ShipmentsPage() {
                 id="create-shipment-point"
                 value={createPointId}
                 onChange={(event) => setCreatePointId(event.target.value)}
+                disabled={!createHubId}
               >
                 <option value="">Sin punto</option>
                 {hubPoints.map((point) => {
@@ -1758,6 +2334,7 @@ export function ShipmentsPage() {
                   );
                 })}
               </select>
+              {createHubId && hubPoints.length === 0 ? <div className="helper">Sin puntos operativos para el hub seleccionado.</div> : null}
             </div>
             <div>
               <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
@@ -1812,6 +2389,12 @@ export function ShipmentsPage() {
                 <div className="helper">
                   Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
                 </div>
+              ) : null}
+              {createOperation === 'shipment' && createServiceType === 'business_parcel' ? (
+                <div className="helper">Business Parcel: solo L-V.</div>
+              ) : null}
+              {createOperation === 'shipment' && createServiceType === 'thermo_parcel' ? (
+                <div className="helper">Thermo Parcel: L-S (sin domingo).</div>
               ) : null}
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
@@ -1872,8 +2455,22 @@ export function ShipmentsPage() {
           ) : null}
 
           {!wizardMode || wizardStep === 4 ? (
+          <div className="filters-panel">
+            <div className="helper">
+              Checklist de alta: {canCreateShipment ? 'lista para crear' : `faltan ${createBlockingChecks.length} validaciones`}
+            </div>
+            {createBlockingChecks.slice(0, 4).map((issue) => (
+              <div key={issue} className="helper error">{issue}</div>
+            ))}
+            {createBlockingChecks.length > 4 ? (
+              <div className="helper">+{createBlockingChecks.length - 4} validaciones adicionales pendientes.</div>
+            ) : null}
+          </div>
+          ) : null}
+
+          {!wizardMode || wizardStep === 4 ? (
           <div className="inline-actions">
-            <Button type="button" onClick={createShipment} disabled={creating}>
+            <Button type="button" onClick={createShipment} disabled={creating || !canCreateShipment}>
               {creating ? 'Creando...' : createOperation === 'shipment' ? 'Crear envio' : 'Crear recogida'}
             </Button>
           </div>
@@ -1891,6 +2488,46 @@ export function ShipmentsPage() {
           </Button>
         }
       >
+        <div className="inline-actions">
+          <label htmlFor="recipient-template-select">Plantilla destinatario</label>
+          <select
+            id="recipient-template-select"
+            value={selectedRecipientTemplateId}
+            onChange={(event) => {
+              const templateId = event.target.value;
+              setSelectedRecipientTemplateId(templateId);
+              const template = rankedRecipientTemplates.find((item) => item.id === templateId);
+              if (template) applyRecipientTemplate(template);
+            }}
+          >
+            <option value="">Seleccionar plantilla</option>
+            {rankedRecipientTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+          </select>
+          <input
+            value={newRecipientTemplateName}
+            onChange={(event) => setNewRecipientTemplateName(event.target.value)}
+            placeholder="Nombre nueva plantilla"
+          />
+          <Button type="button" variant="outline" onClick={saveCurrentRecipientAsTemplate}>
+            Guardar plantilla
+          </Button>
+          <Button type="button" variant="outline" onClick={deleteSelectedRecipientTemplate} disabled={!selectedRecipientTemplateId}>
+            Eliminar
+          </Button>
+        </div>
+        <div className="inline-actions">
+          <span className="helper">Contactos compartidos recientes</span>
+          {rankedRecentRecipientContacts.length === 0 ? (
+            <span className="helper">Sin contactos recientes</span>
+          ) : null}
+          {rankedRecentRecipientContacts.map((contact) => (
+            <Button key={contact.id} type="button" variant="outline" onClick={() => applyRecipientContact(contact)}>
+              {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
+            </Button>
+          ))}
+        </div>
         <div className="form-row">
           <label htmlFor="create-shipment-consignee-lookup">Buscar por movil</label>
           <input
@@ -2049,6 +2686,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateProvince(event.target.value)}
             placeholder="Malaga"
           />
+          {createFieldErrors.province ? <div className="helper error">{createFieldErrors.province}</div> : null}
           <label htmlFor="create-shipment-country">Pais</label>
           <input
             id="create-shipment-country"
@@ -2075,6 +2713,46 @@ export function ShipmentsPage() {
           </Button>
         }
       >
+        <div className="inline-actions">
+          <label htmlFor="sender-template-select">Plantilla remitente</label>
+          <select
+            id="sender-template-select"
+            value={selectedSenderTemplateId}
+            onChange={(event) => {
+              const templateId = event.target.value;
+              setSelectedSenderTemplateId(templateId);
+              const template = rankedSenderTemplates.find((item) => item.id === templateId);
+              if (template) applySenderTemplate(template);
+            }}
+          >
+            <option value="">Seleccionar plantilla</option>
+            {rankedSenderTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+          </select>
+          <input
+            value={newSenderTemplateName}
+            onChange={(event) => setNewSenderTemplateName(event.target.value)}
+            placeholder="Nombre nueva plantilla"
+          />
+          <Button type="button" variant="outline" onClick={saveCurrentSenderAsTemplate}>
+            Guardar plantilla
+          </Button>
+          <Button type="button" variant="outline" onClick={deleteSelectedSenderTemplate} disabled={!selectedSenderTemplateId}>
+            Eliminar
+          </Button>
+        </div>
+        <div className="inline-actions">
+          <span className="helper">Contactos compartidos recientes</span>
+          {rankedRecentSenderContacts.length === 0 ? (
+            <span className="helper">Sin contactos recientes</span>
+          ) : null}
+          {rankedRecentSenderContacts.map((contact) => (
+            <Button key={contact.id} type="button" variant="outline" onClick={() => applySenderContact(contact)}>
+              {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
+            </Button>
+          ))}
+        </div>
         <div className="form-row">
           <label htmlFor="create-sender-lookup">Buscar por movil</label>
           <input
@@ -2232,6 +2910,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderProvince(event.target.value)}
             placeholder="Malaga"
           />
+          {createFieldErrors.senderProvince ? <div className="helper error">{createFieldErrors.senderProvince}</div> : null}
           <label htmlFor="create-sender-country">Pais</label>
           <input
             id="create-sender-country"
@@ -2521,6 +3200,9 @@ export function ShipmentsPage() {
                         <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
                           Incidencia
                         </Button>
+                        <Link to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(item.id)}&resolved=open`} className="btn btn-outline">
+                          Ver incidencias
+                        </Link>
                         <Link to={`/shipments/${item.id}`} className="btn btn-outline">
                           Ver
                         </Link>
@@ -2536,7 +3218,7 @@ export function ShipmentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
@@ -2565,7 +3247,7 @@ export function ShipmentsPage() {
               exportPdf={exportPdf}
             />
           ) : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <span className="helper">Columnas export</span>
           {[
             'reference',
@@ -2598,7 +3280,7 @@ export function ShipmentsPage() {
             </Button>
           </div>
           {exportError ? <div className="helper error">{exportError}</div> : null}
-          <div className="inline-actions">
+          <div className="inline-actions ops-toolbar">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior
             </Button>

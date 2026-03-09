@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Contacts\ContactResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,5 +72,64 @@ class ContactController extends Controller
         $rows = $query->orderByDesc('updated_at')->limit($limit)->get();
 
         return response()->json(['data' => $rows]);
+    }
+
+    public function store(Request $request, ContactResolver $resolver): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('contacts.write')) {
+            return response()->json([
+                'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
+            ], 403);
+        }
+
+        $payload = $request->validate([
+            'kind' => ['required', 'string', 'in:sender,recipient,both'],
+            'display_name' => ['nullable', 'string', 'max:180'],
+            'legal_name' => ['nullable', 'string', 'max:180'],
+            'document_id' => ['nullable', 'string', 'max:60'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'phone_alt' => ['nullable', 'string', 'max:40'],
+            'email' => ['nullable', 'email', 'max:120'],
+            'address_line' => ['nullable', 'string', 'max:220'],
+            'address_street' => ['nullable', 'string', 'max:180'],
+            'address_number' => ['nullable', 'string', 'max:40'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'city' => ['nullable', 'string', 'max:80'],
+            'province' => ['nullable', 'string', 'max:80'],
+            'country' => ['nullable', 'string', 'max:80'],
+            'address_notes' => ['nullable', 'string', 'max:220'],
+        ]);
+
+        $resolvedId = $resolver->resolve([
+            'user_id' => $actor->id,
+            'name' => $payload['display_name'] ?? null,
+            'legal_name' => $payload['legal_name'] ?? null,
+            'document_id' => $payload['document_id'] ?? null,
+            'phone' => $payload['phone'] ?? null,
+            'phone_alt' => $payload['phone_alt'] ?? null,
+            'email' => $payload['email'] ?? null,
+            'address_line' => $payload['address_line'] ?? null,
+            'address_street' => $payload['address_street'] ?? null,
+            'address_number' => $payload['address_number'] ?? null,
+            'postal_code' => $payload['postal_code'] ?? null,
+            'city' => $payload['city'] ?? null,
+            'province' => $payload['province'] ?? null,
+            'country' => $payload['country'] ?? null,
+            'address_notes' => $payload['address_notes'] ?? null,
+        ], $payload['kind']);
+
+        if ($resolvedId === null) {
+            return response()->json([
+                'error' => ['code' => 'CONTACT_EMPTY', 'message' => 'At least one contact field is required.'],
+            ], 422);
+        }
+
+        $contact = DB::table('contacts')->where('id', $resolvedId)->first();
+
+        return response()->json([
+            'data' => $contact,
+        ], 201);
     }
 }

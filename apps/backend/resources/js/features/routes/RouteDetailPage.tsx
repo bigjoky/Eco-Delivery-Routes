@@ -51,6 +51,7 @@ export function RouteDetailPage() {
   const [assignmentWarnings, setAssignmentWarnings] = useState<string[]>([]);
   const [recommendedSubcontractorId, setRecommendedSubcontractorId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [smartAssigning, setSmartAssigning] = useState(false);
   const [error, setError] = useState('');
   const [stopType, setStopType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
   const [shipmentQuery, setShipmentQuery] = useState('');
@@ -216,6 +217,69 @@ export function RouteDetailPage() {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar la ruta');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const suggestSmartAssignment = async () => {
+    if (!id) return;
+    setSmartAssigning(true);
+    setError('');
+    try {
+      const activeSubcontractors = subcontractors.filter((item) => item.status === 'active');
+      const orderedSubcontractorIds = Array.from(
+        new Set([
+          subcontractorId || null,
+          recommendedSubcontractorId || null,
+          route?.subcontractor_id ?? null,
+          ...activeSubcontractors.map((item) => item.id),
+          null,
+        ])
+      );
+
+      let attempts = 0;
+      const maxAttempts = 40;
+      for (const candidateSubcontractorId of orderedSubcontractorIds) {
+        const candidateDrivers = drivers
+          .filter((driver) => driver.status === 'active')
+          .filter((driver) => !candidateSubcontractorId || driver.subcontractor_id === candidateSubcontractorId)
+          .slice(0, 10);
+        const candidateVehicles = vehicles
+          .filter((vehicle) => vehicle.status === 'active')
+          .filter((vehicle) => !candidateSubcontractorId || vehicle.subcontractor_id === candidateSubcontractorId)
+          .slice(0, 10);
+
+        for (const driver of candidateDrivers) {
+          for (const vehicle of candidateVehicles) {
+            if (vehicle.assigned_driver_id && vehicle.assigned_driver_id !== driver.id) continue;
+            attempts += 1;
+            const preview = await apiClient.previewRouteAssignment({
+              subcontractor_id: candidateSubcontractorId || null,
+              driver_id: driver.id,
+              vehicle_id: vehicle.id,
+              route_id: id,
+              route_date: route?.route_date ?? null,
+            });
+            if (preview.valid) {
+              setSubcontractorId(candidateSubcontractorId || '');
+              setDriverId(driver.id);
+              setVehicleId(vehicle.id);
+              setAssignmentConflicts([]);
+              setAssignmentWarnings((preview.warnings ?? []).map((item) => item.message));
+              setRecommendedSubcontractorId(preview.recommended_subcontractor_id ?? null);
+              setError('');
+              return;
+            }
+            if (attempts >= maxAttempts) break;
+          }
+          if (attempts >= maxAttempts) break;
+        }
+        if (attempts >= maxAttempts) break;
+      }
+      setError('No se encontro combinacion valida automatica. Ajusta manualmente y guarda.');
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : 'No se pudo ejecutar asignacion inteligente');
+    } finally {
+      setSmartAssigning(false);
     }
   };
 
@@ -576,6 +640,45 @@ export function RouteDetailPage() {
     return date.toISOString();
   };
 
+  const localDateTimeNow = () => toLocalDateTime(new Date().toISOString());
+
+  const applyBulkPreset = (preset: 'clear' | 'start_shift' | 'mark_in_progress_now' | 'complete_now' | 'delay_15' | 'delay_30') => {
+    if (preset === 'clear') {
+      setBulkStatus('');
+      setBulkPlannedAt('');
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'start_shift') {
+      setBulkStatus('planned');
+      setBulkPlannedAt(localDateTimeNow());
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'mark_in_progress_now') {
+      setBulkStatus('in_progress');
+      setBulkPlannedAt(localDateTimeNow());
+      setBulkCompletedAt('');
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'complete_now') {
+      setBulkStatus('completed');
+      setBulkCompletedAt(localDateTimeNow());
+      setBulkEtaShiftMinutes('0');
+      return;
+    }
+    if (preset === 'delay_15') {
+      setBulkEtaShiftMinutes('15');
+      return;
+    }
+    if (preset === 'delay_30') {
+      setBulkEtaShiftMinutes('30');
+    }
+  };
+
   const shiftIsoDateTime = (value: string, minutes: number) => {
     const parsed = Date.parse(value);
     if (Number.isNaN(parsed)) return value;
@@ -897,6 +1000,9 @@ export function RouteDetailPage() {
             <Button type="button" onClick={saveVehicleAssignment} disabled={saving}>
               {saving ? 'Guardando...' : 'Guardar'}
             </Button>
+            <Button type="button" variant="outline" onClick={suggestSmartAssignment} disabled={smartAssigning || saving}>
+              {smartAssigning ? 'Buscando...' : 'Asignacion inteligente'}
+            </Button>
           </div>
           <div className="helper">
             Ruta: {route?.code ?? id}
@@ -1119,6 +1225,15 @@ export function RouteDetailPage() {
                 Guardar plantilla
               </Button>
             </div>
+          </div>
+          <div className="inline-actions">
+            <span className="helper">Presets operativos</span>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('start_shift')} disabled={bulkUpdatingStops || bulkDeletingStops}>Inicio turno</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('mark_in_progress_now')} disabled={bulkUpdatingStops || bulkDeletingStops}>En curso ahora</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('complete_now')} disabled={bulkUpdatingStops || bulkDeletingStops}>Cerrar ahora</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('delay_15')} disabled={bulkUpdatingStops || bulkDeletingStops}>Retrasar +15m</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('delay_30')} disabled={bulkUpdatingStops || bulkDeletingStops}>Retrasar +30m</Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('clear')} disabled={bulkUpdatingStops || bulkDeletingStops}>Limpiar</Button>
           </div>
           <div className="inline-actions">
             <label htmlFor="bulk-stop-status">Estado masivo</label>

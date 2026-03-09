@@ -69,6 +69,7 @@ export function AppShell({
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
   const canAccessOpenApi = roles.includes('super_admin') || roles.includes('admin');
+  const mobileCorePaths = new Set(['/dashboard', '/shipments', '/routes', '/incidents', '/network']);
   const visibleMenu = menu.filter((item) => {
     if (item.to === '/login' && isAuthenticated) return false;
     if (!item.feature) return true;
@@ -97,7 +98,11 @@ export function AppShell({
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    className={({ isActive }) => cn('sidebar-link', isActive && 'sidebar-link-active')}
+                    className={({ isActive }) => cn(
+                      'sidebar-link',
+                      mobileCorePaths.has(item.to) ? 'sidebar-link-mobile-core' : 'sidebar-link-mobile-extra',
+                      isActive && 'sidebar-link-active'
+                    )}
                   >
                     {item.label}
                   </NavLink>
@@ -124,7 +129,6 @@ export function AppShell({
             <div className="sidebar-user-name">{currentUser?.name ?? 'Operador'}</div>
             <div className="sidebar-user-email">{currentUser?.email ?? 'Sesion activa'}</div>
             <div className="sidebar-user-actions">
-              <a href="/ops" className="sidebar-user-link">Operativa</a>
               {canAccessOpenApi ? (
                 <a href="/api-docs" className="sidebar-user-link">OpenAPI</a>
               ) : null}

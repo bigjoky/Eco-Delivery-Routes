@@ -87,6 +87,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('hubs/{id}', [HubController::class, 'destroy']);
         Route::post('hubs/{id}/restore', [HubController::class, 'restore']);
         Route::get('contacts', [ContactController::class, 'index']);
+        Route::post('contacts', [ContactController::class, 'store']);
         Route::get('addresses/suggest', [AddressSuggestionController::class, 'index']);
         Route::get('depots', [DepotController::class, 'index']);
         Route::post('depots', [DepotController::class, 'store']);
@@ -140,6 +141,7 @@ Route::prefix('v1')->group(function () {
         Route::get('incidents/board', [IncidentController::class, 'board']);
         Route::get('incidents', [IncidentController::class, 'index']);
         Route::post('incidents', [IncidentController::class, 'store']);
+        Route::patch('incidents/{id}', [IncidentController::class, 'update']);
         Route::post('incidents/resolve-bulk', [IncidentController::class, 'resolveBulk']);
         Route::post('incidents/override-sla-bulk', [IncidentController::class, 'overrideSlaBulk']);
         Route::patch('incidents/{id}/resolve', [IncidentController::class, 'resolve']);

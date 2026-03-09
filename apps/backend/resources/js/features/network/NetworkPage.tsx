@@ -21,7 +21,7 @@ export function NetworkPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [hubFilter, setHubFilter] = useState('');
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [includeDeleted, setIncludeDeleted] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
   const [editingHubId, setEditingHubId] = useState('');
@@ -331,6 +331,15 @@ export function NetworkPage() {
     return true;
   }), [points, statusFilter, hubFilter, normalizedQuery, includeDeleted]);
 
+  const hasActiveFilters = normalizedQuery.length > 0 || statusFilter !== 'all' || hubFilter !== '' || includeDeleted !== true;
+
+  const resetFilters = () => {
+    setQuery('');
+    setStatusFilter('all');
+    setHubFilter('');
+    setIncludeDeleted(true);
+  };
+
   return (
     <div className="page-grid">
       <div className="inline-actions">
@@ -431,6 +440,12 @@ export function NetworkPage() {
           {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
         </Button>
         <Button type="button" className="btn btn-outline" onClick={load} disabled={loading}>{loading ? 'Cargando...' : 'Recargar'}</Button>
+        <span className="helper">
+          Hubs {filteredHubs.length}/{hubs.length} | Depots {filteredDepots.length}/{depots.length} | Puntos {filteredPoints.length}/{points.length}
+        </span>
+        {hasActiveFilters ? (
+          <Button type="button" variant="outline" onClick={resetFilters}>Reset filtros</Button>
+        ) : null}
       </div>
       {message ? <div className="helper">{message}</div> : null}
       {error ? <div className="helper error">{error}</div> : null}

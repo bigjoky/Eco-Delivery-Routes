@@ -160,6 +160,74 @@ class SubcontractorDriverVehicleHttpTest extends TestCase
         $forbiddenDeleteVehicle->assertStatus(403)->assertJsonPath('error.code', 'AUTH_UNAUTHORIZED');
     }
 
+    public function test_bulk_status_actions_store_structured_reason_in_audit(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $hubId = (string) DB::table('hubs')->value('id');
+        $this->actingAs($manager, 'sanctum');
+
+        $subcontractorId = (string) $this->postJson('/api/v1/subcontractors', [
+            'legal_name' => 'Audit Bulk Partner SL',
+            'tax_id' => 'B55667788',
+            'status' => 'active',
+            'payment_terms' => 'monthly',
+        ])->json('data.id');
+
+        $driverId = (string) $this->postJson('/api/v1/drivers', [
+            'code' => 'DRV-AUD-001',
+            'name' => 'Driver Audit',
+            'dni' => '44556677Z',
+            'status' => 'active',
+            'employment_type' => 'subcontractor',
+            'subcontractor_id' => $subcontractorId,
+            'home_hub_id' => $hubId,
+        ])->json('data.id');
+
+        $vehicleId = (string) $this->postJson('/api/v1/vehicles', [
+            'code' => 'VEH-AUD-001',
+            'plate_number' => '7788-AUD',
+            'vehicle_type' => 'van',
+            'status' => 'active',
+            'subcontractor_id' => $subcontractorId,
+            'home_hub_id' => $hubId,
+            'assigned_driver_id' => $driverId,
+        ])->json('data.id');
+
+        $this->postJson('/api/v1/subcontractors/bulk-status', [
+            'ids' => [$subcontractorId],
+            'status' => 'suspended',
+            'reason_code' => 'COMPLIANCE',
+            'reason_detail' => 'CAE pendiente',
+            'reason' => 'Suspensión temporal por cumplimiento',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/drivers/bulk-status', [
+            'ids' => [$driverId],
+            'status' => 'inactive',
+            'reason_code' => 'PERFORMANCE',
+            'reason_detail' => 'Baja productividad',
+            'reason' => 'Ajuste operativo',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/vehicles/bulk-status', [
+            'ids' => [$vehicleId],
+            'status' => 'maintenance',
+            'reason_code' => 'COMPLIANCE',
+            'reason_detail' => 'ITV vencida',
+            'reason' => 'Bloqueo por documentación',
+        ])->assertOk();
+
+        $subAudit = (string) DB::table('audit_logs')->where('event', 'subcontractors.bulk_status_updated')->orderByDesc('id')->value('metadata');
+        $drvAudit = (string) DB::table('audit_logs')->where('event', 'drivers.bulk_status_updated')->orderByDesc('id')->value('metadata');
+        $vehAudit = (string) DB::table('audit_logs')->where('event', 'vehicles.bulk_status_updated')->orderByDesc('id')->value('metadata');
+
+        $this->assertStringContainsString('COMPLIANCE', $subAudit);
+        $this->assertStringContainsString('CAE pendiente', $subAudit);
+        $this->assertStringContainsString('PERFORMANCE', $drvAudit);
+        $this->assertStringContainsString('Ajuste operativo', $drvAudit);
+        $this->assertStringContainsString('ITV vencida', $vehAudit);
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

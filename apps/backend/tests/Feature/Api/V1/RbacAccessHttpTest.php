@@ -63,6 +63,64 @@ class RbacAccessHttpTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_shipments_operator_with_shipments_write_can_load_hubs_depots_and_points_for_intake(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Shipments Operator',
+            'email' => 'shipments.operator.' . substr((string) Str::uuid(), 0, 8) . '@eco.local',
+            'password' => Hash::make('password123'),
+            'status' => 'active',
+        ]);
+
+        $roleId = (string) Str::uuid();
+        DB::table('roles')->insert([
+            'id' => $roleId,
+            'code' => 'shipments_intake_temp_' . substr((string) Str::uuid(), 0, 8),
+            'name' => 'Shipments Intake Temp',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $permissionId = DB::table('permissions')->where('code', 'shipments.write')->value('id');
+        $this->assertNotNull($permissionId);
+        DB::table('role_permissions')->insert([
+            'role_id' => $roleId,
+            'permission_id' => $permissionId,
+        ]);
+        DB::table('user_roles')->insert([
+            'user_id' => $user->id,
+            'role_id' => $roleId,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+        $this->getJson('/api/v1/hubs?only_active=1')->assertOk();
+        $this->getJson('/api/v1/depots')->assertOk();
+        $this->getJson('/api/v1/points')->assertOk();
+    }
+
+    public function test_super_admin_role_bypasses_permission_checks_for_network_write(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Super Admin Bypass',
+            'email' => 'superadmin.bypass.' . substr((string) Str::uuid(), 0, 8) . '@eco.local',
+            'password' => Hash::make('password123'),
+            'status' => 'active',
+        ]);
+
+        $roleId = DB::table('roles')->where('code', 'super_admin')->value('id');
+        $this->assertNotNull($roleId);
+        DB::table('user_roles')->insert([
+            'user_id' => $user->id,
+            'role_id' => (string) $roleId,
+        ]);
+
+        $this->actingAs($user, 'sanctum');
+        $response = $this->postJson('/api/v1/hubs', [
+            'name' => 'Hub Bypass',
+            'city' => 'Malaga',
+        ]);
+        $response->assertCreated();
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([

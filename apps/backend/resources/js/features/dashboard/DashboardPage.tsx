@@ -268,38 +268,23 @@ export function DashboardPage() {
           <CardTitle>SLA incidencias</CardTitle>
           <CardDescription>Estado operativo de cumplimiento SLA en el periodo.</CardDescription>
         </CardHeader>
-        <CardContent className="inline-actions">
-          <Link to="/incidents?sla=on_track" className="kpi-item">
+        <CardContent className="dashboard-sla-row">
+          <Link to="/incidents?sla=on_track" className="kpi-item dashboard-sla-item">
             <div className="kpi-label">On Track</div>
             <div className="kpi-value">{overview.sla.on_track}</div>
           </Link>
-          <Link to="/incidents?sla=at_risk" className="kpi-item">
+          <Link to="/incidents?sla=at_risk" className="kpi-item dashboard-sla-item">
             <div className="kpi-label">At Risk</div>
             <div className="kpi-value">{overview.sla.at_risk}</div>
           </Link>
-          <Link to="/incidents?sla=breached" className="kpi-item">
+          <Link to="/incidents?sla=breached" className="kpi-item dashboard-sla-item">
             <div className="kpi-label">Breached</div>
             <div className="kpi-value">{overview.sla.breached}</div>
           </Link>
-          <Link to="/incidents?resolved=resolved" className="kpi-item">
+          <Link to="/incidents?resolved=resolved" className="kpi-item dashboard-sla-item">
             <div className="kpi-label">Resolved</div>
             <div className="kpi-value">{overview.sla.resolved}</div>
           </Link>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Acciones rápidas</CardTitle>
-        </CardHeader>
-        <CardContent className="inline-actions">
-          <Link to="/shipments" className="btn btn-outline">Envíos</Link>
-          <Link to="/routes" className="btn btn-outline">Rutas</Link>
-          <Link to="/incidents" className="btn btn-outline">Incidencias</Link>
-          <Link to="/partners" className="btn btn-outline">Partners</Link>
-          <Link to="/workforce" className="btn btn-outline">Personal</Link>
-          <Link to="/fleet-controls" className="btn btn-outline">Flota</Link>
-          <Link to="/quality" className="btn btn-outline">KPI Calidad</Link>
         </CardContent>
       </Card>
 

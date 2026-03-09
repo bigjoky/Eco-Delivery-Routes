@@ -502,9 +502,7 @@ export const apiClient = {
     if (filters.onlyActive !== undefined) params.set('only_active', filters.onlyActive ? '1' : '0');
     if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
     const suffix = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetch(`${API_BASE_URL}/hubs${suffix}`, {
-      headers: sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {},
-    });
+    const response = await authorizedFetch(`${API_BASE_URL}/hubs${suffix}`);
     return parseData<HubSummary>(response);
   },
 
@@ -748,6 +746,31 @@ export const apiClient = {
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await authorizedFetch(`${API_BASE_URL}/contacts${suffix}`);
     return parseData<ContactSummary>(response);
+  },
+
+  async createContact(payload: {
+    kind: 'sender' | 'recipient' | 'both';
+    display_name?: string | null;
+    legal_name?: string | null;
+    document_id?: string | null;
+    phone?: string | null;
+    phone_alt?: string | null;
+    email?: string | null;
+    address_line?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_notes?: string | null;
+  }): Promise<ContactSummary> {
+    if (USE_MOCK) return mockApi.createContact(payload) as Promise<ContactSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseItemData<ContactSummary>(response);
   },
 
   async getAddressSuggestions(filters: {
@@ -2277,6 +2300,28 @@ export const apiClient = {
     return data.data as IncidentSummary;
   },
 
+  async updateIncident(
+    id: string,
+    payload: {
+      catalog_code?: string;
+      category?: 'failed' | 'absent' | 'retry' | 'general';
+      notes?: string | null;
+    }
+  ): Promise<IncidentSummary> {
+    if (USE_MOCK) return mockApi.updateIncident(id, payload) as Promise<IncidentSummary>;
+    const response = await fetch(`${API_BASE_URL}/incidents/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sessionStore.getToken() ? { Authorization: `Bearer ${sessionStore.getToken()}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message ?? 'Cannot update incident');
+    return data.data as IncidentSummary;
+  },
+
   async resolveIncident(
     id: string,
     payload?: string | {
@@ -2945,12 +2990,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateSubcontractorStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateSubcontractorStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateSubcontractorStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateSubcontractorStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update subcontractors'));
@@ -3024,12 +3073,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateDriverStatus(ids: string[], status: 'active' | 'inactive' | 'suspended'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateDriverStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateDriverStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'suspended',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateDriverStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/drivers/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update drivers'));
@@ -3103,12 +3156,16 @@ export const apiClient = {
     }
   },
 
-  async bulkUpdateVehicleStatus(ids: string[], status: 'active' | 'inactive' | 'maintenance'): Promise<{ affected_count: number }> {
-    if (USE_MOCK) return mockApi.bulkUpdateVehicleStatus(ids, status) as Promise<{ affected_count: number }>;
+  async bulkUpdateVehicleStatus(
+    ids: string[],
+    status: 'active' | 'inactive' | 'maintenance',
+    reason?: { code?: string; detail?: string; note?: string }
+  ): Promise<{ affected_count: number }> {
+    if (USE_MOCK) return mockApi.bulkUpdateVehicleStatus(ids, status, reason) as Promise<{ affected_count: number }>;
     const response = await authorizedFetch(`${API_BASE_URL}/vehicles/bulk-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, status }),
+      body: JSON.stringify({ ids, status, reason_code: reason?.code, reason_detail: reason?.detail, reason: reason?.note }),
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot bulk update vehicles'));

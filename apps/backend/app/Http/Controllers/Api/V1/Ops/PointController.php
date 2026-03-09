@@ -22,7 +22,14 @@ class PointController extends Controller
     {
         /** @var User $actor */
         $actor = $request->user();
-        if (!$actor->hasPermission('points.read')) {
+        if (
+            !$actor->hasPermission('points.read')
+            && !$actor->hasPermission('depots.read')
+            && !$actor->hasPermission('hubs.read')
+            && !$actor->hasPermission('routes.read')
+            && !$actor->hasPermission('shipments.read')
+            && !$actor->hasPermission('shipments.write')
+        ) {
             return response()->json([
                 'error' => ['code' => 'AUTH_UNAUTHORIZED', 'message' => 'Unauthorized.'],
             ], 403);
