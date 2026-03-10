@@ -9,6 +9,7 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { AuditLogEntry, SettlementAdjustment, SettlementBulkReconcilePreview, SettlementDetail, SettlementRecalculatePreview, SettlementReconciliationReason } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { hasValidCatalogReason, normalizeBulkReconcileFilters } from './reconciliation';
 import { apiClient } from '../../services/apiClient';
 
@@ -228,7 +229,7 @@ export function SettlementDetailPage() {
   const canManageAdjustments = roles.includes('accountant') || roles.includes('super_admin');
   const canApproveAdjustments = roles.includes('operations_manager') || roles.includes('super_admin');
   const canRecalculate = roles.includes('accountant') || roles.includes('super_admin');
-  const canExport = roles.includes('accountant') || roles.includes('super_admin');
+  const canExport = hasExportAccess('settlements', roles);
   const canReconcileLines = roles.includes('accountant') || roles.includes('super_admin');
   const canExportByStatus = settlementStatus === 'approved' || settlementStatus === 'exported';
 

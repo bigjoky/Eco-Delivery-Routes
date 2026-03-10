@@ -8,6 +8,8 @@ import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { HubSummary, PaginationMeta, SettlementPreview, SettlementReconciliationSummaryRow, SettlementReconciliationTrendRow, SettlementSummary, SubcontractorSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 function statusVariant(status: SettlementSummary['status']): 'outline' | 'secondary' | 'success' {
@@ -35,6 +37,7 @@ export function SettlementsPage() {
   const [advanceAmountEur, setAdvanceAmountEur] = useState('');
   const [advanceReason, setAdvanceReason] = useState('');
   const [advanceMessage, setAdvanceMessage] = useState('');
+  const canExport = hasExportAccess('settlements', sessionStore.getRoles());
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
@@ -271,6 +274,7 @@ export function SettlementsPage() {
           <div className="inline-actions">
             <ExportActionsModal
               title="Exportar resumen de exclusiones"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'settlements-summary-csv',

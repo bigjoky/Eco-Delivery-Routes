@@ -4,6 +4,8 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import type { DashboardOverview, HubSummary, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
@@ -62,6 +64,7 @@ export function DashboardPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
+  const canExport = hasExportAccess('dashboard', sessionStore.getRoles());
   const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -144,6 +147,7 @@ export function DashboardPage() {
           <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar'}</Button>
           <ExportActionsModal
             title="Exportar dashboard"
+            triggerDisabled={!canExport}
             actions={[
               {
                 id: 'dashboard-csv',

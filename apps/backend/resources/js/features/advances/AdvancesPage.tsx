@@ -4,10 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AdvanceSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 export function AdvancesPage() {
   const [items, setItems] = useState<AdvanceSummary[]>([]);
+  const canExport = hasExportAccess('advances', sessionStore.getRoles());
 
   useEffect(() => {
     apiClient.getAdvances({ page: 1, perPage: 20 }).then((result) => setItems(result.data));
@@ -22,6 +25,7 @@ export function AdvancesPage() {
           <div className="inline-actions">
             <ExportActionsModal
               title="Exportar anticipos"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'advances-csv',

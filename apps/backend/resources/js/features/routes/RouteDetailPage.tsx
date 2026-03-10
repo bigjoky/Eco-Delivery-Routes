@@ -8,6 +8,8 @@ import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Modal } from '../../components/ui/modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 function stopStatusHelp(status: string): string {
@@ -37,6 +39,7 @@ type RouteOpsAuditItem = {
 
 export function RouteDetailPage() {
   const { id } = useParams();
+  const canExport = hasExportAccess('routes', sessionStore.getRoles());
   const [stops, setStops] = useState<RouteStopSummary[]>([]);
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
@@ -1044,7 +1047,7 @@ export function RouteDetailPage() {
             )}
             <ExportActionsModal
               title="Exportar manifest de ruta"
-              triggerDisabled={!id}
+              triggerDisabled={!id || !canExport}
               actions={[
                 {
                   id: 'manifest-csv',
@@ -1454,7 +1457,7 @@ export function RouteDetailPage() {
               <div className="inline-actions">
                 <ExportActionsModal
                   title="Exportar auditoría operativa"
-                  triggerDisabled={opsAudit.length === 0}
+                  triggerDisabled={!canExport || opsAudit.length === 0}
                   actions={[
                     {
                       id: 'audit-csv',
