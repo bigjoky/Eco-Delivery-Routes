@@ -807,6 +807,121 @@ class RouteController extends Controller
         ]);
     }
 
+    public function bulkUpdateStops(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('routes.write')) {
+            return $this->forbidden();
+        }
+
+        $route = DB::table('routes')->where('id', $id)->first();
+        if (!$route) {
+            return response()->json([
+                'error' => ['code' => 'RESOURCE_NOT_FOUND', 'message' => 'Route not found.'],
+            ], 404);
+        }
+
+        $payload = $request->validate([
+            'stop_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'stop_ids.*' => ['required', 'uuid'],
+            'status' => ['nullable', 'in:planned,in_progress,completed'],
+            'planned_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date'],
+            'eta_shift_minutes' => ['nullable', 'integer', 'min:-720', 'max:720'],
+            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_detail' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $hasStatus = array_key_exists('status', $payload);
+        $hasPlannedAt = array_key_exists('planned_at', $payload);
+        $hasCompletedAt = array_key_exists('completed_at', $payload);
+        $hasEtaShift = array_key_exists('eta_shift_minutes', $payload) && ((int) $payload['eta_shift_minutes']) !== 0;
+        if (!$hasStatus && !$hasPlannedAt && !$hasCompletedAt && !$hasEtaShift) {
+            $this->throwValidationError(
+                'Provide at least one field to update (status, planned_at, completed_at, eta_shift_minutes).',
+                'stop_ids'
+            );
+        }
+
+        $stopIds = array_values(array_unique(array_map('strval', $payload['stop_ids'])));
+        $stops = DB::table('route_stops')
+            ->where('route_id', $id)
+            ->whereIn('id', $stopIds)
+            ->get(['id', 'planned_at', 'completed_at']);
+        if ($stops->count() !== count($stopIds)) {
+            $this->throwValidationError('Some stop_ids do not belong to this route.', 'stop_ids');
+        }
+
+        $updatedCount = 0;
+        $etaShift = (int) ($payload['eta_shift_minutes'] ?? 0);
+
+        DB::transaction(function () use (
+            $id,
+            $stopIds,
+            $stops,
+            $payload,
+            $hasStatus,
+            $hasPlannedAt,
+            $hasCompletedAt,
+            $hasEtaShift,
+            $etaShift,
+            &$updatedCount
+        ): void {
+            foreach ($stopIds as $stopId) {
+                /** @var object{id:string,planned_at:?string,completed_at:?string} $current */
+                $current = $stops->firstWhere('id', $stopId);
+                $updatePayload = [
+                    'updated_at' => now(),
+                ];
+
+                if ($hasStatus) {
+                    $updatePayload['status'] = $payload['status'];
+                }
+
+                if ($hasPlannedAt) {
+                    $updatePayload['planned_at'] = $payload['planned_at'];
+                } elseif ($hasEtaShift) {
+                    $updatePayload['planned_at'] = $this->shiftDateTime($current->planned_at, $etaShift);
+                }
+
+                if ($hasCompletedAt) {
+                    $updatePayload['completed_at'] = $payload['completed_at'];
+                } elseif ($hasEtaShift) {
+                    $updatePayload['completed_at'] = $this->shiftDateTime($current->completed_at, $etaShift);
+                }
+
+                if ($hasStatus && $payload['status'] === 'completed' && !$hasCompletedAt && !$hasEtaShift && empty($current->completed_at)) {
+                    $updatePayload['completed_at'] = now()->toDateTimeString();
+                }
+
+                DB::table('route_stops')
+                    ->where('route_id', $id)
+                    ->where('id', $stopId)
+                    ->update($updatePayload);
+                $updatedCount++;
+            }
+        });
+
+        $this->writeRouteAudit($actor, $id, 'route.stops.bulk_updated', [
+            'updated_count' => $updatedCount,
+            'stop_ids' => $stopIds,
+            'status' => $payload['status'] ?? null,
+            'planned_at' => $payload['planned_at'] ?? null,
+            'completed_at' => $payload['completed_at'] ?? null,
+            'eta_shift_minutes' => $payload['eta_shift_minutes'] ?? null,
+            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_detail' => $payload['reason_detail'] ?? null,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'updated_count' => $updatedCount,
+                'stops' => $this->fetchRouteStops($id),
+            ],
+        ]);
+    }
+
     public function manifest(Request $request, string $id): JsonResponse
     {
         /** @var User $actor */
@@ -1139,6 +1254,20 @@ class RouteController extends Controller
             'express_1030', 'express_1400', 'express_1900' => 0,
             default => 2,
         };
+    }
+
+    private function shiftDateTime(?string $value, int $shiftMinutes): ?string
+    {
+        if ($value === null || trim($value) === '' || $shiftMinutes === 0) {
+            return $value;
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return $value;
+        }
+
+        return date('Y-m-d H:i:s', $timestamp + ($shiftMinutes * 60));
     }
 
     /**

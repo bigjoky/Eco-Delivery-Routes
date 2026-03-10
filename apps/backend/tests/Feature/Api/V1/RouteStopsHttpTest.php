@@ -431,6 +431,91 @@ class RouteStopsHttpTest extends TestCase
         $this->assertContains('route.manifest.exported.pdf', $events);
     }
 
+    public function test_operations_manager_can_bulk_update_stops_with_single_request(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $routeId = (string) Str::uuid();
+        DB::table('routes')->insert([
+            'id' => $routeId,
+            'hub_id' => $hubId,
+            'code' => 'R-STOPS-BULK-UPD',
+            'route_date' => now()->toDateString(),
+            'status' => 'planned',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $shipmentA = (string) Str::uuid();
+        $shipmentB = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            [
+                'id' => $shipmentA,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-BULK-UPD-A',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => $shipmentB,
+                'hub_id' => $hubId,
+                'reference' => 'SHP-BULK-UPD-B',
+                'status' => 'created',
+                'service_type' => 'delivery',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $stopA = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 1,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentA,
+            'status' => 'planned',
+        ])->assertStatus(201)->json('data.id');
+
+        $stopB = $this->postJson("/api/v1/routes/{$routeId}/stops", [
+            'sequence' => 2,
+            'stop_type' => 'DELIVERY',
+            'shipment_id' => $shipmentB,
+            'status' => 'planned',
+        ])->assertStatus(201)->json('data.id');
+
+        $bulkUpdate = $this->postJson("/api/v1/routes/{$routeId}/stops/bulk-update", [
+            'stop_ids' => [$stopA, $stopB],
+            'status' => 'completed',
+            'reason_code' => 'WEB_BULK_UPDATE',
+            'reason_detail' => 'Cierre operativo de prueba',
+        ]);
+
+        $bulkUpdate->assertOk();
+        $bulkUpdate->assertJsonPath('data.updated_count', 2);
+
+        $rows = DB::table('route_stops')
+            ->where('route_id', $routeId)
+            ->whereIn('id', [$stopA, $stopB])
+            ->get(['status', 'completed_at']);
+        $this->assertCount(2, $rows);
+        foreach ($rows as $row) {
+            $this->assertSame('completed', $row->status);
+            $this->assertNotNull($row->completed_at);
+        }
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'route.stops.bulk_updated')
+            ->orderByDesc('created_at')
+            ->first(['metadata']);
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) ($audit->metadata ?? '{}'), true);
+        $this->assertSame($routeId, $metadata['resource_id'] ?? null);
+        $this->assertSame(2, $metadata['updated_count'] ?? null);
+        $this->assertSame('WEB_BULK_UPDATE', $metadata['reason_code'] ?? null);
+    }
+
     public function test_operations_manager_can_update_manifest_notes(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

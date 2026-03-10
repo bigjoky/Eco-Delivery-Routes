@@ -114,6 +114,7 @@ Route::prefix('v1')->group(function () {
         Route::get('routes/{id}/stops', [RouteController::class, 'stops']);
         Route::post('routes/{id}/stops', [RouteController::class, 'addStop']);
         Route::post('routes/{id}/stops/bulk-add', [RouteController::class, 'bulkAddStops']);
+        Route::post('routes/{id}/stops/bulk-update', [RouteController::class, 'bulkUpdateStops']);
         Route::post('routes/{id}/stops/reorder', [RouteController::class, 'reorderStops']);
         Route::patch('routes/{id}/stops/{stopId}', [RouteController::class, 'updateStop']);
         Route::delete('routes/{id}/stops/{stopId}', [RouteController::class, 'deleteStop']);

@@ -498,6 +498,8 @@ class IncidentController extends Controller
             'requested_count' => count($ids),
             'updated_count' => (int) $updated,
             'apply_to_filtered' => $applyToFiltered,
+            'filters' => $applyToFiltered ? (array) ($payload['filters'] ?? []) : null,
+            'target_ids_sample' => array_slice($ids, 0, 50),
             'reason_code' => $payload['reason_code'],
             'reason_detail' => $payload['reason_detail'] ?? null,
         ]);
@@ -612,6 +614,18 @@ class IncidentController extends Controller
             'sla_due_at' => $payload['sla_due_at'] ?? null,
             'reason' => $payload['reason'],
             'apply_to_filtered' => $applyToFiltered,
+            'filters' => $applyToFiltered ? (array) ($payload['filters'] ?? []) : null,
+        ]);
+
+        $this->auditLogWriter->write($actor->id, 'incidents.sla_overridden.bulk', [
+            'requested_count' => count($ids),
+            'updated_count' => (int) $updated,
+            'priority' => $payload['priority'] ?? null,
+            'sla_due_at' => $payload['sla_due_at'] ?? null,
+            'reason' => $payload['reason'],
+            'apply_to_filtered' => $applyToFiltered,
+            'filters' => $applyToFiltered ? (array) ($payload['filters'] ?? []) : null,
+            'target_ids_sample' => array_slice($ids, 0, 50),
         ]);
 
         return response()->json([

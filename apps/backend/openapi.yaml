@@ -2499,6 +2499,39 @@ paths:
         '200': { description: Paradas creadas }
         '404': { description: Ruta no encontrada }
 
+  /routes/{id}/stops/bulk-update:
+    post:
+      tags: [Routes]
+      summary: Actualizar paradas masivamente en ruta (estado/ETA)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stop_ids]
+              properties:
+                stop_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                status:
+                  type: string
+                  enum: [planned, in_progress, completed]
+                planned_at: { type: string, format: date-time, nullable: true }
+                completed_at: { type: string, format: date-time, nullable: true }
+                eta_shift_minutes: { type: integer, minimum: -720, maximum: 720 }
+                reason_code: { type: string }
+                reason_detail: { type: string }
+      responses:
+        '200': { description: Paradas actualizadas }
+        '404': { description: Ruta no encontrada }
+        '422': { description: stop_ids o payload invalido }
+
   /routes/{id}/stops/reorder:
     post:
       tags: [Routes]

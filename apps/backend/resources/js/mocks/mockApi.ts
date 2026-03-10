@@ -2237,6 +2237,52 @@ export const mockApi = {
     };
   },
 
+  async bulkUpdateRouteStops(routeId: string, payload: {
+    stop_ids: string[];
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+    eta_shift_minutes?: number;
+    reason_code?: string;
+    reason_detail?: string;
+  }) {
+    const stopIdSet = new Set(payload.stop_ids);
+    const shiftMinutes = Number(payload.eta_shift_minutes ?? 0);
+    const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
+    let updatedCount = 0;
+    const shiftIso = (value?: string | null) => {
+      if (!value || !hasShift) return value ?? null;
+      const ts = Date.parse(value);
+      if (Number.isNaN(ts)) return value;
+      return new Date(ts + (shiftMinutes * 60 * 1000)).toISOString();
+    };
+
+    mockRouteStops = mockRouteStops.map((item) => {
+      if (item.route_id !== routeId || !stopIdSet.has(item.id)) return item;
+      updatedCount += 1;
+      const next = {
+        ...item,
+        status: payload.status ?? item.status,
+        planned_at: payload.planned_at !== undefined ? payload.planned_at : shiftIso((item as { planned_at?: string | null }).planned_at),
+        completed_at: payload.completed_at !== undefined ? payload.completed_at : shiftIso((item as { completed_at?: string | null }).completed_at),
+      } as typeof item & { planned_at?: string | null; completed_at?: string | null };
+      if (payload.status === 'completed' && payload.completed_at === undefined && !hasShift && !next.completed_at) {
+        next.completed_at = nowIso();
+      }
+      return next;
+    });
+
+    const stops = mockRouteStops
+      .filter((row) => row.route_id === routeId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+
+    return {
+      updated_count: updatedCount,
+      stops,
+    };
+  },
+
   async getRouteManifest(routeId: string) {
     const route = mockRoutes.find((row) => row.id === routeId);
     if (!route) throw new Error('Route not found');
