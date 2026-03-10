@@ -33,6 +33,13 @@ describe('route stops CRUD contract', () => {
       status: 'planned',
     });
     expect(bulk.created_count).toBeGreaterThanOrEqual(1);
+    const bulkUpdated = await apiClient.bulkUpdateRouteStops('r-1', {
+      stop_ids: [updated.id],
+      status: 'completed',
+      reason_code: 'WEB_BULK_UPDATE',
+    });
+    expect(bulkUpdated.updated_count).toBe(1);
+    expect(bulkUpdated.stops.find((row) => row.id === updated.id)?.status).toBe('completed');
 
     const manifest = await apiClient.getRouteManifest('r-1');
     expect(manifest.route.id).toBe('r-1');

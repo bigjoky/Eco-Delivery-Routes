@@ -304,6 +304,8 @@ export function ShipmentsPage() {
   const [createError, setCreateError] = useState('');
   const [createFieldErrors, setCreateFieldErrors] = useState<{
     hub?: string;
+    point?: string;
+    externalReference?: string;
     scheduledAt?: string;
     recipientDocument?: string;
     recipientName?: string;
@@ -1246,6 +1248,8 @@ export function ShipmentsPage() {
     }
     const nextErrors: {
       hub?: string;
+      point?: string;
+      externalReference?: string;
       scheduledAt?: string;
       recipientDocument?: string;
       recipientName?: string;
@@ -1272,6 +1276,15 @@ export function ShipmentsPage() {
       (value) => value.trim() !== ''
     );
     if (!createHubId) nextErrors.hub = 'Selecciona un hub.';
+    if (createPointId && !hubPoints.some((point) => point.id === createPointId)) {
+      nextErrors.point = 'El punto operativo seleccionado no pertenece al hub actual.';
+    }
+    if (createExternalReference.trim().length > 80) {
+      nextErrors.externalReference = 'La referencia cliente no puede superar 80 caracteres.';
+    }
+    if (createExternalReference.trim() && !/^[A-Za-z0-9\-_/]+$/.test(createExternalReference.trim())) {
+      nextErrors.externalReference = 'La referencia cliente solo permite letras, números y - _ /.';
+    }
     if (!createScheduledAt.trim()) {
       nextErrors.scheduledAt = 'La fecha programada es obligatoria.';
     }
@@ -2335,6 +2348,7 @@ export function ShipmentsPage() {
                 })}
               </select>
               {createHubId && hubPoints.length === 0 ? <div className="helper">Sin puntos operativos para el hub seleccionado.</div> : null}
+              {createFieldErrors.point ? <div className="helper error">{createFieldErrors.point}</div> : null}
             </div>
             <div>
               <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
@@ -2344,6 +2358,7 @@ export function ShipmentsPage() {
                 onChange={(event) => setCreateExternalReference(event.target.value)}
                 placeholder="Ej: REF-ACME-2026-0001"
               />
+              {createFieldErrors.externalReference ? <div className="helper error">{createFieldErrors.externalReference}</div> : null}
             </div>
             <div>
               <label htmlFor="create-shipment-operation">Operacion</label>

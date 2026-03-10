@@ -193,6 +193,11 @@ export type RouteBulkAddStopsResult = {
   stops: RouteStopSummary[];
 };
 
+export type RouteBulkUpdateStopsResult = {
+  updated_count: number;
+  stops: RouteStopSummary[];
+};
+
 export type RouteAssignmentPreview = {
   valid: boolean;
   conflicts: Array<{ field: 'driver_id' | 'subcontractor_id' | 'vehicle_id'; message: string }>;

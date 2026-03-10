@@ -24,6 +24,7 @@ import {
   RoleDetail,
   RoleSummary,
   RouteBulkAddStopsResult,
+  RouteBulkUpdateStopsResult,
   RouteAssignmentPreview,
   RouteAssignmentPublishPolicy,
   RouteManifest,
@@ -1414,6 +1415,26 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot bulk add route stops');
     return json.data as RouteBulkAddStopsResult;
+  },
+
+  async bulkUpdateRouteStops(routeId: string, payload: {
+    stop_ids: string[];
+    status?: 'planned' | 'in_progress' | 'completed';
+    planned_at?: string | null;
+    completed_at?: string | null;
+    eta_shift_minutes?: number;
+    reason_code?: string;
+    reason_detail?: string;
+  }): Promise<RouteBulkUpdateStopsResult> {
+    if (USE_MOCK) return mockApi.bulkUpdateRouteStops(routeId, payload) as Promise<RouteBulkUpdateStopsResult>;
+    const response = await authorizedFetch(`${API_BASE_URL}/routes/${routeId}/stops/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot bulk update route stops');
+    return json.data as RouteBulkUpdateStopsResult;
   },
 
   async getRouteManifest(routeId: string): Promise<RouteManifest> {

@@ -543,16 +543,21 @@ export function RouteDetailPage() {
     setBulkUpdatingStops(true);
     setError('');
     try {
-      for (const stopId of selectedStopIds) {
-        const current = stops.find((stop) => stop.id === stopId);
-        const payload = buildBulkStopPayload(current);
-        await apiClient.updateRouteStop(id, stopId, payload);
-      }
-
-      const refreshed = await apiClient.getRouteStops(id);
-      setStops(refreshed);
+      const shiftMinutes = Number(bulkEtaShiftMinutes);
+      const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
+      const payload = buildBulkStopPayload();
+      const result = await apiClient.bulkUpdateRouteStops(id, {
+        stop_ids: selectedStopIds,
+        status: payload.status,
+        planned_at: payload.planned_at,
+        completed_at: payload.completed_at,
+        eta_shift_minutes: hasShift ? shiftMinutes : undefined,
+        reason_code: 'WEB_BULK_UPDATE',
+        reason_detail: 'Actualización masiva desde panel de ruta',
+      });
+      setStops(result.stops);
       setBulkUpdatePreviewOpen(false);
-      appendOpsAudit('stops.bulk_update', `Actualizadas ${selectedStopIds.length} paradas en lote.`);
+      appendOpsAudit('stops.bulk_update', `Actualizadas ${result.updated_count} paradas en lote.`);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
