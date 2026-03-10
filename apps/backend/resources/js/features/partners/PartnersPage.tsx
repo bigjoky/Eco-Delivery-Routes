@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AuditLogEntry, DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
@@ -738,23 +739,26 @@ export function PartnersPage() {
             </div>
           </div>
           <div className="inline-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => exportCsv(
-                'partners_subcontractors.csv',
-                ['name', 'tax_id', 'status', 'payment_terms', 'updated_at'],
-                filteredSubcontractors.map((row) => [
-                  row.legal_name,
-                  row.tax_id ?? '',
-                  row.status,
-                  row.payment_terms ?? '',
-                  row.updated_at ?? '',
-                ])
-              )}
-            >
-              Export CSV subcontratas
-            </Button>
+            <ExportActionsModal
+              title="Exportar subcontratas"
+              actions={[
+                {
+                  id: 'partners-subcontractors-csv',
+                  label: 'CSV subcontratas',
+                  run: () => exportCsv(
+                    'partners_subcontractors.csv',
+                    ['name', 'tax_id', 'status', 'payment_terms', 'updated_at'],
+                    filteredSubcontractors.map((row) => [
+                      row.legal_name,
+                      row.tax_id ?? '',
+                      row.status,
+                      row.payment_terms ?? '',
+                      row.updated_at ?? '',
+                    ])
+                  ),
+                },
+              ]}
+            />
             <Button type="button" variant="secondary" onClick={() => { void bulkUpdateSubcontractors('active'); }}>
               Activar seleccion ({selectedSubcontractorIds.length})
             </Button>
@@ -825,24 +829,27 @@ export function PartnersPage() {
 
           <h3>Drivers</h3>
           <div className="inline-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => exportCsv(
-                'partners_drivers.csv',
-                ['code', 'dni', 'name', 'subcontractor', 'status', 'updated_at'],
-                filteredDrivers.map((row) => [
-                  row.code,
-                  row.dni ?? '',
-                  row.name,
-                  row.subcontractor_name ?? '',
-                  row.status,
-                  row.updated_at ?? '',
-                ])
-              )}
-            >
-              Export CSV conductores
-            </Button>
+            <ExportActionsModal
+              title="Exportar conductores"
+              actions={[
+                {
+                  id: 'partners-drivers-csv',
+                  label: 'CSV conductores',
+                  run: () => exportCsv(
+                    'partners_drivers.csv',
+                    ['code', 'dni', 'name', 'subcontractor', 'status', 'updated_at'],
+                    filteredDrivers.map((row) => [
+                      row.code,
+                      row.dni ?? '',
+                      row.name,
+                      row.subcontractor_name ?? '',
+                      row.status,
+                      row.updated_at ?? '',
+                    ])
+                  ),
+                },
+              ]}
+            />
             <Button type="button" variant="secondary" onClick={() => { void bulkUpdateDrivers('active'); }}>
               Activar seleccion ({selectedDriverIds.length})
             </Button>
@@ -922,24 +929,27 @@ export function PartnersPage() {
 
           <h3>Vehiculos</h3>
           <div className="inline-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => exportCsv(
-                'partners_vehicles.csv',
-                ['code', 'plate', 'subcontractor', 'driver', 'status', 'updated_at'],
-                filteredVehicles.map((row) => [
-                  row.code,
-                  row.plate_number ?? '',
-                  row.subcontractor_name ?? '',
-                  row.assigned_driver_code ?? '',
-                  row.status,
-                  row.updated_at ?? '',
-                ])
-              )}
-            >
-              Export CSV vehículos
-            </Button>
+            <ExportActionsModal
+              title="Exportar vehículos"
+              actions={[
+                {
+                  id: 'partners-vehicles-csv',
+                  label: 'CSV vehículos',
+                  run: () => exportCsv(
+                    'partners_vehicles.csv',
+                    ['code', 'plate', 'subcontractor', 'driver', 'status', 'updated_at'],
+                    filteredVehicles.map((row) => [
+                      row.code,
+                      row.plate_number ?? '',
+                      row.subcontractor_name ?? '',
+                      row.assigned_driver_code ?? '',
+                      row.status,
+                      row.updated_at ?? '',
+                    ])
+                  ),
+                },
+              ]}
+            />
             <Button type="button" variant="secondary" onClick={() => { void bulkUpdateVehicles('active'); }}>
               Activar seleccion ({selectedVehicleIds.length})
             </Button>
@@ -1058,16 +1068,19 @@ export function PartnersPage() {
               <Button type="button" variant="outline" onClick={() => { void load(); }}>
                 Actualizar auditoría
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => apiClient.exportAuditLogsCsv({
-                  event: auditEventFilter || undefined,
-                  actor: auditActorFilter || undefined,
-                })}
-              >
-                Export CSV auditoría
-              </Button>
+              <ExportActionsModal
+                title="Exportar auditoría partners"
+                actions={[
+                  {
+                    id: 'partners-audit-csv',
+                    label: 'CSV auditoría',
+                    run: () => apiClient.exportAuditLogsCsv({
+                      event: auditEventFilter || undefined,
+                      actor: auditActorFilter || undefined,
+                    }),
+                  },
+                ]}
+              />
             </div>
             <TableWrapper>
               <Table>

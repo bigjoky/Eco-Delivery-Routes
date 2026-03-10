@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import type { AuditLogEntry } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
@@ -166,20 +167,23 @@ export function AuditOpsPage() {
             <Button type="button" onClick={() => { void runSearch(); }} disabled={loading}>
               {loading ? 'Buscando...' : 'Buscar'}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => apiClient.exportAuditLogsCsv({
-                resource: resource || undefined,
-                id: resourceId.trim() || undefined,
-                event: eventPrefix.trim() || undefined,
-                actor: actor.trim() || undefined,
-                dateFrom: dateFrom || undefined,
-                dateTo: dateTo || undefined,
-              })}
-            >
-              Export CSV
-            </Button>
+            <ExportActionsModal
+              title="Exportar auditoría"
+              actions={[
+                {
+                  id: 'audit-csv',
+                  label: 'CSV',
+                  run: () => apiClient.exportAuditLogsCsv({
+                    resource: resource || undefined,
+                    id: resourceId.trim() || undefined,
+                    event: eventPrefix.trim() || undefined,
+                    actor: actor.trim() || undefined,
+                    dateFrom: dateFrom || undefined,
+                    dateTo: dateTo || undefined,
+                  }),
+                },
+              ]}
+            />
             <Button
               type="button"
               variant="outline"

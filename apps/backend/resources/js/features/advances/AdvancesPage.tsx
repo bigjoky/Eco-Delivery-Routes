@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AdvanceSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
@@ -18,6 +19,18 @@ export function AdvancesPage() {
         <CardHeader>
           <CardTitle className="page-title">Anticipos</CardTitle>
           <CardDescription>Listado de anticipos para subcontratas.</CardDescription>
+          <div className="inline-actions">
+            <ExportActionsModal
+              title="Exportar anticipos"
+              actions={[
+                {
+                  id: 'advances-csv',
+                  label: 'CSV anticipos',
+                  run: () => apiClient.exportAdvancesCsv({}),
+                },
+              ]}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <TableWrapper>

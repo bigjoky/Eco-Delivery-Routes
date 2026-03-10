@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { apiClient } from '../../services/apiClient';
@@ -73,9 +74,6 @@ type ShipmentFiltersProps = {
   hubs: HubSummary[];
   setQuickRange: (range: 'today' | 'tomorrow' | 'next7' | 'clear') => void;
   clearFilters: () => void;
-  canExport: boolean;
-  exportCsv: () => void;
-  exportPdf: () => void;
 };
 
 function ShipmentFilters({
@@ -92,9 +90,6 @@ function ShipmentFilters({
   hubs,
   setQuickRange,
   clearFilters,
-  canExport,
-  exportCsv,
-  exportPdf,
 }: ShipmentFiltersProps) {
   return (
     <div className="filters-panel">
@@ -157,14 +152,6 @@ function ShipmentFilters({
         <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>Manana</Button>
         <Button type="button" variant="outline" onClick={() => setQuickRange('next7')}>Prox 7 dias</Button>
         <Button type="button" variant="outline" onClick={() => setQuickRange('clear')}>Limpiar</Button>
-      </div>
-      <div className="inline-actions">
-        <Button type="button" variant="outline" onClick={exportCsv} disabled={!canExport}>
-          Export CSV
-        </Button>
-        <Button type="button" variant="outline" onClick={exportPdf} disabled={!canExport}>
-          Export PDF
-        </Button>
       </div>
     </div>
   );
@@ -3113,9 +3100,16 @@ export function ShipmentsPage() {
             <Button type="button" variant="outline" onClick={previewBulkUpdate} disabled={bulkPreviewing}>
               {bulkPreviewing ? 'Previsualizando...' : 'Previsualizar'}
             </Button>
-            <Button type="button" variant="outline" onClick={exportBulkPreviewCsv}>
-              Export preview CSV
-            </Button>
+            <ExportActionsModal
+              title="Exportar previsualización masiva"
+              actions={[
+                {
+                  id: 'shipments-bulk-preview-csv-inline',
+                  label: 'CSV preview',
+                  run: () => exportBulkPreviewCsv(),
+                },
+              ]}
+            />
           </div>
           <div className="helper">
             Impacto estimado: {bulkTargetCount} envio(s) {bulkApplyToFiltered ? 'del filtro actual' : 'seleccionado(s)'}.
@@ -3257,42 +3251,52 @@ export function ShipmentsPage() {
               hubs={hubs}
               setQuickRange={setQuickRange}
               clearFilters={clearFilters}
-              canExport={canExport}
-              exportCsv={exportCsv}
-              exportPdf={exportPdf}
             />
           ) : null}
           <div className="inline-actions ops-toolbar">
-            <span className="helper">Columnas export</span>
-          {[
-            'reference',
-            'external_reference',
-            'status',
-            'service_type',
-            'consignee_name',
-            'address_street',
-            'address_number',
-            'postal_code',
-            'city',
-            'province',
-            'country',
-            'scheduled_at',
-            'delivered_at',
-            'hub_code',
-          ].map((column) => (
-              <label key={column}>
-                <input
-                  type="checkbox"
-                  checked={exportColumns.includes(column)}
-                  onChange={() => toggleExportColumn(column)}
-                  disabled={!canExport}
-                />
-                {column}
-              </label>
-            ))}
-            <Button type="button" variant="outline" onClick={resetExportColumns} disabled={!canExport}>
-              Reset columnas
-            </Button>
+            <ExportActionsModal
+              title="Exportar envíos"
+              triggerDisabled={!canExport}
+              actions={[
+                { id: 'shipments-csv', label: 'CSV envíos', run: () => exportCsv() },
+                { id: 'shipments-pdf', label: 'PDF envíos', run: () => exportPdf() },
+              ]}
+            >
+              <div className="helper">Selecciona columnas a incluir en export CSV/PDF.</div>
+              <div className="form-row">
+                {[
+                  'reference',
+                  'external_reference',
+                  'status',
+                  'service_type',
+                  'consignee_name',
+                  'address_street',
+                  'address_number',
+                  'postal_code',
+                  'city',
+                  'province',
+                  'country',
+                  'scheduled_at',
+                  'delivered_at',
+                  'hub_code',
+                ].map((column) => (
+                  <label key={column}>
+                    <input
+                      type="checkbox"
+                      checked={exportColumns.includes(column)}
+                      onChange={() => toggleExportColumn(column)}
+                      disabled={!canExport}
+                    />
+                    {column}
+                  </label>
+                ))}
+              </div>
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={resetExportColumns} disabled={!canExport}>
+                  Reset columnas
+                </Button>
+              </div>
+            </ExportActionsModal>
           </div>
           {exportError ? <div className="helper error">{exportError}</div> : null}
           <div className="inline-actions ops-toolbar">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import type { DashboardOverview, HubSummary, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
@@ -141,28 +142,31 @@ export function DashboardPage() {
             {showFilters ? 'Ocultar filtros' : 'Filtros'}
           </Button>
           <Button type="button" onClick={load} disabled={loading}>{loading ? 'Actualizando...' : 'Actualizar'}</Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => apiClient.exportDashboardOverviewCsv({
-              period,
-              hubId: hubId || undefined,
-              subcontractorId: subcontractorId || undefined,
-            })}
-          >
-            Exportar CSV
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => apiClient.exportDashboardOverviewPdf({
-              period,
-              hubId: hubId || undefined,
-              subcontractorId: subcontractorId || undefined,
-            })}
-          >
-            Exportar PDF
-          </Button>
+          <ExportActionsModal
+            title="Exportar dashboard"
+            actions={[
+              {
+                id: 'dashboard-csv',
+                label: 'CSV',
+                description: 'Resumen dashboard en formato CSV.',
+                run: () => apiClient.exportDashboardOverviewCsv({
+                  period,
+                  hubId: hubId || undefined,
+                  subcontractorId: subcontractorId || undefined,
+                }),
+              },
+              {
+                id: 'dashboard-pdf',
+                label: 'PDF',
+                description: 'Resumen dashboard en formato PDF.',
+                run: () => apiClient.exportDashboardOverviewPdf({
+                  period,
+                  hubId: hubId || undefined,
+                  subcontractorId: subcontractorId || undefined,
+                }),
+              },
+            ]}
+          />
         </div>
       </header>
 
