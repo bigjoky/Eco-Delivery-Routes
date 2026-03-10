@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -579,38 +580,59 @@ export function QualityPage() {
               <option value="month">Desglose mensual</option>
               <option value="week">Desglose semanal</option>
             </Select>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                apiClient.exportQualityCsv({
-                  scopeType: scopeType === 'all' ? undefined : scopeType,
-                  scopeId: scopeId || undefined,
-                  hubId: hubId || undefined,
-                  subcontractorId: subcontractorId || undefined,
-                  periodStart: periodStart || undefined,
-                  periodEnd: periodEnd || undefined,
-                })
-              }
-            >
-              Exportar CSV
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                apiClient.exportQualityPdf({
-                  threshold: thresholdNumber,
-                  scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
-                  hubId: hubId || undefined,
-                  subcontractorId: subcontractorId || undefined,
-                  periodStart: periodStart || undefined,
-                  periodEnd: periodEnd || undefined,
-                })
-              }
-            >
-              Exportar PDF rutas
-            </Button>
+            <ExportActionsModal
+              title="Exportar KPI calidad"
+              actions={[
+                {
+                  id: 'quality-csv',
+                  label: 'CSV calidad',
+                  run: () =>
+                    apiClient.exportQualityCsv({
+                      scopeType: scopeType === 'all' ? undefined : scopeType,
+                      scopeId: scopeId || undefined,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                    }),
+                },
+                {
+                  id: 'quality-pdf',
+                  label: 'PDF rutas',
+                  run: () =>
+                    apiClient.exportQualityPdf({
+                      threshold: thresholdNumber,
+                      scopeId: scopeType === 'route' ? scopeId || undefined : undefined,
+                      hubId: hubId || undefined,
+                      subcontractorId: subcontractorId || undefined,
+                      periodStart: periodStart || undefined,
+                      periodEnd: periodEnd || undefined,
+                    }),
+                },
+                {
+                  id: 'quality-threshold-history-csv',
+                  label: 'CSV historial umbral',
+                  run: () =>
+                    apiClient.exportQualityThresholdHistoryCsv({
+                      scopeType: thresholdScopeType,
+                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                    }),
+                },
+                {
+                  id: 'quality-threshold-history-pdf',
+                  label: 'PDF historial umbral',
+                  run: () =>
+                    apiClient.exportQualityThresholdHistoryPdf({
+                      scopeType: thresholdScopeType,
+                      scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
+                      dateFrom: periodStart || undefined,
+                      dateTo: periodEnd || undefined,
+                    }),
+                },
+              ]}
+            />
             <Badge variant="secondary">Umbral fuente: {thresholdSource}</Badge>
             <Badge variant={alerts.length > 0 ? 'warning' : 'success'}>Alertas activas: {alerts.length}</Badge>
             <Select value={displayTimeZone} onChange={(e) => setDisplayTimeZone(e.target.value)}>
@@ -619,34 +641,6 @@ export function QualityPage() {
               <option value="Atlantic/Canary">Atlantic/Canary</option>
               <option value="America/New_York">America/New_York</option>
             </Select>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                apiClient.exportQualityThresholdHistoryCsv({
-                  scopeType: thresholdScopeType,
-                  scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
-                  dateFrom: periodStart || undefined,
-                  dateTo: periodEnd || undefined,
-                })
-              }
-            >
-              Exportar historial umbral CSV
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                apiClient.exportQualityThresholdHistoryPdf({
-                  scopeType: thresholdScopeType,
-                  scopeId: thresholdScopeType === 'global' ? undefined : (thresholdScopeId || undefined),
-                  dateFrom: periodStart || undefined,
-                  dateTo: periodEnd || undefined,
-                })
-              }
-            >
-              Exportar historial umbral PDF
-            </Button>
           </div>
 
           {alerts.length > 0 && (
@@ -915,32 +909,31 @@ export function QualityPage() {
                 <span>Ruta: {routeBreakdown.route_code ?? routeBreakdown.route_id}</span>
                 <span>Snapshots: {routeBreakdown.snapshots_count}</span>
                 <Link to={`/routes/${routeBreakdown.route_id}`}>Abrir ruta</Link>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualityRouteBreakdownCsv(routeBreakdown.route_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                    })
-                  }
-                >
-                  Exportar CSV desglose
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualityRouteBreakdownPdf(routeBreakdown.route_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                    })
-                  }
-                >
-                  Exportar PDF desglose
-                </Button>
+                <ExportActionsModal
+                  title="Exportar desglose por ruta"
+                  actions={[
+                    {
+                      id: 'quality-route-breakdown-csv',
+                      label: 'CSV desglose',
+                      run: () =>
+                        apiClient.exportQualityRouteBreakdownCsv(routeBreakdown.route_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                        }),
+                    },
+                    {
+                      id: 'quality-route-breakdown-pdf',
+                      label: 'PDF desglose',
+                      run: () =>
+                        apiClient.exportQualityRouteBreakdownPdf(routeBreakdown.route_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                        }),
+                    },
+                  ]}
+                />
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {routeBreakdown.periods.map((period) => (
@@ -994,36 +987,35 @@ export function QualityPage() {
                 </Badge>
                 <span>Conductor: {driverBreakdown.driver_code ?? driverBreakdown.driver_id}</span>
                 <span>Snapshots: {driverBreakdown.snapshots_count}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualityDriverBreakdownCsv(driverBreakdown.driver_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                      hubId: hubId || undefined,
-                      subcontractorId: subcontractorId || undefined,
-                    })
-                  }
-                >
-                  Exportar CSV conductor
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualityDriverBreakdownPdf(driverBreakdown.driver_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                      hubId: hubId || undefined,
-                      subcontractorId: subcontractorId || undefined,
-                    })
-                  }
-                >
-                  Exportar PDF conductor
-                </Button>
+                <ExportActionsModal
+                  title="Exportar desglose por conductor"
+                  actions={[
+                    {
+                      id: 'quality-driver-breakdown-csv',
+                      label: 'CSV conductor',
+                      run: () =>
+                        apiClient.exportQualityDriverBreakdownCsv(driverBreakdown.driver_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                          hubId: hubId || undefined,
+                          subcontractorId: subcontractorId || undefined,
+                        }),
+                    },
+                    {
+                      id: 'quality-driver-breakdown-pdf',
+                      label: 'PDF conductor',
+                      run: () =>
+                        apiClient.exportQualityDriverBreakdownPdf(driverBreakdown.driver_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                          hubId: hubId || undefined,
+                          subcontractorId: subcontractorId || undefined,
+                        }),
+                    },
+                  ]}
+                />
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {driverBreakdown.periods.map((period) => (
@@ -1057,32 +1049,31 @@ export function QualityPage() {
                 </Badge>
                 <span>Subcontrata: {subcontractorBreakdown.subcontractor_code ?? subcontractorBreakdown.subcontractor_id}</span>
                 <span>Snapshots: {subcontractorBreakdown.snapshots_count}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualitySubcontractorBreakdownCsv(subcontractorBreakdown.subcontractor_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                    })
-                  }
-                >
-                  Exportar CSV subcontrata
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    apiClient.exportQualitySubcontractorBreakdownPdf(subcontractorBreakdown.subcontractor_id, {
-                      periodStart: periodStart || undefined,
-                      periodEnd: periodEnd || undefined,
-                      granularity: breakdownGranularity,
-                    })
-                  }
-                >
-                  Exportar PDF subcontrata
-                </Button>
+                <ExportActionsModal
+                  title="Exportar desglose por subcontrata"
+                  actions={[
+                    {
+                      id: 'quality-subcontractor-breakdown-csv',
+                      label: 'CSV subcontrata',
+                      run: () =>
+                        apiClient.exportQualitySubcontractorBreakdownCsv(subcontractorBreakdown.subcontractor_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                        }),
+                    },
+                    {
+                      id: 'quality-subcontractor-breakdown-pdf',
+                      label: 'PDF subcontrata',
+                      run: () =>
+                        apiClient.exportQualitySubcontractorBreakdownPdf(subcontractorBreakdown.subcontractor_id, {
+                          periodStart: periodStart || undefined,
+                          periodEnd: periodEnd || undefined,
+                          granularity: breakdownGranularity,
+                        }),
+                    },
+                  ]}
+                />
               </div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {subcontractorBreakdown.periods.map((period) => (

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -385,8 +386,14 @@ export function SettlementDetailPage() {
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={onPreview} disabled={!canRecalculate || !isDraft}>Previsualizar</Button>
             <Button type="button" onClick={onRecalculate} disabled={!canRecalculate || !isDraft}>Recalcular</Button>
-            <Button type="button" variant="outline" onClick={onExportCsv} disabled={!canExport || !canExportByStatus}>Exportar CSV</Button>
-            <Button type="button" variant="outline" onClick={onExportPdf} disabled={!canExport || !canExportByStatus}>Exportar PDF</Button>
+            <ExportActionsModal
+              title="Exportar liquidación"
+              triggerDisabled={!canExport || !canExportByStatus}
+              actions={[
+                { id: 'settlement-csv', label: 'CSV', run: () => onExportCsv() },
+                { id: 'settlement-pdf', label: 'PDF', run: () => onExportPdf() },
+              ]}
+            />
           </div>
 
           {preview && (

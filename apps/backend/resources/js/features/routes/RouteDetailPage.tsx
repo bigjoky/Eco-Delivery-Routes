@@ -4,6 +4,7 @@ import { EntityActivityTimeline } from '../../components/audit/EntityActivityTim
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Modal } from '../../components/ui/modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
@@ -1041,12 +1042,22 @@ export function RouteDetailPage() {
                 {' | '}Pickups {manifest?.totals.pickups ?? 0} | Completed {manifest?.totals.completed ?? 0}
               </span>
             )}
-            <Button type="button" variant="outline" disabled={!id} onClick={() => void exportManifestCsv()}>
-              Export CSV
-            </Button>
-            <Button type="button" variant="outline" disabled={!id} onClick={() => void exportManifestPdf()}>
-              Export PDF
-            </Button>
+            <ExportActionsModal
+              title="Exportar manifest de ruta"
+              triggerDisabled={!id}
+              actions={[
+                {
+                  id: 'manifest-csv',
+                  label: 'CSV manifest',
+                  run: () => exportManifestCsv(),
+                },
+                {
+                  id: 'manifest-pdf',
+                  label: 'PDF manifest',
+                  run: () => exportManifestPdf(),
+                },
+              ]}
+            />
           </div>
           <div className="inline-actions">
             <label htmlFor="manifest-notes">Notas manifest</label>
@@ -1441,9 +1452,19 @@ export function RouteDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="inline-actions">
-                <Button type="button" variant="outline" onClick={exportOpsAuditCsv} disabled={opsAudit.length === 0}>
-                  Exportar CSV auditoría
-                </Button>
+                <ExportActionsModal
+                  title="Exportar auditoría operativa"
+                  triggerDisabled={opsAudit.length === 0}
+                  actions={[
+                    {
+                      id: 'audit-csv',
+                      label: 'CSV auditoría',
+                      run: () => {
+                        exportOpsAuditCsv();
+                      },
+                    },
+                  ]}
+                />
               </div>
               {opsAudit.length === 0 ? (
                 <div className="helper">Sin eventos aún.</div>

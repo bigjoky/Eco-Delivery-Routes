@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -146,7 +147,12 @@ export function SettlementPreviewPage() {
           <CardFooter>
             <Button type="button" onClick={onFinalize}>Finalizar</Button>
             {finalizedId && !approved && <Button type="button" variant="secondary" onClick={onApprove}>Aprobar</Button>}
-            {finalizedId && approved && !paid && <Button type="button" variant="outline" onClick={onExportCsv}>Exportar CSV</Button>}
+            {finalizedId && approved && !paid && (
+              <ExportActionsModal
+                title="Exportar pre-liquidación"
+                actions={[{ id: 'settlement-preview-csv', label: 'CSV', run: () => onExportCsv() }]}
+              />
+            )}
             {finalizedId && approved && !paid && <Button type="button" variant="secondary" onClick={onMarkPaid}>Marcar pagada</Button>}
             {finalizedId && <Badge variant="outline">ID: {finalizedId}</Badge>}
             {approved && <Badge variant="secondary">Aprobada</Badge>}

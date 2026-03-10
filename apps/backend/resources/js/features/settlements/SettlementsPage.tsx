@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -268,28 +269,29 @@ export function SettlementsPage() {
         </CardHeader>
         <CardContent>
           <div className="inline-actions">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => apiClient.exportSettlementReconciliationSummaryCsv({
-                period: period || undefined,
-                subcontractorId: subcontractorId || undefined,
-                hubId: hubId || undefined,
-              })}
-            >
-              Exportar CSV resumen
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => apiClient.exportSettlementReconciliationSummaryPdf({
-                period: period || undefined,
-                subcontractorId: subcontractorId || undefined,
-                hubId: hubId || undefined,
-              })}
-            >
-              Exportar PDF resumen
-            </Button>
+            <ExportActionsModal
+              title="Exportar resumen de exclusiones"
+              actions={[
+                {
+                  id: 'settlements-summary-csv',
+                  label: 'CSV resumen',
+                  run: () => apiClient.exportSettlementReconciliationSummaryCsv({
+                    period: period || undefined,
+                    subcontractorId: subcontractorId || undefined,
+                    hubId: hubId || undefined,
+                  }),
+                },
+                {
+                  id: 'settlements-summary-pdf',
+                  label: 'PDF resumen',
+                  run: () => apiClient.exportSettlementReconciliationSummaryPdf({
+                    period: period || undefined,
+                    subcontractorId: subcontractorId || undefined,
+                    hubId: hubId || undefined,
+                  }),
+                },
+              ]}
+            />
           </div>
           <TableWrapper>
             <Table>
