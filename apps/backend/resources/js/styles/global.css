@@ -262,6 +262,7 @@ a {
   gap: var(--space-3);
   padding: 20px 22px 28px;
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .page-title {
@@ -933,6 +934,10 @@ textarea:focus {
   background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
 }
 
+.mobile-nav {
+  display: none;
+}
+
 @media (max-width: 1024px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -948,11 +953,11 @@ textarea:focus {
   }
 
   .sidebar-nav {
-    margin-top: 8px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 8px;
-    overflow: visible;
     padding-bottom: 4px;
   }
 
@@ -972,6 +977,7 @@ textarea:focus {
 
   .sidebar-link {
     white-space: nowrap;
+    flex: 0 0 auto;
   }
 
   .sidebar-link-mobile-extra {
@@ -983,7 +989,7 @@ textarea:focus {
   }
 
   .sidebar-footer {
-    padding-top: 8px;
+    display: none;
   }
 
   .sidebar-user-actions {
@@ -1008,7 +1014,7 @@ textarea:focus {
   }
 
   .table {
-    min-width: 620px;
+    min-width: 560px;
   }
 
   .kpi-grid,
@@ -1026,6 +1032,32 @@ textarea:focus {
   .ops-toolbar {
     align-items: stretch;
   }
+
+  .mobile-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .mobile-nav-link {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mobile-nav-link-active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1034,10 +1066,7 @@ textarea:focus {
   }
 
   .app-sidebar {
-    position: relative;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+    display: none;
   }
 
   .topbar {
@@ -1084,7 +1113,13 @@ textarea:focus {
   }
 
   .table {
-    min-width: 500px;
+    min-width: 440px;
+  }
+
+  .table-head,
+  .table-cell {
+    padding: 9px;
+    font-size: 12px;
   }
 
   .kpi-grid,

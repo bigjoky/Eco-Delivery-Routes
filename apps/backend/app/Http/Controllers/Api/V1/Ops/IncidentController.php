@@ -14,6 +14,14 @@ use Illuminate\Support\Str;
 
 class IncidentController extends Controller
 {
+    private const RESOLUTION_REASON_CODES = [
+        'DELIVERY_CONFIRMED_EXTERNALLY',
+        'CUSTOMER_RESCHEDULED',
+        'DUPLICATE_INCIDENT',
+        'DATA_CORRECTION',
+        'OTHER',
+    ];
+
     public function __construct(
         private readonly SequenceService $sequenceService,
         private readonly AuditLogWriter $auditLogWriter
@@ -329,7 +337,7 @@ class IncidentController extends Controller
 
         $payload = $request->validate([
             'notes' => ['nullable', 'string'],
-            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_code' => ['required', 'string', 'in:' . implode(',', self::RESOLUTION_REASON_CODES)],
             'reason_detail' => ['nullable', 'string'],
         ]);
 
@@ -342,7 +350,7 @@ class IncidentController extends Controller
 
         DB::table('incidents')->where('id', $id)->update([
             'notes' => $payload['notes'] ?? DB::raw('notes'),
-            'resolution_reason_code' => $payload['reason_code'] ?? DB::raw('resolution_reason_code'),
+            'resolution_reason_code' => $payload['reason_code'],
             'resolution_reason_detail' => $payload['reason_detail'] ?? DB::raw('resolution_reason_detail'),
             'resolved_at' => now(),
             'updated_at' => now(),
@@ -356,7 +364,7 @@ class IncidentController extends Controller
         ]);
         $this->auditLogWriter->write($actor->id, 'incidents.resolved', [
             'incident_id' => $id,
-            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_code' => $payload['reason_code'],
             'reason_detail' => $payload['reason_detail'] ?? null,
             'resolved_from' => 'single',
         ]);
@@ -461,7 +469,7 @@ class IncidentController extends Controller
             'filters.sla_status' => ['nullable', 'in:on_track,at_risk,breached,resolved'],
             'filters.resolved' => ['nullable', 'in:open,resolved,0,1'],
             'notes' => ['nullable', 'string'],
-            'reason_code' => ['nullable', 'string', 'max:80'],
+            'reason_code' => ['required', 'string', 'in:' . implode(',', self::RESOLUTION_REASON_CODES)],
             'reason_detail' => ['nullable', 'string'],
         ]);
 
@@ -480,7 +488,7 @@ class IncidentController extends Controller
             ->whereNull('resolved_at')
             ->update([
                 'notes' => $payload['notes'] ?? DB::raw('notes'),
-                'resolution_reason_code' => $payload['reason_code'] ?? DB::raw('resolution_reason_code'),
+                'resolution_reason_code' => $payload['reason_code'],
                 'resolution_reason_detail' => $payload['reason_detail'] ?? DB::raw('resolution_reason_detail'),
                 'resolved_at' => now(),
                 'updated_at' => now(),
@@ -490,7 +498,7 @@ class IncidentController extends Controller
             'requested_count' => count($ids),
             'updated_count' => (int) $updated,
             'apply_to_filtered' => $applyToFiltered,
-            'reason_code' => $payload['reason_code'] ?? null,
+            'reason_code' => $payload['reason_code'],
             'reason_detail' => $payload['reason_detail'] ?? null,
         ]);
 

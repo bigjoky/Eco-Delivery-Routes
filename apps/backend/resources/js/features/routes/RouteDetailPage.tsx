@@ -504,6 +504,9 @@ export function RouteDetailPage() {
         payload.completed_at = shiftIsoDateTime(current.completed_at, shiftMinutes);
       }
     }
+    if (payload.status === 'completed' && !payload.completed_at) {
+      payload.completed_at = new Date().toISOString();
+    }
     return payload;
   };
 

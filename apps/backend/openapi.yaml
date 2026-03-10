@@ -2803,9 +2803,10 @@ paths:
           application/json:
             schema:
               type: object
+              required: [reason_code]
               properties:
                 notes: { type: string }
-                reason_code: { type: string }
+                reason_code: { type: string, enum: [DELIVERY_CONFIRMED_EXTERNALLY, CUSTOMER_RESCHEDULED, DUPLICATE_INCIDENT, DATA_CORRECTION, OTHER] }
                 reason_detail: { type: string }
       responses:
         '200': { description: OK }
@@ -2820,13 +2821,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [incident_ids]
+              required: [reason_code]
               properties:
                 incident_ids:
                   type: array
                   items: { type: string, format: uuid }
                 notes: { type: string }
-                reason_code: { type: string }
+                reason_code: { type: string, enum: [DELIVERY_CONFIRMED_EXTERNALLY, CUSTOMER_RESCHEDULED, DUPLICATE_INCIDENT, DATA_CORRECTION, OTHER] }
                 reason_detail: { type: string }
       responses:
         '200': { description: OK }

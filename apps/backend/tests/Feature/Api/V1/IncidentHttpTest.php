@@ -53,12 +53,12 @@ class IncidentHttpTest extends TestCase
 
         $resolved = $this->patchJson('/api/v1/incidents/' . $id . '/resolve', [
             'notes' => 'resolved from test',
-            'reason_code' => 'MANUAL_REVIEW',
+            'reason_code' => 'OTHER',
             'reason_detail' => 'resuelto por operador',
         ]);
         $resolved->assertOk();
         $this->assertNotNull($resolved->json('data.resolved_at'));
-        $this->assertSame('MANUAL_REVIEW', $resolved->json('data.resolution_reason_code'));
+        $this->assertSame('OTHER', $resolved->json('data.resolution_reason_code'));
         $this->assertSame('resuelto por operador', $resolved->json('data.resolution_reason_detail'));
         $auditResolve = DB::table('audit_logs')
             ->where('event', 'incidents.resolved')
@@ -67,7 +67,7 @@ class IncidentHttpTest extends TestCase
         $this->assertNotNull($auditResolve);
         $resolveMetadata = json_decode((string) $auditResolve->metadata, true);
         $this->assertSame($id, $resolveMetadata['incident_id'] ?? null);
-        $this->assertSame('MANUAL_REVIEW', $resolveMetadata['reason_code'] ?? null);
+        $this->assertSame('OTHER', $resolveMetadata['reason_code'] ?? null);
 
         $resolvedList = $this->getJson('/api/v1/incidents?incidentable_id=' . $incidentableId . '&resolved=resolved');
         $resolvedList->assertOk();
@@ -115,7 +115,9 @@ class IncidentHttpTest extends TestCase
             'notes' => 'bulk resolve open two',
         ])->assertCreated()->json('data.id');
 
-        $this->patchJson('/api/v1/incidents/' . $openTwo . '/resolve')->assertOk();
+        $this->patchJson('/api/v1/incidents/' . $openTwo . '/resolve', [
+            'reason_code' => 'OTHER',
+        ])->assertOk();
 
         $response = $this->postJson('/api/v1/incidents/resolve-bulk', [
             'incident_ids' => [$openOne, $openTwo],
@@ -169,6 +171,7 @@ class IncidentHttpTest extends TestCase
                 'resolved' => 'open',
             ],
             'notes' => 'resolved from filtered bulk',
+            'reason_code' => 'DATA_CORRECTION',
         ]);
         $response->assertOk();
         $response->assertJsonPath('data.requested_count', 1);
