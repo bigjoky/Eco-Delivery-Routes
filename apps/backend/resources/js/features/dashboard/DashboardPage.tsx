@@ -7,7 +7,7 @@ import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import type { DashboardOverview, HubSummary, SubcontractorSummary } from '../../core/api/types';
+import type { AuditLogEntry, DashboardOverview, HubSummary, SubcontractorSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
 const initialOverview: DashboardOverview = {
@@ -56,6 +56,25 @@ function alertVariant(severity: 'high' | 'medium' | 'low'): 'destructive' | 'war
   return 'secondary';
 }
 
+type DashboardBulkAuditItem = {
+  key: 'shipments' | 'routes' | 'incidents' | 'partners';
+  label: string;
+  href: string;
+  row: AuditLogEntry | null;
+};
+
+function parseAuditDate(value?: string): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleString('es-ES');
+}
+
+function getAuditActor(row: AuditLogEntry | null): string {
+  if (!row) return '-';
+  return row.actor_name ?? row.actor_user_id ?? 'sistema';
+}
+
 export function DashboardPage() {
   const [overview, setOverview] = useState<DashboardOverview>(initialOverview);
   const [loading, setLoading] = useState(true);
@@ -68,23 +87,56 @@ export function DashboardPage() {
   const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [bulkAuditSummary, setBulkAuditSummary] = useState<DashboardBulkAuditItem[]>([]);
+
+  const fetchLatestAuditByEvent = useCallback(async (eventPrefix: string): Promise<AuditLogEntry | null> => {
+    try {
+      const response = await apiClient.getAuditLogs({
+        event: eventPrefix,
+        page: 1,
+        perPage: 1,
+      });
+      return response.data[0] ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiClient.getDashboardOverview({
-        period,
-        hubId: hubId || undefined,
-        subcontractorId: subcontractorId || undefined,
-      });
+      const [data, shipmentsBulk, routesBulk, incidentsBulk, partnersSubcontractors, partnersDrivers, partnersVehicles] = await Promise.all([
+        apiClient.getDashboardOverview({
+          period,
+          hubId: hubId || undefined,
+          subcontractorId: subcontractorId || undefined,
+        }),
+        fetchLatestAuditByEvent('shipments.bulk_updated'),
+        fetchLatestAuditByEvent('route.stops.bulk_'),
+        fetchLatestAuditByEvent('incidents.resolved.bulk'),
+        fetchLatestAuditByEvent('subcontractors.bulk_status_updated'),
+        fetchLatestAuditByEvent('drivers.bulk_status_updated'),
+        fetchLatestAuditByEvent('vehicles.bulk_status_updated'),
+      ]);
       setOverview(data);
+
+      const partnerRows = [partnersSubcontractors, partnersDrivers, partnersVehicles]
+        .filter((row): row is AuditLogEntry => row !== null)
+        .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+
+      setBulkAuditSummary([
+        { key: 'shipments', label: 'Envíos', href: '/shipments', row: shipmentsBulk },
+        { key: 'routes', label: 'Rutas', href: '/routes', row: routesBulk },
+        { key: 'incidents', label: 'Incidencias', href: '/incidents', row: incidentsBulk },
+        { key: 'partners', label: 'Partners', href: '/partners', row: partnerRows[0] ?? null },
+      ]);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo cargar el dashboard');
     } finally {
       setLoading(false);
     }
-  }, [period, hubId, subcontractorId]);
+  }, [period, hubId, subcontractorId, fetchLatestAuditByEvent]);
 
   useEffect(() => {
     load();
@@ -293,6 +345,26 @@ export function DashboardPage() {
             <div className="kpi-label">Resolved</div>
             <div className="kpi-value">{overview.sla.resolved}</div>
           </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Última acción masiva por módulo</CardTitle>
+          <CardDescription>Trazabilidad rápida desde auditoría operativa.</CardDescription>
+        </CardHeader>
+        <CardContent className="dashboard-bulk-audit-grid">
+          {bulkAuditSummary.map((item) => (
+            <Link key={item.key} to={item.href} className="kpi-item dashboard-bulk-audit-item">
+              <div className="kpi-label">{item.label}</div>
+              <div className="helper">{item.row?.event ?? 'Sin acciones recientes'}</div>
+              <div className="helper">Actor: {getAuditActor(item.row)}</div>
+              <div className="helper">Fecha: {parseAuditDate(item.row?.created_at)}</div>
+            </Link>
+          ))}
+          {bulkAuditSummary.length === 0 && (
+            <div className="helper">Sin datos de auditoría masiva para mostrar.</div>
+          )}
         </CardContent>
       </Card>
 
