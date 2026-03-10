@@ -483,6 +483,14 @@ export function DashboardPage() {
                       <div>{row.completed_stops}/{row.planned_stops}</div>
                     </div>
                   </div>
+                  <div className="mobile-ops-card-actions">
+                    <Link
+                      to={`/routes?hub_id=${encodeURIComponent(row.hub_id)}&date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`}
+                      className="btn btn-outline"
+                    >
+                      Ver rutas
+                    </Link>
+                  </div>
                 </article>
               ))}
               {overview.productivity_by_hub.length === 0 ? <div className="mobile-ops-empty">Sin datos</div> : null}
@@ -595,6 +603,10 @@ export function DashboardPage() {
                     <Badge variant="secondary">{item.status}</Badge>
                   </div>
                   <div className="helper">{item.route_date}</div>
+                  <div className="mobile-ops-card-actions">
+                    <Link to={`/routes/${item.id}`} className="btn btn-outline">Abrir</Link>
+                    <Link to={`/routes?q=${encodeURIComponent(item.code)}`} className="btn btn-outline">Listado</Link>
+                  </div>
                 </article>
               ))}
               {overview.recent.routes.length === 0 ? <div className="mobile-ops-empty">Sin rutas</div> : null}
@@ -633,6 +645,10 @@ export function DashboardPage() {
                     <Badge variant="secondary">{item.status}</Badge>
                   </div>
                   <div className="helper">{item.consignee_name ?? '-'}</div>
+                  <div className="mobile-ops-card-actions">
+                    <Link to={`/shipments/${item.id}`} className="btn btn-outline">Abrir</Link>
+                    <Link to={`/shipments?q=${encodeURIComponent(item.reference)}`} className="btn btn-outline">Listado</Link>
+                  </div>
                 </article>
               ))}
               {overview.recent.shipments.length === 0 ? <div className="mobile-ops-empty">Sin envíos</div> : null}

@@ -530,10 +530,12 @@ textarea:focus {
   border-radius: 16px;
   width: min(760px, 100%);
   max-height: 85vh;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   padding: 16px;
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .modal-header {
@@ -552,6 +554,9 @@ textarea:focus {
 .modal-body {
   display: grid;
   gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  padding-right: 4px;
 }
 
 .modal-footer {
@@ -559,6 +564,7 @@ textarea:focus {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .badge-default {
@@ -1235,5 +1241,41 @@ textarea:focus {
   .auth-topbar-right {
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+    align-items: end;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 18px 18px 0 0;
+    padding: 14px;
+  }
+
+  .modal-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .modal-header .btn {
+    width: 100%;
+  }
+
+  .modal-footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer .btn,
+  .modal-footer button {
+    width: 100%;
+  }
+
+  .modal-body {
+    padding-right: 0;
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
   }
 }

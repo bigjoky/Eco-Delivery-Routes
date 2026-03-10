@@ -1,34 +1,44 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
-import { AuditOpsPage } from '../features/audit/AuditOpsPage';
 import { canAccess } from '../core/auth/access';
 import { sessionStore } from '../core/auth/sessionStore';
 import { apiClient } from '../services/apiClient';
-import { AdvancesPage } from '../features/advances/AdvancesPage';
-import { LoginPage } from '../features/auth/LoginPage';
-import { DashboardPage } from '../features/dashboard/DashboardPage';
-import { FleetControlsPage } from '../features/fleet/FleetControlsPage';
-import { IncidentsPage } from '../features/incidents/IncidentsPage';
-import { NetworkPage } from '../features/network/NetworkPage';
-import { PartnersPage } from '../features/partners/PartnersPage';
-import { CompliancePage } from '../features/compliance/CompliancePage';
-import { QualityPage } from '../features/quality/QualityPage';
-import { RolesPage } from '../features/roles/RolesPage';
-import { RoleDetailPage } from '../features/roles/RoleDetailPage';
-import { RouteDetailPage } from '../features/routes/RouteDetailPage';
-import { RoutesBoardPage } from '../features/routes/RoutesBoardPage';
-import { RoutesPage } from '../features/routes/RoutesPage';
-import { SettlementDetailPage } from '../features/settlements/SettlementDetailPage';
-import { SettlementsPage } from '../features/settlements/SettlementsPage';
-import { SettlementPreviewPage } from '../features/settlements/SettlementPreviewPage';
-import { ShipmentsPage } from '../features/shipments/ShipmentsPage';
-import { ShipmentDetailPage } from '../features/shipments/ShipmentDetailPage';
-import { TariffsPage } from '../features/tariffs/TariffsPage';
-import { WorkforcePage } from '../features/workforce/WorkforcePage';
-import { UsersPage } from '../features/users/UsersPage';
-import { UserDetailPage } from '../features/users/UserDetailPage';
+
+const AuditOpsPage = lazy(() => import('../features/audit/AuditOpsPage').then((module) => ({ default: module.AuditOpsPage })));
+const AdvancesPage = lazy(() => import('../features/advances/AdvancesPage').then((module) => ({ default: module.AdvancesPage })));
+const LoginPage = lazy(() => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage })));
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const FleetControlsPage = lazy(() => import('../features/fleet/FleetControlsPage').then((module) => ({ default: module.FleetControlsPage })));
+const IncidentsPage = lazy(() => import('../features/incidents/IncidentsPage').then((module) => ({ default: module.IncidentsPage })));
+const NetworkPage = lazy(() => import('../features/network/NetworkPage').then((module) => ({ default: module.NetworkPage })));
+const PartnersPage = lazy(() => import('../features/partners/PartnersPage').then((module) => ({ default: module.PartnersPage })));
+const CompliancePage = lazy(() => import('../features/compliance/CompliancePage').then((module) => ({ default: module.CompliancePage })));
+const QualityPage = lazy(() => import('../features/quality/QualityPage').then((module) => ({ default: module.QualityPage })));
+const RolesPage = lazy(() => import('../features/roles/RolesPage').then((module) => ({ default: module.RolesPage })));
+const RoleDetailPage = lazy(() => import('../features/roles/RoleDetailPage').then((module) => ({ default: module.RoleDetailPage })));
+const RouteDetailPage = lazy(() => import('../features/routes/RouteDetailPage').then((module) => ({ default: module.RouteDetailPage })));
+const RoutesBoardPage = lazy(() => import('../features/routes/RoutesBoardPage').then((module) => ({ default: module.RoutesBoardPage })));
+const RoutesPage = lazy(() => import('../features/routes/RoutesPage').then((module) => ({ default: module.RoutesPage })));
+const SettlementDetailPage = lazy(() => import('../features/settlements/SettlementDetailPage').then((module) => ({ default: module.SettlementDetailPage })));
+const SettlementsPage = lazy(() => import('../features/settlements/SettlementsPage').then((module) => ({ default: module.SettlementsPage })));
+const SettlementPreviewPage = lazy(() => import('../features/settlements/SettlementPreviewPage').then((module) => ({ default: module.SettlementPreviewPage })));
+const ShipmentsPage = lazy(() => import('../features/shipments/ShipmentsPage').then((module) => ({ default: module.ShipmentsPage })));
+const ShipmentDetailPage = lazy(() => import('../features/shipments/ShipmentDetailPage').then((module) => ({ default: module.ShipmentDetailPage })));
+const TariffsPage = lazy(() => import('../features/tariffs/TariffsPage').then((module) => ({ default: module.TariffsPage })));
+const WorkforcePage = lazy(() => import('../features/workforce/WorkforcePage').then((module) => ({ default: module.WorkforcePage })));
+const UsersPage = lazy(() => import('../features/users/UsersPage').then((module) => ({ default: module.UsersPage })));
+const UserDetailPage = lazy(() => import('../features/users/UserDetailPage').then((module) => ({ default: module.UserDetailPage })));
+
+function withModuleLoader(element: ReactNode) {
+  return (
+    <Suspense fallback={<div className="status">Cargando módulo...</div>}>
+      {element}
+    </Suspense>
+  );
+}
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(sessionStore.isAuthenticated());
@@ -82,104 +92,104 @@ export function App() {
     <AppShell isAuthenticated={isAuthenticated} roles={roles} currentUser={currentUser} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={withModuleLoader(<LoginPage />)} />
         <Route
           path="/dashboard"
-          element={isAuthenticated ? <DashboardPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated ? withModuleLoader(<DashboardPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/shipments"
-          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('shipments', roles) ? withModuleLoader(<ShipmentsPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/shipments/:id"
-          element={isAuthenticated && canAccess('shipments', roles) ? <ShipmentDetailPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('shipments', roles) ? withModuleLoader(<ShipmentDetailPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes"
-          element={isAuthenticated && canAccess('routes', roles) ? <RoutesPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RoutesPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes/board"
-          element={isAuthenticated && canAccess('routes', roles) ? <RoutesBoardPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RoutesBoardPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/routes/:id"
-          element={isAuthenticated && canAccess('routes', roles) ? <RouteDetailPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RouteDetailPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/incidents"
-          element={isAuthenticated && canAccess('incidents', roles) ? <IncidentsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('incidents', roles) ? withModuleLoader(<IncidentsPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/network"
-          element={isAuthenticated && canAccess('network', roles) ? <NetworkPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('network', roles) ? withModuleLoader(<NetworkPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/partners"
-          element={isAuthenticated && canAccess('partners', roles) ? <PartnersPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('partners', roles) ? withModuleLoader(<PartnersPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/workforce"
-          element={isAuthenticated && canAccess('workforce', roles) ? <WorkforcePage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('workforce', roles) ? withModuleLoader(<WorkforcePage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/compliance"
-          element={isAuthenticated && canAccess('compliance', roles) ? <CompliancePage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('compliance', roles) ? withModuleLoader(<CompliancePage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/fleet-controls"
-          element={isAuthenticated && canAccess('fleet', roles) ? <FleetControlsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('fleet', roles) ? withModuleLoader(<FleetControlsPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/tariffs"
-          element={isAuthenticated && canAccess('tariffs', roles) ? <TariffsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('tariffs', roles) ? withModuleLoader(<TariffsPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/advances"
-          element={isAuthenticated && canAccess('advances', roles) ? <AdvancesPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('advances', roles) ? withModuleLoader(<AdvancesPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementsPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements/:id"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementDetailPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementDetailPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/settlements/preview"
-          element={isAuthenticated && canAccess('settlements', roles) ? <SettlementPreviewPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementPreviewPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/quality"
           element={isAuthenticated && canAccess('quality', roles)
             ? (
               <ErrorBoundary fallback={<div className="helper">No se pudo cargar KPI Calidad.</div>}>
-                <QualityPage />
+                {withModuleLoader(<QualityPage />)}
               </ErrorBoundary>
             )
             : <Navigate to="/login" replace />}
         />
         <Route
           path="/users"
-          element={isAuthenticated && canAccess('users', roles) ? <UsersPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('users', roles) ? withModuleLoader(<UsersPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/users/:id"
-          element={isAuthenticated && canAccess('users', roles) ? <UserDetailPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('users', roles) ? withModuleLoader(<UserDetailPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/roles"
-          element={isAuthenticated && canAccess('roles', roles) ? <RolesPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('roles', roles) ? withModuleLoader(<RolesPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/roles/:id"
-          element={isAuthenticated && canAccess('roles', roles) ? <RoleDetailPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('roles', roles) ? withModuleLoader(<RoleDetailPage />) : <Navigate to="/login" replace />}
         />
         <Route
           path="/audit"
-          element={isAuthenticated && canAccess('audit', roles) ? <AuditOpsPage /> : <Navigate to="/login" replace />}
+          element={isAuthenticated && canAccess('audit', roles) ? withModuleLoader(<AuditOpsPage />) : <Navigate to="/login" replace />}
         />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
