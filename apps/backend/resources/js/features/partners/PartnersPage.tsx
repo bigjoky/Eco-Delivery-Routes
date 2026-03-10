@@ -1,5 +1,6 @@
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -780,7 +781,7 @@ export function PartnersPage() {
               Suspender seleccion
             </Button>
           </div>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -825,6 +826,24 @@ export function PartnersPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredSubcontractors.map((subcontractor) => (
+              <article key={`subcontractor-mobile-${subcontractor.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{subcontractor.legal_name}</strong>
+                    <div className="helper">{subcontractor.tax_id ?? '-'}</div>
+                  </div>
+                  <Badge variant="secondary">{subcontractor.status}</Badge>
+                </div>
+                <div className="helper">{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</div>
+                <div className="mobile-ops-card-actions">
+                  <Button data-testid={`edit-subcontractor-mobile-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
+                  <Button data-testid={`delete-subcontractor-mobile-${subcontractor.id}`} type="button" variant="outline" onClick={() => deleteSubcontractor(subcontractor)}>Archivar</Button>
+                </div>
+              </article>
+            ))}
+          </div>
 
           {editingSubcontractorId ? (
             <div className="inline-actions">
@@ -872,7 +891,7 @@ export function PartnersPage() {
               Suspender seleccion
             </Button>
           </div>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -921,6 +940,33 @@ export function PartnersPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredDrivers.map((driver) => (
+              <article key={`driver-mobile-${driver.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{driver.code} · {driver.name}</strong>
+                    <div className="helper">{driver.dni ?? '-'}</div>
+                  </div>
+                  <Badge variant="secondary">{driver.status}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Subcontrata</div>
+                    <div>{driver.subcontractor_name ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Última edición</div>
+                    <div>{formatDateTime(driver.updated_at)}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  <Button data-testid={`edit-driver-mobile-${driver.id}`} type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
+                  <Button data-testid={`delete-driver-mobile-${driver.id}`} type="button" variant="outline" onClick={() => deleteDriver(driver)}>Archivar</Button>
+                </div>
+              </article>
+            ))}
+          </div>
 
           {editingDriverId ? (
             <div className="inline-actions">
@@ -973,7 +1019,7 @@ export function PartnersPage() {
               Mantenimiento seleccion
             </Button>
           </div>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1022,6 +1068,34 @@ export function PartnersPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredVehicles.map((vehicle) => (
+              <article key={`vehicle-mobile-${vehicle.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{vehicle.code}</strong>
+                    <div className="helper">{vehicle.plate_number ?? '-'}</div>
+                  </div>
+                  <Badge variant="secondary">{vehicle.status}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Subcontrata</div>
+                    <div>{vehicle.subcontractor_name ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Driver</div>
+                    <div>{vehicle.assigned_driver_code ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="helper">{vehicle.last_editor_name ?? '-'} · {formatDateTime(vehicle.updated_at)}</div>
+                <div className="mobile-ops-card-actions">
+                  <Button data-testid={`edit-vehicle-mobile-${vehicle.id}`} type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
+                  <Button data-testid={`delete-vehicle-mobile-${vehicle.id}`} type="button" variant="outline" onClick={() => deleteVehicle(vehicle)}>Archivar</Button>
+                </div>
+              </article>
+            ))}
+          </div>
 
           {editingVehicleId ? (
             <div className="inline-actions">

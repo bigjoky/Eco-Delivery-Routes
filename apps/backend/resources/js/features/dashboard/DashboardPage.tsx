@@ -436,7 +436,7 @@ export function DashboardPage() {
             <CardDescription>Completadas vs planificadas por paradas.</CardDescription>
           </CardHeader>
           <CardContent>
-            <TableWrapper>
+            <TableWrapper className="desktop-table-only">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -465,6 +465,28 @@ export function DashboardPage() {
                 </TableBody>
               </Table>
             </TableWrapper>
+            <div className="mobile-ops-list">
+              {overview.productivity_by_hub.map((row) => (
+                <article key={`hub-mobile-${row.hub_id}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <div>
+                      <Link to={`/routes?hub_id=${encodeURIComponent(row.hub_id)}&date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`}>
+                        {row.hub_code} · {row.hub_name}
+                      </Link>
+                      <div className="helper">Rutas {row.routes_completed}/{row.routes_total}</div>
+                    </div>
+                    <Badge variant="secondary">{row.completion_ratio.toFixed(2)}%</Badge>
+                  </div>
+                  <div className="mobile-ops-card-grid">
+                    <div>
+                      <div className="kpi-label">Paradas</div>
+                      <div>{row.completed_stops}/{row.planned_stops}</div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {overview.productivity_by_hub.length === 0 ? <div className="mobile-ops-empty">Sin datos</div> : null}
+            </div>
           </CardContent>
         </Card>
 
@@ -474,7 +496,7 @@ export function DashboardPage() {
             <CardDescription>Control de ejecución de paradas.</CardDescription>
           </CardHeader>
           <CardContent>
-            <TableWrapper>
+            <TableWrapper className="desktop-table-only">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -506,6 +528,36 @@ export function DashboardPage() {
                 </TableBody>
               </Table>
             </TableWrapper>
+            <div className="mobile-ops-list">
+              {overview.productivity_by_route.map((row) => (
+                <article key={`route-mobile-${row.route_id}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <div>
+                      <Link to={`/routes/${row.route_id}`}>{row.route_code}</Link>
+                      <div className="helper">{row.route_date}</div>
+                    </div>
+                    <Badge variant="secondary">{row.status}</Badge>
+                  </div>
+                  <div className="mobile-ops-card-grid">
+                    <div>
+                      <div className="kpi-label">Paradas</div>
+                      <div>{row.completed_stops}/{row.planned_stops}</div>
+                    </div>
+                    <div>
+                      <div className="kpi-label">Ratio</div>
+                      <div>{row.completion_ratio.toFixed(2)}%</div>
+                    </div>
+                  </div>
+                  <div className="mobile-ops-card-actions">
+                    <Link to={`/routes/${row.route_id}`} className="btn btn-outline">Abrir</Link>
+                    <Link className="btn btn-outline" to={`/routes?q=${encodeURIComponent(row.route_code)}&date_from=${encodeURIComponent(overview.period.from)}&date_to=${encodeURIComponent(overview.period.to)}`}>
+                      Listado
+                    </Link>
+                  </div>
+                </article>
+              ))}
+              {overview.productivity_by_route.length === 0 ? <div className="mobile-ops-empty">Sin datos</div> : null}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -514,7 +566,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader><CardTitle>Rutas recientes</CardTitle></CardHeader>
           <CardContent>
-            <TableWrapper>
+            <TableWrapper className="desktop-table-only">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -535,12 +587,24 @@ export function DashboardPage() {
                 </TableBody>
               </Table>
             </TableWrapper>
+            <div className="mobile-ops-list">
+              {overview.recent.routes.map((item) => (
+                <article key={`recent-route-${item.id}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <Link to={`/routes/${item.id}`}>{item.code}</Link>
+                    <Badge variant="secondary">{item.status}</Badge>
+                  </div>
+                  <div className="helper">{item.route_date}</div>
+                </article>
+              ))}
+              {overview.recent.routes.length === 0 ? <div className="mobile-ops-empty">Sin rutas</div> : null}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Envíos recientes</CardTitle></CardHeader>
           <CardContent>
-            <TableWrapper>
+            <TableWrapper className="desktop-table-only">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -561,6 +625,18 @@ export function DashboardPage() {
                 </TableBody>
               </Table>
             </TableWrapper>
+            <div className="mobile-ops-list">
+              {overview.recent.shipments.map((item) => (
+                <article key={`recent-shipment-${item.id}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
+                    <Badge variant="secondary">{item.status}</Badge>
+                  </div>
+                  <div className="helper">{item.consignee_name ?? '-'}</div>
+                </article>
+              ))}
+              {overview.recent.shipments.length === 0 ? <div className="mobile-ops-empty">Sin envíos</div> : null}
+            </div>
           </CardContent>
         </Card>
       </div>

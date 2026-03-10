@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -504,7 +505,7 @@ export function NetworkPage() {
       <Card>
         <CardHeader><CardTitle>Hubs</CardTitle></CardHeader>
         <CardContent>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -539,13 +540,37 @@ export function NetworkPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredHubs.map((item) => (
+              <article key={`hub-mobile-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{item.code}</strong>
+                    <div className="helper">{item.name}</div>
+                  </div>
+                  <Badge variant="secondary">{item.deleted_at ? 'archivado' : (item.is_active ? 'activo' : 'inactivo')}</Badge>
+                </div>
+                <div className="helper">{item.city ?? '-'}</div>
+                <div className="mobile-ops-card-actions">
+                  {item.deleted_at ? (
+                    <Button type="button" variant="outline" onClick={() => restoreHub(item)}>Restaurar</Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => startEditHub(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => removeHub(item)}>Archivar</Button>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle>Depots</CardTitle></CardHeader>
         <CardContent>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -582,13 +607,46 @@ export function NetworkPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredDepots.map((item) => (
+              <article key={`depot-mobile-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{item.code}</strong>
+                    <div className="helper">{item.name}</div>
+                  </div>
+                  <Badge variant="secondary">{item.deleted_at ? 'archivado' : (item.is_active ? 'activo' : 'inactivo')}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Hub</div>
+                    <div>{hubCode.get(item.hub_id) ?? item.hub_id}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Ciudad</div>
+                    <div>{item.city ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  {item.deleted_at ? (
+                    <Button type="button" variant="outline" onClick={() => restoreDepot(item)}>Restaurar</Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => startEditDepot(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => removeDepot(item)}>Archivar</Button>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader><CardTitle>Puntos</CardTitle></CardHeader>
         <CardContent>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -627,6 +685,43 @@ export function NetworkPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredPoints.map((item) => (
+              <article key={`point-mobile-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{item.code}</strong>
+                    <div className="helper">{item.name}</div>
+                  </div>
+                  <Badge variant="secondary">{item.deleted_at ? 'archivado' : (item.is_active ? 'activo' : 'inactivo')}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Hub</div>
+                    <div>{hubCode.get(item.hub_id) ?? item.hub_id}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Depot</div>
+                    <div>{item.depot_id ? (depotCode.get(item.depot_id) ?? item.depot_id) : '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Ciudad</div>
+                    <div>{item.city ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  {item.deleted_at ? (
+                    <Button type="button" variant="outline" onClick={() => restorePoint(item)}>Restaurar</Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => startEditPoint(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => removePoint(item)}>Archivar</Button>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
