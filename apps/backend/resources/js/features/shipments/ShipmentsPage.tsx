@@ -2407,13 +2407,15 @@ export function ShipmentsPage() {
                     <CardTitle>Destinatario</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="helper">
+                    <div className="wizard-summary-card">
+                    <div className="wizard-summary-line">
                       {createConsigneeDocType === 'CIF'
                         ? (createConsignee || 'Sin destinatario')
                         : ([createConsigneeFirstName, createConsigneeLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin destinatario')}
                     </div>
-                    <div className="helper">{createPhone || '-'}</div>
-                    <div className="helper">{createStreet || ''} {createNumber || ''} {createCity || ''}</div>
+                    <div className="wizard-summary-line">{createConsigneeDocumentId || 'Documento pendiente'} · {createPhone || 'Teléfono pendiente'}</div>
+                    <div className="wizard-summary-line">{createStreet || ''} {createNumber || ''} {createCity || ''}</div>
+                    </div>
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
                         Editar destinatario
@@ -2431,13 +2433,15 @@ export function ShipmentsPage() {
                     <CardTitle>Remitente</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="helper">
+                    <div className="wizard-summary-card">
+                    <div className="wizard-summary-line">
                       {createSenderDocType === 'CIF'
                         ? (createSenderLegalName || 'Sin remitente')
                         : ([createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ') || 'Sin remitente')}
                     </div>
-                    <div className="helper">{createSenderPhone || '-'}</div>
-                    <div className="helper">{createSenderStreet || ''} {createSenderNumber || ''} {createSenderCity || ''}</div>
+                    <div className="wizard-summary-line">{createSenderDocumentId || 'Documento pendiente'} · {createSenderPhone || 'Teléfono pendiente'}</div>
+                    <div className="wizard-summary-line">{createSenderStreet || ''} {createSenderNumber || ''} {createSenderCity || ''}</div>
+                    </div>
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
                         Editar remitente
@@ -2486,47 +2490,54 @@ export function ShipmentsPage() {
           </Button>
         }
       >
-        <div className="inline-actions">
-          <label htmlFor="recipient-template-select">Plantilla destinatario</label>
-          <select
-            id="recipient-template-select"
-            value={selectedRecipientTemplateId}
-            onChange={(event) => {
-              const templateId = event.target.value;
-              setSelectedRecipientTemplateId(templateId);
-              const template = rankedRecipientTemplates.find((item) => item.id === templateId);
-              if (template) applyRecipientTemplate(template);
-            }}
-          >
-            <option value="">Seleccionar plantilla</option>
-            {rankedRecipientTemplates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
-            ))}
-          </select>
-          <input
-            value={newRecipientTemplateName}
-            onChange={(event) => setNewRecipientTemplateName(event.target.value)}
-            placeholder="Nombre nueva plantilla"
-          />
-          <Button type="button" variant="outline" onClick={saveCurrentRecipientAsTemplate}>
-            Guardar plantilla
-          </Button>
-          <Button type="button" variant="outline" onClick={deleteSelectedRecipientTemplate} disabled={!selectedRecipientTemplateId}>
-            Eliminar
-          </Button>
-        </div>
-        <div className="inline-actions">
-          <span className="helper">Contactos compartidos recientes</span>
+        <div className="modal-section">
+          <div className="modal-section-title">Plantillas y contactos</div>
+          <div className="modal-actions-stack">
+            <div className="inline-actions">
+              <label htmlFor="recipient-template-select">Plantilla destinatario</label>
+              <select
+                id="recipient-template-select"
+                value={selectedRecipientTemplateId}
+                onChange={(event) => {
+                  const templateId = event.target.value;
+                  setSelectedRecipientTemplateId(templateId);
+                  const template = rankedRecipientTemplates.find((item) => item.id === templateId);
+                  if (template) applyRecipientTemplate(template);
+                }}
+              >
+                <option value="">Seleccionar plantilla</option>
+                {rankedRecipientTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+              <input
+                value={newRecipientTemplateName}
+                onChange={(event) => setNewRecipientTemplateName(event.target.value)}
+                placeholder="Nombre nueva plantilla"
+              />
+              <Button type="button" variant="outline" onClick={saveCurrentRecipientAsTemplate}>
+                Guardar plantilla
+              </Button>
+              <Button type="button" variant="outline" onClick={deleteSelectedRecipientTemplate} disabled={!selectedRecipientTemplateId}>
+                Eliminar
+              </Button>
+            </div>
+          </div>
+          <div className="modal-section-copy">Contactos compartidos recientes</div>
           {rankedRecentRecipientContacts.length === 0 ? (
             <span className="helper">Sin contactos recientes</span>
           ) : null}
+        </div>
+        <div className="inline-actions">
           {rankedRecentRecipientContacts.map((contact) => (
             <Button key={contact.id} type="button" variant="outline" onClick={() => applyRecipientContact(contact)}>
               {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
             </Button>
           ))}
         </div>
-        <div className="form-row">
+        <div className="modal-section">
+          <div className="modal-section-title">Búsqueda</div>
+          <div className="form-row">
           <label htmlFor="create-shipment-consignee-lookup">Buscar por movil</label>
           <input
             id="create-shipment-consignee-lookup"
@@ -2551,7 +2562,10 @@ export function ShipmentsPage() {
           </Button>
           {consigneeLookupError ? <div className="helper error">{consigneeLookupError}</div> : null}
         </div>
-        <div className="form-row">
+        </div>
+        <div className="modal-section">
+          <div className="modal-section-title">Identidad y contacto</div>
+          <div className="form-row">
           <label htmlFor="create-shipment-consignee-doc-type">Tipo documento</label>
           <select
             id="create-shipment-consignee-doc-type"
@@ -2622,7 +2636,10 @@ export function ShipmentsPage() {
           />
           {createFieldErrors.email ? <div className="helper error">{createFieldErrors.email}</div> : null}
         </div>
-        <div className="form-row">
+        </div>
+        <div className="modal-section">
+          <div className="modal-section-title">Dirección</div>
+          <div className="form-row">
           <label htmlFor="create-shipment-street">Calle</label>
           <input
             id="create-shipment-street"
@@ -2700,6 +2717,7 @@ export function ShipmentsPage() {
             placeholder="Puerta, horario, contacto"
           />
         </div>
+        </div>
       </Modal>
       <Modal
         open={senderModalOpen}
@@ -2711,47 +2729,54 @@ export function ShipmentsPage() {
           </Button>
         }
       >
-        <div className="inline-actions">
-          <label htmlFor="sender-template-select">Plantilla remitente</label>
-          <select
-            id="sender-template-select"
-            value={selectedSenderTemplateId}
-            onChange={(event) => {
-              const templateId = event.target.value;
-              setSelectedSenderTemplateId(templateId);
-              const template = rankedSenderTemplates.find((item) => item.id === templateId);
-              if (template) applySenderTemplate(template);
-            }}
-          >
-            <option value="">Seleccionar plantilla</option>
-            {rankedSenderTemplates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
-            ))}
-          </select>
-          <input
-            value={newSenderTemplateName}
-            onChange={(event) => setNewSenderTemplateName(event.target.value)}
-            placeholder="Nombre nueva plantilla"
-          />
-          <Button type="button" variant="outline" onClick={saveCurrentSenderAsTemplate}>
-            Guardar plantilla
-          </Button>
-          <Button type="button" variant="outline" onClick={deleteSelectedSenderTemplate} disabled={!selectedSenderTemplateId}>
-            Eliminar
-          </Button>
-        </div>
-        <div className="inline-actions">
-          <span className="helper">Contactos compartidos recientes</span>
+        <div className="modal-section">
+          <div className="modal-section-title">Plantillas y contactos</div>
+          <div className="modal-actions-stack">
+            <div className="inline-actions">
+              <label htmlFor="sender-template-select">Plantilla remitente</label>
+              <select
+                id="sender-template-select"
+                value={selectedSenderTemplateId}
+                onChange={(event) => {
+                  const templateId = event.target.value;
+                  setSelectedSenderTemplateId(templateId);
+                  const template = rankedSenderTemplates.find((item) => item.id === templateId);
+                  if (template) applySenderTemplate(template);
+                }}
+              >
+                <option value="">Seleccionar plantilla</option>
+                {rankedSenderTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+              <input
+                value={newSenderTemplateName}
+                onChange={(event) => setNewSenderTemplateName(event.target.value)}
+                placeholder="Nombre nueva plantilla"
+              />
+              <Button type="button" variant="outline" onClick={saveCurrentSenderAsTemplate}>
+                Guardar plantilla
+              </Button>
+              <Button type="button" variant="outline" onClick={deleteSelectedSenderTemplate} disabled={!selectedSenderTemplateId}>
+                Eliminar
+              </Button>
+            </div>
+          </div>
+          <div className="modal-section-copy">Contactos compartidos recientes</div>
           {rankedRecentSenderContacts.length === 0 ? (
             <span className="helper">Sin contactos recientes</span>
           ) : null}
+        </div>
+        <div className="inline-actions">
           {rankedRecentSenderContacts.map((contact) => (
             <Button key={contact.id} type="button" variant="outline" onClick={() => applySenderContact(contact)}>
               {(contact.display_name ?? contact.legal_name ?? contact.document_id ?? contact.phone ?? contact.id).slice(0, 28)}
             </Button>
           ))}
         </div>
-        <div className="form-row">
+        <div className="modal-section">
+          <div className="modal-section-title">Búsqueda</div>
+          <div className="form-row">
           <label htmlFor="create-sender-lookup">Buscar por movil</label>
           <input
             id="create-sender-lookup"
@@ -2776,7 +2801,10 @@ export function ShipmentsPage() {
           </Button>
           {senderLookupError ? <div className="helper error">{senderLookupError}</div> : null}
         </div>
-        <div className="form-row">
+        </div>
+        <div className="modal-section">
+          <div className="modal-section-title">Identidad y contacto</div>
+          <div className="form-row">
           <label htmlFor="create-sender-doc-type">Tipo documento</label>
           <select
             id="create-sender-doc-type"
@@ -2846,7 +2874,10 @@ export function ShipmentsPage() {
           />
           {createFieldErrors.senderEmail ? <div className="helper error">{createFieldErrors.senderEmail}</div> : null}
         </div>
-        <div className="form-row">
+        </div>
+        <div className="modal-section">
+          <div className="modal-section-title">Dirección</div>
+          <div className="form-row">
           <label htmlFor="create-sender-street">Calle</label>
           <input
             id="create-sender-street"
@@ -2923,6 +2954,7 @@ export function ShipmentsPage() {
             onChange={(event) => setCreateSenderAddressNotes(event.target.value)}
             placeholder="Observaciones remitente"
           />
+        </div>
         </div>
       </Modal>
       <Modal
