@@ -7,6 +7,8 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import type { AuditLogEntry } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 type AuditResource =
@@ -86,6 +88,7 @@ export function AuditOpsPage() {
   const [actor, setActor] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const canExport = hasExportAccess('audit', sessionStore.getRoles());
 
   const runSearch = async () => {
     setLoading(true);
@@ -169,6 +172,7 @@ export function AuditOpsPage() {
             </Button>
             <ExportActionsModal
               title="Exportar auditoría"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'audit-csv',

@@ -8,6 +8,8 @@ import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { HubSummary, QualityDriverBreakdown, QualityRiskSummaryRow, QualityRouteBreakdown, QualitySnapshot, QualitySubcontractorBreakdown, QualityThresholdAlertSummary, QualityThresholdAlertTopScope, QualityThresholdHistoryEntry, RoleSummary, SubcontractorSummary, UserSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 import { chartColorByRatio, normalizeChartWidth } from './breakdownChart';
 import { severityFromScore, severityLabel } from './risk';
@@ -67,6 +69,7 @@ export function QualityPage() {
     }
   });
   const thresholdNumber = Number.isFinite(Number(threshold)) ? Number(threshold) : 95;
+  const canExport = hasExportAccess('quality', sessionStore.getRoles());
 
   useEffect(() => {
     setSearchParams((current) => {
@@ -582,6 +585,7 @@ export function QualityPage() {
             </Select>
             <ExportActionsModal
               title="Exportar KPI calidad"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'quality-csv',
@@ -911,6 +915,7 @@ export function QualityPage() {
                 <Link to={`/routes/${routeBreakdown.route_id}`}>Abrir ruta</Link>
                 <ExportActionsModal
                   title="Exportar desglose por ruta"
+                  triggerDisabled={!canExport}
                   actions={[
                     {
                       id: 'quality-route-breakdown-csv',
@@ -989,6 +994,7 @@ export function QualityPage() {
                 <span>Snapshots: {driverBreakdown.snapshots_count}</span>
                 <ExportActionsModal
                   title="Exportar desglose por conductor"
+                  triggerDisabled={!canExport}
                   actions={[
                     {
                       id: 'quality-driver-breakdown-csv',
@@ -1051,6 +1057,7 @@ export function QualityPage() {
                 <span>Snapshots: {subcontractorBreakdown.snapshots_count}</span>
                 <ExportActionsModal
                   title="Exportar desglose por subcontrata"
+                  triggerDisabled={!canExport}
                   actions={[
                     {
                       id: 'quality-subcontractor-breakdown-csv',

@@ -8,11 +8,14 @@ import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AuditLogEntry, DriverSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
 
 export function PartnersPage() {
+  const canExport = hasExportAccess('partners', sessionStore.getRoles());
   const [searchParams] = useSearchParams();
   const [subcontractors, setSubcontractors] = useState<SubcontractorSummary[]>([]);
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
@@ -741,6 +744,7 @@ export function PartnersPage() {
           <div className="inline-actions">
             <ExportActionsModal
               title="Exportar subcontratas"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'partners-subcontractors-csv',
@@ -831,6 +835,7 @@ export function PartnersPage() {
           <div className="inline-actions">
             <ExportActionsModal
               title="Exportar conductores"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'partners-drivers-csv',
@@ -931,6 +936,7 @@ export function PartnersPage() {
           <div className="inline-actions">
             <ExportActionsModal
               title="Exportar vehículos"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'partners-vehicles-csv',
@@ -1070,6 +1076,7 @@ export function PartnersPage() {
               </Button>
               <ExportActionsModal
                 title="Exportar auditoría partners"
+                triggerDisabled={!canExport}
                 actions={[
                   {
                     id: 'partners-audit-csv',

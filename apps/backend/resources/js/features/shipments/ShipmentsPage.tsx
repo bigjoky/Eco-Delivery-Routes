@@ -8,6 +8,7 @@ import { Modal } from '../../components/ui/modal';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 import {
   hasRequiredRecipientName,
@@ -441,9 +442,7 @@ export function ShipmentsPage() {
   const [roles, setRoles] = useState(sessionStore.getRoles());
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
-  const canExport = isMock || roles.some((role) => (
-    role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator' || role === 'accountant'
-  ));
+  const canExport = isMock || hasExportAccess('shipments', roles);
   const canImport = isMock || roles.some((role) => (
     role === 'super_admin' || role === 'operations_manager' || role === 'traffic_operator'
   ));
@@ -3102,6 +3101,7 @@ export function ShipmentsPage() {
             </Button>
             <ExportActionsModal
               title="Exportar previsualización masiva"
+              triggerDisabled={!canExport}
               actions={[
                 {
                   id: 'shipments-bulk-preview-csv-inline',
@@ -3361,9 +3361,18 @@ export function ShipmentsPage() {
             <Button type="button" onClick={runImport} disabled={importing}>
               {importing ? 'Importando...' : 'Importar'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => void downloadImportTemplate()}>
-              Descargar plantilla
-            </Button>
+            <ExportActionsModal
+              title="Descargas de importación"
+              triggerLabel="Descargas"
+              triggerDisabled={!canImport}
+              actions={[
+                {
+                  id: 'shipments-template-csv',
+                  label: 'Plantilla CSV de importación',
+                  run: () => downloadImportTemplate(),
+                },
+              ]}
+            />
             </div>
           {importError ? <div className="helper error">{importError}</div> : null}
           {importMessage ? <div className="helper">{importMessage}</div> : null}

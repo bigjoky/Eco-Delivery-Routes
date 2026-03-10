@@ -7,6 +7,8 @@ import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { SettlementPreview, SubcontractorSummary } from '../../core/api/types';
+import { sessionStore } from '../../core/auth/sessionStore';
+import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
 
 export function SettlementPreviewPage() {
@@ -18,6 +20,7 @@ export function SettlementPreviewPage() {
   const [finalizedId, setFinalizedId] = useState<string | null>(null);
   const [approved, setApproved] = useState(false);
   const [paid, setPaid] = useState(false);
+  const canExport = hasExportAccess('settlements', sessionStore.getRoles());
 
   useEffect(() => {
     apiClient.getSubcontractors({ limit: 20 }).then((items) => {
@@ -150,6 +153,7 @@ export function SettlementPreviewPage() {
             {finalizedId && approved && !paid && (
               <ExportActionsModal
                 title="Exportar pre-liquidación"
+                triggerDisabled={!canExport}
                 actions={[{ id: 'settlement-preview-csv', label: 'CSV', run: () => onExportCsv() }]}
               />
             )}
