@@ -79,6 +79,7 @@ export function AppShell({
   });
   const activeItem = visibleMenu.find((item) => location.pathname === item.to) ?? visibleMenu[0];
   const auditItem = visibleMenu.find((item) => item.to === '/audit');
+  const mobileNavItems = visibleMenu.filter((item) => mobileCorePaths.has(item.to));
 
   return (
     <div className="app-shell">
@@ -156,6 +157,17 @@ export function AppShell({
             <span className="helper">{isAuthenticated ? 'Sesión activa' : 'No autenticado'}</span>
           </div>
         </header>
+        <nav className="mobile-nav" aria-label="Navegación móvil">
+          {mobileNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => cn('mobile-nav-link', isActive && 'mobile-nav-link-active')}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
         <main className="app-main">{children}</main>
       </div>
     </div>
