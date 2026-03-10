@@ -10,6 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWra
 import { IncidentCatalogItem, IncidentSlaRecommendationAction, IncidentSummary, IncidentsBoardSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 import { Link, useSearchParams } from 'react-router-dom';
+import {
+  IncidentBulkReasonCode,
+  composeIncidentBulkResolveNotes,
+  validateIncidentBulkResolve,
+} from './incidentsBulkValidation';
 
 function categoryVariant(category: IncidentSummary['category']): 'warning' | 'destructive' | 'secondary' | 'outline' {
   if (category === 'failed') return 'destructive';
@@ -87,7 +92,7 @@ export function IncidentsPage() {
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
   const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
   const [bulkResolveNotes, setBulkResolveNotes] = useState('Resueltas en lote desde panel web');
-  const [bulkResolveReasonCode, setBulkResolveReasonCode] = useState<(typeof bulkResolveReasonOptions)[number]['code']>('DATA_CORRECTION');
+  const [bulkResolveReasonCode, setBulkResolveReasonCode] = useState<IncidentBulkReasonCode>('DATA_CORRECTION');
   const [bulkResolveReasonDetail, setBulkResolveReasonDetail] = useState('');
   const [bulkOverridePriority, setBulkOverridePriority] = useState<'' | 'high' | 'medium' | 'low'>('');
   const [bulkOverrideDueAt, setBulkOverrideDueAt] = useState('');
@@ -99,7 +104,7 @@ export function IncidentsPage() {
   const [singleOverrideSaving, setSingleOverrideSaving] = useState(false);
   const [resolveTarget, setResolveTarget] = useState<IncidentSummary | null>(null);
   const [resolveNotes, setResolveNotes] = useState('Resuelta desde panel web');
-  const [resolveReasonCode, setResolveReasonCode] = useState<(typeof bulkResolveReasonOptions)[number]['code']>('DATA_CORRECTION');
+  const [resolveReasonCode, setResolveReasonCode] = useState<IncidentBulkReasonCode>('DATA_CORRECTION');
   const [resolveReasonDetail, setResolveReasonDetail] = useState('');
   const [resolveError, setResolveError] = useState('');
   const [createError, setCreateError] = useState('');
@@ -405,8 +410,12 @@ export function IncidentsPage() {
 
   const confirmResolve = async () => {
     if (!resolveTarget) return;
-    if (!resolveNotes.trim()) {
-      setResolveError('Define una nota de resolución.');
+    if (resolveNotes.trim().length < 8) {
+      setResolveError('Define una nota de resolución (mínimo 8 caracteres).');
+      return;
+    }
+    if (resolveReasonCode === 'OTHER' && !resolveReasonDetail.trim()) {
+      setResolveError('Cuando el motivo es OTHER, indica también un detalle.');
       return;
     }
     setResolvingId(resolveTarget.id);
@@ -434,25 +443,27 @@ export function IncidentsPage() {
   };
 
   const onResolveSelected = async () => {
-    if (bulkScope === 'selected' && selectedIncidentIds.length === 0) {
-      setResolveError('Selecciona al menos una incidencia abierta.');
-      return;
-    }
-    if (!bulkResolveNotes.trim()) {
-      setResolveError('Define una nota de resolucion para el cierre masivo.');
-      return;
-    }
-    if (!bulkResolveReasonCode) {
-      setResolveError('Selecciona un motivo estructurado de resolucion.');
+    const validationError = validateIncidentBulkResolve({
+      scope: bulkScope,
+      selectedCount: selectedIncidentIds.length,
+      reasonCode: bulkResolveReasonCode,
+      reasonDetail: bulkResolveReasonDetail,
+      notes: bulkResolveNotes,
+    });
+    if (validationError) {
+      setResolveError(validationError);
       return;
     }
     setBulkResolving(true);
     setResolveError('');
     try {
       const reasonLabel = bulkResolveReasonOptions.find((item) => item.code === bulkResolveReasonCode)?.label ?? bulkResolveReasonCode;
-      const composedNotes = `[${bulkResolveReasonCode}] ${reasonLabel}`
-        + (bulkResolveReasonDetail.trim() ? ` | Detalle: ${bulkResolveReasonDetail.trim()}` : '')
-        + ` | Nota: ${bulkResolveNotes.trim()}`;
+      const composedNotes = composeIncidentBulkResolveNotes({
+        reasonCode: bulkResolveReasonCode,
+        reasonLabel,
+        reasonDetail: bulkResolveReasonDetail,
+        notes: bulkResolveNotes,
+      });
       await apiClient.resolveIncidentsBulk(
         selectedIncidentIds,
         composedNotes,
@@ -616,7 +627,7 @@ export function IncidentsPage() {
           <div className="form-row">
             <div>
               <label>Motivo estructurado</label>
-              <Select value={resolveReasonCode} onChange={(event) => setResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
+              <Select value={resolveReasonCode} onChange={(event) => setResolveReasonCode(event.target.value as IncidentBulkReasonCode)}>
                 {bulkResolveReasonOptions.map((item) => (
                   <option key={item.code} value={item.code}>{item.label}</option>
                 ))}
@@ -932,7 +943,7 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={selectBreachedInPage}>
               Seleccionar SLA vencido
             </Button>
-            <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as (typeof bulkResolveReasonOptions)[number]['code'])}>
+            <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as IncidentBulkReasonCode)}>
               {bulkResolveReasonOptions.map((item) => (
                 <option key={item.code} value={item.code}>{item.label}</option>
               ))}

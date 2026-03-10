@@ -11,6 +11,7 @@ import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSum
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
+import { routeBulkReasonOptions, RouteBulkReasonCode, validateRouteBulkUpdate } from './routeBulkValidation';
 
 function stopStatusHelp(status: string): string {
   const help: Record<string, string> = {
@@ -28,6 +29,8 @@ type RouteBulkActionTemplate = {
   plannedAt: string;
   completedAt: string;
   shiftMinutes: string;
+  reasonCode: RouteBulkReasonCode;
+  reasonDetail: string;
 };
 
 type RouteOpsAuditItem = {
@@ -76,6 +79,8 @@ export function RouteDetailPage() {
   const [bulkPlannedAt, setBulkPlannedAt] = useState('');
   const [bulkCompletedAt, setBulkCompletedAt] = useState('');
   const [bulkEtaShiftMinutes, setBulkEtaShiftMinutes] = useState('0');
+  const [bulkReasonCode, setBulkReasonCode] = useState<RouteBulkReasonCode>('WEB_BULK_UPDATE');
+  const [bulkReasonDetail, setBulkReasonDetail] = useState('');
   const [manifest, setManifest] = useState<RouteManifest | null>(null);
   const [manifestLoading, setManifestLoading] = useState(false);
   const [manifestNotes, setManifestNotes] = useState('');
@@ -515,14 +520,16 @@ export function RouteDetailPage() {
   };
 
   const openBulkUpdatePreview = () => {
-    if (selectedStopIds.length === 0) {
-      setError('Selecciona al menos una parada para actualizar.');
-      return;
-    }
     const shiftMinutes = Number(bulkEtaShiftMinutes);
     const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
-    if (!bulkStatus && !bulkPlannedAt && !bulkCompletedAt && !hasShift) {
-      setError('Define al menos un campo masivo (estado, ETA o desplazamiento).');
+    const validationError = validateRouteBulkUpdate({
+      selectedCount: selectedStopIds.length,
+      hasAnyChange: Boolean(bulkStatus || bulkPlannedAt || bulkCompletedAt || hasShift),
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+    });
+    if (validationError) {
+      setError(validationError);
       return;
     }
     const rows = selectedStopIds.map((stopId) => {
@@ -544,11 +551,21 @@ export function RouteDetailPage() {
 
   const updateSelectedStops = async () => {
     if (!id) return;
+    const shiftMinutes = Number(bulkEtaShiftMinutes);
+    const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
+    const validationError = validateRouteBulkUpdate({
+      selectedCount: selectedStopIds.length,
+      hasAnyChange: Boolean(bulkStatus || bulkPlannedAt || bulkCompletedAt || hasShift),
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+    });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setBulkUpdatingStops(true);
     setError('');
     try {
-      const shiftMinutes = Number(bulkEtaShiftMinutes);
-      const hasShift = Number.isFinite(shiftMinutes) && shiftMinutes !== 0;
       const payload = buildBulkStopPayload();
       const result = await apiClient.bulkUpdateRouteStops(id, {
         stop_ids: selectedStopIds,
@@ -556,12 +573,12 @@ export function RouteDetailPage() {
         planned_at: payload.planned_at,
         completed_at: payload.completed_at,
         eta_shift_minutes: hasShift ? shiftMinutes : undefined,
-        reason_code: 'WEB_BULK_UPDATE',
-        reason_detail: 'Actualización masiva desde panel de ruta',
+        reason_code: bulkReasonCode,
+        reason_detail: bulkReasonDetail.trim() || undefined,
       });
       setStops(result.stops);
       setBulkUpdatePreviewOpen(false);
-      appendOpsAudit('stops.bulk_update', `Actualizadas ${result.updated_count} paradas en lote.`);
+      appendOpsAudit('stops.bulk_update', `Actualizadas ${result.updated_count} paradas en lote. Motivo: ${bulkReasonCode}.`);
       void refreshManifest(id);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo actualizar paradas en bloque');
@@ -660,6 +677,8 @@ export function RouteDetailPage() {
       setBulkPlannedAt('');
       setBulkCompletedAt('');
       setBulkEtaShiftMinutes('0');
+      setBulkReasonCode('WEB_BULK_UPDATE');
+      setBulkReasonDetail('');
       return;
     }
     if (preset === 'start_shift') {
@@ -750,6 +769,8 @@ export function RouteDetailPage() {
         plannedAt: row.planned_at ?? '',
         completedAt: row.completed_at ?? '',
         shiftMinutes: String(row.shift_minutes ?? 0),
+        reasonCode: 'WEB_BULK_UPDATE',
+        reasonDetail: '',
       })));
     }).catch(() => {
       if (typeof window === 'undefined' || cancelled) return;
@@ -757,7 +778,11 @@ export function RouteDetailPage() {
       if (rawTemplates) {
         try {
           const parsed = JSON.parse(rawTemplates) as RouteBulkActionTemplate[];
-          setBulkTemplates(Array.isArray(parsed) ? parsed : []);
+          setBulkTemplates(Array.isArray(parsed) ? parsed.map((item) => ({
+            ...item,
+            reasonCode: (item.reasonCode as RouteBulkReasonCode | undefined) ?? 'WEB_BULK_UPDATE',
+            reasonDetail: item.reasonDetail ?? '',
+          })) : []);
         } catch {
           setBulkTemplates([]);
         }
@@ -805,6 +830,8 @@ export function RouteDetailPage() {
       plannedAt: bulkPlannedAt,
       completedAt: bulkCompletedAt,
       shiftMinutes: bulkEtaShiftMinutes,
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
     };
     setBulkTemplates((current) => [template, ...current].slice(0, 20));
     try {
@@ -835,6 +862,8 @@ export function RouteDetailPage() {
     setBulkPlannedAt(template.plannedAt);
     setBulkCompletedAt(template.completedAt);
     setBulkEtaShiftMinutes(template.shiftMinutes);
+    setBulkReasonCode(template.reasonCode);
+    setBulkReasonDetail(template.reasonDetail);
     appendOpsAudit('template.applied', `Plantilla aplicada: ${template.name}`);
   };
 
@@ -933,6 +962,7 @@ export function RouteDetailPage() {
       >
         <div className="page-grid">
           <div className="helper">Se aplicarán cambios a {bulkUpdatePreviewRows.length} parada(s).</div>
+          <div className="helper">Motivo estructurado: {bulkReasonCode}{bulkReasonDetail.trim() ? ` (${bulkReasonDetail.trim()})` : ''}</div>
           <TableWrapper>
             <Table>
               <TableHeader>
@@ -1298,6 +1328,25 @@ export function RouteDetailPage() {
             <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('-15')} disabled={bulkUpdatingStops || bulkDeletingStops}>-15m</Button>
             <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('15')} disabled={bulkUpdatingStops || bulkDeletingStops}>+15m</Button>
             <Button type="button" variant="outline" onClick={() => setBulkEtaShiftMinutes('30')} disabled={bulkUpdatingStops || bulkDeletingStops}>+30m</Button>
+            <label htmlFor="bulk-stop-reason-code">Motivo</label>
+            <select
+              id="bulk-stop-reason-code"
+              value={bulkReasonCode}
+              onChange={(event) => setBulkReasonCode(event.target.value as RouteBulkReasonCode)}
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            >
+              {routeBulkReasonOptions.map((item) => (
+                <option key={item.code} value={item.code}>{item.label}</option>
+              ))}
+            </select>
+            <label htmlFor="bulk-stop-reason-detail">Detalle motivo</label>
+            <input
+              id="bulk-stop-reason-detail"
+              value={bulkReasonDetail}
+              onChange={(event) => setBulkReasonDetail(event.target.value)}
+              placeholder="Detalle opcional (obligatorio si motivo=OTHER)"
+              disabled={bulkUpdatingStops || bulkDeletingStops}
+            />
             <Button
               type="button"
               variant="outline"
