@@ -658,6 +658,7 @@ textarea:focus {
   padding: 12px;
   display: grid;
   gap: 10px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
 }
 
 .mobile-ops-card-header {
@@ -677,6 +678,11 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.mobile-ops-card-actions .btn,
+.mobile-ops-card-actions button {
+  width: 100%;
 }
 
 .mobile-ops-empty {
