@@ -963,7 +963,7 @@ export function RouteDetailPage() {
         <div className="page-grid">
           <div className="helper">Se aplicarán cambios a {bulkUpdatePreviewRows.length} parada(s).</div>
           <div className="helper">Motivo estructurado: {bulkReasonCode}{bulkReasonDetail.trim() ? ` (${bulkReasonDetail.trim()})` : ''}</div>
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1481,6 +1481,50 @@ export function RouteDetailPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {stops.map((stop, index) => (
+              <article key={`mobile-stop-${stop.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{stop.reference ?? stop.entity_id}</strong>
+                    <div className="helper">Secuencia {stop.sequence} · {stop.entity_type}</div>
+                  </div>
+                  <Badge variant="secondary">{stop.status}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Tipo</div>
+                    <div>{stop.stop_type}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">ETA</div>
+                    <div>{toLocalDateTime(etaSuggestions[stop.id]) || '-'}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={reorderingStops || index === 0}
+                    onClick={() => moveStopByOffset(stop.id, -1)}
+                  >
+                    Subir
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={reorderingStops || index === stops.length - 1}
+                    onClick={() => moveStopByOffset(stop.id, 1)}
+                  >
+                    Bajar
+                  </Button>
+                  <Button type="button" variant="outline" disabled={reorderingStops} onClick={() => deleteStop(stop.id)}>
+                    Eliminar
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
           <div className="helper">
             Arrastra y suelta una fila para reordenar paradas. {reorderingStops ? 'Guardando orden...' : ''}
           </div>

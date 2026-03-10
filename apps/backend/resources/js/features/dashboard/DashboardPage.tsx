@@ -57,7 +57,7 @@ function alertVariant(severity: 'high' | 'medium' | 'low'): 'destructive' | 'war
 }
 
 type DashboardBulkAuditItem = {
-  key: 'shipments' | 'routes' | 'incidents' | 'partners';
+  key: 'shipments' | 'routes' | 'incidents' | 'partners' | 'settlements' | 'quality';
   label: string;
   href: string;
   row: AuditLogEntry | null;
@@ -75,6 +75,29 @@ function getAuditActor(row: AuditLogEntry | null): string {
   return row.actor_name ?? row.actor_user_id ?? 'sistema';
 }
 
+export function getAuditRangeDates(range: '24h' | '7d' | '30d'): { dateFrom: string; dateTo: string } {
+  const now = new Date();
+  const from = new Date(now);
+  if (range === '24h') {
+    from.setDate(now.getDate() - 1);
+  } else if (range === '7d') {
+    from.setDate(now.getDate() - 7);
+  } else {
+    from.setDate(now.getDate() - 30);
+  }
+
+  return {
+    dateFrom: from.toISOString().slice(0, 10),
+    dateTo: now.toISOString().slice(0, 10),
+  };
+}
+
+function pickLatestAudit(rows: Array<AuditLogEntry | null>): AuditLogEntry | null {
+  return rows
+    .filter((row): row is AuditLogEntry => row !== null)
+    .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0] ?? null;
+}
+
 export function DashboardPage() {
   const [overview, setOverview] = useState<DashboardOverview>(initialOverview);
   const [loading, setLoading] = useState(true);
@@ -87,12 +110,19 @@ export function DashboardPage() {
   const [hubId, setHubId] = useState('');
   const [subcontractorId, setSubcontractorId] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [bulkAuditRange, setBulkAuditRange] = useState<'24h' | '7d' | '30d'>('7d');
   const [bulkAuditSummary, setBulkAuditSummary] = useState<DashboardBulkAuditItem[]>([]);
 
-  const fetchLatestAuditByEvent = useCallback(async (eventPrefix: string): Promise<AuditLogEntry | null> => {
+  const fetchLatestAuditByEvent = useCallback(async (
+    eventPrefix: string,
+    range: '24h' | '7d' | '30d'
+  ): Promise<AuditLogEntry | null> => {
+    const { dateFrom, dateTo } = getAuditRangeDates(range);
     try {
       const response = await apiClient.getAuditLogs({
         event: eventPrefix,
+        dateFrom,
+        dateTo,
         page: 1,
         perPage: 1,
       });
@@ -106,37 +136,54 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [data, shipmentsBulk, routesBulk, incidentsBulk, partnersSubcontractors, partnersDrivers, partnersVehicles] = await Promise.all([
+      const [
+        data,
+        shipmentsBulk,
+        routesBulk,
+        incidentsResolvedBulk,
+        incidentsSlaBulk,
+        partnersSubcontractors,
+        partnersDrivers,
+        partnersVehicles,
+        settlementsBulk,
+        qualityUpdated,
+        qualityAlerts,
+      ] = await Promise.all([
         apiClient.getDashboardOverview({
           period,
           hubId: hubId || undefined,
           subcontractorId: subcontractorId || undefined,
         }),
-        fetchLatestAuditByEvent('shipments.bulk_updated'),
-        fetchLatestAuditByEvent('route.stops.bulk_'),
-        fetchLatestAuditByEvent('incidents.resolved.bulk'),
-        fetchLatestAuditByEvent('subcontractors.bulk_status_updated'),
-        fetchLatestAuditByEvent('drivers.bulk_status_updated'),
-        fetchLatestAuditByEvent('vehicles.bulk_status_updated'),
+        fetchLatestAuditByEvent('shipments.bulk_updated', bulkAuditRange),
+        fetchLatestAuditByEvent('route.stops.bulk_', bulkAuditRange),
+        fetchLatestAuditByEvent('incidents.resolved.bulk', bulkAuditRange),
+        fetchLatestAuditByEvent('incidents.sla_overridden.bulk', bulkAuditRange),
+        fetchLatestAuditByEvent('subcontractors.bulk_status_updated', bulkAuditRange),
+        fetchLatestAuditByEvent('drivers.bulk_status_updated', bulkAuditRange),
+        fetchLatestAuditByEvent('vehicles.bulk_status_updated', bulkAuditRange),
+        fetchLatestAuditByEvent('settlement.', bulkAuditRange),
+        fetchLatestAuditByEvent('quality.threshold.updated', bulkAuditRange),
+        fetchLatestAuditByEvent('quality.threshold.alert_settings.updated', bulkAuditRange),
       ]);
       setOverview(data);
-
-      const partnerRows = [partnersSubcontractors, partnersDrivers, partnersVehicles]
-        .filter((row): row is AuditLogEntry => row !== null)
-        .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime());
+      const partnerLatest = pickLatestAudit([partnersSubcontractors, partnersDrivers, partnersVehicles]);
+      const incidentsLatest = pickLatestAudit([incidentsResolvedBulk, incidentsSlaBulk]);
+      const qualityLatest = pickLatestAudit([qualityUpdated, qualityAlerts]);
 
       setBulkAuditSummary([
         { key: 'shipments', label: 'Envíos', href: '/shipments', row: shipmentsBulk },
         { key: 'routes', label: 'Rutas', href: '/routes', row: routesBulk },
-        { key: 'incidents', label: 'Incidencias', href: '/incidents', row: incidentsBulk },
-        { key: 'partners', label: 'Partners', href: '/partners', row: partnerRows[0] ?? null },
+        { key: 'incidents', label: 'Incidencias', href: '/incidents', row: incidentsLatest },
+        { key: 'partners', label: 'Partners', href: '/partners', row: partnerLatest },
+        { key: 'settlements', label: 'Liquidaciones', href: '/settlements', row: settlementsBulk },
+        { key: 'quality', label: 'Calidad', href: '/quality', row: qualityLatest },
       ]);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : 'No se pudo cargar el dashboard');
     } finally {
       setLoading(false);
     }
-  }, [period, hubId, subcontractorId, fetchLatestAuditByEvent]);
+  }, [period, hubId, subcontractorId, fetchLatestAuditByEvent, bulkAuditRange]);
 
   useEffect(() => {
     load();
@@ -354,6 +401,18 @@ export function DashboardPage() {
           <CardDescription>Trazabilidad rápida desde auditoría operativa.</CardDescription>
         </CardHeader>
         <CardContent className="dashboard-bulk-audit-grid">
+          <div className="dashboard-bulk-audit-toolbar">
+            <span className="helper">Ventana</span>
+            <Button type="button" variant={bulkAuditRange === '24h' ? 'secondary' : 'outline'} onClick={() => setBulkAuditRange('24h')}>
+              24h
+            </Button>
+            <Button type="button" variant={bulkAuditRange === '7d' ? 'secondary' : 'outline'} onClick={() => setBulkAuditRange('7d')}>
+              7d
+            </Button>
+            <Button type="button" variant={bulkAuditRange === '30d' ? 'secondary' : 'outline'} onClick={() => setBulkAuditRange('30d')}>
+              30d
+            </Button>
+          </div>
           {bulkAuditSummary.map((item) => (
             <Link key={item.key} to={item.href} className="kpi-item dashboard-bulk-audit-item">
               <div className="kpi-label">{item.label}</div>
