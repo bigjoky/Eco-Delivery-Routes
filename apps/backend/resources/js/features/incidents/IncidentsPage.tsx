@@ -1012,7 +1012,7 @@ export function IncidentsPage() {
               </div>
             </div>
           ) : null}
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1098,6 +1098,56 @@ export function IncidentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {displayedItems.map((item) => (
+              <article key={`mobile-incident-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{item.catalog_code}</strong>
+                    <div className="helper">{item.id}</div>
+                  </div>
+                  <Badge variant={categoryVariant(item.category)}>{item.category}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Referencia</div>
+                    <div>{item.shipment_reference ?? item.incidentable_id}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">SLA</div>
+                    <div>{item.sla_status ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Prioridad</div>
+                    <div>{item.priority ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Estado</div>
+                    <div>{item.resolved_at ? 'resuelta' : 'abierta'}</div>
+                  </div>
+                </div>
+                <div className="helper">{formatSlaTimeline(item)}</div>
+                <div className="mobile-ops-card-actions">
+                  {!item.resolved_at ? (
+                    <Button type="button" onClick={() => onResolve(item)} disabled={resolvingId === item.id}>
+                      {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>
+                    Ajustar SLA
+                  </Button>
+                  {item.incidentable_type === 'shipment' ? (
+                    <Link to={`/shipments/${item.incidentable_id}`} className="btn btn-outline">
+                      Ver envío
+                    </Link>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            {displayedItems.length === 0 ? (
+              <div className="mobile-ops-empty">Sin incidencias para los filtros seleccionados.</div>
+            ) : null}
+          </div>
           <div className="inline-actions">
             <Button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
               Anterior

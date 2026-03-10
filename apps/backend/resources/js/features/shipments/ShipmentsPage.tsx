@@ -3119,7 +3119,7 @@ export function ShipmentsPage() {
           {bulkError ? <div className="helper error">{bulkError}</div> : null}
           {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}
           {actionError ? <div className="helper error">{actionError}</div> : null}
-          <TableWrapper>
+          <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -3224,6 +3224,59 @@ export function ShipmentsPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {items.map((item) => (
+              <article key={`mobile-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
+                    <div className="helper">ID: {item.id}</div>
+                  </div>
+                  <Badge variant={shipmentVariant(item.status)} title={shipmentStatusHelp(item.status)}>
+                    {item.status}
+                  </Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Servicio</div>
+                    <div>{serviceTypeLabel(item.service_type)}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Hub</div>
+                    <div>{item.hub_code ?? item.hub_id ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Destinatario</div>
+                    <div>{item.consignee_name ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Programado</div>
+                    <div>{item.scheduled_at ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="helper">{item.address_line ?? '-'}</div>
+                <div className="mobile-ops-card-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => markDelivered(item)}
+                    disabled={item.status === 'delivered' || actionLoadingId === item.id}
+                  >
+                    {actionLoadingId === item.id ? 'Marcando...' : 'Entregado'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
+                    Incidencia
+                  </Button>
+                  <Link to={`/shipments/${item.id}`} className="btn btn-outline">
+                    Ver
+                  </Link>
+                </div>
+              </article>
+            ))}
+            {items.length === 0 ? (
+              <div className="mobile-ops-empty">Sin envíos para los filtros seleccionados.</div>
+            ) : null}
+          </div>
           <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
