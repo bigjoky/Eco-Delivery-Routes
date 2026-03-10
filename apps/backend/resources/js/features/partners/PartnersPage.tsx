@@ -11,6 +11,7 @@ import { AuditLogEntry, DriverSummary, SubcontractorSummary, VehicleSummary } fr
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
+import { PartnerBulkReasonCode, validatePartnerBulkStatusAction } from './bulkStatusValidation';
 
 type CreatePartnerType = '' | 'subcontractor' | 'driver' | 'vehicle';
 
@@ -72,7 +73,7 @@ export function PartnersPage() {
   const [selectedSubcontractorIds, setSelectedSubcontractorIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
-  const [bulkReasonCode, setBulkReasonCode] = useState<'REBALANCE' | 'COMPLIANCE' | 'PERFORMANCE' | 'OTHER'>('REBALANCE');
+  const [bulkReasonCode, setBulkReasonCode] = useState<PartnerBulkReasonCode>('REBALANCE');
   const [bulkReasonDetail, setBulkReasonDetail] = useState('');
   const [bulkReasonNote, setBulkReasonNote] = useState('');
   const formatDateTime = (value?: string | null) => {
@@ -494,14 +495,17 @@ export function PartnersPage() {
   };
 
   const bulkUpdateSubcontractors = async (status: 'active' | 'inactive' | 'suspended') => {
-    if (!selectedSubcontractorIds.length) {
-      setError('Selecciona al menos una subcontrata.');
-      return;
-    }
     setMessage('');
     setError('');
-    if (!bulkReasonNote.trim()) {
-      setError('Define una nota de motivo para la acción masiva.');
+    const validationError = validatePartnerBulkStatusAction({
+      selectedCount: selectedSubcontractorIds.length,
+      entityLabel: 'subcontrata',
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReasonNote,
+    });
+    if (validationError) {
+      setError(validationError);
       return;
     }
     try {
@@ -519,14 +523,17 @@ export function PartnersPage() {
   };
 
   const bulkUpdateDrivers = async (status: 'active' | 'inactive' | 'suspended') => {
-    if (!selectedDriverIds.length) {
-      setError('Selecciona al menos un conductor.');
-      return;
-    }
     setMessage('');
     setError('');
-    if (!bulkReasonNote.trim()) {
-      setError('Define una nota de motivo para la acción masiva.');
+    const validationError = validatePartnerBulkStatusAction({
+      selectedCount: selectedDriverIds.length,
+      entityLabel: 'conductor',
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReasonNote,
+    });
+    if (validationError) {
+      setError(validationError);
       return;
     }
     try {
@@ -544,14 +551,17 @@ export function PartnersPage() {
   };
 
   const bulkUpdateVehicles = async (status: 'active' | 'inactive' | 'maintenance') => {
-    if (!selectedVehicleIds.length) {
-      setError('Selecciona al menos un vehículo.');
-      return;
-    }
     setMessage('');
     setError('');
-    if (!bulkReasonNote.trim()) {
-      setError('Define una nota de motivo para la acción masiva.');
+    const validationError = validatePartnerBulkStatusAction({
+      selectedCount: selectedVehicleIds.length,
+      entityLabel: 'vehículo',
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReasonNote,
+    });
+    if (validationError) {
+      setError(validationError);
       return;
     }
     try {
@@ -731,7 +741,7 @@ export function PartnersPage() {
           <div className="filters-panel">
             <div className="helper">Motivo estructurado para acciones masivas (auditado)</div>
             <div className="inline-actions">
-              <Select value={bulkReasonCode} onChange={(e) => setBulkReasonCode(e.target.value as 'REBALANCE' | 'COMPLIANCE' | 'PERFORMANCE' | 'OTHER')}>
+              <Select value={bulkReasonCode} onChange={(e) => setBulkReasonCode(e.target.value as PartnerBulkReasonCode)}>
                 <option value="REBALANCE">Rebalanceo operativo</option>
                 <option value="COMPLIANCE">Cumplimiento documental</option>
                 <option value="PERFORMANCE">Rendimiento</option>
