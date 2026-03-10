@@ -21,6 +21,7 @@ import {
   isValidPostalCode,
 } from './shipmentFormValidation';
 import { buildAddressSuggestions } from './addressAutocomplete';
+import { shipmentBulkReasonOptions, ShipmentBulkReasonCode, validateShipmentBulkUpdate } from './shipmentsBulkValidation';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
   if (status === 'delivered') return 'success';
@@ -52,14 +53,6 @@ function serviceTypeLabel(value?: string | null) {
   };
   return labels[value] ?? value;
 }
-
-const bulkShipmentReasonOptions = [
-  { code: 'REPLAN_OPERATION', label: 'Replanificación operativa' },
-  { code: 'CAPACITY_REBALANCE', label: 'Rebalanceo de capacidad' },
-  { code: 'INCIDENT_CONTAINMENT', label: 'Contención de incidencias' },
-  { code: 'ROUTE_OPTIMIZATION', label: 'Optimización de rutas' },
-  { code: 'OTHER', label: 'Otro motivo' },
-] as const;
 
 type ShipmentFiltersProps = {
   query: string;
@@ -421,7 +414,7 @@ export function ShipmentsPage() {
   const [bulkScheduledAt, setBulkScheduledAt] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
-  const [bulkReasonCode, setBulkReasonCode] = useState<(typeof bulkShipmentReasonOptions)[number]['code']>('REPLAN_OPERATION');
+  const [bulkReasonCode, setBulkReasonCode] = useState<ShipmentBulkReasonCode>('REPLAN_OPERATION');
   const [bulkReasonDetail, setBulkReasonDetail] = useState('');
   const [bulkApplyToFiltered, setBulkApplyToFiltered] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
@@ -1604,16 +1597,16 @@ export function ShipmentsPage() {
   const runBulkUpdate = async () => {
     setBulkError('');
     setBulkMessage('');
-    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
-      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
-      return;
-    }
-    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
-      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
-      return;
-    }
-    if (!bulkReason.trim()) {
-      setBulkError('Indica un motivo para auditoria.');
+    const validationError = validateShipmentBulkUpdate({
+      applyToFiltered: bulkApplyToFiltered,
+      selectedCount: selectedShipmentIds.length,
+      hasAnyChange: Boolean(bulkStatus || bulkHubId || bulkScheduledAt),
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReason,
+    });
+    if (validationError) {
+      setBulkError(validationError);
       return;
     }
     setBulkUpdating(true);
@@ -1650,16 +1643,16 @@ export function ShipmentsPage() {
 
   const applyBulkUpdate = async () => {
     setBulkError('');
-    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
-      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
-      return;
-    }
-    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
-      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
-      return;
-    }
-    if (!bulkReason.trim()) {
-      setBulkError('Indica un motivo para auditoria.');
+    const validationError = validateShipmentBulkUpdate({
+      applyToFiltered: bulkApplyToFiltered,
+      selectedCount: selectedShipmentIds.length,
+      hasAnyChange: Boolean(bulkStatus || bulkHubId || bulkScheduledAt),
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReason,
+    });
+    if (validationError) {
+      setBulkError(validationError);
       return;
     }
     const ok = await previewBulkUpdate();
@@ -1671,12 +1664,16 @@ export function ShipmentsPage() {
   const previewBulkUpdate = async (): Promise<boolean> => {
     setBulkError('');
     setBulkMessage('');
-    if (!bulkApplyToFiltered && selectedShipmentIds.length === 0) {
-      setBulkError('Selecciona al menos un envio o marca aplicar a filtrados.');
-      return false;
-    }
-    if (!bulkStatus && !bulkHubId && !bulkScheduledAt) {
-      setBulkError('Selecciona al menos un cambio masivo (estado, hub o fecha).');
+    const validationError = validateShipmentBulkUpdate({
+      applyToFiltered: bulkApplyToFiltered,
+      selectedCount: selectedShipmentIds.length,
+      hasAnyChange: Boolean(bulkStatus || bulkHubId || bulkScheduledAt),
+      reasonCode: bulkReasonCode,
+      reasonDetail: bulkReasonDetail,
+      reasonNote: bulkReason,
+    });
+    if (validationError) {
+      setBulkError(validationError);
       return false;
     }
     setBulkPreviewing(true);
@@ -3081,8 +3078,8 @@ export function ShipmentsPage() {
               placeholder="Ej: Replanificacion operativa"
             />
             <label htmlFor="bulk-reason-code">Reason code</label>
-            <select id="bulk-reason-code" value={bulkReasonCode} onChange={(event) => setBulkReasonCode(event.target.value as (typeof bulkShipmentReasonOptions)[number]['code'])}>
-              {bulkShipmentReasonOptions.map((item) => (
+            <select id="bulk-reason-code" value={bulkReasonCode} onChange={(event) => setBulkReasonCode(event.target.value as ShipmentBulkReasonCode)}>
+              {shipmentBulkReasonOptions.map((item) => (
                 <option key={item.code} value={item.code}>{item.label}</option>
               ))}
             </select>

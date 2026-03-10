@@ -928,6 +928,16 @@ textarea:focus {
   min-height: 70px;
 }
 
+.dashboard-bulk-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-bulk-audit-item {
+  min-height: 88px;
+}
+
 .trend-bar {
   width: 10px;
   border-radius: 4px 4px 2px 2px;
@@ -1091,6 +1101,10 @@ textarea:focus {
     overflow-x: auto;
   }
 
+  .dashboard-bulk-audit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .sidebar-user-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1124,6 +1138,10 @@ textarea:focus {
 
   .kpi-grid,
   .dashboard-alert-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-bulk-audit-grid {
     grid-template-columns: 1fr;
   }
 
