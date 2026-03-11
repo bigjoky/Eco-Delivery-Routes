@@ -9,7 +9,6 @@ import { apiClient } from '../services/apiClient';
 
 const AuditOpsPage = lazy(() => import('../features/audit/AuditOpsPage').then((module) => ({ default: module.AuditOpsPage })));
 const AdvancesPage = lazy(() => import('../features/advances/AdvancesPage').then((module) => ({ default: module.AdvancesPage })));
-const LoginPage = lazy(() => import('../features/auth/LoginPage').then((module) => ({ default: module.LoginPage })));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })));
 const FleetControlsPage = lazy(() => import('../features/fleet/FleetControlsPage').then((module) => ({ default: module.FleetControlsPage })));
 const IncidentsPage = lazy(() => import('../features/incidents/IncidentsPage').then((module) => ({ default: module.IncidentsPage })));
@@ -46,6 +45,14 @@ function authLoadingView() {
   return <div className="status">Recuperando sesión...</div>;
 }
 
+function ExternalRedirect({ href }: { href: string }) {
+  useEffect(() => {
+    window.location.replace(href);
+  }, [href]);
+
+  return <div className="status">Redirigiendo...</div>;
+}
+
 export function App({
   initialSessionUser = null,
 }: {
@@ -63,8 +70,8 @@ export function App({
 
     const resolveAuth = async () => {
       try {
-        if (sessionStore.getToken()) {
-          const profile = await apiClient.getCurrentUser();
+        if (initialSessionUser) {
+          const profile = await apiClient.bootstrapWebSession();
           if (cancelled) return;
           setCurrentUser({ name: profile.name, email: profile.email });
           setRoles(profile.roles.map((role) => role.code));
@@ -72,8 +79,8 @@ export function App({
           return;
         }
 
-        if (initialSessionUser) {
-          const profile = await apiClient.bootstrapWebSession();
+        if (sessionStore.getToken()) {
+          const profile = await apiClient.getCurrentUser();
           if (cancelled) return;
           setCurrentUser({ name: profile.name, email: profile.email });
           setRoles(profile.roles.map((role) => role.code));
@@ -140,7 +147,7 @@ export function App({
       return authLoadingView();
     }
     if (!isAuthenticated) {
-      return <Navigate to="/login" replace />;
+      return <ExternalRedirect href="/login" />;
     }
     if (feature && !canAccess(feature, roles)) {
       return <Navigate to="/dashboard" replace />;
@@ -151,8 +158,7 @@ export function App({
   return (
     <AppShell isAuthenticated={isAuthenticated} roles={roles} currentUser={currentUser} onLogout={handleLogout}>
       <Routes>
-        <Route path="/" element={authResolved ? <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace /> : authLoadingView()} />
-        <Route path="/login" element={!authResolved ? authLoadingView() : (isAuthenticated ? <Navigate to="/dashboard" replace /> : withModuleLoader(<LoginPage />))} />
+        <Route path="/" element={authResolved ? (isAuthenticated ? <Navigate to="/dashboard" replace /> : <ExternalRedirect href="/login" />) : authLoadingView()} />
         <Route path="/dashboard" element={protectedRoute(null, <DashboardPage />)} />
         <Route
           path="/shipments"
@@ -242,7 +248,7 @@ export function App({
           path="/audit"
           element={protectedRoute('audit', <AuditOpsPage />)}
         />
-        <Route path="*" element={authResolved ? <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace /> : authLoadingView()} />
+        <Route path="*" element={authResolved ? (isAuthenticated ? <Navigate to="/dashboard" replace /> : <ExternalRedirect href="/login" />) : authLoadingView()} />
       </Routes>
     </AppShell>
   );

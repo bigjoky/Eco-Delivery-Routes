@@ -112,6 +112,7 @@ export function IncidentsPage() {
   const initializedFromParams = useRef(false);
   const incidentsFilterStorageKey = 'eco_delivery_routes_incidents_filters';
   const [showFilters, setShowFilters] = useState(false);
+  const [showBulkResolvePanel, setShowBulkResolvePanel] = useState(false);
   const [showBulkSlaPanel, setShowBulkSlaPanel] = useState(false);
   const [slaQueueMode, setSlaQueueMode] = useState(false);
   const [activityIncidentId, setActivityIncidentId] = useState('');
@@ -1009,69 +1010,97 @@ export function IncidentsPage() {
             </div>
           ) : null}
           <div className="inline-actions ops-toolbar">
-            <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
-              Modo selección
-            </Button>
-            <Button type="button" variant={bulkScope === 'filtered' ? 'secondary' : 'outline'} onClick={() => setBulkScope('filtered')}>
-              Modo filtro completo
-            </Button>
-            <Button type="button" variant="outline" onClick={selectOpenInPage}>
-              Seleccionar abiertas (página)
-            </Button>
-            <Button type="button" variant="outline" onClick={selectBreachedInPage}>
-              Seleccionar SLA vencido
-            </Button>
-            <Button type="button" variant="outline" onClick={selectHighPriorityInPage}>
-              Seleccionar alta prioridad
-            </Button>
-            <Button type="button" variant="outline" onClick={clearIncidentSelection}>
-              Limpiar selección
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('breached_fix')}>
-              Flujo SLA vencido
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('high_customer')}>
-              Flujo alta prioridad
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('open_replan')}>
-              Flujo abiertas página
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('filtered_replan')}>
-              Flujo filtro completo
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('data_fix')}>
-              Preset corrección
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('customer_request')}>
-              Preset cliente
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('operational_replan')}>
-              Preset replanificación
-            </Button>
-            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('clear')}>
-              Limpiar preset
-            </Button>
-            <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as IncidentBulkReasonCode)}>
-              {bulkResolveReasonOptions.map((item) => (
-                <option key={item.code} value={item.code}>{item.label}</option>
-              ))}
-            </Select>
-            <Input
-              value={bulkResolveReasonDetail}
-              onChange={(event) => setBulkResolveReasonDetail(event.target.value)}
-              placeholder="Detalle del motivo (opcional)"
-            />
-            <Input
-              value={bulkResolveNotes}
-              onChange={(event) => setBulkResolveNotes(event.target.value)}
-              placeholder="Nota de resolucion masiva"
-            />
-            <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || (bulkScope === 'selected' && selectedIncidentIds.length === 0)}>
-              {bulkResolving ? 'Resolviendo...' : bulkScope === 'filtered'
-                ? 'Resolver abiertas del filtro'
-                : `Resolver seleccionadas (${selectedIncidentIds.length})`}
+            <Button
+              type="button"
+              variant={showBulkResolvePanel ? 'secondary' : 'outline'}
+              onClick={() => setShowBulkResolvePanel((value) => !value)}
+            >
+              {showBulkResolvePanel ? 'Ocultar cierre masivo' : 'Mostrar cierre masivo'}
             </Button>
           </div>
+          {showBulkResolvePanel ? (
+            <div className="filters-panel">
+              <div className="inline-actions ops-toolbar">
+                <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
+                  Modo selección
+                </Button>
+                <Button type="button" variant={bulkScope === 'filtered' ? 'secondary' : 'outline'} onClick={() => setBulkScope('filtered')}>
+                  Modo filtro completo
+                </Button>
+                <Button type="button" variant="outline" onClick={selectOpenInPage}>
+                  Seleccionar abiertas
+                </Button>
+                <Button type="button" variant="outline" onClick={selectBreachedInPage}>
+                  SLA vencido
+                </Button>
+                <Button type="button" variant="outline" onClick={selectHighPriorityInPage}>
+                  Alta prioridad
+                </Button>
+                <Button type="button" variant="outline" onClick={clearIncidentSelection}>
+                  Limpiar
+                </Button>
+              </div>
+              <div className="inline-actions ops-toolbar">
+                <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('breached_fix')}>
+                  Flujo SLA vencido
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('high_customer')}>
+                  Flujo alta prioridad
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('open_replan')}>
+                  Flujo abiertas página
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('filtered_replan')}>
+                  Flujo filtro completo
+                </Button>
+              </div>
+              <div className="form-row">
+                <div>
+                  <label>Motivo estructurado</label>
+                  <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as IncidentBulkReasonCode)}>
+                    {bulkResolveReasonOptions.map((item) => (
+                      <option key={item.code} value={item.code}>{item.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <label>Detalle del motivo</label>
+                  <Input
+                    value={bulkResolveReasonDetail}
+                    onChange={(event) => setBulkResolveReasonDetail(event.target.value)}
+                    placeholder="Detalle opcional"
+                  />
+                </div>
+                <div>
+                  <label>Nota de cierre</label>
+                  <Input
+                    value={bulkResolveNotes}
+                    onChange={(event) => setBulkResolveNotes(event.target.value)}
+                    placeholder="Nota de resolucion masiva"
+                  />
+                </div>
+              </div>
+              <div className="inline-actions ops-toolbar">
+                <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('data_fix')}>
+                  Preset corrección
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('customer_request')}>
+                  Preset cliente
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('operational_replan')}>
+                  Preset replanificación
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('clear')}>
+                  Limpiar preset
+                </Button>
+                <Button type="button" onClick={onResolveSelected} disabled={bulkResolving || (bulkScope === 'selected' && selectedIncidentIds.length === 0)}>
+                  {bulkResolving ? 'Resolviendo...' : bulkScope === 'filtered'
+                    ? 'Resolver abiertas del filtro'
+                    : `Resolver seleccionadas (${selectedIncidentIds.length})`}
+                </Button>
+              </div>
+            </div>
+          ) : null}
           <div className="helper">
             Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
           </div>

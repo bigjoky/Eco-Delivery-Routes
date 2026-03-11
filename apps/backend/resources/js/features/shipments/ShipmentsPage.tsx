@@ -277,6 +277,7 @@ export function ShipmentsPage() {
   const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
   const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
+  const [showAdvancedCreateOptions, setShowAdvancedCreateOptions] = useState(false);
   const [operatorMode, setOperatorMode] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
@@ -2472,6 +2473,16 @@ export function ShipmentsPage() {
           {!wizardMode || wizardStep === 1 ? (
           <div className="modal-section">
             <div className="modal-section-title">Planificación operativa</div>
+          <div className="inline-actions ops-toolbar">
+            <span className="helper">Vista rápida</span>
+            <Button
+              type="button"
+              variant={showAdvancedCreateOptions ? 'secondary' : 'outline'}
+              onClick={() => setShowAdvancedCreateOptions((value) => !value)}
+            >
+              {showAdvancedCreateOptions ? 'Ocultar opciones avanzadas' : 'Mostrar opciones avanzadas'}
+            </Button>
+          </div>
           <div className="form-row">
             <div>
               <label htmlFor="create-shipment-hub">Hub</label>
@@ -2486,53 +2497,25 @@ export function ShipmentsPage() {
               {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>
-              <label htmlFor="create-shipment-point">Punto operativo (opcional)</label>
+              <label htmlFor="create-shipment-service">{createOperation === 'shipment' ? 'Tipo de envio' : 'Modalidad operativa'}</label>
               <select
-                id="create-shipment-point"
-                value={createPointId}
-                onChange={(event) => setCreatePointId(event.target.value)}
-                disabled={!createHubId}
+                id="create-shipment-service"
+                value={createServiceType}
+                onChange={(event) => setCreateServiceType(event.target.value as typeof createServiceType)}
               >
-                <option value="">Sin punto</option>
-                {hubPoints.map((point) => {
-                  const depotCode = point.depot_id ? (hubDepots.find((item) => item.id === point.depot_id)?.code ?? point.depot_id) : null;
-                  return (
-                    <option key={point.id} value={point.id}>
-                      {point.code} - {point.name}{depotCode ? ` (${depotCode})` : ''}
-                    </option>
-                  );
-                })}
+                <option value="express_1030">Express 10:30</option>
+                <option value="express_1400">Express 14:00</option>
+                <option value="express_1900">Express 19:00</option>
+                <option value="economy_parcel">Economy Parcel</option>
+                <option value="business_parcel">Business Parcel</option>
+                <option value="thermo_parcel">Thermo Parcel</option>
               </select>
-              {createHubId && hubPoints.length === 0 ? <div className="helper">Sin puntos operativos para el hub seleccionado.</div> : null}
-              {createFieldErrors.point ? <div className="helper error">{createFieldErrors.point}</div> : null}
-            </div>
-            <div>
-              <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
-              <input
-                id="create-shipment-external-ref"
-                value={createExternalReference}
-                onChange={(event) => setCreateExternalReference(event.target.value)}
-                placeholder="Ej: REF-ACME-2026-0001"
-              />
-              {createFieldErrors.externalReference ? <div className="helper error">{createFieldErrors.externalReference}</div> : null}
-            </div>
-            {createOperation === 'shipment' ? (
-              <div>
-                <label htmlFor="create-shipment-service">Tipo de envio</label>
-                <select
-                  id="create-shipment-service"
-                  value={createServiceType}
-                  onChange={(event) => setCreateServiceType(event.target.value as typeof createServiceType)}
-                >
-                  <option value="express_1030">Express 10:30</option>
-                  <option value="express_1400">Express 14:00</option>
-                  <option value="express_1900">Express 19:00</option>
-                  <option value="economy_parcel">Economy Parcel</option>
-                  <option value="business_parcel">Business Parcel</option>
-                  <option value="thermo_parcel">Thermo Parcel</option>
-                </select>
+              <div className="helper">
+                {createOperation === 'shipment'
+                  ? 'Servicio comercial y ventana de entrega.'
+                  : 'Prioridad operativa prevista para la recogida.'}
               </div>
-            ) : null}
+            </div>
             <div>
               <label htmlFor="create-shipment-scheduled">Fecha programada</label>
               <input
@@ -2564,6 +2547,41 @@ export function ShipmentsPage() {
               ) : null}
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
+            {showAdvancedCreateOptions ? (
+              <>
+                <div>
+                  <label htmlFor="create-shipment-point">Punto operativo (opcional)</label>
+                  <select
+                    id="create-shipment-point"
+                    value={createPointId}
+                    onChange={(event) => setCreatePointId(event.target.value)}
+                    disabled={!createHubId}
+                  >
+                    <option value="">Sin punto</option>
+                    {hubPoints.map((point) => {
+                      const depotCode = point.depot_id ? (hubDepots.find((item) => item.id === point.depot_id)?.code ?? point.depot_id) : null;
+                      return (
+                        <option key={point.id} value={point.id}>
+                          {point.code} - {point.name}{depotCode ? ` (${depotCode})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {createHubId && hubPoints.length === 0 ? <div className="helper">Sin puntos operativos para el hub seleccionado.</div> : null}
+                  {createFieldErrors.point ? <div className="helper error">{createFieldErrors.point}</div> : null}
+                </div>
+                <div>
+                  <label htmlFor="create-shipment-external-ref">Referencia cliente</label>
+                  <input
+                    id="create-shipment-external-ref"
+                    value={createExternalReference}
+                    onChange={(event) => setCreateExternalReference(event.target.value)}
+                    placeholder="Ej: REF-ACME-2026-0001"
+                  />
+                  {createFieldErrors.externalReference ? <div className="helper error">{createFieldErrors.externalReference}</div> : null}
+                </div>
+              </>
+            ) : null}
           </div>
           </div>
           ) : null}

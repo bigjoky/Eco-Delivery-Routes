@@ -1063,13 +1063,33 @@ export function RoutesPage() {
                   <Button type="button" variant="outline" onClick={() => toggleRouteSelection(item.id)}>
                     {selectedRouteIds.includes(item.id) ? 'Quitar' : 'Seleccionar'}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void quickUpdateRouteStatus(item.id, item.status === 'planned' ? 'in_progress' : 'completed')}
-                  >
-                    {item.status === 'planned' ? 'Iniciar' : 'Completar'}
-                  </Button>
+                  {item.status !== 'planned' ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void quickUpdateRouteStatus(item.id, 'planned')}
+                    >
+                      Planned
+                    </Button>
+                  ) : null}
+                  {item.status !== 'in_progress' ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void quickUpdateRouteStatus(item.id, 'in_progress')}
+                    >
+                      En ruta
+                    </Button>
+                  ) : null}
+                  {item.status !== 'completed' ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void quickUpdateRouteStatus(item.id, 'completed')}
+                    >
+                      Completa
+                    </Button>
+                  ) : null}
                   <Link to={`/routes/${item.id}`} className="btn btn-outline">Abrir</Link>
                 </div>
               </article>

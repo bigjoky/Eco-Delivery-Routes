@@ -47,7 +47,7 @@ Route::post('/ops/bootstrap-token', function (Request $request) {
             'roles' => $user->roles()->get(['id', 'code', 'name']),
         ],
     ]);
-})->middleware('web')->name('ops.bootstrap-token');
+})->middleware(['web', 'auth'])->name('ops.bootstrap-token');
 
 Route::middleware('api.docs.access')->group(function () {
     Route::get('/openapi.json', function () {
@@ -83,6 +83,6 @@ Route::middleware('api.docs.access')->group(function () {
 
 Route::get('/ops/{any?}', function () {
     return Inertia::render('AppShellPage');
-})->where('any', '.*');
+})->middleware('auth')->where('any', '.*');
 
 require __DIR__.'/auth.php';
