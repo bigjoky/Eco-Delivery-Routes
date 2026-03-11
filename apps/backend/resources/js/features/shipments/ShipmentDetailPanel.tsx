@@ -5,6 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import type { ShipmentDetail } from '../../core/api/types';
 
+const shipmentDetailSectionIds = {
+  summary: 'shipment-detail-summary',
+  tracking: 'shipment-detail-tracking',
+  pod: 'shipment-detail-pod',
+  incidents: 'shipment-detail-incidents',
+  stops: 'shipment-detail-stops',
+} as const;
+
+function scrollToShipmentDetailSection(sectionId: string) {
+  if (typeof document === 'undefined') return;
+  document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
   if (status === 'delivered') return 'success';
   if (status === 'out_for_delivery') return 'secondary';
@@ -75,19 +88,33 @@ export function ShipmentDetailPanel({
       </div>
 
       <div className="inline-actions ops-toolbar">
+        <Button type="button" variant="outline" onClick={() => scrollToShipmentDetailSection(shipmentDetailSectionIds.summary)}>
+          Ficha
+        </Button>
+        <Button type="button" variant="outline" onClick={() => scrollToShipmentDetailSection(shipmentDetailSectionIds.tracking)}>
+          Tracking
+        </Button>
+        <Button type="button" variant="outline" onClick={() => scrollToShipmentDetailSection(shipmentDetailSectionIds.pod)}>
+          POD
+        </Button>
+        <Button type="button" variant="outline" onClick={() => scrollToShipmentDetailSection(shipmentDetailSectionIds.incidents)}>
+          Incidencias
+        </Button>
+        <Button type="button" variant="outline" onClick={() => scrollToShipmentDetailSection(shipmentDetailSectionIds.stops)}>
+          Paradas
+        </Button>
         {shipment?.route_id ? <Link to={`/routes/${shipment.route_id}`} className="btn btn-outline">Ir a ruta</Link> : null}
         {shipment ? <Link to={`/shipments/${shipment.id}`} className="btn btn-outline">Abrir página completa</Link> : null}
-        {shipment ? <Link to={`/incidents?incidentable_id=${encodeURIComponent(shipment.id)}`} className="btn btn-outline">Ir a incidencias</Link> : null}
         {onOpenIncidents ? (
           <Button type="button" variant="outline" onClick={onOpenIncidents}>
-            Filtrar incidencias aquí
+            Incidencias relacionadas
           </Button>
         ) : null}
         {loading ? <span className="helper">Cargando detalle...</span> : null}
         {error ? <span className="helper error">{error}</span> : null}
       </div>
 
-      <Card>
+      <Card id={shipmentDetailSectionIds.summary}>
         <CardHeader>
           <CardTitle className="page-title">Ficha del envío</CardTitle>
         </CardHeader>
@@ -197,7 +224,7 @@ export function ShipmentDetailPanel({
       </div>
 
       <div className="page-grid two">
-        <Card>
+        <Card id={shipmentDetailSectionIds.tracking}>
           <CardHeader>
             <CardTitle className="page-title">Tracking</CardTitle>
           </CardHeader>
@@ -232,7 +259,7 @@ export function ShipmentDetailPanel({
             </TableWrapper>
           </CardContent>
         </Card>
-        <Card>
+        <Card id={shipmentDetailSectionIds.pod}>
           <CardHeader>
             <CardTitle className="page-title">POD</CardTitle>
           </CardHeader>
@@ -266,7 +293,7 @@ export function ShipmentDetailPanel({
       </div>
 
       <div className="page-grid two">
-        <Card>
+        <Card id={shipmentDetailSectionIds.incidents}>
           <CardHeader>
             <CardTitle className="page-title">Incidencias</CardTitle>
           </CardHeader>
@@ -299,7 +326,7 @@ export function ShipmentDetailPanel({
             </TableWrapper>
           </CardContent>
         </Card>
-        <Card>
+        <Card id={shipmentDetailSectionIds.stops}>
           <CardHeader>
             <CardTitle className="page-title">Paradas</CardTitle>
           </CardHeader>

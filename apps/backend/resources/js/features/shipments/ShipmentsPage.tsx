@@ -3253,19 +3253,26 @@ export function ShipmentsPage() {
           detail={shipmentDetailData}
           loading={shipmentDetailLoading}
           error={shipmentDetailError}
+          onOpenIncidents={() => {
+            if (typeof document === 'undefined') return;
+            document.getElementById('shipment-detail-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
         />
         {shipmentDetailId ? (
           <div className="inline-actions ops-toolbar">
             <Link to={`/shipments/${shipmentDetailId}`} className="btn btn-outline" onClick={() => setShipmentDetailOpen(false)}>
               Abrir página completa
             </Link>
-            <Link
-              to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(shipmentDetailId)}&resolved=open`}
-              className="btn btn-outline"
-              onClick={() => setShipmentDetailOpen(false)}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (typeof document === 'undefined') return;
+                document.getElementById('shipment-detail-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
             >
               Ver incidencias relacionadas
-            </Link>
+            </Button>
           </div>
         ) : null}
       </Modal>
