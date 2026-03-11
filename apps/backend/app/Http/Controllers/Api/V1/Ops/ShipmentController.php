@@ -139,9 +139,20 @@ class ShipmentController extends Controller
             $recipientContact = DB::table('contacts')->where('id', $shipment->recipient_contact_id)->first();
         }
 
+        $expedition = null;
+        $linkedPickup = null;
+        if (!empty($shipment->expedition_id)) {
+            $expedition = DB::table('expeditions')->where('id', $shipment->expedition_id)->first();
+            if ($expedition && !empty($expedition->pickup_id)) {
+                $linkedPickup = DB::table('pickups')->where('id', $expedition->pickup_id)->first();
+            }
+        }
+
         return response()->json([
             'data' => [
                 'shipment' => $shipment,
+                'expedition' => $expedition,
+                'linked_pickup' => $linkedPickup,
                 'sender_contact' => $senderContact,
                 'recipient_contact' => $recipientContact,
                 'tracking_events' => $trackingEvents,

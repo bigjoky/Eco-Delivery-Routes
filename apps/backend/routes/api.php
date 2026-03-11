@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Ops\ContactController;
 use App\Http\Controllers\Api\V1\Ops\DashboardController;
 use App\Http\Controllers\Api\V1\Ops\DepotController;
 use App\Http\Controllers\Api\V1\Ops\DriverRouteController;
+use App\Http\Controllers\Api\V1\Ops\ExpeditionController;
 use App\Http\Controllers\Api\V1\Ops\WorkforceController;
 use App\Http\Controllers\Api\V1\Ops\ComplianceDocumentController;
 use App\Http\Controllers\Api\V1\Ops\HubController;
@@ -77,6 +78,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
+        Route::post('expeditions', [ExpeditionController::class, 'store']);
         Route::patch('shipments/{id}', [ShipmentController::class, 'update']);
         Route::post('shipments/bulk-update/preview', [ShipmentController::class, 'bulkUpdatePreview']);
         Route::post('shipments/bulk-update/preview.csv', [ShipmentController::class, 'bulkUpdatePreviewCsv']);

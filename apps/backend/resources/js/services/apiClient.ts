@@ -50,6 +50,7 @@ import {
   ContactSummary,
   AddressSuggestion,
   ShipmentSummary,
+  ExpeditionSummary,
   ShipmentDetail,
   PickupSummary,
   TariffSummary,
@@ -926,6 +927,68 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create shipment'));
     return json.data as ShipmentSummary;
+  },
+
+  async createExpedition(payload: {
+    hub_id: string;
+    external_reference?: string | null;
+    operation_kind: 'shipment' | 'return';
+    product_category: 'parcel' | 'thermo';
+    temperature_min_c?: number | null;
+    temperature_max_c?: number | null;
+    requires_temperature_log?: boolean;
+    thermo_notes?: string | null;
+    consignee_name?: string | null;
+    consignee_document_id?: string | null;
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    address_municipality?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_reference?: string | null;
+    address_notes?: string | null;
+    consignee_phone?: string | null;
+    consignee_email?: string | null;
+    sender_name?: string | null;
+    sender_legal_name?: string | null;
+    sender_document_id?: string | null;
+    sender_phone?: string | null;
+    sender_email?: string | null;
+    sender_address_line?: string | null;
+    sender_address_street_type?: string | null;
+    sender_address_street?: string | null;
+    sender_address_number?: string | null;
+    sender_address_block?: string | null;
+    sender_address_stair?: string | null;
+    sender_address_floor?: string | null;
+    sender_address_door?: string | null;
+    sender_postal_code?: string | null;
+    sender_city?: string | null;
+    sender_address_municipality?: string | null;
+    sender_province?: string | null;
+    sender_country?: string | null;
+    sender_address_reference?: string | null;
+    sender_address_notes?: string | null;
+    scheduled_at?: string | null;
+    service_type?: string | null;
+  }): Promise<{ expedition: ExpeditionSummary; shipment: ShipmentSummary; pickup: PickupSummary }> {
+    if (USE_MOCK) return mockApi.createExpedition(payload) as Promise<{ expedition: ExpeditionSummary; shipment: ShipmentSummary; pickup: PickupSummary }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/expeditions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create expedition'));
+    return json.data as { expedition: ExpeditionSummary; shipment: ShipmentSummary; pickup: PickupSummary };
   },
 
   async updateShipment(id: string, payload: {

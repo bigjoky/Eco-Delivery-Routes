@@ -46,8 +46,15 @@ export type RoleDetail = {
 
 export type ShipmentSummary = {
   id: string;
+  expedition_id?: string | null;
   reference: string;
   external_reference?: string | null;
+  operation_kind?: 'shipment' | 'return' | null;
+  product_category?: 'parcel' | 'thermo' | null;
+  temperature_min_c?: number | null;
+  temperature_max_c?: number | null;
+  requires_temperature_log?: boolean;
+  thermo_notes?: string | null;
   status: string;
   consignee_name?: string | null;
   consignee_document_id?: string | null;
@@ -122,10 +129,36 @@ export type AddressSuggestion = {
 
 export type PickupSummary = {
   id: string;
+  expedition_id?: string | null;
   reference: string;
   pickup_type: 'NORMAL' | 'RETURN';
+  service_type?: string | null;
+  product_category?: 'parcel' | 'thermo' | null;
+  temperature_min_c?: number | null;
+  temperature_max_c?: number | null;
+  requires_temperature_log?: boolean;
+  thermo_notes?: string | null;
   status: string;
   requester_name?: string | null;
+  address_line?: string | null;
+  scheduled_at?: string | null;
+};
+
+export type ExpeditionSummary = {
+  id: string;
+  reference: string;
+  external_reference?: string | null;
+  operation_kind: 'shipment' | 'return';
+  product_category: 'parcel' | 'thermo';
+  service_type?: string | null;
+  status: string;
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  temperature_min_c?: number | null;
+  temperature_max_c?: number | null;
+  requires_temperature_log?: boolean;
+  thermo_notes?: string | null;
+  scheduled_at?: string | null;
 };
 
 export type RouteSummary = {
@@ -286,6 +319,8 @@ export type ShipmentDetail = {
     subcontractor_id?: string | null;
     delivered_at?: string | null;
   };
+  expedition?: ExpeditionSummary | null;
+  linked_pickup?: PickupSummary | null;
   sender_contact?: ContactSummary | null;
   recipient_contact?: ContactSummary | null;
   tracking_events: TrackingEventSummary[];

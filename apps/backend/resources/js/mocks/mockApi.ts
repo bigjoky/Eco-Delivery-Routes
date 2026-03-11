@@ -1610,6 +1610,127 @@ export const mockApi = {
     return item;
   },
 
+  async createExpedition(payload: {
+    hub_id: string;
+    external_reference?: string | null;
+    operation_kind: 'shipment' | 'return';
+    product_category: 'parcel' | 'thermo';
+    temperature_min_c?: number | null;
+    temperature_max_c?: number | null;
+    requires_temperature_log?: boolean;
+    thermo_notes?: string | null;
+    consignee_name?: string | null;
+    consignee_document_id?: string | null;
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    address_municipality?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_reference?: string | null;
+    address_notes?: string | null;
+    consignee_phone?: string | null;
+    consignee_email?: string | null;
+    sender_name?: string | null;
+    sender_legal_name?: string | null;
+    sender_document_id?: string | null;
+    sender_phone?: string | null;
+    sender_email?: string | null;
+    sender_address_line?: string | null;
+    scheduled_at?: string | null;
+    service_type?: string | null;
+  }) {
+    const expeditionId = `exp-${shipmentSeq + 1}`;
+    const shipment = await this.createShipment({
+      hub_id: payload.hub_id,
+      external_reference: payload.external_reference ?? null,
+      consignee_name: payload.consignee_name ?? null,
+      consignee_document_id: payload.consignee_document_id ?? null,
+      address_line: payload.address_line ?? null,
+      address_street_type: payload.address_street_type ?? null,
+      address_street: payload.address_street ?? null,
+      address_number: payload.address_number ?? null,
+      address_block: payload.address_block ?? null,
+      address_stair: payload.address_stair ?? null,
+      address_floor: payload.address_floor ?? null,
+      address_door: payload.address_door ?? null,
+      postal_code: payload.postal_code ?? null,
+      city: payload.city ?? null,
+      address_municipality: payload.address_municipality ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? null,
+      address_reference: payload.address_reference ?? null,
+      address_notes: payload.address_notes ?? null,
+      consignee_phone: payload.consignee_phone ?? null,
+      consignee_email: payload.consignee_email ?? null,
+      sender_name: payload.sender_name ?? null,
+      sender_legal_name: payload.sender_legal_name ?? null,
+      sender_document_id: payload.sender_document_id ?? null,
+      sender_phone: payload.sender_phone ?? null,
+      sender_email: payload.sender_email ?? null,
+      sender_address_line: payload.sender_address_line ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
+      service_type: payload.service_type ?? 'express_1030',
+    });
+    const pickup = await this.createPickup({
+      hub_id: payload.hub_id,
+      external_reference: payload.external_reference ?? null,
+      pickup_type: payload.operation_kind === 'return' ? 'RETURN' : 'NORMAL',
+      requester_name: payload.sender_name ?? payload.sender_legal_name ?? null,
+      address_line: payload.sender_address_line ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
+    });
+    const shipmentWithExpedition = {
+      ...shipment,
+      expedition_id: expeditionId,
+      operation_kind: payload.operation_kind,
+      product_category: payload.product_category,
+      temperature_min_c: payload.temperature_min_c ?? null,
+      temperature_max_c: payload.temperature_max_c ?? null,
+      requires_temperature_log: payload.requires_temperature_log ?? false,
+      thermo_notes: payload.thermo_notes ?? null,
+    };
+    mockShipments = mockShipments.map((row) => row.id === shipment.id ? shipmentWithExpedition : row);
+    return {
+      expedition: {
+        id: expeditionId,
+        reference: `EXP-${10000 + shipmentSeq}`,
+        external_reference: payload.external_reference ?? null,
+        operation_kind: payload.operation_kind,
+        product_category: payload.product_category,
+        service_type: payload.service_type ?? 'express_1030',
+        status: 'planned',
+        shipment_id: shipment.id,
+        pickup_id: pickup.id,
+        temperature_min_c: payload.temperature_min_c ?? null,
+        temperature_max_c: payload.temperature_max_c ?? null,
+        requires_temperature_log: payload.requires_temperature_log ?? false,
+        thermo_notes: payload.thermo_notes ?? null,
+        scheduled_at: payload.scheduled_at ?? null,
+      },
+      shipment: shipmentWithExpedition,
+      pickup: {
+        ...pickup,
+        expedition_id: expeditionId,
+        service_type: payload.service_type ?? 'express_1030',
+        product_category: payload.product_category,
+        temperature_min_c: payload.temperature_min_c ?? null,
+        temperature_max_c: payload.temperature_max_c ?? null,
+        requires_temperature_log: payload.requires_temperature_log ?? false,
+        thermo_notes: payload.thermo_notes ?? null,
+        address_line: payload.sender_address_line ?? null,
+        scheduled_at: payload.scheduled_at ?? null,
+      },
+    };
+  },
+
   async markShipmentDelivered(id: string) {
     let updated: Record<string, unknown> | null = null;
     mockShipments = mockShipments.map((row) => {
@@ -1722,8 +1843,15 @@ export const mockApi = {
     return {
       shipment: {
         id,
+        expedition_id: (row as { expedition_id?: string | null } | undefined)?.expedition_id ?? null,
         reference: row?.reference ?? (id === 's-2' ? 'SHP-AGP-0002' : 'SHP-AGP-0001'),
         external_reference: row?.external_reference ?? (id === 's-2' ? 'REF-CLIENTE-002' : 'REF-CLIENTE-001'),
+        operation_kind: (row as { operation_kind?: 'shipment' | 'return' | null } | undefined)?.operation_kind ?? 'shipment',
+        product_category: (row as { product_category?: 'parcel' | 'thermo' | null } | undefined)?.product_category ?? 'parcel',
+        temperature_min_c: (row as { temperature_min_c?: number | null } | undefined)?.temperature_min_c ?? null,
+        temperature_max_c: (row as { temperature_max_c?: number | null } | undefined)?.temperature_max_c ?? null,
+        requires_temperature_log: (row as { requires_temperature_log?: boolean } | undefined)?.requires_temperature_log ?? false,
+        thermo_notes: (row as { thermo_notes?: string | null } | undefined)?.thermo_notes ?? null,
         status: row?.status ?? (id === 's-2' ? 'delivered' : 'out_for_delivery'),
         consignee_name: row?.consignee_name ?? (id === 's-2' ? 'Cliente Centro' : 'Cliente Demo'),
         consignee_document_id: id === 's-2' ? '12345678B' : '12345678A',
@@ -1752,6 +1880,23 @@ export const mockApi = {
         subcontractor_id: null,
         delivered_at: id === 's-2' ? '2026-03-01T10:15:00Z' : null,
       },
+      expedition: (row as { expedition_id?: string | null; external_reference?: string | null; operation_kind?: 'shipment' | 'return' | null; product_category?: 'parcel' | 'thermo' | null; service_type?: string | null; temperature_min_c?: number | null; temperature_max_c?: number | null; requires_temperature_log?: boolean; thermo_notes?: string | null; scheduled_at?: string | null } | undefined)?.expedition_id ? {
+        id: (row as { expedition_id?: string | null }).expedition_id ?? '',
+        reference: `EXP-${id}`,
+        external_reference: row?.external_reference ?? null,
+        operation_kind: (row as { operation_kind?: 'shipment' | 'return' | null }).operation_kind ?? 'shipment',
+        product_category: (row as { product_category?: 'parcel' | 'thermo' | null }).product_category ?? 'parcel',
+        service_type: row?.service_type ?? 'express_1030',
+        status: 'planned',
+        shipment_id: id,
+        pickup_id: null,
+        temperature_min_c: (row as { temperature_min_c?: number | null }).temperature_min_c ?? null,
+        temperature_max_c: (row as { temperature_max_c?: number | null }).temperature_max_c ?? null,
+        requires_temperature_log: (row as { requires_temperature_log?: boolean }).requires_temperature_log ?? false,
+        thermo_notes: (row as { thermo_notes?: string | null }).thermo_notes ?? null,
+        scheduled_at: row?.scheduled_at ?? null,
+      } : null,
+      linked_pickup: null,
       sender_contact: senderContact,
       recipient_contact: recipientContact,
       tracking_events: [
@@ -1996,9 +2141,18 @@ export const mockApi = {
     return {
       id: `p-${Math.floor(Math.random() * 10000)}`,
       reference: String(Math.floor(100000 + Math.random() * 900000)),
+      expedition_id: null,
       pickup_type: payload.pickup_type,
+      service_type: null,
+      product_category: 'parcel',
+      temperature_min_c: null,
+      temperature_max_c: null,
+      requires_temperature_log: false,
+      thermo_notes: null,
       status: 'planned',
       requester_name: payload.requester_name ?? null,
+      address_line: payload.address_line ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
     };
   },
 

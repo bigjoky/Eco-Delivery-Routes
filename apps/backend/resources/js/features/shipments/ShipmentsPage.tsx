@@ -155,7 +155,12 @@ function ShipmentFilters({
 type ShipmentQuickTemplate = {
   id: string;
   name: string;
-  operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+  operation: 'shipment' | 'return';
+  productCategory: 'parcel' | 'thermo';
+  temperatureMinC?: string;
+  temperatureMaxC?: string;
+  requiresTemperatureLog?: boolean;
+  thermoNotes?: string;
   serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
   hubId: string;
   pointId: string;
@@ -289,7 +294,12 @@ export function ShipmentsPage() {
   const [createSenderAddressNotes, setCreateSenderAddressNotes] = useState('');
   const [createSenderPhone, setCreateSenderPhone] = useState('');
   const [createSenderEmail, setCreateSenderEmail] = useState('');
-  const [createOperation, setCreateOperation] = useState<'shipment' | 'pickup_normal' | 'pickup_return'>('shipment');
+  const [createOperation, setCreateOperation] = useState<'shipment' | 'return'>('shipment');
+  const [createProductCategory, setCreateProductCategory] = useState<'parcel' | 'thermo'>('parcel');
+  const [createTemperatureMinC, setCreateTemperatureMinC] = useState('');
+  const [createTemperatureMaxC, setCreateTemperatureMaxC] = useState('');
+  const [createRequiresTemperatureLog, setCreateRequiresTemperatureLog] = useState(false);
+  const [createThermoNotes, setCreateThermoNotes] = useState('');
   const [createServiceType, setCreateServiceType] = useState<'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel'>('express_1030');
   const [createScheduledAt, setCreateScheduledAt] = useState(new Date().toISOString().slice(0, 10));
   const [showAdvancedCreateOptions, setShowAdvancedCreateOptions] = useState(false);
@@ -725,10 +735,6 @@ export function ShipmentsPage() {
   const normalizeScheduledAtForPayload = (): string | null => {
     const raw = createScheduledAt.trim();
     if (!raw) return null;
-    if (createOperation !== 'shipment') {
-      const pickupDate = Date.parse(raw.includes('T') ? raw : `${raw}T09:00:00`);
-      return Number.isNaN(pickupDate) ? null : new Date(pickupDate).toISOString();
-    }
     const withTime = raw.includes('T')
       ? raw
       : `${raw}T${serviceDefaultTime[createServiceType]}`;
@@ -822,13 +828,15 @@ export function ShipmentsPage() {
         enabled: boolean;
         hubId: string;
         pointId: string;
-        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        operation: 'shipment' | 'return';
+        productCategory: 'parcel' | 'thermo';
         serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
       }>;
       if (typeof parsed.enabled === 'boolean') setOperatorMode(parsed.enabled);
       if (parsed.hubId) setCreateHubId(parsed.hubId);
       if (parsed.pointId) setCreatePointId(parsed.pointId);
       if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.productCategory) setCreateProductCategory(parsed.productCategory);
       if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
     } catch {
       // ignore
@@ -844,10 +852,11 @@ export function ShipmentsPage() {
         hubId: createHubId,
         pointId: createPointId,
         operation: createOperation,
+        productCategory: createProductCategory,
         serviceType: createServiceType,
       })
     );
-  }, [operatorMode, createHubId, createPointId, createOperation, createServiceType]);
+  }, [operatorMode, createHubId, createPointId, createOperation, createProductCategory, createServiceType]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -925,7 +934,7 @@ export function ShipmentsPage() {
       if (!createScheduledAt.trim()) return 'Define fecha programada en Paso 1.';
       return null;
     }
-    if (step === 2 && createOperation === 'shipment') {
+    if (step === 2) {
       if (!createConsigneeDocumentId.trim()) return 'Documento destinatario obligatorio (Paso 2).';
       if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
         return createConsigneeDocType === 'CIF'
@@ -949,10 +958,7 @@ export function ShipmentsPage() {
   };
 
   const goPrevWizardStep = () => {
-    setWizardStep((value) => {
-      if (createOperation !== 'shipment' && value === 3) return 1;
-      return Math.max(1, value - 1) as 1 | 2 | 3 | 4;
-    });
+    setWizardStep((value) => Math.max(1, value - 1) as 1 | 2 | 3 | 4);
   };
 
   const goNextWizardStep = () => {
@@ -962,10 +968,7 @@ export function ShipmentsPage() {
       return;
     }
     setCreateError('');
-    setWizardStep((value) => {
-      if (createOperation !== 'shipment' && value === 1) return 3;
-      return Math.min(4, value + 1) as 1 | 2 | 3 | 4;
-    });
+    setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
   };
 
   const applyOperatorDefaults = () => {
@@ -976,12 +979,14 @@ export function ShipmentsPage() {
       const parsed = JSON.parse(raw) as Partial<{
         hubId: string;
         pointId: string;
-        operation: 'shipment' | 'pickup_normal' | 'pickup_return';
+        operation: 'shipment' | 'return';
+        productCategory: 'parcel' | 'thermo';
         serviceType: 'express_1030' | 'express_1400' | 'express_1900' | 'economy_parcel' | 'business_parcel' | 'thermo_parcel';
       }>;
       if (parsed.hubId) setCreateHubId(parsed.hubId);
       if (parsed.pointId) setCreatePointId(parsed.pointId);
       if (parsed.operation) setCreateOperation(parsed.operation);
+      if (parsed.productCategory) setCreateProductCategory(parsed.productCategory);
       if (parsed.serviceType) setCreateServiceType(parsed.serviceType);
       setCreateError('');
     } catch {
@@ -998,6 +1003,7 @@ export function ShipmentsPage() {
         hubId: createHubId,
         pointId: createPointId,
         operation: createOperation,
+        productCategory: createProductCategory,
         serviceType: createServiceType,
       })
     );
@@ -1008,20 +1014,18 @@ export function ShipmentsPage() {
     if (!createHubId.trim()) checks.push('Selecciona un hub.');
     if (!createScheduledAt.trim()) checks.push('Define fecha programada.');
 
-    if (createOperation === 'shipment') {
-      if (!createConsigneeDocumentId.trim()) checks.push('Documento de destinatario obligatorio.');
-      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
-        checks.push(createConsigneeDocType === 'CIF'
-          ? 'Razon social de destinatario obligatoria.'
-          : 'Nombre y apellidos de destinatario obligatorios.');
-      }
-      if (!createPhone.trim()) checks.push('Telefono de destinatario obligatorio.');
-      if (!createStreet.trim() || !createCity.trim() || !createPostalCode.trim()) {
-        checks.push('Direccion completa de destinatario obligatoria (calle, ciudad, CP).');
-      }
-      if (isProvinceRequired(createCountry) && !createProvince.trim()) {
-        checks.push('Provincia de destinatario obligatoria para el país seleccionado.');
-      }
+    if (!createConsigneeDocumentId.trim()) checks.push('Documento de destinatario obligatorio.');
+    if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+      checks.push(createConsigneeDocType === 'CIF'
+        ? 'Razon social de destinatario obligatoria.'
+        : 'Nombre y apellidos de destinatario obligatorios.');
+    }
+    if (!createPhone.trim()) checks.push('Telefono de destinatario obligatorio.');
+    if (!createStreet.trim() || !createCity.trim() || !createPostalCode.trim()) {
+      checks.push('Direccion completa de destinatario obligatoria (calle, ciudad, CP).');
+    }
+    if (isProvinceRequired(createCountry) && !createProvince.trim()) {
+      checks.push('Provincia de destinatario obligatoria para el país seleccionado.');
     }
 
     if (!createSenderDocumentId.trim()) checks.push('Documento de remitente obligatorio.');
@@ -1030,14 +1034,12 @@ export function ShipmentsPage() {
         ? 'Razon social de remitente obligatoria.'
         : 'Nombre y apellidos de remitente obligatorios.');
     }
-    if (createOperation !== 'shipment') {
-      if (!createSenderPhone.trim()) checks.push('Telefono de remitente obligatorio para recogidas.');
-      if (!createSenderStreet.trim() || !createSenderCity.trim() || !createSenderPostalCode.trim()) {
-        checks.push('Direccion completa de remitente obligatoria para recogidas.');
-      }
-      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
-        checks.push('Provincia de remitente obligatoria para el país seleccionado.');
-      }
+    if (!createSenderPhone.trim()) checks.push('Telefono de remitente obligatorio.');
+    if (!createSenderStreet.trim() || !createSenderCity.trim() || !createSenderPostalCode.trim()) {
+      checks.push('Direccion completa de remitente obligatoria.');
+    }
+    if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+      checks.push('Provincia de remitente obligatoria para el país seleccionado.');
     }
 
     if (createPhone.trim() && !isValidPhone(createPhone)) checks.push('Telefono de destinatario invalido.');
@@ -1046,8 +1048,11 @@ export function ShipmentsPage() {
     if (createSenderEmail.trim() && !isValidEmail(createSenderEmail)) checks.push('Email de remitente invalido.');
     if (createPostalCode.trim() && !isValidPostalCode(createCountry, createPostalCode)) checks.push('Codigo postal de destinatario invalido.');
     if (createSenderPostalCode.trim() && !isValidPostalCode(createSenderCountry, createSenderPostalCode)) checks.push('Codigo postal de remitente invalido.');
-    if (createOperation === 'shipment' && createScheduledAt.trim() && !isServiceDateAllowed(createServiceType, createScheduledAt)) {
+    if (createScheduledAt.trim() && !isServiceDateAllowed(createServiceType, createScheduledAt)) {
       checks.push(`El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`);
+    }
+    if (createProductCategory === 'thermo' && !createTemperatureMinC.trim() && !createTemperatureMaxC.trim()) {
+      checks.push('La expedición thermo requiere rango de temperatura.');
     }
 
     return Array.from(new Set(checks));
@@ -1325,25 +1330,23 @@ export function ShipmentsPage() {
     if (!createScheduledAt.trim()) {
       nextErrors.scheduledAt = 'La fecha programada es obligatoria.';
     }
-    if (createOperation === 'shipment') {
-      if (!createConsigneeDocumentId.trim()) {
-        nextErrors.recipientDocument = 'Documento destinatario obligatorio.';
-      }
-      if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
-        if (createConsigneeDocType === 'CIF') {
-          nextErrors.recipientName = 'Razon social destinatario obligatoria.';
-        } else {
-          nextErrors.recipientName = 'Nombre y apellidos destinatario obligatorios.';
-        }
-      }
-      if (!createPhone.trim()) {
-        nextErrors.recipientPhone = 'Telefono destinatario obligatorio.';
-      }
-      if (!createStreet.trim()) nextErrors.street = 'La calle del destinatario es obligatoria.';
-      if (!createCity.trim()) nextErrors.city = 'La ciudad del destinatario es obligatoria.';
-      if (!createPostalCode.trim()) nextErrors.postalCode = 'Codigo postal destinatario obligatorio.';
-      if (isProvinceRequired(createCountry) && !createProvince.trim()) nextErrors.province = 'Provincia destinatario obligatoria.';
+    if (!createConsigneeDocumentId.trim()) {
+      nextErrors.recipientDocument = 'Documento destinatario obligatorio.';
     }
+    if (!hasRequiredRecipientName(createConsigneeDocType, createConsignee, createConsigneeFirstName, createConsigneeLastName)) {
+      if (createConsigneeDocType === 'CIF') {
+        nextErrors.recipientName = 'Razon social destinatario obligatoria.';
+      } else {
+        nextErrors.recipientName = 'Nombre y apellidos destinatario obligatorios.';
+      }
+    }
+    if (!createPhone.trim()) {
+      nextErrors.recipientPhone = 'Telefono destinatario obligatorio.';
+    }
+    if (!createStreet.trim()) nextErrors.street = 'La calle del destinatario es obligatoria.';
+    if (!createCity.trim()) nextErrors.city = 'La ciudad del destinatario es obligatoria.';
+    if (!createPostalCode.trim()) nextErrors.postalCode = 'Codigo postal destinatario obligatorio.';
+    if (isProvinceRequired(createCountry) && !createProvince.trim()) nextErrors.province = 'Provincia destinatario obligatoria.';
     if (hasAddressFields) {
       if (!createStreet.trim()) nextErrors.street = 'La calle es obligatoria.';
       if (!createCity.trim()) nextErrors.city = 'La ciudad es obligatoria.';
@@ -1373,22 +1376,23 @@ export function ShipmentsPage() {
     if (!createSenderDocumentId.trim()) {
       nextErrors.senderDocument = 'Documento remitente obligatorio.';
     }
-    if (createOperation !== 'shipment') {
-      if (!createSenderPhone.trim()) {
-        nextErrors.senderPhone = 'Telefono remitente obligatorio para recogidas.';
-      }
-      if (!createSenderStreet.trim()) {
-        nextErrors.senderStreet = 'La calle del remitente es obligatoria para recogidas.';
-      }
-      if (!createSenderPostalCode.trim()) {
-        nextErrors.senderPostalCode = 'Codigo postal remitente obligatorio para recogidas.';
-      }
-      if (!createSenderCity.trim()) {
-        nextErrors.senderCity = 'La ciudad del remitente es obligatoria para recogidas.';
-      }
-      if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
-        nextErrors.senderProvince = 'Provincia remitente obligatoria para el país seleccionado.';
-      }
+    if (!createSenderPhone.trim()) {
+      nextErrors.senderPhone = 'Telefono remitente obligatorio.';
+    }
+    if (!createSenderStreet.trim()) {
+      nextErrors.senderStreet = 'La calle del remitente es obligatoria.';
+    }
+    if (!createSenderPostalCode.trim()) {
+      nextErrors.senderPostalCode = 'Codigo postal remitente obligatorio.';
+    }
+    if (!createSenderCity.trim()) {
+      nextErrors.senderCity = 'La ciudad del remitente es obligatoria.';
+    }
+    if (isProvinceRequired(createSenderCountry) && !createSenderProvince.trim()) {
+      nextErrors.senderProvince = 'Provincia remitente obligatoria para el país seleccionado.';
+    }
+    if (createProductCategory === 'thermo' && !createTemperatureMinC.trim() && !createTemperatureMaxC.trim()) {
+      nextErrors.scheduledAt = nextErrors.scheduledAt ?? 'Define rango térmico para expedición thermo.';
     }
     if (!hasRequiredSenderName(createSenderDocType, createSenderLegalName, createSenderFirstName, createSenderLastName)) {
       if (createSenderDocType === 'CIF') {
@@ -1406,15 +1410,13 @@ export function ShipmentsPage() {
         const maxDate = new Date(`${maxScheduledAt}T23:59:59Z`);
         if (parsed < minDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser posterior a ${minScheduledAt}.`;
         if (parsed > maxDate.getTime()) nextErrors.scheduledAt = `La fecha debe ser anterior a ${maxScheduledAt}.`;
-        if (createOperation === 'shipment') {
-          const scheduledDate = new Date(parsed);
-          const cutoff = serviceCutoffHour[createServiceType];
-          if (scheduledDate.getUTCHours() > cutoff || (scheduledDate.getUTCHours() === cutoff && scheduledDate.getUTCMinutes() > 30)) {
-            nextErrors.scheduledAt = `La hora supera la ventana del servicio (${serviceTypeLabel(createServiceType)}).`;
-          }
-          if (!isServiceDateAllowed(createServiceType, createScheduledAt)) {
-            nextErrors.scheduledAt = `El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`;
-          }
+        const scheduledDate = new Date(parsed);
+        const cutoff = serviceCutoffHour[createServiceType];
+        if (scheduledDate.getUTCHours() > cutoff || (scheduledDate.getUTCHours() === cutoff && scheduledDate.getUTCMinutes() > 30)) {
+          nextErrors.scheduledAt = `La hora supera la ventana del servicio (${serviceTypeLabel(createServiceType)}).`;
+        }
+        if (!isServiceDateAllowed(createServiceType, createScheduledAt)) {
+          nextErrors.scheduledAt = `El servicio ${serviceTypeLabel(createServiceType)} no opera en la fecha seleccionada.`;
         }
       }
     }
@@ -1451,62 +1453,57 @@ export function ShipmentsPage() {
         ? createSenderLegalName
         : [createSenderFirstName, createSenderLastName].filter((value) => value.trim() !== '').join(' ');
       const normalizedScheduledAt = normalizeScheduledAtForPayload();
-      if (createOperation === 'shipment') {
-        await apiClient.createShipment({
-          hub_id: createHubId,
-          external_reference: createExternalReference || null,
-          consignee_name: recipientName || null,
-          consignee_document_id: createConsigneeDocumentId || null,
-          address_line: composedAddress || null,
-          address_street_type: createStreetType || null,
-          address_street: createStreet || null,
-          address_number: createNumber || null,
-          address_block: createBlock || null,
-          address_stair: createStair || null,
-          address_floor: createFloor || null,
-          address_door: createDoor || null,
-          postal_code: createPostalCode || null,
-          city: createCity || null,
-          address_municipality: createMunicipality || null,
-          province: createProvince || null,
-          country: createCountry || null,
-          address_reference: createAddressReference || null,
-          address_notes: createAddressNotes || null,
-          consignee_phone: createPhone || null,
-          consignee_email: createEmail || null,
-          sender_name: senderName || null,
-          sender_legal_name: createSenderDocType === 'CIF' ? createSenderLegalName || null : null,
-          sender_document_id: createSenderDocumentId || null,
-          sender_phone: createSenderPhone || null,
-          sender_email: createSenderEmail || null,
-          sender_address_line: composedSenderAddress || null,
-          sender_address_street_type: createSenderStreetType || null,
-          sender_address_street: createSenderStreet || null,
-          sender_address_number: createSenderNumber || null,
-          sender_address_block: createSenderBlock || null,
-          sender_address_stair: createSenderStair || null,
-          sender_address_floor: createSenderFloor || null,
-          sender_address_door: createSenderDoor || null,
-          sender_postal_code: createSenderPostalCode || null,
-          sender_city: createSenderCity || null,
-          sender_address_municipality: createSenderMunicipality || null,
-          sender_province: createSenderProvince || null,
-          sender_country: createSenderCountry || null,
-          sender_address_reference: createSenderAddressReference || null,
-          sender_address_notes: createSenderAddressNotes || null,
-          scheduled_at: normalizedScheduledAt,
-          service_type: createServiceType,
-        });
-      } else {
-        await apiClient.createPickup({
-          hub_id: createHubId,
-          external_reference: createExternalReference || null,
-          pickup_type: createOperation === 'pickup_return' ? 'RETURN' : 'NORMAL',
-          requester_name: senderName || null,
-          address_line: composedSenderAddress || null,
-          scheduled_at: normalizedScheduledAt,
-        });
-      }
+      await apiClient.createExpedition({
+        hub_id: createHubId,
+        external_reference: createExternalReference || null,
+        operation_kind: createOperation,
+        product_category: createProductCategory,
+        temperature_min_c: createTemperatureMinC.trim() ? Number(createTemperatureMinC) : null,
+        temperature_max_c: createTemperatureMaxC.trim() ? Number(createTemperatureMaxC) : null,
+        requires_temperature_log: createRequiresTemperatureLog,
+        thermo_notes: createThermoNotes || null,
+        consignee_name: recipientName || null,
+        consignee_document_id: createConsigneeDocumentId || null,
+        address_line: composedAddress || null,
+        address_street_type: createStreetType || null,
+        address_street: createStreet || null,
+        address_number: createNumber || null,
+        address_block: createBlock || null,
+        address_stair: createStair || null,
+        address_floor: createFloor || null,
+        address_door: createDoor || null,
+        postal_code: createPostalCode || null,
+        city: createCity || null,
+        address_municipality: createMunicipality || null,
+        province: createProvince || null,
+        country: createCountry || null,
+        address_reference: createAddressReference || null,
+        address_notes: createAddressNotes || null,
+        consignee_phone: createPhone || null,
+        consignee_email: createEmail || null,
+        sender_name: senderName || null,
+        sender_legal_name: createSenderDocType === 'CIF' ? createSenderLegalName || null : null,
+        sender_document_id: createSenderDocumentId || null,
+        sender_phone: createSenderPhone || null,
+        sender_email: createSenderEmail || null,
+        sender_address_line: composedSenderAddress || null,
+        sender_address_street_type: createSenderStreetType || null,
+        sender_address_street: createSenderStreet || null,
+        sender_address_number: createSenderNumber || null,
+        sender_address_block: createSenderBlock || null,
+        sender_address_stair: createSenderStair || null,
+        sender_address_floor: createSenderFloor || null,
+        sender_address_door: createSenderDoor || null,
+        sender_postal_code: createSenderPostalCode || null,
+        sender_city: createSenderCity || null,
+        sender_address_municipality: createSenderMunicipality || null,
+        sender_province: createSenderProvince || null,
+        sender_country: createSenderCountry || null,
+        sender_address_reference: createSenderAddressReference || null,
+        sender_address_notes: createSenderAddressNotes || null,
+        scheduled_at: normalizedScheduledAt,
+        service_type: createServiceType,
+      });
       setCreateExternalReference('');
       setCreateConsignee('');
       setCreateConsigneeDocumentId('');
@@ -1529,7 +1526,7 @@ export function ShipmentsPage() {
       setCreateAddressNotes('');
       setCreatePhone('');
       setCreateEmail('');
-      if (!operatorMode || createOperation === 'shipment') {
+      if (!operatorMode) {
         setCreateSenderLegalName('');
         setCreateSenderDocumentId('');
         setCreateSenderDocType('DNI');
@@ -1561,6 +1558,11 @@ export function ShipmentsPage() {
       setCreateScheduledAt(new Date().toISOString().slice(0, 10));
       if (!operatorMode) {
         setCreateOperation('shipment');
+        setCreateProductCategory('parcel');
+        setCreateTemperatureMinC('');
+        setCreateTemperatureMaxC('');
+        setCreateRequiresTemperatureLog(false);
+        setCreateThermoNotes('');
         setCreateServiceType('express_1030');
         setCreateHubId('');
         setCreatePointId('');
@@ -1959,30 +1961,21 @@ export function ShipmentsPage() {
   const operationMeta = {
     shipment: {
       title: 'Crear envio',
-      subtitle: 'Entrega programada con destinatario, remitente y servicio.',
-      checklistReady: 'Alta lista para crear envio.',
-      actionLabel: 'Crear envio',
+      subtitle: 'Expedición estándar con recogida de origen y entrega de destino enlazadas.',
+      checklistReady: 'Expedición lista para crear envío completo.',
+      actionLabel: 'Crear expedición de envío',
       senderTitle: 'Remitente',
       recipientTitle: 'Destinatario',
       recipientOptional: false,
     },
-    pickup_normal: {
-      title: 'Crear recogida',
-      subtitle: 'Alta de recogida normal centrada en origen, hub y programación.',
-      checklistReady: 'Alta lista para crear recogida.',
-      actionLabel: 'Crear recogida',
-      senderTitle: 'Origen de recogida',
-      recipientTitle: 'Destino final (opcional)',
-      recipientOptional: true,
-    },
-    pickup_return: {
+    return: {
       title: 'Crear devolucion',
-      subtitle: 'Alta de devolución con origen operativo y retorno controlado.',
-      checklistReady: 'Alta lista para crear devolucion.',
-      actionLabel: 'Crear devolucion',
-      senderTitle: 'Origen de devolucion',
-      recipientTitle: 'Destino final (opcional)',
-      recipientOptional: true,
+      subtitle: 'Expedición inversa con recogida de devolución y entrega de retorno enlazadas.',
+      checklistReady: 'Expedición lista para crear devolución completa.',
+      actionLabel: 'Crear expedición de devolución',
+      senderTitle: 'Origen',
+      recipientTitle: 'Destino',
+      recipientOptional: false,
     },
   }[createOperation];
 
@@ -1999,10 +1992,8 @@ export function ShipmentsPage() {
 
   const createNextActionSummary = useMemo(() => {
     if (!createHubId.trim()) return 'Selecciona hub y fecha para fijar el contexto.';
-    if (createOperation === 'shipment' && !hasRecipientSummary) return 'Completa el destinatario para continuar.';
-    if (!createSenderDocumentId.trim() && !createSenderPhone.trim() && !createSenderStreet.trim()) {
-      return createOperation === 'shipment' ? 'Completa el remitente.' : 'Completa el origen de recogida.';
-    }
+    if (!hasRecipientSummary) return 'Completa el destinatario para continuar.';
+    if (!createSenderDocumentId.trim() && !createSenderPhone.trim() && !createSenderStreet.trim()) return 'Completa el remitente/origen.';
     if (createBlockingChecks.length > 0) return `Quedan ${createBlockingChecks.length} validaciones pendientes.`;
     return operationMeta.checklistReady;
   }, [
@@ -2016,15 +2007,13 @@ export function ShipmentsPage() {
     operationMeta.checklistReady,
   ]);
 
-  const applyOperationPreset = (operation: 'shipment' | 'pickup_normal' | 'pickup_return') => {
+  const applyOperationPreset = (operation: 'shipment' | 'return') => {
     setCreateOperation(operation);
     setCreateError('');
-    if (wizardMode) {
-      setWizardStep(operation === 'shipment' ? 1 : 3);
-    }
+    if (wizardMode) setWizardStep(1);
   };
 
-  const applyCreateWorkflowPreset = (preset: 'shipment_express_today' | 'shipment_economy_tomorrow' | 'pickup_today' | 'return_today') => {
+  const applyCreateWorkflowPreset = (preset: 'shipment_express_today' | 'shipment_economy_tomorrow' | 'return_today' | 'thermo_today') => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
@@ -2040,6 +2029,7 @@ export function ShipmentsPage() {
     }
     if (preset === 'shipment_economy_tomorrow') {
       setCreateOperation('shipment');
+      setCreateProductCategory('parcel');
       setCreateServiceType('economy_parcel');
       setCreateScheduledAt(tomorrow.toISOString().slice(0, 10));
       setCreateError('');
@@ -2047,19 +2037,22 @@ export function ShipmentsPage() {
       setRecipientModalOpen(true);
       return;
     }
-    if (preset === 'pickup_today') {
-      setCreateOperation('pickup_normal');
+    if (preset === 'thermo_today') {
+      setCreateOperation('shipment');
+      setCreateProductCategory('thermo');
+      setCreateServiceType('thermo_parcel');
       setCreateScheduledAt(today.toISOString().slice(0, 10));
       setCreateError('');
-      if (wizardMode) setWizardStep(3);
-      setSenderModalOpen(true);
+      if (wizardMode) setWizardStep(2);
+      setRecipientModalOpen(true);
       return;
     }
-    setCreateOperation('pickup_return');
+    setCreateOperation('return');
+    setCreateProductCategory('parcel');
     setCreateScheduledAt(today.toISOString().slice(0, 10));
     setCreateError('');
-    if (wizardMode) setWizardStep(3);
-    setSenderModalOpen(true);
+    if (wizardMode) setWizardStep(2);
+    setRecipientModalOpen(true);
   };
 
   const applyBulkPreset = (preset: 'clear' | 'out_today' | 'incident' | 'delivered_today') => {
@@ -2120,6 +2113,11 @@ export function ShipmentsPage() {
 
   const applyTemplate = (template: ShipmentQuickTemplate) => {
     setCreateOperation(template.operation);
+    setCreateProductCategory(template.productCategory);
+    setCreateTemperatureMinC(template.temperatureMinC ?? '');
+    setCreateTemperatureMaxC(template.temperatureMaxC ?? '');
+    setCreateRequiresTemperatureLog(template.requiresTemperatureLog ?? false);
+    setCreateThermoNotes(template.thermoNotes ?? '');
     setCreateServiceType(template.serviceType);
     setCreateHubId(template.hubId);
     setCreatePointId(template.pointId);
@@ -2166,6 +2164,11 @@ export function ShipmentsPage() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name,
       operation: createOperation,
+      productCategory: createProductCategory,
+      temperatureMinC: createTemperatureMinC,
+      temperatureMaxC: createTemperatureMaxC,
+      requiresTemperatureLog: createRequiresTemperatureLog,
+      thermoNotes: createThermoNotes,
       serviceType: createServiceType,
       hubId: createHubId,
       pointId: createPointId,
@@ -2481,8 +2484,8 @@ export function ShipmentsPage() {
           <div className="ops-summary-strip">
             <div className="ops-summary-chip">
               <div className="ops-summary-label">Operación</div>
-              <div className="ops-summary-value">{createOperation === 'shipment' ? 'Envío' : createOperation === 'pickup_normal' ? 'Recogida' : 'Devolución'}</div>
-              <div className="ops-summary-caption">Servicio {serviceTypeLabel(createServiceType)}</div>
+              <div className="ops-summary-value">{createOperation === 'shipment' ? 'Envío' : 'Devolución'}</div>
+              <div className="ops-summary-caption">{createProductCategory === 'thermo' ? 'Thermo' : 'Paquetería'} · {serviceTypeLabel(createServiceType)}</div>
             </div>
             <div className="ops-summary-chip">
               <div className="ops-summary-label">Fecha</div>
@@ -2501,13 +2504,13 @@ export function ShipmentsPage() {
             </div>
           </div>
           <div className="inline-actions ops-toolbar">
-            {!createHubId.trim() ? null : createOperation === 'shipment' && !hasRecipientSummary ? (
+            {!createHubId.trim() ? null : !hasRecipientSummary ? (
               <Button type="button" onClick={() => setRecipientModalOpen(true)}>
                 Completar destinatario
               </Button>
             ) : (!createSenderDocumentId.trim() && !createSenderPhone.trim() && !createSenderStreet.trim()) ? (
               <Button type="button" onClick={() => setSenderModalOpen(true)}>
-                {createOperation === 'shipment' ? 'Completar remitente' : 'Completar origen'}
+                Completar remitente
               </Button>
             ) : (
               <Button type="button" onClick={createShipment} disabled={creating || !canCreateShipment}>
@@ -2530,11 +2533,17 @@ export function ShipmentsPage() {
               <Button type="button" variant={createOperation === 'shipment' ? 'default' : 'outline'} onClick={() => applyOperationPreset('shipment')}>
                 Envio
               </Button>
-              <Button type="button" variant={createOperation === 'pickup_normal' ? 'default' : 'outline'} onClick={() => applyOperationPreset('pickup_normal')}>
-                Recogida
-              </Button>
-              <Button type="button" variant={createOperation === 'pickup_return' ? 'default' : 'outline'} onClick={() => applyOperationPreset('pickup_return')}>
+              <Button type="button" variant={createOperation === 'return' ? 'default' : 'outline'} onClick={() => applyOperationPreset('return')}>
                 Devolucion
+              </Button>
+            </div>
+            <div className="inline-actions">
+              <label>Producto</label>
+              <Button type="button" variant={createProductCategory === 'parcel' ? 'default' : 'outline'} onClick={() => setCreateProductCategory('parcel')}>
+                Paquetería
+              </Button>
+              <Button type="button" variant={createProductCategory === 'thermo' ? 'default' : 'outline'} onClick={() => setCreateProductCategory('thermo')}>
+                Thermo
               </Button>
             </div>
             <div className="inline-actions">
@@ -2545,11 +2554,11 @@ export function ShipmentsPage() {
               <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_economy_tomorrow')}>
                 Economy mañana
               </Button>
-              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('pickup_today')}>
-                Recogida hoy
-              </Button>
               <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('return_today')}>
                 Devolucion hoy
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('thermo_today')}>
+                Thermo hoy
               </Button>
             </div>
             <div className="inline-actions">
@@ -2611,9 +2620,7 @@ export function ShipmentsPage() {
                     return;
                   }
                   setWizardMode(enabled);
-                  if (enabled && createOperation !== 'shipment' && wizardStep === 2) {
-                    setWizardStep(3);
-                  }
+                  if (enabled && wizardStep < 1) setWizardStep(1);
                 }}
               />
               {wizardMode ? (
@@ -2635,16 +2642,14 @@ export function ShipmentsPage() {
             </div>
           ) : null}
           <div className="helper">
-            {createOperation === 'shipment'
-              ? 'Flujo recomendado: define planificación, completa destinatario y después remitente.'
-              : 'Flujo recomendado: define planificación y completa primero el origen de recogida.'}
+            Flujo recomendado: define planificación, completa destinatario y después remitente/origen para generar recogida y entrega enlazadas.
           </div>
           {wizardMode ? (
             <div className="helper">
               {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'
-                : wizardStep === 2 ? (createOperation === 'shipment' ? 'Paso 2: completa destinatario.' : 'Paso 2 opcional: define destino final si aplica.')
-                : wizardStep === 3 ? (createOperation === 'shipment' ? 'Paso 3: completa remitente.' : 'Paso 3: completa origen de recogida.')
-                : `Paso 4: revisa y crea ${createOperation === 'shipment' ? 'envio' : 'recogida'}.`}
+                : wizardStep === 2 ? 'Paso 2: completa destinatario.'
+                : wizardStep === 3 ? 'Paso 3: completa remitente/origen.'
+                : `Paso 4: revisa y crea ${createOperation === 'shipment' ? 'envío' : 'devolución'}.`}
             </div>
           ) : null}
           {!wizardMode || wizardStep === 1 ? (
@@ -2674,7 +2679,7 @@ export function ShipmentsPage() {
               {createFieldErrors.hub ? <div className="helper error">{createFieldErrors.hub}</div> : null}
             </div>
             <div>
-              <label htmlFor="create-shipment-service">{createOperation === 'shipment' ? 'Tipo de envio' : 'Modalidad operativa'}</label>
+              <label htmlFor="create-shipment-service">Servicio comercial</label>
               <select
                 id="create-shipment-service"
                 value={createServiceType}
@@ -2687,11 +2692,19 @@ export function ShipmentsPage() {
                 <option value="business_parcel">Business Parcel</option>
                 <option value="thermo_parcel">Thermo Parcel</option>
               </select>
-              <div className="helper">
-                {createOperation === 'shipment'
-                  ? 'Servicio comercial y ventana de entrega.'
-                  : 'Prioridad operativa prevista para la recogida.'}
-              </div>
+              <div className="helper">Servicio comercial de la expedición y ventana objetivo.</div>
+            </div>
+            <div>
+              <label htmlFor="create-shipment-product-category">Tipo de producto</label>
+              <select
+                id="create-shipment-product-category"
+                value={createProductCategory}
+                onChange={(event) => setCreateProductCategory(event.target.value as typeof createProductCategory)}
+              >
+                <option value="parcel">Paquetería normal</option>
+                <option value="thermo">Thermo</option>
+              </select>
+              <div className="helper">Separa naturaleza del producto de la modalidad comercial.</div>
             </div>
             <div>
               <label htmlFor="create-shipment-scheduled">Fecha programada</label>
@@ -2709,21 +2722,40 @@ export function ShipmentsPage() {
                 <Button type="button" variant="outline" onClick={() => applyCreateDatePreset('next2')}>+2 días</Button>
               </div>
               <div className="helper">Ventana: {minScheduledAt} a {maxScheduledAt}</div>
-              {createOperation === 'shipment' ? (
-                <div className="helper">
-                  Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
-                </div>
-              ) : (
-                <div className="helper">Hora operativa por defecto: 09:00 para recogidas.</div>
-              )}
-              {createOperation === 'shipment' && createServiceType === 'business_parcel' ? (
+              <div className="helper">
+                Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
+              </div>
+              {createServiceType === 'business_parcel' ? (
                 <div className="helper">Business Parcel: solo L-V.</div>
               ) : null}
-              {createOperation === 'shipment' && createServiceType === 'thermo_parcel' ? (
+              {createServiceType === 'thermo_parcel' ? (
                 <div className="helper">Thermo Parcel: L-S (sin domingo).</div>
               ) : null}
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
+            {createProductCategory === 'thermo' ? (
+              <div className="form-row" style={{ gridColumn: '1 / -1' }}>
+                <div>
+                  <label htmlFor="create-thermo-min">Temp. mínima (ºC)</label>
+                  <input id="create-thermo-min" value={createTemperatureMinC} onChange={(event) => setCreateTemperatureMinC(event.target.value)} placeholder="2" />
+                </div>
+                <div>
+                  <label htmlFor="create-thermo-max">Temp. máxima (ºC)</label>
+                  <input id="create-thermo-max" value={createTemperatureMaxC} onChange={(event) => setCreateTemperatureMaxC(event.target.value)} placeholder="8" />
+                </div>
+                <div>
+                  <label htmlFor="create-thermo-log">Control de temperatura</label>
+                  <select id="create-thermo-log" value={createRequiresTemperatureLog ? 'yes' : 'no'} onChange={(event) => setCreateRequiresTemperatureLog(event.target.value === 'yes')}>
+                    <option value="no">No requerido</option>
+                    <option value="yes">Requerido</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="create-thermo-notes">Notas thermo</label>
+                  <input id="create-thermo-notes" value={createThermoNotes} onChange={(event) => setCreateThermoNotes(event.target.value)} placeholder="Cadena de frío, embalaje, sonda..." />
+                </div>
+              </div>
+            ) : null}
             {showAdvancedCreateOptions ? (
               <>
                 <div>
@@ -2813,10 +2845,10 @@ export function ShipmentsPage() {
                     </div>
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
-                        {createOperation === 'shipment' ? 'Editar remitente' : 'Editar origen'}
+                        Editar remitente/origen
                       </Button>
                       <Button type="button" onClick={() => setSenderModalOpen(true)}>
-                        {createOperation === 'shipment' ? 'Completar remitente' : 'Completar origen'}
+                        Completar remitente/origen
                       </Button>
                       <Button type="button" variant="outline" onClick={clearSender}>
                         Limpiar

@@ -828,8 +828,24 @@ export function ShipmentDetailPanel({
                   <div>{serviceTypeLabel(shipment.service_type)}</div>
                 </div>
                 <div>
+                  <div className="helper">Operación</div>
+                  <div>{shipment.operation_kind === 'return' ? 'Devolución' : 'Envío'}</div>
+                </div>
+                <div>
+                  <div className="helper">Producto</div>
+                  <div>{shipment.product_category === 'thermo' ? 'Thermo' : 'Paquetería normal'}</div>
+                </div>
+                <div>
                   <div className="helper">Hub</div>
                   <div>{shipment.hub_code ?? shipment.hub_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Expedición</div>
+                  <div>{detail?.expedition?.reference ?? shipment.expedition_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Recogida enlazada</div>
+                  <div>{detail?.linked_pickup?.reference ?? '-'}</div>
                 </div>
                 <div>
                   <div className="helper">Destinatario</div>
@@ -839,6 +855,18 @@ export function ShipmentDetailPanel({
                   <div className="helper">Direccion</div>
                   <div>{shipment.address_line ?? '-'}</div>
                 </div>
+                {shipment.product_category === 'thermo' ? (
+                  <>
+                    <div>
+                      <div className="helper">Rango térmico</div>
+                      <div>{shipment.temperature_min_c ?? '-'}ºC / {shipment.temperature_max_c ?? '-'}ºC</div>
+                    </div>
+                    <div>
+                      <div className="helper">Control térmico</div>
+                      <div>{shipment.requires_temperature_log ? 'Requerido' : 'No requerido'}</div>
+                    </div>
+                  </>
+                ) : null}
               </div>
             )
           ) : (

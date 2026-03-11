@@ -733,6 +733,62 @@ class ShipmentsHttpTest extends TestCase
         $listResponse->assertOk();
     }
 
+    public function test_can_create_expedition_with_linked_pickup_and_shipment(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+
+        $response = $this->postJson('/api/v1/expeditions', [
+            'hub_id' => $hubId,
+            'external_reference' => 'CLI-EXP-001',
+            'operation_kind' => 'return',
+            'product_category' => 'thermo',
+            'temperature_min_c' => 2,
+            'temperature_max_c' => 8,
+            'requires_temperature_log' => true,
+            'thermo_notes' => 'Cadena de frío controlada',
+            'consignee_name' => 'Cliente Retorno',
+            'consignee_document_id' => '12345678Z',
+            'consignee_phone' => '+34600111222',
+            'consignee_email' => 'destino@eco.local',
+            'address_street_type' => 'Calle',
+            'address_street' => 'Destino',
+            'address_number' => '10',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'province' => 'Malaga',
+            'country' => 'ES',
+            'sender_name' => 'Origen Demo',
+            'sender_document_id' => 'B12345678',
+            'sender_phone' => '+34600333444',
+            'sender_email' => 'origen@eco.local',
+            'sender_address_street_type' => 'Avenida',
+            'sender_address_street' => 'Origen',
+            'sender_address_number' => '4',
+            'sender_postal_code' => '29002',
+            'sender_city' => 'Malaga',
+            'sender_province' => 'Malaga',
+            'sender_country' => 'ES',
+            'scheduled_at' => '2026-03-15 10:30:00',
+            'service_type' => 'thermo_parcel',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.expedition.operation_kind', 'return');
+        $response->assertJsonPath('data.shipment.product_category', 'thermo');
+        $response->assertJsonPath('data.pickup.pickup_type', 'RETURN');
+
+        $expeditionId = $response->json('data.expedition.id');
+        $shipmentId = $response->json('data.shipment.id');
+        $pickupId = $response->json('data.pickup.id');
+
+        $this->assertNotNull(DB::table('expeditions')->where('id', $expeditionId)->first());
+        $this->assertSame($expeditionId, DB::table('shipments')->where('id', $shipmentId)->value('expedition_id'));
+        $this->assertSame($expeditionId, DB::table('pickups')->where('id', $pickupId)->value('expedition_id'));
+    }
+
     private function createUserWithRole(string $roleCode): User
     {
         $user = User::query()->create([
