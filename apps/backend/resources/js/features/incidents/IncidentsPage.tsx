@@ -504,6 +504,40 @@ export function IncidentsPage() {
     setSelectedIncidentIds(items.filter((item) => !item.resolved_at && item.sla_status === 'breached').map((item) => item.id));
   };
 
+  const selectHighPriorityInPage = () => {
+    setBulkScope('selected');
+    setSelectedIncidentIds(items.filter((item) => !item.resolved_at && item.priority === 'high').map((item) => item.id));
+  };
+
+  const clearIncidentSelection = () => {
+    setBulkScope('selected');
+    setSelectedIncidentIds([]);
+  };
+
+  const applyBulkResolvePreset = (preset: 'data_fix' | 'customer_request' | 'operational_replan' | 'clear') => {
+    if (preset === 'clear') {
+      setBulkResolveReasonCode('DATA_CORRECTION');
+      setBulkResolveReasonDetail('');
+      setBulkResolveNotes('Resueltas en lote desde panel web');
+      return;
+    }
+    if (preset === 'customer_request') {
+      setBulkResolveReasonCode('CUSTOMER_REQUEST');
+      setBulkResolveReasonDetail('');
+      setBulkResolveNotes('Resueltas por solicitud o confirmación del cliente.');
+      return;
+    }
+    if (preset === 'operational_replan') {
+      setBulkResolveReasonCode('REPLAN_OPERATION');
+      setBulkResolveReasonDetail('');
+      setBulkResolveNotes('Resueltas tras replanificación operativa validada.');
+      return;
+    }
+    setBulkResolveReasonCode('DATA_CORRECTION');
+    setBulkResolveReasonDetail('');
+    setBulkResolveNotes('Resueltas tras corrección operativa de datos.');
+  };
+
   const onBulkOverrideSla = async () => {
     if (!bulkOverridePriority && !bulkOverrideDueAt.trim()) {
       setResolveError('Define prioridad o due_at para el ajuste SLA masivo.');
@@ -966,6 +1000,24 @@ export function IncidentsPage() {
             </Button>
             <Button type="button" variant="outline" onClick={selectBreachedInPage}>
               Seleccionar SLA vencido
+            </Button>
+            <Button type="button" variant="outline" onClick={selectHighPriorityInPage}>
+              Seleccionar alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={clearIncidentSelection}>
+              Limpiar selección
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('data_fix')}>
+              Preset corrección
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('customer_request')}>
+              Preset cliente
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('operational_replan')}>
+              Preset replanificación
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('clear')}>
+              Limpiar preset
             </Button>
             <Select value={bulkResolveReasonCode} onChange={(event) => setBulkResolveReasonCode(event.target.value as IncidentBulkReasonCode)}>
               {bulkResolveReasonOptions.map((item) => (
