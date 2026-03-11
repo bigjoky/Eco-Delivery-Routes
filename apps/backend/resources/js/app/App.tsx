@@ -42,35 +42,78 @@ function withModuleLoader(element: ReactNode) {
   );
 }
 
-export function App() {
+function authLoadingView() {
+  return <div className="status">Recuperando sesión...</div>;
+}
+
+export function App({
+  initialSessionUser = null,
+}: {
+  initialSessionUser?: { id?: string; name?: string; email?: string } | null;
+}) {
   const [isAuthenticated, setIsAuthenticated] = useState(sessionStore.isAuthenticated());
+  const [authResolved, setAuthResolved] = useState(false);
   const [roles, setRoles] = useState(sessionStore.getRoles());
-  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string } | null>(
+    initialSessionUser ? { name: initialSessionUser.name ?? 'Operador', email: initialSessionUser.email } : null
+  );
 
   useEffect(() => {
-    apiClient.getCurrentUser().then((profile) => {
-      setCurrentUser({ name: profile.name, email: profile.email });
-      setRoles(profile.roles.map((role) => role.code));
-      setIsAuthenticated(true);
-    }).catch(() => undefined);
-  }, []);
+    let cancelled = false;
+
+    const resolveAuth = async () => {
+      try {
+        if (sessionStore.getToken()) {
+          const profile = await apiClient.getCurrentUser();
+          if (cancelled) return;
+          setCurrentUser({ name: profile.name, email: profile.email });
+          setRoles(profile.roles.map((role) => role.code));
+          setIsAuthenticated(true);
+          return;
+        }
+
+        if (initialSessionUser) {
+          const profile = await apiClient.bootstrapWebSession();
+          if (cancelled) return;
+          setCurrentUser({ name: profile.name, email: profile.email });
+          setRoles(profile.roles.map((role) => role.code));
+          setIsAuthenticated(true);
+          return;
+        }
+
+        if (!cancelled) {
+          setCurrentUser(null);
+          setRoles([]);
+          setIsAuthenticated(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentUser(null);
+          setRoles([]);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthResolved(true);
+        }
+      }
+    };
+
+    void resolveAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSessionUser]);
 
   useEffect(() => {
     sessionStore.syncFromStorage();
     return sessionStore.subscribe(() => {
       setIsAuthenticated(sessionStore.isAuthenticated());
       setRoles(sessionStore.getRoles());
+      setAuthResolved(true);
     });
   }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated || roles.length > 0) return;
-    apiClient.getCurrentUser().then((profile) => {
-      setCurrentUser({ name: profile.name, email: profile.email });
-      setRoles(profile.roles.map((role) => role.code));
-      setIsAuthenticated(true);
-    }).catch(() => undefined);
-  }, [isAuthenticated, roles.length]);
 
   async function handleLogout() {
     try {
@@ -86,112 +129,120 @@ export function App() {
     } finally {
       sessionStore.setToken(null);
       sessionStore.setRoles([]);
+      setCurrentUser(null);
+      setAuthResolved(true);
       window.location.href = '/login';
     }
   }
 
+  const protectedRoute = (feature: Parameters<typeof canAccess>[0] | null, element: ReactNode) => {
+    if (!authResolved) {
+      return authLoadingView();
+    }
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    if (feature && !canAccess(feature, roles)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return withModuleLoader(element);
+  };
+
   return (
     <AppShell isAuthenticated={isAuthenticated} roles={roles} currentUser={currentUser} onLogout={handleLogout}>
       <Routes>
-        <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : withModuleLoader(<LoginPage />)} />
-        <Route
-          path="/dashboard"
-          element={isAuthenticated ? withModuleLoader(<DashboardPage />) : <Navigate to="/login" replace />}
-        />
+        <Route path="/" element={authResolved ? <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace /> : authLoadingView()} />
+        <Route path="/login" element={!authResolved ? authLoadingView() : (isAuthenticated ? <Navigate to="/dashboard" replace /> : withModuleLoader(<LoginPage />))} />
+        <Route path="/dashboard" element={protectedRoute(null, <DashboardPage />)} />
         <Route
           path="/shipments"
-          element={isAuthenticated && canAccess('shipments', roles) ? withModuleLoader(<ShipmentsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('shipments', <ShipmentsPage />)}
         />
         <Route
           path="/shipments/:id"
-          element={isAuthenticated && canAccess('shipments', roles) ? withModuleLoader(<ShipmentDetailPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('shipments', <ShipmentDetailPage />)}
         />
         <Route
           path="/routes"
-          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RoutesPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('routes', <RoutesPage />)}
         />
         <Route
           path="/routes/board"
-          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RoutesBoardPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('routes', <RoutesBoardPage />)}
         />
         <Route
           path="/routes/:id"
-          element={isAuthenticated && canAccess('routes', roles) ? withModuleLoader(<RouteDetailPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('routes', <RouteDetailPage />)}
         />
         <Route
           path="/incidents"
-          element={isAuthenticated && canAccess('incidents', roles) ? withModuleLoader(<IncidentsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('incidents', <IncidentsPage />)}
         />
         <Route
           path="/network"
-          element={isAuthenticated && canAccess('network', roles) ? withModuleLoader(<NetworkPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('network', <NetworkPage />)}
         />
         <Route
           path="/partners"
-          element={isAuthenticated && canAccess('partners', roles) ? withModuleLoader(<PartnersPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('partners', <PartnersPage />)}
         />
         <Route
           path="/workforce"
-          element={isAuthenticated && canAccess('workforce', roles) ? withModuleLoader(<WorkforcePage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('workforce', <WorkforcePage />)}
         />
         <Route
           path="/compliance"
-          element={isAuthenticated && canAccess('compliance', roles) ? withModuleLoader(<CompliancePage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('compliance', <CompliancePage />)}
         />
         <Route
           path="/fleet-controls"
-          element={isAuthenticated && canAccess('fleet', roles) ? withModuleLoader(<FleetControlsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('fleet', <FleetControlsPage />)}
         />
         <Route
           path="/tariffs"
-          element={isAuthenticated && canAccess('tariffs', roles) ? withModuleLoader(<TariffsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('tariffs', <TariffsPage />)}
         />
         <Route
           path="/advances"
-          element={isAuthenticated && canAccess('advances', roles) ? withModuleLoader(<AdvancesPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('advances', <AdvancesPage />)}
         />
         <Route
           path="/settlements"
-          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('settlements', <SettlementsPage />)}
         />
         <Route
           path="/settlements/:id"
-          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementDetailPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('settlements', <SettlementDetailPage />)}
         />
         <Route
           path="/settlements/preview"
-          element={isAuthenticated && canAccess('settlements', roles) ? withModuleLoader(<SettlementPreviewPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('settlements', <SettlementPreviewPage />)}
         />
         <Route
           path="/quality"
-          element={isAuthenticated && canAccess('quality', roles)
-            ? (
-              withModuleLoader(<QualityPage />)
-            )
-            : <Navigate to="/login" replace />}
+          element={protectedRoute('quality', <QualityPage />)}
         />
         <Route
           path="/users"
-          element={isAuthenticated && canAccess('users', roles) ? withModuleLoader(<UsersPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('users', <UsersPage />)}
         />
         <Route
           path="/users/:id"
-          element={isAuthenticated && canAccess('users', roles) ? withModuleLoader(<UserDetailPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('users', <UserDetailPage />)}
         />
         <Route
           path="/roles"
-          element={isAuthenticated && canAccess('roles', roles) ? withModuleLoader(<RolesPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('roles', <RolesPage />)}
         />
         <Route
           path="/roles/:id"
-          element={isAuthenticated && canAccess('roles', roles) ? withModuleLoader(<RoleDetailPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('roles', <RoleDetailPage />)}
         />
         <Route
           path="/audit"
-          element={isAuthenticated && canAccess('audit', roles) ? withModuleLoader(<AuditOpsPage />) : <Navigate to="/login" replace />}
+          element={protectedRoute('audit', <AuditOpsPage />)}
         />
-        <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
+        <Route path="*" element={authResolved ? <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace /> : authLoadingView()} />
       </Routes>
     </AppShell>
   );

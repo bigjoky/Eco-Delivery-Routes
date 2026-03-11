@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\Yaml\Yaml;
 
@@ -19,6 +20,34 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::post('/ops/bootstrap-token', function (Request $request) {
+    $user = $request->user();
+
+    if (!$user) {
+        return response()->json([
+            'error' => [
+                'code' => 'AUTH_UNAUTHORIZED',
+                'message' => 'Unauthorized.',
+            ],
+        ], 401);
+    }
+
+    $user->tokens()->where('name', 'web-shell')->delete();
+    $plainTextToken = $user->createToken('web-shell')->plainTextToken;
+
+    return response()->json([
+        'token' => $plainTextToken,
+        'user' => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'status' => $user->status,
+            'last_login_at' => optional($user->last_login_at)->toISOString(),
+            'roles' => $user->roles()->get(['id', 'code', 'name']),
+        ],
+    ]);
+})->middleware('web')->name('ops.bootstrap-token');
 
 Route::middleware('api.docs.access')->group(function () {
     Route::get('/openapi.json', function () {
@@ -54,6 +83,6 @@ Route::middleware('api.docs.access')->group(function () {
 
 Route::get('/ops/{any?}', function () {
     return Inertia::render('AppShellPage');
-})->where('any', '.*')->middleware('auth');
+})->where('any', '.*');
 
 require __DIR__.'/auth.php';

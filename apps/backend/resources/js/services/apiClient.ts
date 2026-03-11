@@ -265,6 +265,30 @@ export const apiClient = {
     return profile;
   },
 
+  async bootstrapWebSession(): Promise<CurrentUserProfile> {
+    if (USE_MOCK) {
+      const profile = await mockApi.getCurrentUser() as CurrentUserProfile;
+      sessionStore.setRoles(profile.roles.map((role) => role.code));
+      return profile;
+    }
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const response = await fetch('/ops/bootstrap-token', {
+      method: 'POST',
+      headers: csrf ? { 'X-CSRF-TOKEN': csrf } : undefined,
+      credentials: 'same-origin',
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || typeof json?.token !== 'string' || !json?.user) {
+      throw new Error(readApiErrorMessage(json, 'No se pudo bootstrapear la sesión web.'));
+    }
+
+    sessionStore.setToken(json.token);
+    const profile = json.user as CurrentUserProfile;
+    sessionStore.setRoles((profile.roles ?? []).map((role) => role.code));
+    return profile;
+  },
+
   async getUsers(filters: {
     q?: string;
     status?: 'pending' | 'active' | 'suspended';
