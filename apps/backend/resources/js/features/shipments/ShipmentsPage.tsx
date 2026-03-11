@@ -2387,6 +2387,29 @@ export function ShipmentsPage() {
               <div className="ops-summary-caption">{showAdvancedCreateOptions ? 'Opciones avanzadas visibles' : 'Vista compacta activa'}</div>
             </div>
           </div>
+          <div className="inline-actions ops-toolbar">
+            {!createHubId.trim() ? null : createOperation === 'shipment' && !hasRecipientSummary ? (
+              <Button type="button" onClick={() => setRecipientModalOpen(true)}>
+                Completar destinatario
+              </Button>
+            ) : (!createSenderDocumentId.trim() && !createSenderPhone.trim() && !createSenderStreet.trim()) ? (
+              <Button type="button" onClick={() => setSenderModalOpen(true)}>
+                {createOperation === 'shipment' ? 'Completar remitente' : 'Completar origen'}
+              </Button>
+            ) : (
+              <Button type="button" onClick={createShipment} disabled={creating || !canCreateShipment}>
+                {creating ? 'Creando...' : operationMeta.actionLabel}
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={() => setShowAdvancedCreateOptions((value) => !value)}>
+              {showAdvancedCreateOptions ? 'Ocultar opciones avanzadas' : 'Mostrar opciones avanzadas'}
+            </Button>
+            {wizardMode ? (
+              <Button type="button" variant="outline" onClick={goNextWizardStep}>
+                Siguiente paso
+              </Button>
+            ) : null}
+          </div>
           <div className="modal-section">
             <div className="modal-section-title">Contexto de alta</div>
             <div className="inline-actions">

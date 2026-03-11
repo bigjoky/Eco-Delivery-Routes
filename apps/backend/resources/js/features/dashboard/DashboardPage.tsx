@@ -298,6 +298,29 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <div className="ops-summary-strip">
+        <Link to="/shipments" className="ops-summary-chip">
+          <div className="ops-summary-label">Operativa</div>
+          <div className="ops-summary-value">Envíos</div>
+          <div className="ops-summary-caption">Alta rápida, filtros y ejecución diaria</div>
+        </Link>
+        <Link to="/routes" className="ops-summary-chip">
+          <div className="ops-summary-label">Planificación</div>
+          <div className="ops-summary-value">Rutas</div>
+          <div className="ops-summary-caption">Asignación, seguimiento y cierre</div>
+        </Link>
+        <Link to="/incidents" className="ops-summary-chip">
+          <div className="ops-summary-label">Control</div>
+          <div className="ops-summary-value">Incidencias</div>
+          <div className="ops-summary-caption">SLA, resolución y priorización</div>
+        </Link>
+        <Link to="/quality" className="ops-summary-chip">
+          <div className="ops-summary-label">Seguimiento</div>
+          <div className="ops-summary-value">Calidad</div>
+          <div className="ops-summary-caption">Rutas bajo umbral y riesgo operativo</div>
+        </Link>
+      </div>
+
       {showFilters && (
         <Card>
           <CardHeader>
@@ -681,6 +704,64 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>Incidencias recientes</CardTitle></CardHeader>
+        <CardContent>
+          <TableWrapper className="desktop-table-only">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Catálogo</TableHead>
+                  <TableHead>Referencia</TableHead>
+                  <TableHead>SLA</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {overview.recent.incidents.length === 0 && <TableRow><TableCell colSpan={4}>Sin incidencias</TableCell></TableRow>}
+                {overview.recent.incidents.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell><Link to={`/incidents?q=${encodeURIComponent(item.id)}`}>{item.id}</Link></TableCell>
+                    <TableCell>{item.catalog_code}</TableCell>
+                    <TableCell>{item.shipment_reference ?? item.incidentable_id}</TableCell>
+                    <TableCell>{item.sla_status ?? '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+          <div className="mobile-ops-list">
+            {overview.recent.incidents.map((item) => (
+              <article key={`recent-incident-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <Link to={`/incidents?q=${encodeURIComponent(item.id)}`}>{item.id}</Link>
+                  <Badge variant={alertVariant(item.sla_status === 'breached' ? 'high' : item.sla_status === 'at_risk' ? 'medium' : 'low')}>
+                    {item.sla_status ?? 'open'}
+                  </Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Catálogo</div>
+                    <div>{item.catalog_code}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Referencia</div>
+                    <div>{item.shipment_reference ?? item.incidentable_id}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  <Link to={`/incidents?q=${encodeURIComponent(item.id)}`} className="btn btn-outline">Abrir</Link>
+                  {item.shipment_reference ? (
+                    <Link to={`/shipments?q=${encodeURIComponent(item.shipment_reference)}`} className="btn btn-outline">Ver envío</Link>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+            {overview.recent.incidents.length === 0 ? <div className="mobile-ops-empty">Sin incidencias</div> : null}
+          </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }

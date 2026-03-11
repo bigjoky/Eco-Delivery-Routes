@@ -841,6 +841,36 @@ export function IncidentsPage() {
         </CardHeader>
         <CardContent>
           <div className="page-grid">
+            {slaRecommendations.length > 0 ? (
+              <div className="ops-summary-strip">
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Prioridad</div>
+                  <div className="ops-summary-value">{slaRecommendations[0].estimated_count}</div>
+                  <div className="ops-summary-caption">{slaRecommendations[0].label}</div>
+                </div>
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Acción recomendada</div>
+                  <div className="ops-summary-value">{slaRecommendations[0].recommended_payload.priority}</div>
+                  <div className="ops-summary-caption">{slaRecommendations[0].recommended_payload.sla_due_at}</div>
+                </div>
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Automatismo</div>
+                  <div className="ops-summary-value">Aplicar</div>
+                  <div className="ops-summary-caption">{slaRecommendations[0].description}</div>
+                </div>
+              </div>
+            ) : null}
+            {slaRecommendations.length > 0 ? (
+              <div className="inline-actions ops-toolbar">
+                <Button
+                  type="button"
+                  onClick={() => { void onApplySlaRecommendation(slaRecommendations[0]); }}
+                  disabled={applyingRecommendationKey !== null}
+                >
+                  {applyingRecommendationKey === slaRecommendations[0].key ? 'Aplicando...' : `Aplicar recomendación principal (${slaRecommendations[0].estimated_count})`}
+                </Button>
+              </div>
+            ) : null}
             {slaRecommendations.length === 0 ? (
               <div className="helper">No hay recomendaciones SLA disponibles.</div>
             ) : (
