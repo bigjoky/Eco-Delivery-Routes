@@ -514,6 +514,26 @@ export function IncidentsPage() {
     setSelectedIncidentIds([]);
   };
 
+  const applyBulkWorkflowPreset = (preset: 'breached_fix' | 'high_customer' | 'open_replan' | 'filtered_replan') => {
+    if (preset === 'breached_fix') {
+      selectBreachedInPage();
+      applyBulkResolvePreset('data_fix');
+      return;
+    }
+    if (preset === 'high_customer') {
+      selectHighPriorityInPage();
+      applyBulkResolvePreset('customer_request');
+      return;
+    }
+    if (preset === 'open_replan') {
+      selectOpenInPage();
+      applyBulkResolvePreset('operational_replan');
+      return;
+    }
+    setBulkScope('filtered');
+    applyBulkResolvePreset('operational_replan');
+  };
+
   const applyBulkResolvePreset = (preset: 'data_fix' | 'customer_request' | 'operational_replan' | 'clear') => {
     if (preset === 'clear') {
       setBulkResolveReasonCode('DATA_CORRECTION');
@@ -1007,6 +1027,18 @@ export function IncidentsPage() {
             <Button type="button" variant="outline" onClick={clearIncidentSelection}>
               Limpiar selección
             </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('breached_fix')}>
+              Flujo SLA vencido
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('high_customer')}>
+              Flujo alta prioridad
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('open_replan')}>
+              Flujo abiertas página
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkWorkflowPreset('filtered_replan')}>
+              Flujo filtro completo
+            </Button>
             <Button type="button" variant="outline" onClick={() => applyBulkResolvePreset('data_fix')}>
               Preset corrección
             </Button>
@@ -1042,6 +1074,9 @@ export function IncidentsPage() {
           </div>
           <div className="helper">
             Impacto cierre masivo: objetivo estimado {bulkTargetEstimate} incidencia(s) abierta(s).
+          </div>
+          <div className="helper">
+            Modo actual: {bulkScope === 'filtered' ? 'todas las incidencias abiertas del filtro activo' : `${selectedIncidentIds.length} incidencia(s) seleccionada(s)`}.
           </div>
           <div className="inline-actions ops-toolbar">
             <Button type="button" variant={showBulkSlaPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkSlaPanel((value) => !value)}>

@@ -1891,6 +1891,44 @@ export function ShipmentsPage() {
     }
   };
 
+  const applyCreateWorkflowPreset = (preset: 'shipment_express_today' | 'shipment_economy_tomorrow' | 'pickup_today' | 'return_today') => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (preset === 'shipment_express_today') {
+      setCreateOperation('shipment');
+      setCreateServiceType('express_1030');
+      setCreateScheduledAt(today.toISOString().slice(0, 10));
+      setCreateError('');
+      if (wizardMode) setWizardStep(2);
+      setRecipientModalOpen(true);
+      return;
+    }
+    if (preset === 'shipment_economy_tomorrow') {
+      setCreateOperation('shipment');
+      setCreateServiceType('economy_parcel');
+      setCreateScheduledAt(tomorrow.toISOString().slice(0, 10));
+      setCreateError('');
+      if (wizardMode) setWizardStep(2);
+      setRecipientModalOpen(true);
+      return;
+    }
+    if (preset === 'pickup_today') {
+      setCreateOperation('pickup_normal');
+      setCreateScheduledAt(today.toISOString().slice(0, 10));
+      setCreateError('');
+      if (wizardMode) setWizardStep(3);
+      setSenderModalOpen(true);
+      return;
+    }
+    setCreateOperation('pickup_return');
+    setCreateScheduledAt(today.toISOString().slice(0, 10));
+    setCreateError('');
+    if (wizardMode) setWizardStep(3);
+    setSenderModalOpen(true);
+  };
+
   const applyBulkPreset = (preset: 'clear' | 'out_today' | 'incident' | 'delivered_today') => {
     const today = new Date().toISOString().slice(0, 10);
     if (preset === 'clear') {
@@ -2322,6 +2360,21 @@ export function ShipmentsPage() {
               </Button>
             </div>
             <div className="inline-actions">
+              <label>Atajos</label>
+              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_express_today')}>
+                Envio express hoy
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_economy_tomorrow')}>
+                Economy mañana
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('pickup_today')}>
+                Recogida hoy
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('return_today')}>
+                Devolucion hoy
+              </Button>
+            </div>
+            <div className="inline-actions">
               <label htmlFor="shipment-template-select">Plantilla rapida</label>
               <select
                 id="shipment-template-select"
@@ -2403,6 +2456,11 @@ export function ShipmentsPage() {
               Modo operador activo: se conservan hub/operación/servicio al crear para carga rápida.
             </div>
           ) : null}
+          <div className="helper">
+            {createOperation === 'shipment'
+              ? 'Flujo recomendado: define planificación, completa destinatario y después remitente.'
+              : 'Flujo recomendado: define planificación y completa primero el origen de recogida.'}
+          </div>
           {wizardMode ? (
             <div className="helper">
               {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'
@@ -2531,6 +2589,11 @@ export function ShipmentsPage() {
                       <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
                         {operationMeta.recipientOptional ? 'Editar destino final' : 'Editar destinatario'}
                       </Button>
+                      {!operationMeta.recipientOptional && !hasRecipientSummary ? (
+                        <Button type="button" onClick={() => setRecipientModalOpen(true)}>
+                          Completar ahora
+                        </Button>
+                      ) : null}
                       <Button type="button" variant="outline" onClick={clearRecipient}>
                         Limpiar
                       </Button>
@@ -2556,6 +2619,9 @@ export function ShipmentsPage() {
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
                         {createOperation === 'shipment' ? 'Editar remitente' : 'Editar origen'}
+                      </Button>
+                      <Button type="button" onClick={() => setSenderModalOpen(true)}>
+                        {createOperation === 'shipment' ? 'Completar remitente' : 'Completar origen'}
                       </Button>
                       <Button type="button" variant="outline" onClick={clearSender}>
                         Limpiar
