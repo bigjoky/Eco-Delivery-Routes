@@ -43,11 +43,14 @@ Con el servidor levantado (`php artisan serve`):
   - levanta `npm run dev`
 
 - `composer run dev:lan`
+  - detecta automáticamente la IP LAN activa del Mac
+  - exporta `APP_URL` y `SANCTUM_STATEFUL_DOMAINS` con esa IP
   - levanta Laravel en `0.0.0.0:8001`
-  - expone Vite en `0.0.0.0:5173`
+  - expone Vite/HMR usando esa IP en `:5173`
   - pensado para pruebas web/PWA desde móvil en red local
 
 Notas:
 
 - si `8000` está ocupado, `php artisan serve` usará el siguiente puerto libre
 - para pruebas móviles usa `composer run dev:lan`
+- puedes forzar la IP con `LAN_IP_OVERRIDE=... composer run dev:lan`
