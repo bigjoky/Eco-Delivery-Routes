@@ -130,6 +130,75 @@ export function ShipmentDetailPanel({
       <div className="page-grid two">
         <Card>
           <CardHeader>
+            <CardTitle className="page-title">Contacto destinatario</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {shipment ? (
+              <div className="kpi-grid">
+                <div>
+                  <div className="helper">Nombre</div>
+                  <div>{shipment.consignee_name ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Documento</div>
+                  <div>{shipment.consignee_document_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Teléfono</div>
+                  <div>{shipment.consignee_phone ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Email</div>
+                  <div>{shipment.consignee_email ?? '-'}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="helper">Sin datos de contacto.</div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="page-title">Dirección operativa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {shipment ? (
+              <div className="kpi-grid">
+                <div>
+                  <div className="helper">Calle</div>
+                  <div>{shipment.address_street ?? shipment.address_line ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Número</div>
+                  <div>{shipment.address_number ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Código postal</div>
+                  <div>{shipment.postal_code ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Ciudad / Provincia</div>
+                  <div>{[shipment.city, shipment.province].filter(Boolean).join(' · ') || '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">País</div>
+                  <div>{shipment.country ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Notas</div>
+                  <div>{shipment.address_notes ?? '-'}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="helper">Sin dirección disponible.</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="page-grid two">
+        <Card>
+          <CardHeader>
             <CardTitle className="page-title">Tracking</CardTitle>
           </CardHeader>
           <CardContent>

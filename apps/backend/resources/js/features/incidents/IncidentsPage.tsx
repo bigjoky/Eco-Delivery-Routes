@@ -564,6 +564,25 @@ export function IncidentsPage() {
     setBulkResolveNotes('Resueltas tras corrección operativa de datos.');
   };
 
+  const applyBulkSlaPreset = (preset: 'breached_2h' | 'atrisk_4h' | 'clear') => {
+    if (preset === 'clear') {
+      setBulkOverridePriority('');
+      setBulkOverrideDueAt('');
+      setBulkOverrideReason('');
+      return;
+    }
+
+    const dueAt = new Date();
+    dueAt.setHours(dueAt.getHours() + (preset === 'breached_2h' ? 2 : 4));
+    setBulkOverridePriority('high');
+    setBulkOverrideDueAt(dueAt.toISOString());
+    setBulkOverrideReason(
+      preset === 'breached_2h'
+        ? 'Repriorización operativa automática para incidencias SLA vencidas.'
+        : 'Repriorización operativa preventiva para incidencias SLA en riesgo.'
+    );
+  };
+
   const onBulkOverrideSla = async () => {
     if (!bulkOverridePriority && !bulkOverrideDueAt.trim()) {
       setResolveError('Define prioridad o due_at para el ajuste SLA masivo.');
@@ -1189,6 +1208,17 @@ export function IncidentsPage() {
           {showBulkSlaPanel ? (
             <div className="filters-panel">
               <div className="helper">Override SLA masivo</div>
+              <div className="inline-actions ops-toolbar">
+                <Button type="button" variant="outline" onClick={() => applyBulkSlaPreset('breached_2h')}>
+                  Vencidas +2h
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkSlaPreset('atrisk_4h')}>
+                  En riesgo +4h
+                </Button>
+                <Button type="button" variant="outline" onClick={() => applyBulkSlaPreset('clear')}>
+                  Limpiar preset
+                </Button>
+              </div>
               <div className="form-row">
                 <div>
                   <label>Prioridad</label>

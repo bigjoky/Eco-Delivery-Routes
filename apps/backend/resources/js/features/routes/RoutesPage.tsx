@@ -767,6 +767,21 @@ export function RoutesPage() {
               <div className="ops-summary-caption">{showFilters ? 'Panel visible' : 'Panel oculto'}</div>
             </div>
           </div>
+          <div className="inline-actions ops-toolbar">
+            <Link to="/routes/board" className="btn btn-outline">Abrir board</Link>
+            <Button type="button" variant="outline" onClick={() => setQuickRange('today')}>
+              Plan de hoy
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setQuickRange('tomorrow')}>
+              Plan de mañana
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { setStatus('planned'); setQuickRange('today'); }}>
+              Planned hoy
+            </Button>
+            <Button type="button" variant="outline" onClick={() => { setStatus('in_progress'); setQuickRange('today'); }}>
+              En ruta hoy
+            </Button>
+          </div>
           <div className="kpi-grid">
             <div className="kpi-item">
               <div className="kpi-label">Total</div>
