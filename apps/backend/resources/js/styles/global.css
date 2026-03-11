@@ -567,6 +567,44 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+.modal-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-muted) 100%);
+}
+
+.modal-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.modal-section-copy {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modal-actions-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.wizard-summary-card {
+  display: grid;
+  gap: 8px;
+}
+
+.wizard-summary-line {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .badge-default {
   background: #e2e8f0;
   color: #0f172a;

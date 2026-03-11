@@ -364,13 +364,18 @@ export function NetworkPage() {
         )}
       >
         <div className="page-grid">
-          <div className="helper">1) Selecciona tipo de nodo</div>
+          <div className="modal-section">
+          <div className="modal-section-title">Paso 1 · Tipo de nodo</div>
+          <div className="modal-section-copy">Crea hubs, depots y puntos desde un único flujo operativo.</div>
           <div className="inline-actions">
             <Button type="button" variant={createType === 'hub' ? 'secondary' : 'outline'} onClick={() => setCreateType('hub')}>Hub</Button>
             <Button type="button" variant={createType === 'depot' ? 'secondary' : 'outline'} onClick={() => setCreateType('depot')}>Depot</Button>
             <Button type="button" variant={createType === 'point' ? 'secondary' : 'outline'} onClick={() => setCreateType('point')}>Punto</Button>
           </div>
+          </div>
           {createType === 'hub' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos del hub</div>
             <div className="form-row">
               <div>
                 <label htmlFor="create-node-hub-name">Nombre</label>
@@ -381,8 +386,11 @@ export function NetworkPage() {
                 <Input id="create-node-hub-city" value={createHubCity} onChange={(event) => setCreateHubCity(event.target.value)} placeholder="Malaga" />
               </div>
             </div>
+            </div>
           ) : null}
           {createType === 'depot' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos del depot</div>
             <div className="form-row">
               <div>
                 <label htmlFor="create-node-depot-hub">Hub</label>
@@ -400,8 +408,11 @@ export function NetworkPage() {
                 <Input id="create-node-depot-city" value={createDepotCity} onChange={(event) => setCreateDepotCity(event.target.value)} placeholder="Malaga" />
               </div>
             </div>
+            </div>
           ) : null}
           {createType === 'point' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos del punto</div>
             <div className="form-row">
               <div>
                 <label htmlFor="create-node-point-hub">Hub</label>
@@ -425,6 +436,7 @@ export function NetworkPage() {
                 <label htmlFor="create-node-point-city">Ciudad</label>
                 <Input id="create-node-point-city" value={createPointCity} onChange={(event) => setCreatePointCity(event.target.value)} placeholder="Malaga" />
               </div>
+            </div>
             </div>
           ) : null}
         </div>

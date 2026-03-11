@@ -600,19 +600,27 @@ export function PartnersPage() {
         )}
       >
         <div className="page-grid">
-          <div className="helper">1) Selecciona qué quieres crear</div>
+          <div className="modal-section">
+          <div className="modal-section-title">Paso 1 · Tipo de partner</div>
+          <div className="modal-section-copy">Selecciona la entidad a crear y completa únicamente los campos operativos mínimos.</div>
           <div className="inline-actions">
             <Button type="button" variant={createType === 'subcontractor' ? 'secondary' : 'outline'} onClick={() => setCreateType('subcontractor')}>Subcontrata</Button>
             <Button type="button" variant={createType === 'driver' ? 'secondary' : 'outline'} onClick={() => setCreateType('driver')}>Conductor</Button>
             <Button type="button" variant={createType === 'vehicle' ? 'secondary' : 'outline'} onClick={() => setCreateType('vehicle')}>Vehículo</Button>
           </div>
+          </div>
           {createType === 'subcontractor' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos de subcontrata</div>
             <div className="form-row">
               <div><label>Nombre</label><Input value={subcontractorName} onChange={(e) => setSubcontractorName(e.target.value)} placeholder="Eco Partner Málaga" /></div>
               <div><label>CIF/NIF</label><Input value={subcontractorTaxId} onChange={(e) => setSubcontractorTaxId(e.target.value)} placeholder="B12345678" /></div>
             </div>
+            </div>
           ) : null}
           {createType === 'driver' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos de conductor</div>
             <div className="form-row">
               <div><label>Código</label><Input value={driverCode} onChange={(e) => setDriverCode(e.target.value)} placeholder="DRV-001" /></div>
               <div><label>DNI/NIE</label><Input value={driverDni} onChange={(e) => setDriverDni(e.target.value)} placeholder="12345678Z" /></div>
@@ -627,8 +635,11 @@ export function PartnersPage() {
                 </Select>
               </div>
             </div>
+            </div>
           ) : null}
           {createType === 'vehicle' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos de vehículo</div>
             <div className="form-row">
               <div><label>Código</label><Input value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} placeholder="VEH-001" /></div>
               <div><label>Matrícula</label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} placeholder="1234-ABC" /></div>
@@ -650,6 +661,7 @@ export function PartnersPage() {
                   ))}
                 </Select>
               </div>
+            </div>
             </div>
           ) : null}
         </div>
