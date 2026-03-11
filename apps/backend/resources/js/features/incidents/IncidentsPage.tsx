@@ -874,6 +874,28 @@ export function IncidentsPage() {
           <CardDescription>Filtra por estado, tipo, categoria o referencia.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="ops-summary-strip">
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Abiertas</div>
+              <div className="ops-summary-value">{incidentSummary.open}</div>
+              <div className="ops-summary-caption">Página {incidentSummary.pageCount} · Resueltas {incidentSummary.resolved}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">SLA crítico</div>
+              <div className="ops-summary-value">{board?.by_sla_status.breached ?? 0}</div>
+              <div className="ops-summary-caption">At risk {board?.by_sla_status.at_risk ?? 0}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Selección</div>
+              <div className="ops-summary-value">{selectedIncidentIds.length}</div>
+              <div className="ops-summary-caption">{bulkScope === 'filtered' ? 'Acción sobre filtro completo' : 'Acción sobre selección manual'}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Filtros</div>
+              <div className="ops-summary-value">{activeFiltersCount}</div>
+              <div className="ops-summary-caption">{showFilters ? 'Panel visible' : 'Panel oculto'}</div>
+            </div>
+          </div>
           <div className="kpi-grid">
             <div className="kpi-item">
               <div className="kpi-label">En página</div>

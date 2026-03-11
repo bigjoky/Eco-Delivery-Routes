@@ -743,6 +743,28 @@ export function RoutesPage() {
           <div className="page-subtitle">Listado operativo con filtros por estado, hub y fechas.</div>
         </CardHeader>
         <CardContent>
+          <div className="ops-summary-strip">
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Total</div>
+              <div className="ops-summary-value">{routeSummary.total}</div>
+              <div className="ops-summary-caption">Página {routeSummary.pageCount}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">En ejecución</div>
+              <div className="ops-summary-value">{routeSummary.inProgress}</div>
+              <div className="ops-summary-caption">Planned {routeSummary.planned} · Completed {routeSummary.completed}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Selección</div>
+              <div className="ops-summary-value">{selectedRouteIds.length}</div>
+              <div className="ops-summary-caption">Lista preparada para acciones masivas</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Filtros</div>
+              <div className="ops-summary-value">{activeFiltersCount}</div>
+              <div className="ops-summary-caption">{showFilters ? 'Panel visible' : 'Panel oculto'}</div>
+            </div>
+          </div>
           <div className="kpi-grid">
             <div className="kpi-item">
               <div className="kpi-label">Total</div>

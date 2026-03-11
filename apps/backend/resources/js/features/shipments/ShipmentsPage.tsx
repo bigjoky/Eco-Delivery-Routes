@@ -3243,6 +3243,28 @@ export function ShipmentsPage() {
           <div className="page-subtitle">Listado operativo con filtros rápidos y exportación.</div>
         </CardHeader>
         <CardContent>
+          <div className="ops-summary-strip">
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Total</div>
+              <div className="ops-summary-value">{shipmentSummary.total}</div>
+              <div className="ops-summary-caption">Página {shipmentSummary.pageCount}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Entregas hoy</div>
+              <div className="ops-summary-value">{shipmentSummary.delivered}</div>
+              <div className="ops-summary-caption">Out {shipmentSummary.out} · Incident {shipmentSummary.incident}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Selección</div>
+              <div className="ops-summary-value">{selectedShipmentIds.length}</div>
+              <div className="ops-summary-caption">{bulkApplyToFiltered ? 'Aplicación sobre filtro activo' : 'Aplicación sobre selección manual'}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Filtros</div>
+              <div className="ops-summary-value">{activeFiltersCount}</div>
+              <div className="ops-summary-caption">{showFilters ? 'Panel visible' : 'Panel oculto'}</div>
+            </div>
+          </div>
           <div className="kpi-grid">
             <div className="kpi-item">
               <div className="kpi-label">Total</div>

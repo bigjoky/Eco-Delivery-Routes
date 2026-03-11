@@ -275,6 +275,29 @@ export function DashboardPage() {
         </div>
       </header>
 
+      <div className="ops-summary-strip">
+        <div className="ops-summary-chip">
+          <div className="ops-summary-label">Envíos</div>
+          <div className="ops-summary-value">{overview.totals.shipments}</div>
+          <div className="ops-summary-caption">Created {overview.shipments_by_status.created} · Delivered {overview.shipments_by_status.delivered}</div>
+        </div>
+        <div className="ops-summary-chip">
+          <div className="ops-summary-label">Rutas</div>
+          <div className="ops-summary-value">{overview.totals.routes}</div>
+          <div className="ops-summary-caption">Planned {overview.routes_by_status.planned} · In progress {overview.routes_by_status.in_progress}</div>
+        </div>
+        <div className="ops-summary-chip">
+          <div className="ops-summary-label">Incidencias</div>
+          <div className="ops-summary-value">{overview.totals.incidents_open}</div>
+          <div className="ops-summary-caption">At risk {overview.sla.at_risk} · Breached {overview.sla.breached}</div>
+        </div>
+        <div className="ops-summary-chip">
+          <div className="ops-summary-label">Calidad ruta</div>
+          <div className="ops-summary-value">{overview.quality.route_avg.toFixed(1)}%</div>
+          <div className="ops-summary-caption">Umbral {overview.totals.quality_threshold.toFixed(1)}% · Bajo umbral {overview.quality.below_threshold_routes}</div>
+        </div>
+      </div>
+
       {showFilters && (
         <Card>
           <CardHeader>
