@@ -34,9 +34,11 @@ const UserDetailPage = lazy(() => import('../features/users/UserDetailPage').the
 
 function withModuleLoader(element: ReactNode) {
   return (
-    <Suspense fallback={<div className="status">Cargando módulo...</div>}>
-      {element}
-    </Suspense>
+    <ErrorBoundary fallback={<div className="helper">Se produjo un error al cargar este módulo. Recarga la página.</div>}>
+      <Suspense fallback={<div className="status">Cargando módulo...</div>}>
+        {element}
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
@@ -165,9 +167,7 @@ export function App() {
           path="/quality"
           element={isAuthenticated && canAccess('quality', roles)
             ? (
-              <ErrorBoundary fallback={<div className="helper">No se pudo cargar KPI Calidad.</div>}>
-                {withModuleLoader(<QualityPage />)}
-              </ErrorBoundary>
+              withModuleLoader(<QualityPage />)
             )
             : <Navigate to="/login" replace />}
         />
