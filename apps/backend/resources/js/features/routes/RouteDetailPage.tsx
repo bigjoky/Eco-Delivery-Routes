@@ -945,6 +945,10 @@ export function RouteDetailPage() {
 
   return (
     <section className="page-grid">
+      <div className="page-header">
+        <h1 className="page-title">Detalle de ruta</h1>
+        <div className="page-subtitle">Asignación, manifest y control de paradas en una vista operativa unificada.</div>
+      </div>
       <Modal
         open={bulkUpdatePreviewOpen}
         onClose={() => setBulkUpdatePreviewOpen(false)}

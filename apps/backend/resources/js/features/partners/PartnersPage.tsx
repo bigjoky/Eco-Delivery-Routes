@@ -637,6 +637,10 @@ export function PartnersPage() {
         <span className="helper">/</span>
         <span className="helper">Partners</span>
       </div>
+      <div className="page-header">
+        <h1 className="page-title">Partners</h1>
+        <div className="page-subtitle">Gestión operativa de subcontratas, conductores y vehículos con acciones rápidas y trazabilidad.</div>
+      </div>
       <Modal
         open={createOpen}
         onClose={closeCreateWizard}

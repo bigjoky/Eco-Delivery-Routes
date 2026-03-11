@@ -608,6 +608,10 @@ export function IncidentsPage() {
         <span className="helper">/</span>
         <span className="helper">Incidencias</span>
       </div>
+      <div className="page-header">
+        <h1 className="page-title">Incidencias</h1>
+        <div className="page-subtitle">Registro, priorización y resolución operativa con control de SLA y auditoría bajo demanda.</div>
+      </div>
       <Modal
         open={resolveTarget !== null}
         title={`Resolver incidencia · ${resolveTarget?.reference ?? resolveTarget?.id ?? ''}`}
