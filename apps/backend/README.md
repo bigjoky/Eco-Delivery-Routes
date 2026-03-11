@@ -33,3 +33,21 @@ Con el servidor levantado (`php artisan serve`):
 ## Checklist CI sugerido
 
 - Tests: `./vendor/bin/phpunit`
+
+## Desarrollo local estilo Laravel 11
+
+- `composer run dev`
+  - levanta `php artisan serve`
+  - levanta `php artisan queue:listen --tries=1`
+  - levanta `php artisan pail --timeout=0`
+  - levanta `npm run dev`
+
+- `composer run dev:lan`
+  - levanta Laravel en `0.0.0.0:8001`
+  - expone Vite en `0.0.0.0:5173`
+  - pensado para pruebas web/PWA desde móvil en red local
+
+Notas:
+
+- si `8000` está ocupado, `php artisan serve` usará el siguiente puerto libre
+- para pruebas móviles usa `composer run dev:lan`

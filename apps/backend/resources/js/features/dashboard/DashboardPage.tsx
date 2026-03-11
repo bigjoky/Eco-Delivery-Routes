@@ -4,6 +4,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
+import InstallPwaButton from '../../components/InstallPwaButton';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
@@ -231,6 +232,7 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="dashboard-controls">
+          <InstallPwaButton />
           <select
             className="select"
             value={period}

@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "dev:host": "vite --host 0.0.0.0 --port 5173",
         "build": "vite build",
         "test": "vitest run",
         "lint": "node -e \"console.log('lint placeholder: configure eslint/typescript checks when network is available')\""
@@ -22,6 +23,7 @@
         "@types/react-dom": "^18.3.1",
         "@vitejs/plugin-react": "^4.2.0",
         "autoprefixer": "^10.4.12",
+        "concurrently": "^9.2.1",
         "laravel-vite-plugin": "^1.0.5",
         "postcss": "^8.4.31",
         "react": "^18.3.1",
