@@ -1127,8 +1127,9 @@ export function RouteDetailPage() {
             </Button>
           </div>
           </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Carga masiva</div>
           <div className="inline-actions">
-            <strong>Bulk add:</strong>
             <label htmlFor="bulk-shipment-ids">Envios</label>
             <select
               id="bulk-shipment-ids"
@@ -1165,6 +1166,9 @@ export function RouteDetailPage() {
               {bulkAdding ? 'Agregando...' : 'Agregar seleccionados'}
             </Button>
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Alta individual y utilidades</div>
           <div className="inline-actions">
             <label htmlFor="stop-type">Tipo</label>
             <select id="stop-type" value={stopType} onChange={(event) => setStopType(event.target.value as 'DELIVERY' | 'PICKUP')}>
@@ -1227,6 +1231,9 @@ export function RouteDetailPage() {
               {recalculatingEta ? 'Recalculando ETA...' : 'Recalcular ETA'}
             </Button>
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Selección y limpieza</div>
           <div className="inline-actions">
             <Button
               type="button"
@@ -1254,6 +1261,9 @@ export function RouteDetailPage() {
               {bulkDeletingStops ? 'Eliminando...' : 'Eliminar seleccionadas'}
             </Button>
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Plantillas y presets</div>
           <div className="filters-panel">
             <div className="inline-actions">
               <label htmlFor="bulk-template-select">Plantilla masiva</label>
@@ -1309,6 +1319,9 @@ export function RouteDetailPage() {
             <Button type="button" variant="outline" onClick={() => applyBulkPreset('delay_30')} disabled={bulkUpdatingStops || bulkDeletingStops}>Retrasar +30m</Button>
             <Button type="button" variant="outline" onClick={() => applyBulkPreset('clear')} disabled={bulkUpdatingStops || bulkDeletingStops}>Limpiar</Button>
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Cambios masivos</div>
           <div className="inline-actions">
             <label htmlFor="bulk-stop-status">Estado masivo</label>
             <select
@@ -1377,6 +1390,7 @@ export function RouteDetailPage() {
             >
               Previsualizar cambios
             </Button>
+          </div>
           </div>
           <TableWrapper>
             <Table>

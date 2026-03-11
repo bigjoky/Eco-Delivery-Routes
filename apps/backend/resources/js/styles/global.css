@@ -387,7 +387,10 @@ label {
 
 .card-content > .inline-actions + .filters-panel,
 .card-content > .filters-panel + .inline-actions,
-.card-content > .filters-panel + .filters-panel {
+.card-content > .filters-panel + .filters-panel,
+.card-content > .modal-section + .modal-section,
+.card-content > .modal-section + .filters-panel,
+.card-content > .filters-panel + .modal-section {
   margin-top: 2px;
 }
 

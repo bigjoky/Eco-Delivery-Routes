@@ -912,7 +912,12 @@ export function ShipmentsPage() {
     return null;
   };
 
-  const goPrevWizardStep = () => setWizardStep((value) => Math.max(1, value - 1) as 1 | 2 | 3 | 4);
+  const goPrevWizardStep = () => {
+    setWizardStep((value) => {
+      if (createOperation !== 'shipment' && value === 3) return 1;
+      return Math.max(1, value - 1) as 1 | 2 | 3 | 4;
+    });
+  };
 
   const goNextWizardStep = () => {
     const blockingError = validateWizardStep(wizardStep);
@@ -921,7 +926,10 @@ export function ShipmentsPage() {
       return;
     }
     setCreateError('');
-    setWizardStep((value) => Math.min(4, value + 1) as 1 | 2 | 3 | 4);
+    setWizardStep((value) => {
+      if (createOperation !== 'shipment' && value === 1) return 3;
+      return Math.min(4, value + 1) as 1 | 2 | 3 | 4;
+    });
   };
 
   const applyOperatorDefaults = () => {
@@ -1834,6 +1842,55 @@ export function ShipmentsPage() {
     setCreateScheduledAt(base.toISOString().slice(0, 10));
   };
 
+  const operationMeta = {
+    shipment: {
+      title: 'Crear envio',
+      subtitle: 'Entrega programada con destinatario, remitente y servicio.',
+      checklistReady: 'Alta lista para crear envio.',
+      actionLabel: 'Crear envio',
+      senderTitle: 'Remitente',
+      recipientTitle: 'Destinatario',
+      recipientOptional: false,
+    },
+    pickup_normal: {
+      title: 'Crear recogida',
+      subtitle: 'Alta de recogida normal centrada en origen, hub y programación.',
+      checklistReady: 'Alta lista para crear recogida.',
+      actionLabel: 'Crear recogida',
+      senderTitle: 'Origen de recogida',
+      recipientTitle: 'Destino final (opcional)',
+      recipientOptional: true,
+    },
+    pickup_return: {
+      title: 'Crear devolucion',
+      subtitle: 'Alta de devolución con origen operativo y retorno controlado.',
+      checklistReady: 'Alta lista para crear devolucion.',
+      actionLabel: 'Crear devolucion',
+      senderTitle: 'Origen de devolucion',
+      recipientTitle: 'Destino final (opcional)',
+      recipientOptional: true,
+    },
+  }[createOperation];
+
+  const hasRecipientSummary = Boolean(
+    createConsigneeDocumentId.trim()
+    || createPhone.trim()
+    || createStreet.trim()
+    || createCity.trim()
+    || createPostalCode.trim()
+    || createConsignee.trim()
+    || createConsigneeFirstName.trim()
+    || createConsigneeLastName.trim()
+  );
+
+  const applyOperationPreset = (operation: 'shipment' | 'pickup_normal' | 'pickup_return') => {
+    setCreateOperation(operation);
+    setCreateError('');
+    if (wizardMode) {
+      setWizardStep(operation === 'shipment' ? 1 : 3);
+    }
+  };
+
   const applyBulkPreset = (preset: 'clear' | 'out_today' | 'incident' | 'delivered_today') => {
     const today = new Date().toISOString().slice(0, 10);
     if (preset === 'clear') {
@@ -2246,84 +2303,100 @@ export function ShipmentsPage() {
     <section className="page-grid">
       <Card>
         <CardHeader>
-          <CardTitle className="page-title">Crear Envio</CardTitle>
-          <div className="page-subtitle">Operación, contactos y programación en un flujo rápido.</div>
+          <CardTitle className="page-title">{operationMeta.title}</CardTitle>
+          <div className="page-subtitle">{operationMeta.subtitle}</div>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <label htmlFor="shipment-template-select">Plantilla rapida</label>
-            <select
-              id="shipment-template-select"
-              value={selectedTemplateId}
-              onChange={(event) => {
-                const templateId = event.target.value;
-                setSelectedTemplateId(templateId);
-                const template = shipmentTemplates.find((item) => item.id === templateId);
-                if (template) applyTemplate(template);
-              }}
-            >
-              <option value="">Seleccionar plantilla</option>
-              {shipmentTemplates.map((template) => (
-                <option key={template.id} value={template.id}>{template.name}</option>
-              ))}
-            </select>
-            <input
-              value={newTemplateName}
-              onChange={(event) => setNewTemplateName(event.target.value)}
-              placeholder="Nombre nueva plantilla"
-            />
-            <Button type="button" variant="outline" onClick={saveCurrentAsTemplate}>
-              Guardar plantilla
-            </Button>
-            <Button type="button" variant="outline" onClick={deleteSelectedTemplate} disabled={!selectedTemplateId}>
-              Eliminar plantilla
-            </Button>
-          </div>
-          <div className="inline-actions">
-            <label htmlFor="shipment-operator-mode">Modo operador (alta repetitiva)</label>
-            <input
-              id="shipment-operator-mode"
-              type="checkbox"
-              checked={operatorMode}
-              onChange={(event) => {
-                const enabled = event.target.checked;
-                setOperatorMode(enabled);
-                if (enabled) setWizardMode(false);
-              }}
-            />
-            <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
-              Guardar defaults
-            </Button>
-            <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
-              Aplicar defaults
-            </Button>
-          </div>
-          <div className="inline-actions">
-            <label htmlFor="shipment-wizard-mode">Asistente paso a paso (beta)</label>
-            <input
-              id="shipment-wizard-mode"
-              type="checkbox"
-              checked={wizardMode}
-              onChange={(event) => {
-                const enabled = event.target.checked;
-                if (operatorMode && enabled) {
-                  setCreateError('Desactiva modo operador para usar asistente.');
-                  return;
-                }
-                setWizardMode(enabled);
-              }}
-            />
-            {wizardMode ? (
-              <>
-                <Button type="button" variant="outline" onClick={goPrevWizardStep}>
-                  Paso anterior
-                </Button>
-                <Button type="button" variant="outline" onClick={goNextWizardStep}>
-                  Siguiente paso
-                </Button>
-                <span className="helper">Paso {wizardStep}/4</span>
-              </>
-            ) : null}
+          <div className="modal-section">
+            <div className="modal-section-title">Contexto de alta</div>
+            <div className="inline-actions">
+              <label>Operacion</label>
+              <Button type="button" variant={createOperation === 'shipment' ? 'default' : 'outline'} onClick={() => applyOperationPreset('shipment')}>
+                Envio
+              </Button>
+              <Button type="button" variant={createOperation === 'pickup_normal' ? 'default' : 'outline'} onClick={() => applyOperationPreset('pickup_normal')}>
+                Recogida
+              </Button>
+              <Button type="button" variant={createOperation === 'pickup_return' ? 'default' : 'outline'} onClick={() => applyOperationPreset('pickup_return')}>
+                Devolucion
+              </Button>
+            </div>
+            <div className="inline-actions">
+              <label htmlFor="shipment-template-select">Plantilla rapida</label>
+              <select
+                id="shipment-template-select"
+                value={selectedTemplateId}
+                onChange={(event) => {
+                  const templateId = event.target.value;
+                  setSelectedTemplateId(templateId);
+                  const template = shipmentTemplates.find((item) => item.id === templateId);
+                  if (template) applyTemplate(template);
+                }}
+              >
+                <option value="">Seleccionar plantilla</option>
+                {shipmentTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+              <input
+                value={newTemplateName}
+                onChange={(event) => setNewTemplateName(event.target.value)}
+                placeholder="Nombre nueva plantilla"
+              />
+              <Button type="button" variant="outline" onClick={saveCurrentAsTemplate}>
+                Guardar plantilla
+              </Button>
+              <Button type="button" variant="outline" onClick={deleteSelectedTemplate} disabled={!selectedTemplateId}>
+                Eliminar plantilla
+              </Button>
+            </div>
+            <div className="inline-actions">
+              <label htmlFor="shipment-operator-mode">Modo operador</label>
+              <input
+                id="shipment-operator-mode"
+                type="checkbox"
+                checked={operatorMode}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setOperatorMode(enabled);
+                  if (enabled) setWizardMode(false);
+                }}
+              />
+              <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
+                Guardar defaults
+              </Button>
+              <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
+                Aplicar defaults
+              </Button>
+              <label htmlFor="shipment-wizard-mode">Asistente</label>
+              <input
+                id="shipment-wizard-mode"
+                type="checkbox"
+                checked={wizardMode}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  if (operatorMode && enabled) {
+                    setCreateError('Desactiva modo operador para usar asistente.');
+                    return;
+                  }
+                  setWizardMode(enabled);
+                  if (enabled && createOperation !== 'shipment' && wizardStep === 2) {
+                    setWizardStep(3);
+                  }
+                }}
+              />
+              {wizardMode ? (
+                <>
+                  <Button type="button" variant="outline" onClick={goPrevWizardStep}>
+                    Paso anterior
+                  </Button>
+                  <Button type="button" variant="outline" onClick={goNextWizardStep}>
+                    Siguiente paso
+                  </Button>
+                  <span className="helper">Paso {wizardStep}/4</span>
+                </>
+              ) : null}
+            </div>
           </div>
           {operatorMode ? (
             <div className="helper">
@@ -2333,12 +2406,14 @@ export function ShipmentsPage() {
           {wizardMode ? (
             <div className="helper">
               {wizardStep === 1 ? 'Paso 1: define hub, operación y fecha.'
-                : wizardStep === 2 ? 'Paso 2: completa destinatario.'
-                : wizardStep === 3 ? 'Paso 3: completa remitente.'
-                : 'Paso 4: revisa y crea envío/recogida.'}
+                : wizardStep === 2 ? (createOperation === 'shipment' ? 'Paso 2: completa destinatario.' : 'Paso 2 opcional: define destino final si aplica.')
+                : wizardStep === 3 ? (createOperation === 'shipment' ? 'Paso 3: completa remitente.' : 'Paso 3: completa origen de recogida.')
+                : `Paso 4: revisa y crea ${createOperation === 'shipment' ? 'envio' : 'recogida'}.`}
             </div>
           ) : null}
           {!wizardMode || wizardStep === 1 ? (
+          <div className="modal-section">
+            <div className="modal-section-title">Planificación operativa</div>
           <div className="form-row">
             <div>
               <label htmlFor="create-shipment-hub">Hub</label>
@@ -2383,18 +2458,6 @@ export function ShipmentsPage() {
               />
               {createFieldErrors.externalReference ? <div className="helper error">{createFieldErrors.externalReference}</div> : null}
             </div>
-            <div>
-              <label htmlFor="create-shipment-operation">Operacion</label>
-              <select
-                id="create-shipment-operation"
-                value={createOperation}
-                onChange={(event) => setCreateOperation(event.target.value as 'shipment' | 'pickup_normal' | 'pickup_return')}
-              >
-                <option value="shipment">Envio</option>
-                <option value="pickup_normal">Recogida</option>
-                <option value="pickup_return">Devolucion</option>
-              </select>
-            </div>
             {createOperation === 'shipment' ? (
               <div>
                 <label htmlFor="create-shipment-service">Tipo de envio</label>
@@ -2432,7 +2495,9 @@ export function ShipmentsPage() {
                 <div className="helper">
                   Hora automática por servicio: {serviceTypeLabel(createServiceType)} ({serviceDefaultTime[createServiceType].slice(0, 5)}).
                 </div>
-              ) : null}
+              ) : (
+                <div className="helper">Hora operativa por defecto: 09:00 para recogidas.</div>
+              )}
               {createOperation === 'shipment' && createServiceType === 'business_parcel' ? (
                 <div className="helper">Business Parcel: solo L-V.</div>
               ) : null}
@@ -2442,14 +2507,15 @@ export function ShipmentsPage() {
               {createFieldErrors.scheduledAt ? <div className="helper error">{createFieldErrors.scheduledAt}</div> : null}
             </div>
           </div>
+          </div>
           ) : null}
 
           {(!wizardMode || wizardStep === 2 || wizardStep === 3 || wizardStep === 4) ? (
             <div className="page-grid two">
-              {!wizardMode || wizardStep === 2 || wizardStep === 4 ? (
+              {(!operationMeta.recipientOptional || hasRecipientSummary) && (!wizardMode || wizardStep === 2 || wizardStep === 4) ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Destinatario</CardTitle>
+                    <CardTitle>{operationMeta.recipientTitle}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="wizard-summary-card">
@@ -2463,7 +2529,7 @@ export function ShipmentsPage() {
                     </div>
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setRecipientModalOpen(true)}>
-                        Editar destinatario
+                        {operationMeta.recipientOptional ? 'Editar destino final' : 'Editar destinatario'}
                       </Button>
                       <Button type="button" variant="outline" onClick={clearRecipient}>
                         Limpiar
@@ -2475,7 +2541,7 @@ export function ShipmentsPage() {
               {!wizardMode || wizardStep === 3 || wizardStep === 4 ? (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Remitente</CardTitle>
+                    <CardTitle>{operationMeta.senderTitle}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="wizard-summary-card">
@@ -2489,7 +2555,7 @@ export function ShipmentsPage() {
                     </div>
                     <div className="inline-actions">
                       <Button type="button" variant="outline" onClick={() => setSenderModalOpen(true)}>
-                        Editar remitente
+                        {createOperation === 'shipment' ? 'Editar remitente' : 'Editar origen'}
                       </Button>
                       <Button type="button" variant="outline" onClick={clearSender}>
                         Limpiar
@@ -2504,7 +2570,7 @@ export function ShipmentsPage() {
           {!wizardMode || wizardStep === 4 ? (
           <div className="filters-panel">
             <div className="helper">
-              Checklist de alta: {canCreateShipment ? 'lista para crear' : `faltan ${createBlockingChecks.length} validaciones`}
+              Checklist de alta: {canCreateShipment ? operationMeta.checklistReady : `faltan ${createBlockingChecks.length} validaciones`}
             </div>
             {createBlockingChecks.slice(0, 4).map((issue) => (
               <div key={issue} className="helper error">{issue}</div>
@@ -2518,7 +2584,7 @@ export function ShipmentsPage() {
           {!wizardMode || wizardStep === 4 ? (
           <div className="inline-actions">
             <Button type="button" onClick={createShipment} disabled={creating || !canCreateShipment}>
-              {creating ? 'Creando...' : createOperation === 'shipment' ? 'Crear envio' : 'Crear recogida'}
+              {creating ? 'Creando...' : operationMeta.actionLabel}
             </Button>
           </div>
           ) : null}
