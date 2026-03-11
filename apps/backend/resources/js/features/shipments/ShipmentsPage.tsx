@@ -1827,6 +1827,46 @@ export function ShipmentsPage() {
     setSearchParams(new URLSearchParams(), { replace: true });
   };
 
+  const applyCreateDatePreset = (preset: 'today' | 'tomorrow' | 'next2') => {
+    const base = new Date();
+    if (preset === 'tomorrow') base.setDate(base.getDate() + 1);
+    if (preset === 'next2') base.setDate(base.getDate() + 2);
+    setCreateScheduledAt(base.toISOString().slice(0, 10));
+  };
+
+  const applyBulkPreset = (preset: 'clear' | 'out_today' | 'incident' | 'delivered_today') => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (preset === 'clear') {
+      setBulkStatus('');
+      setBulkHubId('');
+      setBulkScheduledAt('');
+      setBulkReason('Replanificación operativa');
+      setBulkReasonCode('REPLAN_OPERATION');
+      setBulkReasonDetail('');
+      return;
+    }
+    if (preset === 'out_today') {
+      setBulkStatus('out_for_delivery');
+      setBulkScheduledAt(today);
+      setBulkReasonCode('REPLAN_OPERATION');
+      setBulkReason('Salida operativa del día');
+      setBulkReasonDetail('');
+      return;
+    }
+    if (preset === 'incident') {
+      setBulkStatus('incident');
+      setBulkReasonCode('CUSTOMER_REQUEST');
+      setBulkReason('Marcado masivo por incidencia operativa');
+      setBulkReasonDetail('');
+      return;
+    }
+    setBulkStatus('delivered');
+    setBulkScheduledAt(today);
+    setBulkReasonCode('DATA_FIX');
+    setBulkReason('Cierre masivo validado');
+    setBulkReasonDetail('');
+  };
+
   const resetExportColumns = () => {
     setExportColumns(defaultExportColumns);
   };
@@ -2382,6 +2422,11 @@ export function ShipmentsPage() {
                 min={minScheduledAt}
                 max={maxScheduledAt}
               />
+              <div className="inline-actions">
+                <Button type="button" variant="outline" onClick={() => applyCreateDatePreset('today')}>Hoy</Button>
+                <Button type="button" variant="outline" onClick={() => applyCreateDatePreset('tomorrow')}>Mañana</Button>
+                <Button type="button" variant="outline" onClick={() => applyCreateDatePreset('next2')}>+2 días</Button>
+              </div>
               <div className="helper">Ventana: {minScheduledAt} a {maxScheduledAt}</div>
               {createOperation === 'shipment' ? (
                 <div className="helper">
@@ -3122,6 +3167,18 @@ export function ShipmentsPage() {
               onChange={(event) => setBulkReasonDetail(event.target.value)}
               placeholder="Detalle estructurado opcional"
             />
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('out_today')}>
+              Salida hoy
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('delivered_today')}>
+              Cerrar hoy
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('incident')}>
+              Marcar incidencia
+            </Button>
+            <Button type="button" variant="outline" onClick={() => applyBulkPreset('clear')}>
+              Limpiar preset
+            </Button>
             <Button type="button" onClick={applyBulkUpdate} disabled={bulkUpdating}>
               {bulkUpdating ? 'Aplicando...' : 'Aplicar masivo'}
             </Button>
