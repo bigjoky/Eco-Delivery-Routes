@@ -961,8 +961,13 @@ export function RouteDetailPage() {
         )}
       >
         <div className="page-grid">
-          <div className="helper">Se aplicarán cambios a {bulkUpdatePreviewRows.length} parada(s).</div>
-          <div className="helper">Motivo estructurado: {bulkReasonCode}{bulkReasonDetail.trim() ? ` (${bulkReasonDetail.trim()})` : ''}</div>
+          <div className="modal-section">
+            <div className="modal-section-title">Resumen de ejecución</div>
+            <div className="modal-section-copy">Se aplicarán cambios a {bulkUpdatePreviewRows.length} parada(s).</div>
+            <div className="modal-section-copy">Motivo estructurado: {bulkReasonCode}{bulkReasonDetail.trim() ? ` (${bulkReasonDetail.trim()})` : ''}</div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Detalle de cambios</div>
           <TableWrapper className="desktop-table-only">
             <Table>
               <TableHeader>
@@ -981,6 +986,7 @@ export function RouteDetailPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          </div>
           {bulkUpdatePreviewRows.length > 20 ? (
             <div className="helper">Mostrando 20 de {bulkUpdatePreviewRows.length} paradas.</div>
           ) : null}
@@ -991,20 +997,31 @@ export function RouteDetailPage() {
           <CardTitle className="page-title">Asignaciones de Ruta</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="inline-actions">
-            <Link to="/dashboard" className="helper">Dashboard</Link>
-            <span className="helper">/</span>
-            <Link to="/routes" className="btn btn-outline">Rutas</Link>
-            {route?.subcontractor_id ? (
-              <Link to={`/partners?focus=subcontractor&id=${encodeURIComponent(route.subcontractor_id)}`} className="btn btn-outline">Subcontrata</Link>
-            ) : null}
-            {route?.driver_id ? (
-              <Link to={`/partners?focus=driver&id=${encodeURIComponent(route.driver_id)}`} className="btn btn-outline">Conductor</Link>
-            ) : null}
-            {route?.vehicle_id ? (
-              <Link to={`/fleet-controls?vehicle_id=${encodeURIComponent(route.vehicle_id)}`} className="btn btn-outline">Flota</Link>
-            ) : null}
+          <div className="modal-section">
+            <div className="modal-section-title">Contexto de ruta</div>
+            <div className="inline-actions">
+              <Link to="/dashboard" className="helper">Dashboard</Link>
+              <span className="helper">/</span>
+              <Link to="/routes" className="btn btn-outline">Rutas</Link>
+              {route?.subcontractor_id ? (
+                <Link to={`/partners?focus=subcontractor&id=${encodeURIComponent(route.subcontractor_id)}`} className="btn btn-outline">Subcontrata</Link>
+              ) : null}
+              {route?.driver_id ? (
+                <Link to={`/partners?focus=driver&id=${encodeURIComponent(route.driver_id)}`} className="btn btn-outline">Conductor</Link>
+              ) : null}
+              {route?.vehicle_id ? (
+                <Link to={`/fleet-controls?vehicle_id=${encodeURIComponent(route.vehicle_id)}`} className="btn btn-outline">Flota</Link>
+              ) : null}
+            </div>
+            <div className="modal-section-copy">
+              Ruta: {route?.code ?? id}
+              {' | '}ID: {route?.id ?? id}
+              {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
+              {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
+            </div>
           </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Asignación operativa</div>
           <div className="inline-actions">
             <label htmlFor="route-subcontractor">Subcontrata</label>
             <select id="route-subcontractor" value={subcontractorId} onChange={(event) => setSubcontractorId(event.target.value)}>
@@ -1046,11 +1063,6 @@ export function RouteDetailPage() {
               {smartAssigning ? 'Buscando...' : 'Asignacion inteligente'}
             </Button>
           </div>
-          <div className="helper">
-            Ruta: {route?.code ?? id}
-            {' | '}ID: {route?.id ?? id}
-            {' | '}Conductor actual: {route?.driver_code ?? 'Sin asignar'}
-            {' | '}Vehiculo actual: {route?.vehicle_code ?? 'Sin asignar'}
           </div>
           {assignmentConflicts.length > 0 ? <div className="helper error">{assignmentConflicts.join(' ')}</div> : null}
           {assignmentWarnings.length > 0 ? <div className="helper">{assignmentWarnings.join(' ')}</div> : null}
@@ -1065,6 +1077,8 @@ export function RouteDetailPage() {
           <CardTitle className="page-title">Paradas de Ruta</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="modal-section">
+            <div className="modal-section-title">Manifest y exportación</div>
           <div className="inline-actions">
             <strong>Manifest:</strong>
             {manifestLoading ? (
@@ -1092,6 +1106,9 @@ export function RouteDetailPage() {
               ]}
             />
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Notas operativas</div>
           <div className="inline-actions">
             <label htmlFor="manifest-notes">Notas manifest</label>
             <textarea
@@ -1104,6 +1121,7 @@ export function RouteDetailPage() {
             <Button type="button" onClick={saveManifestNotes} disabled={manifestSaving || !id}>
               {manifestSaving ? 'Guardando...' : 'Guardar notas'}
             </Button>
+          </div>
           </div>
           <div className="inline-actions">
             <strong>Bulk add:</strong>
