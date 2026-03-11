@@ -43,14 +43,9 @@ if (typeof globalThis !== 'undefined' && typeof (globalThis as { route?: unknown
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(registrations.map((registration) => registration.unregister()));
-            if ('caches' in window) {
-                const keys = await window.caches.keys();
-                await Promise.all(keys.filter((key) => key.startsWith('eco-routes-')).map((key) => window.caches.delete(key)));
-            }
+            await navigator.serviceWorker.register('/sw.js', { scope: '/ops/' });
         } catch {
-            // Ignore cleanup failures; the app should still boot.
+            // Ignore registration failures; the app should still boot.
         }
     });
 }

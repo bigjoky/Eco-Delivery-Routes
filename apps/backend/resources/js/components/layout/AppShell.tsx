@@ -4,7 +4,6 @@ import { cn } from '../../lib/cn';
 import { canAccess } from '../../core/auth/access';
 
 const menu = [
-  { to: '/login', label: 'Login', feature: null },
   { to: '/dashboard', label: 'Dashboard', feature: null },
   { to: '/shipments', label: 'Envios', feature: 'shipments' },
   { to: '/routes', label: 'Rutas', feature: 'routes' },
@@ -71,7 +70,6 @@ export function AppShell({
   const canAccessOpenApi = roles.includes('super_admin') || roles.includes('admin');
   const mobileCorePaths = new Set(['/dashboard', '/shipments', '/routes', '/incidents', '/network']);
   const visibleMenu = menu.filter((item) => {
-    if (item.to === '/login' && isAuthenticated) return false;
     if (!item.feature) return true;
     if (!isAuthenticated) return false;
     if (isMock && roles.length === 0) return true;

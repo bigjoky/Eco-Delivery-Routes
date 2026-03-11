@@ -2,16 +2,19 @@
   "name": "Eco Delivery Routes",
   "short_name": "EcoRoutes",
   "description": "Backoffice TMS para Eco Delivery Routes",
-  "start_url": "/",
-  "scope": "/",
+  "id": "/ops/dashboard",
+  "start_url": "/ops/dashboard",
+  "scope": "/ops/",
   "display": "standalone",
+  "display_override": ["standalone", "browser"],
   "background_color": "#f8fafc",
   "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/favicon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/favicon-512.png",

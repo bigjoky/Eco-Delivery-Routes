@@ -94,7 +94,7 @@ export function App() {
     <AppShell isAuthenticated={isAuthenticated} roles={roles} currentUser={currentUser} onLogout={handleLogout}>
       <Routes>
         <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
-        <Route path="/login" element={withModuleLoader(<LoginPage />)} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : withModuleLoader(<LoginPage />)} />
         <Route
           path="/dashboard"
           element={isAuthenticated ? withModuleLoader(<DashboardPage />) : <Navigate to="/login" replace />}

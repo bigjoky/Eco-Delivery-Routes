@@ -1206,6 +1206,10 @@ textarea:focus {
     padding: 16px;
   }
 
+  .topbar-title {
+    font-size: 18px;
+  }
+
   .card {
     padding: 12px;
   }
@@ -1246,7 +1250,7 @@ textarea:focus {
   }
 
   .table {
-    min-width: 440px;
+    min-width: 360px;
   }
 
   .table-head,
@@ -1335,5 +1339,36 @@ textarea:focus {
   .modal-body {
     padding-right: 0;
     padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 220px 1fr;
+  }
+
+  .app-sidebar {
+    padding: 16px 12px;
+  }
+
+  .app-main {
+    padding: 18px;
+  }
+
+  .page-grid.two,
+  .page-grid.four,
+  .dashboard-alert-grid,
+  .dashboard-bulk-audit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .inline-actions > input,
+  .inline-actions > select {
+    min-width: 140px;
+    max-width: 100%;
   }
 }
