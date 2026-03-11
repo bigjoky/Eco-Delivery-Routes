@@ -1527,6 +1527,23 @@ export function RouteDetailPage() {
                   </div>
                   <Badge variant="secondary">{stop.status}</Badge>
                 </div>
+                <div className="inline-actions">
+                  <label htmlFor={`mobile-stop-selected-${stop.id}`}>Seleccionar</label>
+                  <input
+                    id={`mobile-stop-selected-${stop.id}`}
+                    type="checkbox"
+                    checked={selectedStopIds.includes(stop.id)}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setSelectedStopIds((current) => (
+                        checked
+                          ? Array.from(new Set([...current, stop.id]))
+                          : current.filter((itemId) => itemId !== stop.id)
+                      ));
+                    }}
+                    disabled={bulkDeletingStops}
+                  />
+                </div>
                 <div className="mobile-ops-card-grid">
                   <div>
                     <div className="kpi-label">Tipo</div>
@@ -1535,6 +1552,32 @@ export function RouteDetailPage() {
                   <div>
                     <div className="kpi-label">ETA</div>
                     <div>{toLocalDateTime(etaSuggestions[stop.id]) || '-'}</div>
+                  </div>
+                </div>
+                <div className="modal-section">
+                  <div className="modal-section-title">Edición rápida</div>
+                  <div className="inline-actions">
+                    <label htmlFor={`mobile-stop-status-${stop.id}`}>Estado</label>
+                    <select
+                      id={`mobile-stop-status-${stop.id}`}
+                      disabled={reorderingStops}
+                      value={stop.status}
+                      onChange={(event) => updateStop(stop.id, { status: event.target.value as 'planned' | 'in_progress' | 'completed' })}
+                    >
+                      <option value="planned">planned</option>
+                      <option value="in_progress">in_progress</option>
+                      <option value="completed">completed</option>
+                    </select>
+                    <label htmlFor={`mobile-stop-planned-${stop.id}`}>ETA planificada</label>
+                    <input
+                      id={`mobile-stop-planned-${stop.id}`}
+                      type="datetime-local"
+                      value={toLocalDateTime(stop.planned_at)}
+                      onChange={(event) => {
+                        const iso = toIsoDateTime(event.target.value);
+                        updateStop(stop.id, { planned_at: iso });
+                      }}
+                    />
                   </div>
                 </div>
                 <div className="mobile-ops-card-actions">
