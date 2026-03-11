@@ -624,6 +624,9 @@ export function IncidentsPage() {
         )}
       >
         <div className="page-grid">
+          <div className="modal-section">
+            <div className="modal-section-title">Resolución</div>
+            <div className="modal-section-copy">La resolución quedará auditada con motivo estructurado y nota operativa.</div>
           <div className="form-row">
             <div>
               <label>Motivo estructurado</label>
@@ -642,6 +645,9 @@ export function IncidentsPage() {
               />
             </div>
           </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Nota</div>
           <div>
             <label>Nota de resolución</label>
             <Input
@@ -649,6 +655,7 @@ export function IncidentsPage() {
               onChange={(event) => setResolveNotes(event.target.value)}
               placeholder="Describe la resolución"
             />
+          </div>
           </div>
         </div>
       </Modal>
@@ -667,6 +674,9 @@ export function IncidentsPage() {
           </>
         )}
       >
+        <div className="modal-section">
+          <div className="modal-section-title">Ajuste manual SLA</div>
+          <div className="modal-section-copy">Usa este ajuste solo cuando el SLA operativo requiera excepción justificada.</div>
         <div className="form-row">
           <div>
             <label>Prioridad</label>
@@ -694,6 +704,7 @@ export function IncidentsPage() {
             />
           </div>
         </div>
+        </div>
       </Modal>
       <Card>
         <CardHeader>
@@ -702,7 +713,9 @@ export function IncidentsPage() {
         </CardHeader>
         <CardContent>
           <form className="page-grid" onSubmit={onSubmit}>
-            <div className="form-row">
+            <div className="modal-section">
+              <div className="modal-section-title">Objetivo</div>
+              <div className="form-row">
               <div>
                 <label>Tipo</label>
                 <Select value={incidentableType} onChange={(e) => setIncidentableType(e.target.value as 'shipment' | 'pickup')}>
@@ -715,6 +728,9 @@ export function IncidentsPage() {
                 <Input value={incidentableId} onChange={(e) => setIncidentableId(e.target.value)} placeholder="Shipment/ pickup id" />
               </div>
             </div>
+            </div>
+            <div className="modal-section">
+              <div className="modal-section-title">Catálogo</div>
             <div className="form-row">
               <div>
                 <label>Catalogo</label>
@@ -736,11 +752,15 @@ export function IncidentsPage() {
                 <Input value={category} readOnly />
               </div>
             </div>
+            </div>
+            <div className="modal-section">
+              <div className="modal-section-title">Detalle</div>
             <div className="form-row">
               <div>
                 <label>Notas</label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Detalle breve" />
               </div>
+            </div>
             </div>
             <div className="inline-actions">
               <Button type="submit">Registrar incidencia</Button>
