@@ -5,13 +5,14 @@ type Props = PropsWithChildren<{
   title?: string;
   onClose: () => void;
   footer?: ReactNode;
+  size?: 'default' | 'xl';
 }>;
 
-export function Modal({ open, title, onClose, footer, children }: Props) {
+export function Modal({ open, title, onClose, footer, size = 'default', children }: Props) {
   if (!open) return null;
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal">
+      <div className={`modal ${size === 'xl' ? 'modal-xl' : ''}`}>
         <div className="modal-header">
           <div className="modal-title">{title ?? ''}</div>
           <button type="button" className="btn btn-outline" onClick={onClose}>Cerrar</button>

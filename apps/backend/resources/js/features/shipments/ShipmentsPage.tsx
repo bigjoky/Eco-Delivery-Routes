@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
-import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentDetail, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
@@ -21,6 +21,7 @@ import {
   isValidPostalCode,
 } from './shipmentFormValidation';
 import { buildAddressSuggestions } from './addressAutocomplete';
+import { ShipmentDetailPanel } from './ShipmentDetailPanel';
 import { shipmentBulkReasonOptions, ShipmentBulkReasonCode, validateShipmentBulkUpdate } from './shipmentsBulkValidation';
 
 function shipmentVariant(status: string): 'default' | 'secondary' | 'warning' | 'success' {
@@ -433,6 +434,11 @@ export function ShipmentsPage() {
   const [incidentNotes, setIncidentNotes] = useState('');
   const [incidentSubmitting, setIncidentSubmitting] = useState(false);
   const [incidentError, setIncidentError] = useState('');
+  const [shipmentDetailOpen, setShipmentDetailOpen] = useState(false);
+  const [shipmentDetailId, setShipmentDetailId] = useState<string | null>(null);
+  const [shipmentDetailData, setShipmentDetailData] = useState<ShipmentDetail | null>(null);
+  const [shipmentDetailLoading, setShipmentDetailLoading] = useState(false);
+  const [shipmentDetailError, setShipmentDetailError] = useState('');
   const [roles, setRoles] = useState(sessionStore.getRoles());
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
@@ -1601,6 +1607,22 @@ export function ShipmentsPage() {
       return;
     }
     setSelectedShipmentIds((current) => Array.from(new Set([...current, ...pageIds])));
+  };
+
+  const openShipmentDetail = async (shipmentId: string) => {
+    setShipmentDetailOpen(true);
+    setShipmentDetailId(shipmentId);
+    setShipmentDetailData(null);
+    setShipmentDetailLoading(true);
+    setShipmentDetailError('');
+    try {
+      const data = await apiClient.getShipmentDetail(shipmentId);
+      setShipmentDetailData(data);
+    } catch (exception) {
+      setShipmentDetailError(exception instanceof Error ? exception.message : 'No se pudo cargar el envío');
+    } finally {
+      setShipmentDetailLoading(false);
+    }
   };
 
   const runBulkUpdate = async () => {
@@ -3217,6 +3239,37 @@ export function ShipmentsPage() {
         </div>
       </Modal>
       <Modal
+        open={shipmentDetailOpen}
+        onClose={() => {
+          setShipmentDetailOpen(false);
+          setShipmentDetailId(null);
+          setShipmentDetailData(null);
+          setShipmentDetailError('');
+        }}
+        title={shipmentDetailData?.shipment.reference ? `Detalle envío · ${shipmentDetailData.shipment.reference}` : 'Detalle envío'}
+        size="xl"
+      >
+        <ShipmentDetailPanel
+          detail={shipmentDetailData}
+          loading={shipmentDetailLoading}
+          error={shipmentDetailError}
+        />
+        {shipmentDetailId ? (
+          <div className="inline-actions ops-toolbar">
+            <Link to={`/shipments/${shipmentDetailId}`} className="btn btn-outline" onClick={() => setShipmentDetailOpen(false)}>
+              Abrir página completa
+            </Link>
+            <Link
+              to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(shipmentDetailId)}&resolved=open`}
+              className="btn btn-outline"
+              onClick={() => setShipmentDetailOpen(false)}
+            >
+              Ver incidencias relacionadas
+            </Link>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
         open={incidentModalOpen}
         onClose={() => setIncidentModalOpen(false)}
         title="Registrar incidencia"
@@ -3491,17 +3544,20 @@ export function ShipmentsPage() {
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className="table-row-clickable" onClick={() => void openShipmentDetail(item.id)}>
                     <TableCell>
                       <input
                         type="checkbox"
                         checked={selectedShipmentIds.includes(item.id)}
                         onChange={() => toggleShipmentSelection(item.id)}
+                        onClick={(event) => event.stopPropagation()}
                       />
                     </TableCell>
                     <TableCell>
                       <div>
-                        <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
+                        <button type="button" className="btn btn-link" onClick={(event) => { event.stopPropagation(); void openShipmentDetail(item.id); }}>
+                          {item.reference}
+                        </button>
                       </div>
                       <div className="helper">ID: {item.id}</div>
                       {item.external_reference ? <div className="helper">Ext: {item.external_reference}</div> : null}
@@ -3523,20 +3579,20 @@ export function ShipmentsPage() {
                         <Button
                           type="button"
                           variant="secondary"
-                          onClick={() => markDelivered(item)}
+                          onClick={(event) => { event.stopPropagation(); void markDelivered(item); }}
                           disabled={item.status === 'delivered' || actionLoadingId === item.id}
                         >
                           {actionLoadingId === item.id ? 'Marcando...' : 'Marcar entregado'}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
+                        <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openIncidentModal(item); }}>
                           Incidencia
                         </Button>
-                        <Link to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(item.id)}&resolved=open`} className="btn btn-outline">
+                        <Link to={`/incidents?type=shipment&incidentable_id=${encodeURIComponent(item.id)}&resolved=open`} className="btn btn-outline" onClick={(event) => event.stopPropagation()}>
                           Ver incidencias
                         </Link>
-                        <Link to={`/shipments/${item.id}`} className="btn btn-outline">
-                          Ver
-                        </Link>
+                        <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); void openShipmentDetail(item.id); }}>
+                          Ver detalle
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -3551,10 +3607,12 @@ export function ShipmentsPage() {
           </TableWrapper>
           <div className="mobile-ops-list">
             {items.map((item) => (
-              <article key={`mobile-${item.id}`} className="mobile-ops-card">
+              <article key={`mobile-${item.id}`} className="mobile-ops-card" onClick={() => void openShipmentDetail(item.id)}>
                 <div className="mobile-ops-card-header">
                   <div>
-                    <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
+                    <button type="button" className="btn btn-link" onClick={(event) => { event.stopPropagation(); void openShipmentDetail(item.id); }}>
+                      {item.reference}
+                    </button>
                     <div className="helper">ID: {item.id}</div>
                   </div>
                   <Badge variant={shipmentVariant(item.status)} title={shipmentStatusHelp(item.status)}>
@@ -3584,17 +3642,17 @@ export function ShipmentsPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => markDelivered(item)}
+                    onClick={(event) => { event.stopPropagation(); void markDelivered(item); }}
                     disabled={item.status === 'delivered' || actionLoadingId === item.id}
                   >
                     {actionLoadingId === item.id ? 'Marcando...' : 'Entregado'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => openIncidentModal(item)}>
+                  <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); openIncidentModal(item); }}>
                     Incidencia
                   </Button>
-                  <Link to={`/shipments/${item.id}`} className="btn btn-outline">
-                    Ver
-                  </Link>
+                  <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); void openShipmentDetail(item.id); }}>
+                    Ver detalle
+                  </Button>
                 </div>
               </article>
             ))}

@@ -610,6 +610,10 @@ textarea:focus {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
+.modal.modal-xl {
+  width: min(1120px, 100%);
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -756,6 +760,10 @@ textarea:focus {
   background: #f9fafb;
 }
 
+.table-row.table-row-clickable {
+  cursor: pointer;
+}
+
 .table-row:nth-child(even) .table-cell {
   background: #fcfdff;
 }
@@ -809,6 +817,21 @@ textarea:focus {
   color: var(--muted);
   font-size: 13px;
   background: #fff;
+}
+
+.btn.btn-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.btn.btn-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .kpi-grid {
