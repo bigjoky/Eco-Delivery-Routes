@@ -491,6 +491,57 @@ export function PartnersPage() {
     }
   };
 
+  const quickUpdateSubcontractorStatus = async (row: SubcontractorSummary, status: 'active' | 'inactive' | 'suspended') => {
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.updateSubcontractor(row.id, {
+        legal_name: row.legal_name,
+        tax_id: row.tax_id ?? '',
+        status,
+        payment_terms: row.payment_terms ?? 'monthly',
+      });
+      setMessage(`Subcontrata ${status === 'active' ? 'activada' : status === 'suspended' ? 'suspendida' : 'actualizada'}.`);
+      await load();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar la subcontrata.');
+    }
+  };
+
+  const quickUpdateDriverStatus = async (row: DriverSummary, status: 'active' | 'inactive' | 'suspended') => {
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.updateDriver(row.id, {
+        name: row.name,
+        dni: row.dni ?? '',
+        status,
+        subcontractor_id: row.subcontractor_id ?? null,
+      });
+      setMessage(`Conductor ${status === 'active' ? 'activado' : status === 'suspended' ? 'suspendido' : 'actualizado'}.`);
+      await load();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el conductor.');
+    }
+  };
+
+  const quickUpdateVehicleStatus = async (row: VehicleSummary, status: 'active' | 'inactive' | 'maintenance') => {
+    setMessage('');
+    setError('');
+    try {
+      await apiClient.updateVehicle(row.id, {
+        plate_number: row.plate_number ?? '',
+        status,
+        subcontractor_id: row.subcontractor_id ?? null,
+        assigned_driver_id: row.assigned_driver_id ?? null,
+      });
+      setMessage(`Vehículo ${status === 'active' ? 'activado' : status === 'maintenance' ? 'en mantenimiento' : 'actualizado'}.`);
+      await load();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el vehículo.');
+    }
+  };
+
   const toggleSelected = (setState: Dispatch<SetStateAction<string[]>>, id: string, checked: boolean) => {
     setState((current) => (checked ? Array.from(new Set([...current, id])) : current.filter((item) => item !== id)));
   };
@@ -851,6 +902,13 @@ export function PartnersPage() {
                 <div className="helper">{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</div>
                 <div className="mobile-ops-card-actions">
                   <Button data-testid={`edit-subcontractor-mobile-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void quickUpdateSubcontractorStatus(subcontractor, subcontractor.status === 'active' ? 'suspended' : 'active')}
+                  >
+                    {subcontractor.status === 'active' ? 'Suspender' : 'Activar'}
+                  </Button>
                   <Button data-testid={`delete-subcontractor-mobile-${subcontractor.id}`} type="button" variant="outline" onClick={() => deleteSubcontractor(subcontractor)}>Archivar</Button>
                 </div>
               </article>
@@ -974,6 +1032,13 @@ export function PartnersPage() {
                 </div>
                 <div className="mobile-ops-card-actions">
                   <Button data-testid={`edit-driver-mobile-${driver.id}`} type="button" variant="outline" onClick={() => startEditDriver(driver)}>Editar</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void quickUpdateDriverStatus(driver, driver.status === 'active' ? 'suspended' : 'active')}
+                  >
+                    {driver.status === 'active' ? 'Suspender' : 'Activar'}
+                  </Button>
                   <Button data-testid={`delete-driver-mobile-${driver.id}`} type="button" variant="outline" onClick={() => deleteDriver(driver)}>Archivar</Button>
                 </div>
               </article>
@@ -1103,6 +1168,13 @@ export function PartnersPage() {
                 <div className="helper">{vehicle.last_editor_name ?? '-'} · {formatDateTime(vehicle.updated_at)}</div>
                 <div className="mobile-ops-card-actions">
                   <Button data-testid={`edit-vehicle-mobile-${vehicle.id}`} type="button" variant="outline" onClick={() => startEditVehicle(vehicle)}>Editar</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void quickUpdateVehicleStatus(vehicle, vehicle.status === 'active' ? 'maintenance' : 'active')}
+                  >
+                    {vehicle.status === 'active' ? 'Mantenimiento' : 'Activar'}
+                  </Button>
                   <Button data-testid={`delete-vehicle-mobile-${vehicle.id}`} type="button" variant="outline" onClick={() => deleteVehicle(vehicle)}>Archivar</Button>
                 </div>
               </article>

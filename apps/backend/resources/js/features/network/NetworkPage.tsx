@@ -108,6 +108,19 @@ export function NetworkPage() {
     setCreateOpen(true);
   };
 
+  const openCreateDepotFromHub = (hubId: string) => {
+    resetCreateWizard('depot');
+    setCreateDepotHubId(hubId);
+    setCreateOpen(true);
+  };
+
+  const openCreatePointFromDepot = (hubId: string, depotId: string) => {
+    resetCreateWizard('point');
+    setCreatePointHubId(hubId);
+    setCreatePointDepotId(depotId);
+    setCreateOpen(true);
+  };
+
   const closeCreateWizard = () => {
     setCreateOpen(false);
     setCreateSaving(false);
@@ -568,6 +581,7 @@ export function NetworkPage() {
                     <Button type="button" variant="outline" onClick={() => restoreHub(item)}>Restaurar</Button>
                   ) : (
                     <>
+                      <Button type="button" variant="outline" onClick={() => openCreateDepotFromHub(item.id)}>Nuevo depot</Button>
                       <Button type="button" variant="outline" onClick={() => startEditHub(item)}>Editar</Button>
                       <Button type="button" variant="outline" onClick={() => removeHub(item)}>Archivar</Button>
                     </>
@@ -644,6 +658,7 @@ export function NetworkPage() {
                     <Button type="button" variant="outline" onClick={() => restoreDepot(item)}>Restaurar</Button>
                   ) : (
                     <>
+                      <Button type="button" variant="outline" onClick={() => openCreatePointFromDepot(item.hub_id, item.id)}>Nuevo punto</Button>
                       <Button type="button" variant="outline" onClick={() => startEditDepot(item)}>Editar</Button>
                       <Button type="button" variant="outline" onClick={() => removeDepot(item)}>Archivar</Button>
                     </>
