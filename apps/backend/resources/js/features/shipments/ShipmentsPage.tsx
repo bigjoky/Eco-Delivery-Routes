@@ -2498,9 +2498,9 @@ export function ShipmentsPage() {
               <div className="ops-summary-caption">{createNextActionSummary}</div>
             </div>
             <div className="ops-summary-chip">
-              <div className="ops-summary-label">Wizard</div>
-              <div className="ops-summary-value">{wizardMode ? `Paso ${wizardStep}` : 'Libre'}</div>
-              <div className="ops-summary-caption">{showAdvancedCreateOptions ? 'Opciones avanzadas visibles' : 'Vista compacta activa'}</div>
+              <div className="ops-summary-label">Configuración</div>
+              <div className="ops-summary-value">{showAdvancedCreateOptions ? 'Avanzada' : 'Básica'}</div>
+              <div className="ops-summary-caption">{wizardMode ? `Asistente paso ${wizardStep}` : 'Flujo directo'}</div>
             </div>
           </div>
           <div className="inline-actions ops-toolbar">
@@ -2520,11 +2520,6 @@ export function ShipmentsPage() {
             <Button type="button" variant="outline" onClick={() => setShowAdvancedCreateOptions((value) => !value)}>
               {showAdvancedCreateOptions ? 'Ocultar opciones avanzadas' : 'Mostrar opciones avanzadas'}
             </Button>
-            {wizardMode ? (
-              <Button type="button" variant="outline" onClick={goNextWizardStep}>
-                Siguiente paso
-              </Button>
-            ) : null}
           </div>
           <div className="modal-section">
             <div className="modal-section-title">Contexto de alta</div>
@@ -2546,95 +2541,99 @@ export function ShipmentsPage() {
                 Thermo
               </Button>
             </div>
-            <div className="inline-actions">
-              <label>Atajos</label>
-              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_express_today')}>
-                Envio express hoy
-              </Button>
-              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_economy_tomorrow')}>
-                Economy mañana
-              </Button>
-              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('return_today')}>
-                Devolucion hoy
-              </Button>
-              <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('thermo_today')}>
-                Thermo hoy
-              </Button>
-            </div>
-            <div className="inline-actions">
-              <label htmlFor="shipment-template-select">Plantilla rapida</label>
-              <select
-                id="shipment-template-select"
-                value={selectedTemplateId}
-                onChange={(event) => {
-                  const templateId = event.target.value;
-                  setSelectedTemplateId(templateId);
-                  const template = shipmentTemplates.find((item) => item.id === templateId);
-                  if (template) applyTemplate(template);
-                }}
-              >
-                <option value="">Seleccionar plantilla</option>
-                {shipmentTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-              <input
-                value={newTemplateName}
-                onChange={(event) => setNewTemplateName(event.target.value)}
-                placeholder="Nombre nueva plantilla"
-              />
-              <Button type="button" variant="outline" onClick={saveCurrentAsTemplate}>
-                Guardar plantilla
-              </Button>
-              <Button type="button" variant="outline" onClick={deleteSelectedTemplate} disabled={!selectedTemplateId}>
-                Eliminar plantilla
-              </Button>
-            </div>
-            <div className="inline-actions">
-              <label htmlFor="shipment-operator-mode">Modo operador</label>
-              <input
-                id="shipment-operator-mode"
-                type="checkbox"
-                checked={operatorMode}
-                onChange={(event) => {
-                  const enabled = event.target.checked;
-                  setOperatorMode(enabled);
-                  if (enabled) setWizardMode(false);
-                }}
-              />
-              <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
-                Guardar defaults
-              </Button>
-              <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
-                Aplicar defaults
-              </Button>
-              <label htmlFor="shipment-wizard-mode">Asistente</label>
-              <input
-                id="shipment-wizard-mode"
-                type="checkbox"
-                checked={wizardMode}
-                onChange={(event) => {
-                  const enabled = event.target.checked;
-                  if (operatorMode && enabled) {
-                    setCreateError('Desactiva modo operador para usar asistente.');
-                    return;
-                  }
-                  setWizardMode(enabled);
-                  if (enabled && wizardStep < 1) setWizardStep(1);
-                }}
-              />
-              {wizardMode ? (
-                <>
-                  <Button type="button" variant="outline" onClick={goPrevWizardStep}>
-                    Paso anterior
+            {showAdvancedCreateOptions ? (
+              <div className="modal-actions-stack">
+                <div className="inline-actions">
+                  <label>Atajos</label>
+                  <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_express_today')}>
+                    Envio express hoy
                   </Button>
-                  <Button type="button" variant="outline" onClick={goNextWizardStep}>
-                    Siguiente paso
+                  <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('shipment_economy_tomorrow')}>
+                    Economy mañana
                   </Button>
-                  <span className="helper">Paso {wizardStep}/4</span>
-                </>
-              ) : null}
-            </div>
+                  <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('return_today')}>
+                    Devolucion hoy
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => applyCreateWorkflowPreset('thermo_today')}>
+                    Thermo hoy
+                  </Button>
+                </div>
+                <div className="inline-actions">
+                  <label htmlFor="shipment-template-select">Plantillas</label>
+                  <select
+                    id="shipment-template-select"
+                    value={selectedTemplateId}
+                    onChange={(event) => {
+                      const templateId = event.target.value;
+                      setSelectedTemplateId(templateId);
+                      const template = shipmentTemplates.find((item) => item.id === templateId);
+                      if (template) applyTemplate(template);
+                    }}
+                  >
+                    <option value="">Seleccionar plantilla</option>
+                    {shipmentTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>{template.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={newTemplateName}
+                    onChange={(event) => setNewTemplateName(event.target.value)}
+                    placeholder="Nombre nueva plantilla"
+                  />
+                  <Button type="button" variant="outline" onClick={saveCurrentAsTemplate}>
+                    Guardar
+                  </Button>
+                  <Button type="button" variant="outline" onClick={deleteSelectedTemplate} disabled={!selectedTemplateId}>
+                    Eliminar
+                  </Button>
+                </div>
+                <div className="inline-actions">
+                  <label htmlFor="shipment-operator-mode">Modo operador</label>
+                  <input
+                    id="shipment-operator-mode"
+                    type="checkbox"
+                    checked={operatorMode}
+                    onChange={(event) => {
+                      const enabled = event.target.checked;
+                      setOperatorMode(enabled);
+                      if (enabled) setWizardMode(false);
+                    }}
+                  />
+                  <Button type="button" variant="outline" onClick={saveOperatorDefaults}>
+                    Guardar defaults
+                  </Button>
+                  <Button type="button" variant="outline" onClick={applyOperatorDefaults}>
+                    Aplicar defaults
+                  </Button>
+                  <label htmlFor="shipment-wizard-mode">Asistente</label>
+                  <input
+                    id="shipment-wizard-mode"
+                    type="checkbox"
+                    checked={wizardMode}
+                    onChange={(event) => {
+                      const enabled = event.target.checked;
+                      if (operatorMode && enabled) {
+                        setCreateError('Desactiva modo operador para usar asistente.');
+                        return;
+                      }
+                      setWizardMode(enabled);
+                      if (enabled && wizardStep < 1) setWizardStep(1);
+                    }}
+                  />
+                  {wizardMode ? (
+                    <>
+                      <Button type="button" variant="outline" onClick={goPrevWizardStep}>
+                        Paso anterior
+                      </Button>
+                      <Button type="button" variant="outline" onClick={goNextWizardStep}>
+                        Siguiente paso
+                      </Button>
+                      <span className="helper">Paso {wizardStep}/4</span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
           {operatorMode ? (
             <div className="helper">
@@ -2655,16 +2654,6 @@ export function ShipmentsPage() {
           {!wizardMode || wizardStep === 1 ? (
           <div className="modal-section">
             <div className="modal-section-title">Planificación operativa</div>
-          <div className="inline-actions ops-toolbar">
-            <span className="helper">Vista rápida</span>
-            <Button
-              type="button"
-              variant={showAdvancedCreateOptions ? 'secondary' : 'outline'}
-              onClick={() => setShowAdvancedCreateOptions((value) => !value)}
-            >
-              {showAdvancedCreateOptions ? 'Ocultar opciones avanzadas' : 'Mostrar opciones avanzadas'}
-            </Button>
-          </div>
           <div className="form-row">
             <div>
               <label htmlFor="create-shipment-hub">Hub</label>

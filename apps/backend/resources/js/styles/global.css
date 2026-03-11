@@ -62,9 +62,7 @@ a {
 
 .app-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 264px 1fr;
-  gap: 0;
+  display: block;
 }
 
 .brand {
@@ -84,11 +82,14 @@ a {
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-right: 1px solid var(--border);
   padding: 18px 14px;
-  position: sticky;
+  position: fixed;
   top: 0;
-  height: 100vh;
+  left: 0;
+  bottom: 0;
+  width: 264px;
   display: flex;
   flex-direction: column;
+  z-index: 40;
 }
 
 .sidebar-nav {
@@ -233,6 +234,7 @@ a {
   min-height: 100vh;
   min-width: 0;
   overflow-x: hidden;
+  margin-left: 264px;
 }
 
 .topbar {
@@ -1150,11 +1152,12 @@ textarea:focus {
 
 @media (max-width: 1024px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    display: block;
   }
 
   .app-sidebar {
     position: static;
+    width: auto;
     height: auto;
     border-right: none;
     border-bottom: 1px solid var(--border);
@@ -1209,6 +1212,10 @@ textarea:focus {
 
   .topbar {
     padding: 12px 14px;
+  }
+
+  .app-content {
+    margin-left: 0;
   }
 
   .topbar-subtitle {
@@ -1272,7 +1279,7 @@ textarea:focus {
 
 @media (max-width: 720px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    display: block;
   }
 
   .app-sidebar {
@@ -1528,14 +1535,12 @@ textarea:focus {
 }
 
 @media (min-width: 721px) and (max-width: 1024px) {
-  .app-shell {
-    grid-template-columns: 220px 1fr;
-  }
-
   .app-sidebar {
-    position: sticky;
+    position: fixed;
     top: 0;
-    height: 100vh;
+    left: 0;
+    bottom: 0;
+    width: 220px;
     border-right: 1px solid var(--border);
     border-bottom: none;
     padding: 16px 12px;
@@ -1579,6 +1584,10 @@ textarea:focus {
 
   .mobile-nav {
     display: none;
+  }
+
+  .app-content {
+    margin-left: 220px;
   }
 
   .app-main {
