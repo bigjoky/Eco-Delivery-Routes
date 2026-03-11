@@ -6,6 +6,19 @@ APP_PORT="${APP_PORT:-8001}"
 VITE_PORT="${VITE_PORT:-5173}"
 VITE_LISTEN_HOST="${VITE_LISTEN_HOST:-0.0.0.0}"
 
+is_port_in_use() {
+  local port="$1"
+  lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+find_free_port() {
+  local port="$1"
+  while is_port_in_use "${port}"; do
+    port="$((port + 1))"
+  done
+  printf '%s\n' "${port}"
+}
+
 detect_lan_ip() {
   if [[ -n "${LAN_IP_OVERRIDE:-}" ]]; then
     printf '%s\n' "${LAN_IP_OVERRIDE}"
@@ -37,6 +50,9 @@ if [[ -z "${LAN_IP}" ]]; then
   printf 'No se pudo detectar una IP LAN activa.\n' >&2
   exit 1
 fi
+
+APP_PORT="$(find_free_port "${APP_PORT}")"
+VITE_PORT="$(find_free_port "${VITE_PORT}")"
 
 export APP_URL="http://${LAN_IP}:${APP_PORT}"
 export SANCTUM_STATEFUL_DOMAINS="localhost,127.0.0.1,127.0.0.1:8000,127.0.0.1:${APP_PORT},${LAN_IP},${LAN_IP}:${APP_PORT}"
