@@ -395,6 +395,13 @@ export function RoutesPage() {
     });
   };
 
+  const selectRoutesByStatusInPage = (nextStatus: '' | 'planned' | 'in_progress' | 'completed' | 'cancelled') => {
+    const ids = items
+      .filter((item) => (nextStatus === '' ? true : item.status === nextStatus))
+      .map((item) => item.id);
+    setSelectedRouteIds(ids);
+  };
+
   const previewBulkAssignment = async () => {
     setBulkError('');
     setBulkMessage('');
@@ -767,6 +774,18 @@ export function RoutesPage() {
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
             <span className="helper">Filtros activos: {activeFiltersCount}</span>
+            <Button type="button" variant="outline" onClick={() => selectRoutesByStatusInPage('')}>
+              Seleccionar página
+            </Button>
+            <Button type="button" variant="outline" onClick={() => selectRoutesByStatusInPage('planned')}>
+              Seleccionar planned
+            </Button>
+            <Button type="button" variant="outline" onClick={() => selectRoutesByStatusInPage('in_progress')}>
+              Seleccionar en ruta
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setSelectedRouteIds([])}>
+              Limpiar selección
+            </Button>
             {activeFiltersCount > 0 ? (
               <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
             ) : null}
