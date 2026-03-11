@@ -170,6 +170,11 @@ export function IncidentsPage() {
     return `Cambios a aplicar: ${changes.join(' | ')}`;
   }, [bulkOverridePriority, bulkOverrideDueAt]);
 
+  const bulkResolveSummary = useMemo(() => {
+    const reasonLabel = bulkResolveReasonOptions.find((item) => item.code === bulkResolveReasonCode)?.label ?? bulkResolveReasonCode;
+    return `${bulkScope === 'filtered' ? 'Filtro completo' : 'Selección manual'} · ${bulkTargetEstimate} objetivo(s) · ${reasonLabel}${bulkResolveReasonDetail.trim() ? ` · ${bulkResolveReasonDetail.trim()}` : ''}`;
+  }, [bulkResolveReasonCode, bulkResolveReasonDetail, bulkScope, bulkTargetEstimate]);
+
   const displayedItems = useMemo(() => {
     if (!slaQueueMode) return items;
     return items.slice().sort((a, b) => {
@@ -1042,6 +1047,23 @@ export function IncidentsPage() {
           </div>
           {showBulkResolvePanel ? (
             <div className="filters-panel">
+              <div className="ops-summary-strip">
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Modo</div>
+                  <div className="ops-summary-value">{bulkScope === 'filtered' ? 'Filtro' : 'Selección'}</div>
+                  <div className="ops-summary-caption">{selectedIncidentIds.length} incidencia(s) seleccionada(s)</div>
+                </div>
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Objetivo</div>
+                  <div className="ops-summary-value">{bulkTargetEstimate}</div>
+                  <div className="ops-summary-caption">Abiertas alcanzadas por la acción</div>
+                </div>
+                <div className="ops-summary-chip">
+                  <div className="ops-summary-label">Motivo</div>
+                  <div className="ops-summary-value">{bulkResolveReasonCode}</div>
+                  <div className="ops-summary-caption">{bulkResolveSummary}</div>
+                </div>
+              </div>
               <div className="inline-actions ops-toolbar">
                 <Button type="button" variant={bulkScope === 'selected' ? 'secondary' : 'outline'} onClick={() => setBulkScope('selected')}>
                   Modo selección

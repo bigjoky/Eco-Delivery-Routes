@@ -1884,6 +1884,25 @@ export function ShipmentsPage() {
     || createConsigneeLastName.trim()
   );
 
+  const createNextActionSummary = useMemo(() => {
+    if (!createHubId.trim()) return 'Selecciona hub y fecha para fijar el contexto.';
+    if (createOperation === 'shipment' && !hasRecipientSummary) return 'Completa el destinatario para continuar.';
+    if (!createSenderDocumentId.trim() && !createSenderPhone.trim() && !createSenderStreet.trim()) {
+      return createOperation === 'shipment' ? 'Completa el remitente.' : 'Completa el origen de recogida.';
+    }
+    if (createBlockingChecks.length > 0) return `Quedan ${createBlockingChecks.length} validaciones pendientes.`;
+    return operationMeta.checklistReady;
+  }, [
+    createHubId,
+    createOperation,
+    createSenderDocumentId,
+    createSenderPhone,
+    createSenderStreet,
+    hasRecipientSummary,
+    createBlockingChecks.length,
+    operationMeta.checklistReady,
+  ]);
+
   const applyOperationPreset = (operation: 'shipment' | 'pickup_normal' | 'pickup_return') => {
     setCreateOperation(operation);
     setCreateError('');
@@ -2346,6 +2365,28 @@ export function ShipmentsPage() {
           <div className="page-subtitle">{operationMeta.subtitle}</div>
         </CardHeader>
         <CardContent>
+          <div className="ops-summary-strip">
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Operación</div>
+              <div className="ops-summary-value">{createOperation === 'shipment' ? 'Envío' : createOperation === 'pickup_normal' ? 'Recogida' : 'Devolución'}</div>
+              <div className="ops-summary-caption">Servicio {serviceTypeLabel(createServiceType)}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Fecha</div>
+              <div className="ops-summary-value">{createScheduledAt || '-'}</div>
+              <div className="ops-summary-caption">{createHubId ? `Hub seleccionado` : 'Sin hub seleccionado'}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Siguiente acción</div>
+              <div className="ops-summary-value">{canCreateShipment ? 'Listo' : 'Pendiente'}</div>
+              <div className="ops-summary-caption">{createNextActionSummary}</div>
+            </div>
+            <div className="ops-summary-chip">
+              <div className="ops-summary-label">Wizard</div>
+              <div className="ops-summary-value">{wizardMode ? `Paso ${wizardStep}` : 'Libre'}</div>
+              <div className="ops-summary-caption">{showAdvancedCreateOptions ? 'Opciones avanzadas visibles' : 'Vista compacta activa'}</div>
+            </div>
+          </div>
           <div className="modal-section">
             <div className="modal-section-title">Contexto de alta</div>
             <div className="inline-actions">

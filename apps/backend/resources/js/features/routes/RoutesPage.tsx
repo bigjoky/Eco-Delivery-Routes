@@ -53,6 +53,8 @@ export function RoutesPage() {
   const [publishPolicyCriticalCodes, setPublishPolicyCriticalCodes] = useState<string[]>(['LOW_DRIVER_QUALITY', 'LOW_SUBCONTRACTOR_QUALITY']);
   const [publishPolicyBypassRoles, setPublishPolicyBypassRoles] = useState('super_admin');
   const [showFilters, setShowFilters] = useState(false);
+  const [showBulkAssignmentPanel, setShowBulkAssignmentPanel] = useState(false);
+  const [showBulkStatusPanel, setShowBulkStatusPanel] = useState(false);
   const [selectedRouteIds, setSelectedRouteIds] = useState<string[]>([]);
   const [bulkSubcontractorId, setBulkSubcontractorId] = useState('');
   const [bulkDriverId, setBulkDriverId] = useState('');
@@ -795,6 +797,12 @@ export function RoutesPage() {
             <Button type="button" variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters((value) => !value)}>
               {showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
+            <Button type="button" variant={showBulkAssignmentPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkAssignmentPanel((value) => !value)}>
+              {showBulkAssignmentPanel ? 'Ocultar reasignación' : 'Reasignación masiva'}
+            </Button>
+            <Button type="button" variant={showBulkStatusPanel ? 'secondary' : 'outline'} onClick={() => setShowBulkStatusPanel((value) => !value)}>
+              {showBulkStatusPanel ? 'Ocultar estado masivo' : 'Estado masivo'}
+            </Button>
             <span className="helper">Filtros activos: {activeFiltersCount}</span>
             <Button type="button" variant="outline" onClick={() => selectRoutesByStatusInPage('')}>
               Seleccionar página
@@ -812,6 +820,7 @@ export function RoutesPage() {
               <Button type="button" variant="outline" onClick={clearFilters}>Limpiar todo</Button>
             ) : null}
           </div>
+          {showBulkAssignmentPanel ? (
           <div className="filters-panel">
             <div className="inline-actions ops-toolbar">
               <span className="helper">Reasignación masiva</span>
@@ -893,6 +902,10 @@ export function RoutesPage() {
                 {bulkUpdating ? 'Aplicando...' : 'Aplicar asignación masiva'}
               </Button>
             </div>
+          </div>
+          ) : null}
+          {showBulkStatusPanel ? (
+          <div className="filters-panel">
             <div className="inline-actions ops-toolbar">
               <label htmlFor="routes-bulk-status">Estado masivo</label>
               <select
@@ -918,6 +931,7 @@ export function RoutesPage() {
             {bulkError ? <div className="helper error">{bulkError}</div> : null}
             {bulkMessage ? <div className="helper">{bulkMessage}</div> : null}
           </div>
+          ) : null}
           {showFilters ? (
             <div className="filters-panel">
               <div className="form-row">
