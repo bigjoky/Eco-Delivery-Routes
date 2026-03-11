@@ -494,6 +494,61 @@ export function RoutesPage() {
     }
   };
 
+  const applyAssignmentPreset = (preset: 'clear' | 'smart_scope' | 'driver_only' | 'vehicle_only') => {
+    if (preset === 'clear') {
+      setBulkSetUnassigned(false);
+      setBulkSubcontractorId('');
+      setBulkDriverId('');
+      setBulkVehicleId('');
+      setBulkPreviewWarnings([]);
+      setBulkPreviewConflicts([]);
+      setBulkMessage('');
+      setBulkError('');
+      return;
+    }
+    if (preset === 'smart_scope') {
+      if (bulkDriverId) {
+        const driver = drivers.find((item) => item.id === bulkDriverId);
+        if (driver?.subcontractor_id) setBulkSubcontractorId(driver.subcontractor_id);
+      }
+      if (bulkVehicleId) {
+        const vehicle = vehicles.find((item) => item.id === bulkVehicleId);
+        if (vehicle?.subcontractor_id) setBulkSubcontractorId(vehicle.subcontractor_id);
+      }
+      setBulkSetUnassigned(false);
+      return;
+    }
+    if (preset === 'driver_only') {
+      setBulkVehicleId('');
+      setBulkSetUnassigned(false);
+      return;
+    }
+    if (preset === 'vehicle_only') {
+      setBulkDriverId('');
+      setBulkSetUnassigned(false);
+    }
+  };
+
+  const applyStatusPreset = (preset: 'planned' | 'in_progress' | 'completed' | 'clear') => {
+    if (preset === 'clear') {
+      setBulkStatus('');
+      return;
+    }
+    setBulkStatus(preset);
+  };
+
+  const quickUpdateRouteStatus = async (routeId: string, nextStatus: 'planned' | 'in_progress' | 'completed') => {
+    setBulkError('');
+    setBulkMessage('');
+    try {
+      await apiClient.updateRoute(routeId, { status: nextStatus });
+      setBulkMessage(`Ruta actualizada a ${nextStatus}.`);
+      await reload(meta.page);
+    } catch (exception) {
+      setBulkError(exception instanceof Error ? exception.message : 'No se pudo actualizar la ruta');
+    }
+  };
+
   return (
     <section className="page-grid">
       <Card>
@@ -768,6 +823,21 @@ export function RoutesPage() {
               </div>
             </div>
             <div className="inline-actions ops-toolbar">
+              <span className="helper">Presets asignación</span>
+              <Button type="button" variant="outline" onClick={() => applyAssignmentPreset('smart_scope')} disabled={bulkUpdating}>
+                Alinear subcontrata
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyAssignmentPreset('driver_only')} disabled={bulkUpdating}>
+                Solo conductor
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyAssignmentPreset('vehicle_only')} disabled={bulkUpdating}>
+                Solo vehículo
+              </Button>
+              <Button type="button" variant="outline" onClick={() => applyAssignmentPreset('clear')} disabled={bulkUpdating}>
+                Limpiar
+              </Button>
+            </div>
+            <div className="inline-actions ops-toolbar">
               <label htmlFor="routes-bulk-unassigned">Dejar sin asignar</label>
               <input
                 id="routes-bulk-unassigned"
@@ -794,6 +864,10 @@ export function RoutesPage() {
                 <option value="in_progress">in_progress</option>
                 <option value="completed">completed</option>
               </select>
+              <Button type="button" variant="outline" onClick={() => applyStatusPreset('planned')} disabled={bulkUpdating}>Planned</Button>
+              <Button type="button" variant="outline" onClick={() => applyStatusPreset('in_progress')} disabled={bulkUpdating}>En ruta</Button>
+              <Button type="button" variant="outline" onClick={() => applyStatusPreset('completed')} disabled={bulkUpdating}>Completa</Button>
+              <Button type="button" variant="outline" onClick={() => applyStatusPreset('clear')} disabled={bulkUpdating}>Limpiar</Button>
               <Button type="button" variant="outline" onClick={applyBulkStatus} disabled={bulkUpdating || !bulkStatus}>
                 Aplicar estado masivo
               </Button>
@@ -936,6 +1010,55 @@ export function RoutesPage() {
               </TableBody>
             </Table>
           </TableWrapper>
+          <div className="mobile-ops-list">
+            {items.map((item) => (
+              <article key={`mobile-route-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <Link to={`/routes/${item.id}`}>{item.code}</Link>
+                    <div className="helper">{item.route_date}</div>
+                  </div>
+                  <Badge variant="secondary" title={routeStatusHelp(item.status)}>
+                    {item.status}
+                  </Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Conductor</div>
+                    <div>{item.driver_code ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Vehículo</div>
+                    <div>{item.vehicle_code ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Paradas</div>
+                    <div>{item.stops_count ?? 0}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Selección</div>
+                    <div>{selectedRouteIds.includes(item.id) ? 'Seleccionada' : 'Sin seleccionar'}</div>
+                  </div>
+                </div>
+                <div className="mobile-ops-card-actions">
+                  <Button type="button" variant="outline" onClick={() => toggleRouteSelection(item.id)}>
+                    {selectedRouteIds.includes(item.id) ? 'Quitar' : 'Seleccionar'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void quickUpdateRouteStatus(item.id, item.status === 'planned' ? 'in_progress' : 'completed')}
+                  >
+                    {item.status === 'planned' ? 'Iniciar' : 'Completar'}
+                  </Button>
+                  <Link to={`/routes/${item.id}`} className="btn btn-outline">Abrir</Link>
+                </div>
+              </article>
+            ))}
+            {items.length === 0 ? (
+              <div className="mobile-ops-empty">Sin rutas para los filtros seleccionados.</div>
+            ) : null}
+          </div>
           <div className="inline-actions">
             <Button type="button" variant="outline" onClick={() => reload(Math.max(1, meta.page - 1))} disabled={meta.page <= 1}>
               Anterior

@@ -1153,8 +1153,22 @@ export function IncidentsPage() {
                 <div className="helper">{formatSlaTimeline(item)}</div>
                 <div className="mobile-ops-card-actions">
                   {!item.resolved_at ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => toggleSelectedIncident(item.id, !selectedIncidentIds.includes(item.id))}
+                    >
+                      {selectedIncidentIds.includes(item.id) ? 'Quitar' : 'Seleccionar'}
+                    </Button>
+                  ) : null}
+                  {!item.resolved_at ? (
                     <Button type="button" onClick={() => onResolve(item)} disabled={resolvingId === item.id}>
                       {resolvingId === item.id ? 'Resolviendo...' : 'Resolver'}
+                    </Button>
+                  ) : null}
+                  {!item.resolved_at && item.priority !== 'high' ? (
+                    <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>
+                      Escalar alta
                     </Button>
                   ) : null}
                   <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>
