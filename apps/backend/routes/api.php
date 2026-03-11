@@ -77,6 +77,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
+        Route::patch('shipments/{id}', [ShipmentController::class, 'update']);
         Route::post('shipments/bulk-update/preview', [ShipmentController::class, 'bulkUpdatePreview']);
         Route::post('shipments/bulk-update/preview.csv', [ShipmentController::class, 'bulkUpdatePreviewCsv']);
         Route::post('shipments/bulk-update', [ShipmentController::class, 'bulkUpdate']);
@@ -88,6 +89,7 @@ Route::prefix('v1')->group(function () {
         Route::post('hubs/{id}/restore', [HubController::class, 'restore']);
         Route::get('contacts', [ContactController::class, 'index']);
         Route::post('contacts', [ContactController::class, 'store']);
+        Route::patch('contacts/{id}', [ContactController::class, 'update']);
         Route::get('addresses/suggest', [AddressSuggestionController::class, 'index']);
         Route::get('depots', [DepotController::class, 'index']);
         Route::post('depots', [DepotController::class, 'store']);

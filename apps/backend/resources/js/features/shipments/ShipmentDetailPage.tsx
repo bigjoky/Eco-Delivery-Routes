@@ -139,7 +139,6 @@ export function ShipmentDetailPage() {
             {shipment?.route_id ? (
               <Link to={`/routes/${shipment.route_id}`} className="btn btn-outline">Ir a ruta</Link>
             ) : null}
-            <Link to={`/incidents?incidentable_id=${encodeURIComponent(id ?? '')}`} className="btn btn-outline">Ver incidencias relacionadas</Link>
             {loading ? <span className="helper">Cargando...</span> : null}
             {error ? <span className="helper">{error}</span> : null}
           </div>

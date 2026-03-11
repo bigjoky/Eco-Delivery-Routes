@@ -129,9 +129,21 @@ class ShipmentController extends Controller
                 'route_stops.completed_at',
             ]);
 
+        $senderContact = null;
+        if (!empty($shipment->sender_contact_id)) {
+            $senderContact = DB::table('contacts')->where('id', $shipment->sender_contact_id)->first();
+        }
+
+        $recipientContact = null;
+        if (!empty($shipment->recipient_contact_id)) {
+            $recipientContact = DB::table('contacts')->where('id', $shipment->recipient_contact_id)->first();
+        }
+
         return response()->json([
             'data' => [
                 'shipment' => $shipment,
+                'sender_contact' => $senderContact,
+                'recipient_contact' => $recipientContact,
                 'tracking_events' => $trackingEvents,
                 'pods' => $pods,
                 'incidents' => $incidents,
@@ -150,39 +162,27 @@ class ShipmentController extends Controller
 
         $minScheduled = Carbon::now()->subDays(30)->format('Y-m-d H:i:s');
         $maxScheduled = Carbon::now()->addDays(180)->format('Y-m-d H:i:s');
-        $payload = $request->validate([
-            'hub_id' => ['required', 'uuid'],
-            'external_reference' => ['nullable', 'string', 'max:80'],
-            'consignee_name' => ['required', 'string', 'max:120'],
-            'consignee_document_id' => ['required', 'string', 'max:60'],
-            'address_line' => ['nullable', 'string', 'max:220'],
-            'address_street' => ['required', 'string', 'max:180'],
-            'address_number' => ['nullable', 'string', 'max:40'],
-            'postal_code' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
-            'city' => ['required', 'string', 'max:80'],
-            'province' => ['nullable', 'string', 'max:80'],
-            'country' => ['required', 'string', 'max:80'],
-            'address_notes' => ['nullable', 'string', 'max:220'],
-            'consignee_phone' => ['required', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
-            'consignee_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
-            'consignee_email' => ['nullable', 'email', 'max:120'],
-            'sender_name' => ['nullable', 'string', 'max:120'],
-            'sender_legal_name' => ['nullable', 'string', 'max:180'],
-            'sender_document_id' => ['required', 'string', 'max:60'],
-            'sender_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
-            'sender_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
-            'sender_email' => ['nullable', 'email', 'max:120'],
-            'sender_address_line' => ['nullable', 'string', 'max:220'],
-            'sender_address_street' => ['required', 'string', 'max:180'],
-            'sender_address_number' => ['nullable', 'string', 'max:40'],
-            'sender_postal_code' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
-            'sender_city' => ['required', 'string', 'max:80'],
-            'sender_province' => ['nullable', 'string', 'max:80'],
-            'sender_country' => ['required', 'string', 'max:80'],
-            'sender_address_notes' => ['nullable', 'string', 'max:220'],
-            'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
-            'service_type' => ['required', 'in:express_1030,express_1400,express_1900,economy_parcel,business_parcel,thermo_parcel,delivery'],
-        ]);
+        $payload = $request->validate(array_merge(
+            $this->shipmentAddressRules(''),
+            $this->shipmentAddressRules('sender_'),
+            [
+                'hub_id' => ['required', 'uuid'],
+                'external_reference' => ['nullable', 'string', 'max:80'],
+                'consignee_name' => ['required', 'string', 'max:120'],
+                'consignee_document_id' => ['required', 'string', 'max:60'],
+                'consignee_phone' => ['required', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+                'consignee_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+                'consignee_email' => ['nullable', 'email', 'max:120'],
+                'sender_name' => ['nullable', 'string', 'max:120'],
+                'sender_legal_name' => ['nullable', 'string', 'max:180'],
+                'sender_document_id' => ['required', 'string', 'max:60'],
+                'sender_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+                'sender_phone_alt' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+                'sender_email' => ['nullable', 'email', 'max:120'],
+                'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
+                'service_type' => ['required', 'in:express_1030,express_1400,express_1900,economy_parcel,business_parcel,thermo_parcel,delivery'],
+            ]
+        ));
         if (
             $this->normalizeText($payload['sender_name'] ?? null) === null
             && $this->normalizeText($payload['sender_legal_name'] ?? null) === null
@@ -221,12 +221,19 @@ class ShipmentController extends Controller
             'phone_alt' => $payload['sender_phone_alt'] ?? null,
             'email' => $payload['sender_email'] ?? null,
             'address_line' => $senderAddressLine,
+            'address_street_type' => $payload['sender_address_street_type'] ?? null,
             'address_street' => $payload['sender_address_street'] ?? null,
             'address_number' => $payload['sender_address_number'] ?? null,
+            'address_block' => $payload['sender_address_block'] ?? null,
+            'address_stair' => $payload['sender_address_stair'] ?? null,
+            'address_floor' => $payload['sender_address_floor'] ?? null,
+            'address_door' => $payload['sender_address_door'] ?? null,
             'postal_code' => $payload['sender_postal_code'] ?? null,
             'city' => $payload['sender_city'] ?? null,
+            'address_municipality' => $payload['sender_address_municipality'] ?? null,
             'province' => $payload['sender_province'] ?? null,
             'country' => $payload['sender_country'] ?? null,
+            'address_reference' => $payload['sender_address_reference'] ?? null,
             'address_notes' => $payload['sender_address_notes'] ?? null,
         ], 'sender');
 
@@ -239,12 +246,19 @@ class ShipmentController extends Controller
             'external_reference' => $this->normalizeText($payload['external_reference'] ?? null),
             'consignee_name' => $this->normalizeTitle($payload['consignee_name'] ?? null),
             'address_line' => $addressLine,
+            'address_street_type' => $this->normalizeTitle($payload['address_street_type'] ?? null),
             'address_street' => $this->normalizeTitle($payload['address_street'] ?? null),
             'address_number' => $this->normalizeText($payload['address_number'] ?? null),
+            'address_block' => $this->normalizeText($payload['address_block'] ?? null),
+            'address_stair' => $this->normalizeText($payload['address_stair'] ?? null),
+            'address_floor' => $this->normalizeText($payload['address_floor'] ?? null),
+            'address_door' => $this->normalizeText($payload['address_door'] ?? null),
             'postal_code' => $this->normalizeText($payload['postal_code'] ?? null),
             'city' => $this->normalizeTitle($payload['city'] ?? null),
+            'address_municipality' => $this->normalizeTitle($payload['address_municipality'] ?? null),
             'province' => $this->normalizeTitle($payload['province'] ?? null),
             'country' => $this->normalizeText($payload['country'] ?? null),
+            'address_reference' => $this->normalizeText($payload['address_reference'] ?? null),
             'address_notes' => $this->normalizeText($payload['address_notes'] ?? null),
             'consignee_phone' => $this->normalizeText($payload['consignee_phone'] ?? null),
             'consignee_email' => $this->normalizeText($payload['consignee_email'] ?? null),
@@ -258,6 +272,129 @@ class ShipmentController extends Controller
         return response()->json([
             'data' => DB::table('shipments')->where('id', $id)->first(),
         ], 201);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.write')) {
+            return $this->forbidden();
+        }
+
+        $existing = DB::table('shipments')->where('id', $id)->first();
+        if (!$existing) {
+            return $this->notFound('Shipment not found.');
+        }
+
+        $minScheduled = Carbon::now()->subDays(30)->format('Y-m-d H:i:s');
+        $maxScheduled = Carbon::now()->addDays(180)->format('Y-m-d H:i:s');
+        $payload = $request->validate(array_merge(
+            $this->shipmentAddressRules(''),
+            [
+                'external_reference' => ['nullable', 'string', 'max:80'],
+                'consignee_name' => ['nullable', 'string', 'max:120'],
+                'consignee_document_id' => ['nullable', 'string', 'max:60'],
+                'consignee_phone' => ['nullable', 'string', 'max:40', 'regex:/^[+0-9 -]{7,20}$/'],
+                'consignee_email' => ['nullable', 'email', 'max:120'],
+                'scheduled_at' => ['nullable', 'date', 'after_or_equal:' . $minScheduled, 'before_or_equal:' . $maxScheduled],
+                'service_type' => ['nullable', 'in:express_1030,express_1400,express_1900,economy_parcel,business_parcel,thermo_parcel,delivery'],
+            ]
+        ));
+        $addressLine = $this->normalizeText($payload['address_line'] ?? '') ?: $this->composeAddressLine($payload);
+
+        $updates = [
+            'external_reference' => $this->normalizeText($payload['external_reference'] ?? $existing->external_reference ?? null),
+            'consignee_name' => $this->normalizeTitle($payload['consignee_name'] ?? $existing->consignee_name ?? null),
+            'address_line' => $addressLine,
+            'address_street_type' => $this->normalizeTitle($payload['address_street_type'] ?? null),
+            'address_street' => $this->normalizeTitle($payload['address_street'] ?? null),
+            'address_number' => $this->normalizeText($payload['address_number'] ?? null),
+            'address_block' => $this->normalizeText($payload['address_block'] ?? null),
+            'address_stair' => $this->normalizeText($payload['address_stair'] ?? null),
+            'address_floor' => $this->normalizeText($payload['address_floor'] ?? null),
+            'address_door' => $this->normalizeText($payload['address_door'] ?? null),
+            'postal_code' => $this->normalizeText($payload['postal_code'] ?? null),
+            'city' => $this->normalizeTitle($payload['city'] ?? null),
+            'address_municipality' => $this->normalizeTitle($payload['address_municipality'] ?? null),
+            'province' => $this->normalizeTitle($payload['province'] ?? null),
+            'country' => $this->normalizeText($payload['country'] ?? null),
+            'address_reference' => $this->normalizeText($payload['address_reference'] ?? null),
+            'address_notes' => $this->normalizeText($payload['address_notes'] ?? null),
+            'consignee_phone' => $this->normalizeText($payload['consignee_phone'] ?? $existing->consignee_phone ?? null),
+            'consignee_email' => $this->normalizeText($payload['consignee_email'] ?? $existing->consignee_email ?? null),
+            'scheduled_at' => $payload['scheduled_at'] ?? $existing->scheduled_at ?? null,
+            'service_type' => $payload['service_type'] ?? $existing->service_type ?? null,
+            'updated_at' => now(),
+        ];
+
+        DB::table('shipments')->where('id', $id)->update($updates);
+
+        if (!empty($existing->recipient_contact_id)) {
+            DB::table('contacts')->where('id', $existing->recipient_contact_id)->update([
+                'display_name' => $updates['consignee_name'],
+                'document_id' => $updates['consignee_document_id'],
+                'phone' => $updates['consignee_phone'],
+                'email' => $updates['consignee_email'],
+                'address_line' => $updates['address_line'],
+                'address_street_type' => $updates['address_street_type'],
+                'address_street' => $updates['address_street'],
+                'address_number' => $updates['address_number'],
+                'address_block' => $updates['address_block'],
+                'address_stair' => $updates['address_stair'],
+                'address_floor' => $updates['address_floor'],
+                'address_door' => $updates['address_door'],
+                'postal_code' => $updates['postal_code'],
+                'city' => $updates['city'],
+                'address_municipality' => $updates['address_municipality'],
+                'province' => $updates['province'],
+                'country' => $updates['country'],
+                'address_reference' => $updates['address_reference'],
+                'address_notes' => $updates['address_notes'],
+                'updated_at' => now(),
+            ]);
+        }
+
+        $changedFields = [];
+        foreach ([
+            'address_line',
+            'external_reference',
+            'consignee_name',
+            'address_street_type',
+            'address_street',
+            'address_number',
+            'address_block',
+            'address_stair',
+            'address_floor',
+            'address_door',
+            'postal_code',
+            'city',
+            'address_municipality',
+            'province',
+            'country',
+            'address_reference',
+            'address_notes',
+            'consignee_phone',
+            'consignee_email',
+            'scheduled_at',
+            'service_type',
+        ] as $field) {
+            if (($existing->{$field} ?? null) !== ($updates[$field] ?? null)) {
+                $changedFields[$field] = [
+                'before' => $existing->{$field} ?? null,
+                'after' => $updates[$field] ?? null,
+            ];
+        }
+        }
+
+        $this->auditLogWriter->write($actor->id, 'shipments.updated', [
+            'shipment_id' => $id,
+            'changes' => $changedFields,
+        ]);
+
+        return response()->json([
+            'data' => DB::table('shipments')->where('id', $id)->first(),
+        ]);
     }
 
     public function exportCsv(Request $request)
@@ -626,20 +763,35 @@ class ShipmentController extends Controller
 
     private function composeAddressLine(array $payload): ?string
     {
+        $streetType = $this->normalizeTitle($payload['address_street_type'] ?? null) ?? '';
         $street = $this->normalizeTitle($payload['address_street'] ?? null) ?? '';
         $number = $this->normalizeText($payload['address_number'] ?? null) ?? '';
+        $block = $this->normalizeText($payload['address_block'] ?? null) ?? '';
+        $stair = $this->normalizeText($payload['address_stair'] ?? null) ?? '';
+        $floor = $this->normalizeText($payload['address_floor'] ?? null) ?? '';
+        $door = $this->normalizeText($payload['address_door'] ?? null) ?? '';
         $postal = $this->normalizeText($payload['postal_code'] ?? null) ?? '';
         $city = $this->normalizeTitle($payload['city'] ?? null) ?? '';
+        $municipality = $this->normalizeTitle($payload['address_municipality'] ?? null) ?? '';
         $province = $this->normalizeTitle($payload['province'] ?? null) ?? '';
         $country = $this->normalizeText($payload['country'] ?? null) ?? '';
 
         $parts = [];
+        $streetLabel = trim($streetType . ' ' . $street);
         if ($street !== '') {
-            $parts[] = $number !== '' ? $street . ' ' . $number : $street;
+            $primaryLine = $number !== '' ? $streetLabel . ' ' . $number : $streetLabel;
+            $secondaryBits = array_values(array_filter([$block !== '' ? 'Bloque ' . $block : '', $stair !== '' ? 'Esc. ' . $stair : '', $floor !== '' ? 'Planta ' . $floor : '', $door !== '' ? 'Puerta ' . $door : '']));
+            if ($secondaryBits !== []) {
+                $primaryLine .= ', ' . implode(', ', $secondaryBits);
+            }
+            $parts[] = trim($primaryLine, ' ,');
         }
         $locality = trim($postal . ' ' . $city);
         if ($locality !== '') {
             $parts[] = $locality;
+        }
+        if ($municipality !== '' && mb_strtolower($municipality, 'UTF-8') !== mb_strtolower($city, 'UTF-8')) {
+            $parts[] = $municipality;
         }
         if ($province !== '') {
             $parts[] = $province;
@@ -657,20 +809,35 @@ class ShipmentController extends Controller
 
     private function composeAddressLineWithPrefix(array $payload, string $prefix): ?string
     {
+        $streetType = $this->normalizeTitle($payload[$prefix . 'address_street_type'] ?? null) ?? '';
         $street = $this->normalizeTitle($payload[$prefix . 'address_street'] ?? null) ?? '';
         $number = $this->normalizeText($payload[$prefix . 'address_number'] ?? null) ?? '';
+        $block = $this->normalizeText($payload[$prefix . 'address_block'] ?? null) ?? '';
+        $stair = $this->normalizeText($payload[$prefix . 'address_stair'] ?? null) ?? '';
+        $floor = $this->normalizeText($payload[$prefix . 'address_floor'] ?? null) ?? '';
+        $door = $this->normalizeText($payload[$prefix . 'address_door'] ?? null) ?? '';
         $postal = $this->normalizeText($payload[$prefix . 'postal_code'] ?? null) ?? '';
         $city = $this->normalizeTitle($payload[$prefix . 'city'] ?? null) ?? '';
+        $municipality = $this->normalizeTitle($payload[$prefix . 'address_municipality'] ?? null) ?? '';
         $province = $this->normalizeTitle($payload[$prefix . 'province'] ?? null) ?? '';
         $country = $this->normalizeText($payload[$prefix . 'country'] ?? null) ?? '';
 
         $parts = [];
+        $streetLabel = trim($streetType . ' ' . $street);
         if ($street !== '') {
-            $parts[] = $number !== '' ? $street . ' ' . $number : $street;
+            $primaryLine = $number !== '' ? $streetLabel . ' ' . $number : $streetLabel;
+            $secondaryBits = array_values(array_filter([$block !== '' ? 'Bloque ' . $block : '', $stair !== '' ? 'Esc. ' . $stair : '', $floor !== '' ? 'Planta ' . $floor : '', $door !== '' ? 'Puerta ' . $door : '']));
+            if ($secondaryBits !== []) {
+                $primaryLine .= ', ' . implode(', ', $secondaryBits);
+            }
+            $parts[] = trim($primaryLine, ' ,');
         }
         $locality = trim($postal . ' ' . $city);
         if ($locality !== '') {
             $parts[] = $locality;
+        }
+        if ($municipality !== '' && mb_strtolower($municipality, 'UTF-8') !== mb_strtolower($city, 'UTF-8')) {
+            $parts[] = $municipality;
         }
         if ($province !== '') {
             $parts[] = $province;
@@ -684,6 +851,30 @@ class ShipmentController extends Controller
         }
 
         return implode(', ', $parts);
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function shipmentAddressRules(string $prefix): array
+    {
+        return [
+            $prefix . 'address_line' => ['nullable', 'string', 'max:220'],
+            $prefix . 'address_street_type' => ['nullable', 'string', 'max:40'],
+            $prefix . 'address_street' => ['required', 'string', 'max:180'],
+            $prefix . 'address_number' => ['nullable', 'string', 'max:40'],
+            $prefix . 'address_block' => ['nullable', 'string', 'max:40'],
+            $prefix . 'address_stair' => ['nullable', 'string', 'max:40'],
+            $prefix . 'address_floor' => ['nullable', 'string', 'max:40'],
+            $prefix . 'address_door' => ['nullable', 'string', 'max:40'],
+            $prefix . 'postal_code' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z -]{4,10}$/'],
+            $prefix . 'city' => ['required', 'string', 'max:80'],
+            $prefix . 'address_municipality' => ['nullable', 'string', 'max:120'],
+            $prefix . 'province' => ['nullable', 'string', 'max:80'],
+            $prefix . 'country' => ['required', 'string', 'max:80'],
+            $prefix . 'address_reference' => ['nullable', 'string', 'max:220'],
+            $prefix . 'address_notes' => ['nullable', 'string', 'max:220'],
+        ];
     }
 
     private function normalizeText(?string $value): ?string

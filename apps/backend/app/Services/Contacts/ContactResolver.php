@@ -68,12 +68,19 @@ final class ContactResolver
             'phone_alt' => $this->normalizePhone($payload['phone_alt'] ?? null),
             'email' => $this->normalizeText($payload['email'] ?? null),
             'address_line' => $this->normalizeText($payload['address_line'] ?? null),
+            'address_street_type' => $this->normalizeTitle($payload['address_street_type'] ?? null),
             'address_street' => $this->normalizeTitle($payload['address_street'] ?? null),
             'address_number' => $this->normalizeText($payload['address_number'] ?? null),
+            'address_block' => $this->normalizeText($payload['address_block'] ?? null),
+            'address_stair' => $this->normalizeText($payload['address_stair'] ?? null),
+            'address_floor' => $this->normalizeText($payload['address_floor'] ?? null),
+            'address_door' => $this->normalizeText($payload['address_door'] ?? null),
             'postal_code' => $this->normalizeText($payload['postal_code'] ?? null),
             'city' => $this->normalizeTitle($payload['city'] ?? null),
+            'address_municipality' => $this->normalizeTitle($payload['address_municipality'] ?? null),
             'province' => $this->normalizeTitle($payload['province'] ?? null),
             'country' => $this->normalizeText($payload['country'] ?? null),
+            'address_reference' => $this->normalizeText($payload['address_reference'] ?? null),
             'address_notes' => $this->normalizeText($payload['address_notes'] ?? null),
             'kind' => $kind,
             'created_at' => now(),
@@ -95,12 +102,19 @@ final class ContactResolver
         $updates = $this->fillIfEmpty($updates, 'phone_alt', $existing, $this->normalizePhone($payload['phone_alt'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'email', $existing, $this->normalizeText($payload['email'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'address_line', $existing, $this->normalizeText($payload['address_line'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_street_type', $existing, $this->normalizeTitle($payload['address_street_type'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'address_street', $existing, $this->normalizeTitle($payload['address_street'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'address_number', $existing, $this->normalizeText($payload['address_number'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_block', $existing, $this->normalizeText($payload['address_block'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_stair', $existing, $this->normalizeText($payload['address_stair'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_floor', $existing, $this->normalizeText($payload['address_floor'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_door', $existing, $this->normalizeText($payload['address_door'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'postal_code', $existing, $this->normalizeText($payload['postal_code'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'city', $existing, $this->normalizeTitle($payload['city'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_municipality', $existing, $this->normalizeTitle($payload['address_municipality'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'province', $existing, $this->normalizeTitle($payload['province'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'country', $existing, $this->normalizeText($payload['country'] ?? null));
+        $updates = $this->fillIfEmpty($updates, 'address_reference', $existing, $this->normalizeText($payload['address_reference'] ?? null));
         $updates = $this->fillIfEmpty($updates, 'address_notes', $existing, $this->normalizeText($payload['address_notes'] ?? null));
 
         if (($existing->kind ?? null) === null) {

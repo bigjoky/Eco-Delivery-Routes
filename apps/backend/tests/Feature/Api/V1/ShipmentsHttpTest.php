@@ -480,6 +480,75 @@ class ShipmentsHttpTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_can_update_shipment_spanish_address_fields(): void
+    {
+        $manager = $this->createUserWithRole('operations_manager');
+        $this->actingAs($manager, 'sanctum');
+
+        $hubId = (string) DB::table('hubs')->value('id');
+        $shipmentId = (string) Str::uuid();
+        DB::table('shipments')->insert([
+            'id' => $shipmentId,
+            'hub_id' => $hubId,
+            'reference' => 'SHP-ADDR-001',
+            'status' => 'created',
+            'service_type' => 'delivery',
+            'consignee_name' => 'Cliente Direccion',
+            'address_line' => 'Calle Larios 1, 29001 Malaga, ES',
+            'address_street' => 'Larios',
+            'address_number' => '1',
+            'postal_code' => '29001',
+            'city' => 'Malaga',
+            'province' => 'Malaga',
+            'country' => 'ES',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->patchJson('/api/v1/shipments/' . $shipmentId, [
+            'address_street_type' => 'Avenida',
+            'address_street' => 'Andalucia',
+            'address_number' => '20',
+            'address_block' => 'B',
+            'address_stair' => '2',
+            'address_floor' => '3',
+            'address_door' => 'A',
+            'postal_code' => '29002',
+            'city' => 'Malaga',
+            'address_municipality' => 'Malaga',
+            'province' => 'Malaga',
+            'country' => 'ES',
+            'address_reference' => 'Acceso por recepcion',
+            'address_notes' => 'Portero azul',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.address_street_type', 'Avenida');
+        $response->assertJsonPath('data.address_block', 'B');
+        $response->assertJsonPath('data.address_reference', 'Acceso por recepcion');
+
+        $row = DB::table('shipments')->where('id', $shipmentId)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('Avenida', $row->address_street_type);
+        $this->assertSame('Andalucia', $row->address_street);
+        $this->assertSame('B', $row->address_block);
+        $this->assertSame('2', $row->address_stair);
+        $this->assertSame('3', $row->address_floor);
+        $this->assertSame('A', $row->address_door);
+        $this->assertSame('Malaga', $row->address_municipality);
+        $this->assertSame('Acceso por recepcion', $row->address_reference);
+
+        $audit = DB::table('audit_logs')
+            ->where('event', 'shipments.updated')
+            ->orderByDesc('id')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $metadata = json_decode((string) $audit->metadata, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($shipmentId, $metadata['shipment_id'] ?? null);
+        $this->assertSame('Avenida', $metadata['changes']['address_street_type']['after'] ?? null);
+    }
+
     public function test_can_show_shipment_detail_with_tracking_pods_incidents(): void
     {
         $manager = $this->createUserWithRole('operations_manager');

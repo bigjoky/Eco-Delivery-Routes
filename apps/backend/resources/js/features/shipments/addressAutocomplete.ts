@@ -34,12 +34,19 @@ function normalizeCountry(country?: string | null): string {
 function toSuggestion(row: ContactSummary): AddressSuggestion {
   const country = normalizeCountry(row.country);
   return {
+    address_street_type: compact((row as ContactSummary & { address_street_type?: string | null }).address_street_type),
     address_street: compact(row.address_street),
     address_number: compact(row.address_number),
+    address_block: compact((row as ContactSummary & { address_block?: string | null }).address_block),
+    address_stair: compact((row as ContactSummary & { address_stair?: string | null }).address_stair),
+    address_floor: compact((row as ContactSummary & { address_floor?: string | null }).address_floor),
+    address_door: compact((row as ContactSummary & { address_door?: string | null }).address_door),
     postal_code: normalizePostalCode(country, row.postal_code),
     city: compact(row.city),
+    address_municipality: compact((row as ContactSummary & { address_municipality?: string | null }).address_municipality),
     province: compact(row.province),
     country,
+    address_reference: compact((row as ContactSummary & { address_reference?: string | null }).address_reference),
     address_notes: compact(row.address_notes),
   };
 }

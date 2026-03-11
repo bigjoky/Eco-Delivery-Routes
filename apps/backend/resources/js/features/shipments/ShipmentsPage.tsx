@@ -252,12 +252,19 @@ export function ShipmentsPage() {
   const [createConsigneeDocType, setCreateConsigneeDocType] = useState<'DNI' | 'NIE' | 'PASSPORT' | 'CIF'>('DNI');
   const [createConsigneeFirstName, setCreateConsigneeFirstName] = useState('');
   const [createConsigneeLastName, setCreateConsigneeLastName] = useState('');
+  const [createStreetType, setCreateStreetType] = useState('Calle');
   const [createStreet, setCreateStreet] = useState('');
   const [createNumber, setCreateNumber] = useState('');
+  const [createBlock, setCreateBlock] = useState('');
+  const [createStair, setCreateStair] = useState('');
+  const [createFloor, setCreateFloor] = useState('');
+  const [createDoor, setCreateDoor] = useState('');
   const [createPostalCode, setCreatePostalCode] = useState('');
   const [createCity, setCreateCity] = useState('');
+  const [createMunicipality, setCreateMunicipality] = useState('');
   const [createProvince, setCreateProvince] = useState('');
   const [createCountry, setCreateCountry] = useState('ES');
+  const [createAddressReference, setCreateAddressReference] = useState('');
   const [createAddressNotes, setCreateAddressNotes] = useState('');
   const [createPhone, setCreatePhone] = useState('');
   const [createEmail, setCreateEmail] = useState('');
@@ -266,12 +273,19 @@ export function ShipmentsPage() {
   const [createSenderDocType, setCreateSenderDocType] = useState<'DNI' | 'NIE' | 'PASSPORT' | 'CIF'>('DNI');
   const [createSenderFirstName, setCreateSenderFirstName] = useState('');
   const [createSenderLastName, setCreateSenderLastName] = useState('');
+  const [createSenderStreetType, setCreateSenderStreetType] = useState('Calle');
   const [createSenderStreet, setCreateSenderStreet] = useState('');
   const [createSenderNumber, setCreateSenderNumber] = useState('');
+  const [createSenderBlock, setCreateSenderBlock] = useState('');
+  const [createSenderStair, setCreateSenderStair] = useState('');
+  const [createSenderFloor, setCreateSenderFloor] = useState('');
+  const [createSenderDoor, setCreateSenderDoor] = useState('');
   const [createSenderPostalCode, setCreateSenderPostalCode] = useState('');
   const [createSenderCity, setCreateSenderCity] = useState('');
+  const [createSenderMunicipality, setCreateSenderMunicipality] = useState('');
   const [createSenderProvince, setCreateSenderProvince] = useState('');
   const [createSenderCountry, setCreateSenderCountry] = useState('ES');
+  const [createSenderAddressReference, setCreateSenderAddressReference] = useState('');
   const [createSenderAddressNotes, setCreateSenderAddressNotes] = useState('');
   const [createSenderPhone, setCreateSenderPhone] = useState('');
   const [createSenderEmail, setCreateSenderEmail] = useState('');
@@ -372,21 +386,35 @@ export function ShipmentsPage() {
   const [senderLookupError, setSenderLookupError] = useState('');
   const [senderLookupLoading, setSenderLookupLoading] = useState(false);
   const [recipientAddressSuggestions, setRecipientAddressSuggestions] = useState<Array<{
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
   }>>([]);
   const [senderAddressSuggestions, setSenderAddressSuggestions] = useState<Array<{
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
   }>>([]);
   const [importSummary, setImportSummary] = useState<null | Record<string, number>>(null);
@@ -642,6 +670,7 @@ export function ShipmentsPage() {
     }
     if (!createCity.trim() && selectedPoint.city) {
       setCreateCity(selectedPoint.city);
+      setCreateMunicipality(selectedPoint.city);
     }
     if (!createAddressNotes.trim()) {
       const depot = selectedPoint.depot_id ? hubDepots.find((item) => item.id === selectedPoint.depot_id) : null;
@@ -1089,12 +1118,19 @@ export function ShipmentsPage() {
         }
         setCreatePhone(contact.phone ?? '');
         setCreateEmail(contact.email ?? '');
+        setCreateStreetType(contact.address_street_type ?? 'Calle');
         setCreateStreet(contact.address_street ?? '');
         setCreateNumber(contact.address_number ?? '');
+        setCreateBlock(contact.address_block ?? '');
+        setCreateStair(contact.address_stair ?? '');
+        setCreateFloor(contact.address_floor ?? '');
+        setCreateDoor(contact.address_door ?? '');
         setCreatePostalCode(contact.postal_code ?? '');
         setCreateCity(contact.city ?? '');
+        setCreateMunicipality(contact.address_municipality ?? '');
         setCreateProvince(contact.province ?? '');
         setCreateCountry(contact.country ?? 'ES');
+        setCreateAddressReference(contact.address_reference ?? '');
         setCreateAddressNotes(contact.address_notes ?? '');
       }
     } catch (error) {
@@ -1142,12 +1178,19 @@ export function ShipmentsPage() {
         }
         setCreateSenderPhone(contact.phone ?? '');
         setCreateSenderEmail(contact.email ?? '');
+        setCreateSenderStreetType(contact.address_street_type ?? 'Calle');
         setCreateSenderStreet(contact.address_street ?? '');
         setCreateSenderNumber(contact.address_number ?? '');
+        setCreateSenderBlock(contact.address_block ?? '');
+        setCreateSenderStair(contact.address_stair ?? '');
+        setCreateSenderFloor(contact.address_floor ?? '');
+        setCreateSenderDoor(contact.address_door ?? '');
         setCreateSenderPostalCode(contact.postal_code ?? '');
         setCreateSenderCity(contact.city ?? '');
+        setCreateSenderMunicipality(contact.address_municipality ?? '');
         setCreateSenderProvince(contact.province ?? '');
         setCreateSenderCountry(contact.country ?? 'ES');
+        setCreateSenderAddressReference(contact.address_reference ?? '');
         setCreateSenderAddressNotes(contact.address_notes ?? '');
       }
     } catch (error) {
@@ -1383,15 +1426,21 @@ export function ShipmentsPage() {
     setCreating(true);
     setCreateError('');
     try {
-      const addressLine = [createStreet, createNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const addressLine = [[createStreetType, createStreet].filter((value) => value.trim() !== '').join(' '), createNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const addressAccess = [createBlock ? `Bloque ${createBlock}` : '', createStair ? `Esc. ${createStair}` : '', createFloor ? `Planta ${createFloor}` : '', createDoor ? `Puerta ${createDoor}` : '']
+        .filter((value) => value.trim() !== '')
+        .join(', ');
       const locality = [createPostalCode, createCity].filter((value) => value.trim() !== '').join(' ').trim();
-      const composedAddress = [addressLine, locality, createProvince, createCountry]
+      const composedAddress = [addressLine, addressAccess, locality, createMunicipality, createProvince, createCountry]
         .map((value) => value.trim())
         .filter((value) => value !== '')
         .join(', ');
-      const senderAddressLine = [createSenderStreet, createSenderNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const senderAddressLine = [[createSenderStreetType, createSenderStreet].filter((value) => value.trim() !== '').join(' '), createSenderNumber].filter((value) => value.trim() !== '').join(' ').trim();
+      const senderAddressAccess = [createSenderBlock ? `Bloque ${createSenderBlock}` : '', createSenderStair ? `Esc. ${createSenderStair}` : '', createSenderFloor ? `Planta ${createSenderFloor}` : '', createSenderDoor ? `Puerta ${createSenderDoor}` : '']
+        .filter((value) => value.trim() !== '')
+        .join(', ');
       const senderLocality = [createSenderPostalCode, createSenderCity].filter((value) => value.trim() !== '').join(' ').trim();
-      const composedSenderAddress = [senderAddressLine, senderLocality, createSenderProvince, createSenderCountry]
+      const composedSenderAddress = [senderAddressLine, senderAddressAccess, senderLocality, createSenderMunicipality, createSenderProvince, createSenderCountry]
         .map((value) => value.trim())
         .filter((value) => value !== '')
         .join(', ');
@@ -1409,12 +1458,19 @@ export function ShipmentsPage() {
           consignee_name: recipientName || null,
           consignee_document_id: createConsigneeDocumentId || null,
           address_line: composedAddress || null,
+          address_street_type: createStreetType || null,
           address_street: createStreet || null,
           address_number: createNumber || null,
+          address_block: createBlock || null,
+          address_stair: createStair || null,
+          address_floor: createFloor || null,
+          address_door: createDoor || null,
           postal_code: createPostalCode || null,
           city: createCity || null,
+          address_municipality: createMunicipality || null,
           province: createProvince || null,
           country: createCountry || null,
+          address_reference: createAddressReference || null,
           address_notes: createAddressNotes || null,
           consignee_phone: createPhone || null,
           consignee_email: createEmail || null,
@@ -1424,12 +1480,19 @@ export function ShipmentsPage() {
           sender_phone: createSenderPhone || null,
           sender_email: createSenderEmail || null,
           sender_address_line: composedSenderAddress || null,
+          sender_address_street_type: createSenderStreetType || null,
           sender_address_street: createSenderStreet || null,
           sender_address_number: createSenderNumber || null,
+          sender_address_block: createSenderBlock || null,
+          sender_address_stair: createSenderStair || null,
+          sender_address_floor: createSenderFloor || null,
+          sender_address_door: createSenderDoor || null,
           sender_postal_code: createSenderPostalCode || null,
           sender_city: createSenderCity || null,
+          sender_address_municipality: createSenderMunicipality || null,
           sender_province: createSenderProvince || null,
           sender_country: createSenderCountry || null,
+          sender_address_reference: createSenderAddressReference || null,
           sender_address_notes: createSenderAddressNotes || null,
           scheduled_at: normalizedScheduledAt,
           service_type: createServiceType,
@@ -1450,12 +1513,19 @@ export function ShipmentsPage() {
       setCreateConsigneeDocType('DNI');
       setCreateConsigneeFirstName('');
       setCreateConsigneeLastName('');
+      setCreateStreetType('Calle');
       setCreateStreet('');
       setCreateNumber('');
+      setCreateBlock('');
+      setCreateStair('');
+      setCreateFloor('');
+      setCreateDoor('');
       setCreatePostalCode('');
       setCreateCity('');
+      setCreateMunicipality('');
       setCreateProvince('');
       setCreateCountry('ES');
+      setCreateAddressReference('');
       setCreateAddressNotes('');
       setCreatePhone('');
       setCreateEmail('');
@@ -1465,12 +1535,19 @@ export function ShipmentsPage() {
         setCreateSenderDocType('DNI');
         setCreateSenderFirstName('');
         setCreateSenderLastName('');
+        setCreateSenderStreetType('Calle');
         setCreateSenderStreet('');
         setCreateSenderNumber('');
+        setCreateSenderBlock('');
+        setCreateSenderStair('');
+        setCreateSenderFloor('');
+        setCreateSenderDoor('');
         setCreateSenderPostalCode('');
         setCreateSenderCity('');
+        setCreateSenderMunicipality('');
         setCreateSenderProvince('');
         setCreateSenderCountry('ES');
+        setCreateSenderAddressReference('');
         setCreateSenderAddressNotes('');
         setCreateSenderPhone('');
         setCreateSenderEmail('');
@@ -1503,12 +1580,19 @@ export function ShipmentsPage() {
     setCreateConsigneeDocType('DNI');
     setCreateConsigneeFirstName('');
     setCreateConsigneeLastName('');
+    setCreateStreetType('Calle');
     setCreateStreet('');
     setCreateNumber('');
+    setCreateBlock('');
+    setCreateStair('');
+    setCreateFloor('');
+    setCreateDoor('');
     setCreatePostalCode('');
     setCreateCity('');
+    setCreateMunicipality('');
     setCreateProvince('');
     setCreateCountry('ES');
+    setCreateAddressReference('');
     setCreateAddressNotes('');
     setCreatePhone('');
     setCreateEmail('');
@@ -1523,12 +1607,19 @@ export function ShipmentsPage() {
     setCreateSenderDocType('DNI');
     setCreateSenderFirstName('');
     setCreateSenderLastName('');
+    setCreateSenderStreetType('Calle');
     setCreateSenderStreet('');
     setCreateSenderNumber('');
+    setCreateSenderBlock('');
+    setCreateSenderStair('');
+    setCreateSenderFloor('');
+    setCreateSenderDoor('');
     setCreateSenderPostalCode('');
     setCreateSenderCity('');
+    setCreateSenderMunicipality('');
     setCreateSenderProvince('');
     setCreateSenderCountry('ES');
+    setCreateSenderAddressReference('');
     setCreateSenderAddressNotes('');
     setCreateSenderPhone('');
     setCreateSenderEmail('');
@@ -2921,6 +3012,13 @@ export function ShipmentsPage() {
         <div className="modal-section">
           <div className="modal-section-title">Dirección</div>
           <div className="form-row">
+          <label htmlFor="create-shipment-street-type">Tipo via</label>
+          <input
+            id="create-shipment-street-type"
+            value={createStreetType}
+            onChange={(event) => setCreateStreetType(event.target.value)}
+            placeholder="Calle"
+          />
           <label htmlFor="create-shipment-street">Calle</label>
           <input
             id="create-shipment-street"
@@ -2939,12 +3037,19 @@ export function ShipmentsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
+                  setCreateStreetType(suggestion.address_street_type ?? 'Calle');
                   setCreateStreet(suggestion.address_street ?? '');
                   setCreateNumber(suggestion.address_number ?? '');
+                  setCreateBlock(suggestion.address_block ?? '');
+                  setCreateStair(suggestion.address_stair ?? '');
+                  setCreateFloor(suggestion.address_floor ?? '');
+                  setCreateDoor(suggestion.address_door ?? '');
                   setCreatePostalCode(suggestion.postal_code ?? '');
                   setCreateCity(suggestion.city ?? '');
+                  setCreateMunicipality(suggestion.address_municipality ?? '');
                   setCreateProvince(suggestion.province ?? '');
                   setCreateCountry(suggestion.country ?? 'ES');
+                  setCreateAddressReference(suggestion.address_reference ?? '');
                   setCreateAddressNotes(suggestion.address_notes ?? '');
                 }}
               >
@@ -2957,7 +3062,35 @@ export function ShipmentsPage() {
             id="create-shipment-number"
             value={createNumber}
             onChange={(event) => setCreateNumber(event.target.value)}
-            placeholder="Portal, piso"
+            placeholder="10"
+          />
+          <label htmlFor="create-shipment-block">Bloque</label>
+          <input
+            id="create-shipment-block"
+            value={createBlock}
+            onChange={(event) => setCreateBlock(event.target.value)}
+            placeholder="B"
+          />
+          <label htmlFor="create-shipment-stair">Escalera</label>
+          <input
+            id="create-shipment-stair"
+            value={createStair}
+            onChange={(event) => setCreateStair(event.target.value)}
+            placeholder="2"
+          />
+          <label htmlFor="create-shipment-floor">Planta</label>
+          <input
+            id="create-shipment-floor"
+            value={createFloor}
+            onChange={(event) => setCreateFloor(event.target.value)}
+            placeholder="3"
+          />
+          <label htmlFor="create-shipment-door">Puerta</label>
+          <input
+            id="create-shipment-door"
+            value={createDoor}
+            onChange={(event) => setCreateDoor(event.target.value)}
+            placeholder="A"
           />
           <label htmlFor="create-shipment-postal">Codigo postal</label>
           <input
@@ -2975,6 +3108,13 @@ export function ShipmentsPage() {
             placeholder="Malaga"
           />
           {createFieldErrors.city ? <div className="helper error">{createFieldErrors.city}</div> : null}
+          <label htmlFor="create-shipment-municipality">Municipio</label>
+          <input
+            id="create-shipment-municipality"
+            value={createMunicipality}
+            onChange={(event) => setCreateMunicipality(event.target.value)}
+            placeholder="Malaga"
+          />
           <label htmlFor="create-shipment-province">Provincia</label>
           <input
             id="create-shipment-province"
@@ -2989,6 +3129,13 @@ export function ShipmentsPage() {
             value={createCountry}
             onChange={(event) => setCreateCountry(event.target.value)}
             placeholder="ES"
+          />
+          <label htmlFor="create-shipment-reference">Referencia acceso</label>
+          <input
+            id="create-shipment-reference"
+            value={createAddressReference}
+            onChange={(event) => setCreateAddressReference(event.target.value)}
+            placeholder="Portero junto a farmacia"
           />
           <label htmlFor="create-shipment-notes">Notas direccion</label>
           <input
@@ -3159,6 +3306,13 @@ export function ShipmentsPage() {
         <div className="modal-section">
           <div className="modal-section-title">Dirección</div>
           <div className="form-row">
+          <label htmlFor="create-sender-street-type">Tipo via</label>
+          <input
+            id="create-sender-street-type"
+            value={createSenderStreetType}
+            onChange={(event) => setCreateSenderStreetType(event.target.value)}
+            placeholder="Calle"
+          />
           <label htmlFor="create-sender-street">Calle</label>
           <input
             id="create-sender-street"
@@ -3177,12 +3331,19 @@ export function ShipmentsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => {
+                  setCreateSenderStreetType(suggestion.address_street_type ?? 'Calle');
                   setCreateSenderStreet(suggestion.address_street ?? '');
                   setCreateSenderNumber(suggestion.address_number ?? '');
+                  setCreateSenderBlock(suggestion.address_block ?? '');
+                  setCreateSenderStair(suggestion.address_stair ?? '');
+                  setCreateSenderFloor(suggestion.address_floor ?? '');
+                  setCreateSenderDoor(suggestion.address_door ?? '');
                   setCreateSenderPostalCode(suggestion.postal_code ?? '');
                   setCreateSenderCity(suggestion.city ?? '');
+                  setCreateSenderMunicipality(suggestion.address_municipality ?? '');
                   setCreateSenderProvince(suggestion.province ?? '');
                   setCreateSenderCountry(suggestion.country ?? 'ES');
+                  setCreateSenderAddressReference(suggestion.address_reference ?? '');
                   setCreateSenderAddressNotes(suggestion.address_notes ?? '');
                 }}
               >
@@ -3195,7 +3356,35 @@ export function ShipmentsPage() {
             id="create-sender-number"
             value={createSenderNumber}
             onChange={(event) => setCreateSenderNumber(event.target.value)}
-            placeholder="Portal, piso"
+            placeholder="20"
+          />
+          <label htmlFor="create-sender-block">Bloque</label>
+          <input
+            id="create-sender-block"
+            value={createSenderBlock}
+            onChange={(event) => setCreateSenderBlock(event.target.value)}
+            placeholder="B"
+          />
+          <label htmlFor="create-sender-stair">Escalera</label>
+          <input
+            id="create-sender-stair"
+            value={createSenderStair}
+            onChange={(event) => setCreateSenderStair(event.target.value)}
+            placeholder="2"
+          />
+          <label htmlFor="create-sender-floor">Planta</label>
+          <input
+            id="create-sender-floor"
+            value={createSenderFloor}
+            onChange={(event) => setCreateSenderFloor(event.target.value)}
+            placeholder="3"
+          />
+          <label htmlFor="create-sender-door">Puerta</label>
+          <input
+            id="create-sender-door"
+            value={createSenderDoor}
+            onChange={(event) => setCreateSenderDoor(event.target.value)}
+            placeholder="A"
           />
           <label htmlFor="create-sender-postal">Codigo postal</label>
           <input
@@ -3213,6 +3402,13 @@ export function ShipmentsPage() {
             placeholder="Malaga"
           />
           {createFieldErrors.senderCity ? <div className="helper error">{createFieldErrors.senderCity}</div> : null}
+          <label htmlFor="create-sender-municipality">Municipio</label>
+          <input
+            id="create-sender-municipality"
+            value={createSenderMunicipality}
+            onChange={(event) => setCreateSenderMunicipality(event.target.value)}
+            placeholder="Malaga"
+          />
           <label htmlFor="create-sender-province">Provincia</label>
           <input
             id="create-sender-province"
@@ -3227,6 +3423,13 @@ export function ShipmentsPage() {
             value={createSenderCountry}
             onChange={(event) => setCreateSenderCountry(event.target.value)}
             placeholder="ES"
+          />
+          <label htmlFor="create-sender-reference">Referencia acceso</label>
+          <input
+            id="create-sender-reference"
+            value={createSenderAddressReference}
+            onChange={(event) => setCreateSenderAddressReference(event.target.value)}
+            placeholder="Acceso principal"
           />
           <label htmlFor="create-sender-notes">Notas</label>
           <input
@@ -3253,9 +3456,14 @@ export function ShipmentsPage() {
           detail={shipmentDetailData}
           loading={shipmentDetailLoading}
           error={shipmentDetailError}
-          onOpenIncidents={() => {
-            if (typeof document === 'undefined') return;
-            document.getElementById('shipment-detail-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          onShipmentUpdated={(updatedShipment) => {
+            setShipmentDetailData((current) => (
+              current ? { ...current, shipment: { ...current.shipment, ...updatedShipment } } : current
+            ));
+            setItems((current) => current.map((row) => (row.id === updatedShipment.id ? { ...row, ...updatedShipment } : row)));
+          }}
+          onDetailUpdated={(detailPatch) => {
+            setShipmentDetailData((current) => (current ? { ...current, ...detailPatch } : current));
           }}
         />
         {shipmentDetailId ? (
@@ -3263,16 +3471,6 @@ export function ShipmentsPage() {
             <Link to={`/shipments/${shipmentDetailId}`} className="btn btn-outline" onClick={() => setShipmentDetailOpen(false)}>
               Abrir página completa
             </Link>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (typeof document === 'undefined') return;
-                document.getElementById('shipment-detail-incidents')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-            >
-              Ver incidencias relacionadas
-            </Button>
           </div>
         ) : null}
       </Modal>

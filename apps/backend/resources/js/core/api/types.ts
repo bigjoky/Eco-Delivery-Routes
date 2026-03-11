@@ -52,12 +52,19 @@ export type ShipmentSummary = {
   consignee_name?: string | null;
   consignee_document_id?: string | null;
   address_line?: string | null;
+  address_street_type?: string | null;
   address_street?: string | null;
   address_number?: string | null;
+  address_block?: string | null;
+  address_stair?: string | null;
+  address_floor?: string | null;
+  address_door?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  address_municipality?: string | null;
   province?: string | null;
   country?: string | null;
+  address_reference?: string | null;
   address_notes?: string | null;
   consignee_phone?: string | null;
   consignee_phone_alt?: string | null;
@@ -77,12 +84,19 @@ export type ContactSummary = {
   phone_alt?: string | null;
   email?: string | null;
   address_line?: string | null;
+  address_street_type?: string | null;
   address_street?: string | null;
   address_number?: string | null;
+  address_block?: string | null;
+  address_stair?: string | null;
+  address_floor?: string | null;
+  address_door?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  address_municipality?: string | null;
   province?: string | null;
   country?: string | null;
+  address_reference?: string | null;
   address_notes?: string | null;
   kind?: string | null;
 };
@@ -90,12 +104,19 @@ export type ContactSummary = {
 export type AddressSuggestion = {
   source: 'contact' | 'point';
   source_id: string;
+  address_street_type?: string | null;
   address_street?: string | null;
   address_number?: string | null;
+  address_block?: string | null;
+  address_stair?: string | null;
+  address_floor?: string | null;
+  address_door?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  address_municipality?: string | null;
   province?: string | null;
   country?: string | null;
+  address_reference?: string | null;
   address_notes?: string | null;
 };
 
@@ -265,6 +286,8 @@ export type ShipmentDetail = {
     subcontractor_id?: string | null;
     delivered_at?: string | null;
   };
+  sender_contact?: ContactSummary | null;
+  recipient_contact?: ContactSummary | null;
   tracking_events: TrackingEventSummary[];
   pods: PodSummary[];
   incidents: IncidentSummary[];

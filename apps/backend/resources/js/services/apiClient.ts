@@ -783,17 +783,56 @@ export const apiClient = {
     phone_alt?: string | null;
     email?: string | null;
     address_line?: string | null;
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
   }): Promise<ContactSummary> {
     if (USE_MOCK) return mockApi.createContact(payload) as Promise<ContactSummary>;
     const response = await authorizedFetch(`${API_BASE_URL}/contacts`, {
       method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return parseItemData<ContactSummary>(response);
+  },
+
+  async updateContact(id: string, payload: {
+    display_name?: string | null;
+    legal_name?: string | null;
+    document_id?: string | null;
+    phone?: string | null;
+    phone_alt?: string | null;
+    email?: string | null;
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    address_municipality?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_reference?: string | null;
+    address_notes?: string | null;
+  }): Promise<ContactSummary> {
+    if (USE_MOCK) return mockApi.updateContact(id, payload) as Promise<ContactSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/contacts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     return parseItemData<ContactSummary>(response);
@@ -839,12 +878,19 @@ export const apiClient = {
     consignee_name?: string | null;
     consignee_document_id?: string | null;
     address_line?: string | null;
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
     consignee_phone?: string | null;
     consignee_email?: string | null;
@@ -854,12 +900,19 @@ export const apiClient = {
     sender_phone?: string | null;
     sender_email?: string | null;
     sender_address_line?: string | null;
+    sender_address_street_type?: string | null;
     sender_address_street?: string | null;
     sender_address_number?: string | null;
+    sender_address_block?: string | null;
+    sender_address_stair?: string | null;
+    sender_address_floor?: string | null;
+    sender_address_door?: string | null;
     sender_postal_code?: string | null;
     sender_city?: string | null;
+    sender_address_municipality?: string | null;
     sender_province?: string | null;
     sender_country?: string | null;
+    sender_address_reference?: string | null;
     sender_address_notes?: string | null;
     scheduled_at?: string | null;
     service_type?: string | null;
@@ -872,6 +925,34 @@ export const apiClient = {
     });
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create shipment'));
+    return json.data as ShipmentSummary;
+  },
+
+  async updateShipment(id: string, payload: {
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street: string;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code: string;
+    city: string;
+    address_municipality?: string | null;
+    province?: string | null;
+    country: string;
+    address_reference?: string | null;
+    address_notes?: string | null;
+  }): Promise<ShipmentSummary> {
+    if (USE_MOCK) return mockApi.updateShipment(id, payload) as Promise<ShipmentSummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/shipments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot update shipment'));
     return json.data as ShipmentSummary;
   },
 

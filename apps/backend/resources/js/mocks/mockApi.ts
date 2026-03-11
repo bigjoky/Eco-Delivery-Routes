@@ -18,8 +18,8 @@ let mockIncidents = [
   },
 ];
 let mockShipments = [
-  { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle 1', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
-  { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Calle 2', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
+  { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle Larios 10, Bloque B, Esc. 2, Planta 3, Puerta A, 29001 Malaga, ES', address_street_type: 'Calle', address_street: 'Larios', address_number: '10', address_block: 'B', address_stair: '2', address_floor: '3', address_door: 'A', postal_code: '29001', city: 'Malaga', address_municipality: 'Malaga', province: 'Malaga', country: 'ES', address_reference: 'Portero junto a farmacia', address_notes: 'Portal azul', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
+  { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Avenida Andalucia 20, 29002 Malaga, ES', address_street_type: 'Avenida', address_street: 'Andalucia', address_number: '20', postal_code: '29002', city: 'Malaga', address_municipality: 'Malaga', province: 'Malaga', country: 'ES', address_reference: 'Acceso por recepcion', address_notes: 'Portal azul', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
 ];
 let mockContacts: Array<{
   id: string;
@@ -30,12 +30,19 @@ let mockContacts: Array<{
   phone_alt?: string | null;
   email?: string | null;
   address_line?: string | null;
+  address_street_type?: string | null;
   address_street?: string | null;
   address_number?: string | null;
+  address_block?: string | null;
+  address_stair?: string | null;
+  address_floor?: string | null;
+  address_door?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  address_municipality?: string | null;
   province?: string | null;
   country?: string | null;
+  address_reference?: string | null;
   address_notes?: string | null;
   kind?: 'sender' | 'recipient' | 'both' | null;
 }> = [
@@ -46,12 +53,15 @@ let mockContacts: Array<{
     phone: '+34950111222',
     email: 'cliente@eco.local',
     address_line: 'Calle 1, 29001 Malaga',
+    address_street_type: 'Calle',
     address_street: 'Calle 1',
     address_number: '12',
     postal_code: '29001',
     city: 'Malaga',
+    address_municipality: 'Malaga',
     province: 'Malaga',
     country: 'ES',
+    address_reference: 'Portal azul',
     kind: 'recipient',
   },
   {
@@ -61,12 +71,15 @@ let mockContacts: Array<{
     phone: '+34950111333',
     email: 'remitente@eco.local',
     address_line: 'Calle 2, 29002 Malaga',
+    address_street_type: 'Avenida',
     address_street: 'Calle 2',
     address_number: '21',
     postal_code: '29002',
     city: 'Malaga',
+    address_municipality: 'Malaga',
     province: 'Malaga',
     country: 'ES',
+    address_reference: 'Acceso principal',
     kind: 'sender',
   },
 ];
@@ -1370,12 +1383,19 @@ export const mockApi = {
     phone_alt?: string | null;
     email?: string | null;
     address_line?: string | null;
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
   }) {
     const query = (payload.phone ?? payload.email ?? payload.document_id ?? '').trim().toLowerCase();
@@ -1395,12 +1415,19 @@ export const mockApi = {
       existing.phone_alt = existing.phone_alt ?? payload.phone_alt ?? null;
       existing.email = existing.email ?? payload.email ?? null;
       existing.address_line = existing.address_line ?? payload.address_line ?? null;
+      existing.address_street_type = existing.address_street_type ?? payload.address_street_type ?? null;
       existing.address_street = existing.address_street ?? payload.address_street ?? null;
       existing.address_number = existing.address_number ?? payload.address_number ?? null;
+      existing.address_block = existing.address_block ?? payload.address_block ?? null;
+      existing.address_stair = existing.address_stair ?? payload.address_stair ?? null;
+      existing.address_floor = existing.address_floor ?? payload.address_floor ?? null;
+      existing.address_door = existing.address_door ?? payload.address_door ?? null;
       existing.postal_code = existing.postal_code ?? payload.postal_code ?? null;
       existing.city = existing.city ?? payload.city ?? null;
+      existing.address_municipality = existing.address_municipality ?? payload.address_municipality ?? null;
       existing.province = existing.province ?? payload.province ?? null;
       existing.country = existing.country ?? payload.country ?? null;
+      existing.address_reference = existing.address_reference ?? payload.address_reference ?? null;
       existing.address_notes = existing.address_notes ?? payload.address_notes ?? null;
       return existing;
     }
@@ -1413,17 +1440,53 @@ export const mockApi = {
       phone_alt: payload.phone_alt ?? null,
       email: payload.email ?? null,
       address_line: payload.address_line ?? null,
+      address_street_type: payload.address_street_type ?? null,
       address_street: payload.address_street ?? null,
       address_number: payload.address_number ?? null,
+      address_block: payload.address_block ?? null,
+      address_stair: payload.address_stair ?? null,
+      address_floor: payload.address_floor ?? null,
+      address_door: payload.address_door ?? null,
       postal_code: payload.postal_code ?? null,
       city: payload.city ?? null,
+      address_municipality: payload.address_municipality ?? null,
       province: payload.province ?? null,
       country: payload.country ?? null,
+      address_reference: payload.address_reference ?? null,
       address_notes: payload.address_notes ?? null,
       kind: payload.kind,
     };
     mockContacts = [created, ...mockContacts];
     return created;
+  },
+
+  async updateContact(id: string, payload: {
+    display_name?: string | null;
+    legal_name?: string | null;
+    document_id?: string | null;
+    phone?: string | null;
+    phone_alt?: string | null;
+    email?: string | null;
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street?: string | null;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    address_municipality?: string | null;
+    province?: string | null;
+    country?: string | null;
+    address_reference?: string | null;
+    address_notes?: string | null;
+  }) {
+    const existing = mockContacts.find((item) => item.id === id);
+    if (!existing) throw new Error('Contact not found');
+    Object.assign(existing, payload);
+    return existing;
   },
 
   async getAddressSuggestions(filters: {
@@ -1442,12 +1505,19 @@ export const mockApi = {
     let rows = contacts.map((item) => ({
       source: 'contact' as const,
       source_id: item.id,
+      address_street_type: item.address_street_type ?? null,
       address_street: item.address_street ?? null,
       address_number: item.address_number ?? null,
+      address_block: item.address_block ?? null,
+      address_stair: item.address_stair ?? null,
+      address_floor: item.address_floor ?? null,
+      address_door: item.address_door ?? null,
       postal_code: item.postal_code ?? null,
       city: item.city ?? null,
+      address_municipality: item.address_municipality ?? null,
       province: item.province ?? null,
       country: item.country ?? 'ES',
+      address_reference: item.address_reference ?? null,
       address_notes: item.address_notes ?? null,
     }));
 
@@ -1468,12 +1538,19 @@ export const mockApi = {
     consignee_name?: string | null;
     consignee_document_id?: string | null;
     address_line?: string | null;
+    address_street_type?: string | null;
     address_street?: string | null;
     address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
     postal_code?: string | null;
     city?: string | null;
+    address_municipality?: string | null;
     province?: string | null;
     country?: string | null;
+    address_reference?: string | null;
     address_notes?: string | null;
     consignee_phone?: string | null;
     consignee_email?: string | null;
@@ -1483,12 +1560,19 @@ export const mockApi = {
     sender_phone?: string | null;
     sender_email?: string | null;
     sender_address_line?: string | null;
+    sender_address_street_type?: string | null;
     sender_address_street?: string | null;
     sender_address_number?: string | null;
+    sender_address_block?: string | null;
+    sender_address_stair?: string | null;
+    sender_address_floor?: string | null;
+    sender_address_door?: string | null;
     sender_postal_code?: string | null;
     sender_city?: string | null;
+    sender_address_municipality?: string | null;
     sender_province?: string | null;
     sender_country?: string | null;
+    sender_address_reference?: string | null;
     sender_address_notes?: string | null;
     scheduled_at?: string | null;
     service_type?: string | null;
@@ -1501,12 +1585,19 @@ export const mockApi = {
       consignee_name: payload.consignee_name ?? null,
       consignee_document_id: payload.consignee_document_id ?? null,
       address_line: payload.address_line ?? null,
+      address_street_type: payload.address_street_type ?? null,
       address_street: payload.address_street ?? null,
       address_number: payload.address_number ?? null,
+      address_block: payload.address_block ?? null,
+      address_stair: payload.address_stair ?? null,
+      address_floor: payload.address_floor ?? null,
+      address_door: payload.address_door ?? null,
       postal_code: payload.postal_code ?? null,
       city: payload.city ?? null,
+      address_municipality: payload.address_municipality ?? null,
       province: payload.province ?? null,
       country: payload.country ?? null,
+      address_reference: payload.address_reference ?? null,
       address_notes: payload.address_notes ?? null,
       consignee_phone: payload.consignee_phone ?? null,
       consignee_email: payload.consignee_email ?? null,
@@ -1625,32 +1716,44 @@ export const mockApi = {
   },
 
   async getShipmentDetail(id: string) {
+    const row = mockShipments.find((item) => item.id === id);
+    const recipientContact = mockContacts.find((item) => item.kind === 'recipient' || item.kind === 'both') ?? null;
+    const senderContact = mockContacts.find((item) => item.kind === 'sender' || item.kind === 'both') ?? null;
     return {
       shipment: {
         id,
-        reference: id === 's-2' ? 'SHP-AGP-0002' : 'SHP-AGP-0001',
-        external_reference: id === 's-2' ? 'REF-CLIENTE-002' : 'REF-CLIENTE-001',
-        status: id === 's-2' ? 'delivered' : 'out_for_delivery',
-        consignee_name: id === 's-2' ? 'Cliente Centro' : 'Cliente Demo',
+        reference: row?.reference ?? (id === 's-2' ? 'SHP-AGP-0002' : 'SHP-AGP-0001'),
+        external_reference: row?.external_reference ?? (id === 's-2' ? 'REF-CLIENTE-002' : 'REF-CLIENTE-001'),
+        status: row?.status ?? (id === 's-2' ? 'delivered' : 'out_for_delivery'),
+        consignee_name: row?.consignee_name ?? (id === 's-2' ? 'Cliente Centro' : 'Cliente Demo'),
         consignee_document_id: id === 's-2' ? '12345678B' : '12345678A',
-        address_line: id === 's-2' ? 'Calle 2' : 'Calle 1',
-        address_street: id === 's-2' ? 'Calle 2' : 'Calle 1',
-        address_number: id === 's-2' ? '20' : '10',
-        postal_code: '29001',
-        city: 'Malaga',
-        province: 'Malaga',
-        country: 'ES',
-        address_notes: 'Portal azul',
+        address_line: row?.address_line ?? (id === 's-2' ? 'Calle 2' : 'Calle 1'),
+        address_street_type: row?.address_street_type ?? 'Calle',
+        address_street: row?.address_street ?? (id === 's-2' ? 'Calle 2' : 'Calle 1'),
+        address_number: row?.address_number ?? (id === 's-2' ? '20' : '10'),
+        address_block: row?.address_block ?? null,
+        address_stair: row?.address_stair ?? null,
+        address_floor: row?.address_floor ?? null,
+        address_door: row?.address_door ?? null,
+        postal_code: row?.postal_code ?? '29001',
+        city: row?.city ?? 'Malaga',
+        address_municipality: row?.address_municipality ?? 'Malaga',
+        province: row?.province ?? 'Malaga',
+        country: row?.country ?? 'ES',
+        address_reference: row?.address_reference ?? 'Portal azul',
+        address_notes: row?.address_notes ?? 'Portal azul',
         consignee_phone: '+34950111222',
         consignee_phone_alt: null,
         consignee_email: 'cliente@eco.local',
-        scheduled_at: '2026-03-01T08:00:00Z',
-        hub_id: 'hub-1',
+        scheduled_at: row?.scheduled_at ?? '2026-03-01T08:00:00Z',
+        hub_id: row?.hub_id ?? 'hub-1',
         route_id: null,
         assigned_driver_id: null,
         subcontractor_id: null,
         delivered_at: id === 's-2' ? '2026-03-01T10:15:00Z' : null,
       },
+      sender_contact: senderContact,
+      recipient_contact: recipientContact,
       tracking_events: [
         {
           id: 'evt-1',
@@ -1713,6 +1816,64 @@ export const mockApi = {
         },
       ],
     };
+  },
+
+  async updateShipment(id: string, payload: {
+    address_line?: string | null;
+    address_street_type?: string | null;
+    address_street: string;
+    address_number?: string | null;
+    address_block?: string | null;
+    address_stair?: string | null;
+    address_floor?: string | null;
+    address_door?: string | null;
+    postal_code: string;
+    city: string;
+    address_municipality?: string | null;
+    province?: string | null;
+    country: string;
+    address_reference?: string | null;
+    address_notes?: string | null;
+  }) {
+    const existing = mockShipments.find((item) => item.id === id);
+    if (!existing) {
+      throw new Error('Shipment not found');
+    }
+
+    const composedAddressLine = payload.address_line
+      ?? [
+        [
+          [payload.address_street_type, payload.address_street].filter(Boolean).join(' '),
+          payload.address_number,
+        ].filter((value) => (value ?? '').toString().trim() !== '').join(' '),
+        [payload.address_block ? `Bloque ${payload.address_block}` : null, payload.address_stair ? `Esc. ${payload.address_stair}` : null, payload.address_floor ? `Planta ${payload.address_floor}` : null, payload.address_door ? `Puerta ${payload.address_door}` : null]
+          .filter((value) => (value ?? '').toString().trim() !== '')
+          .join(', '),
+        [payload.postal_code, payload.city].filter((value) => (value ?? '').toString().trim() !== '').join(' '),
+        payload.address_municipality,
+        payload.province,
+        payload.country,
+      ].filter((value) => (value ?? '').toString().trim() !== '').join(', ');
+
+    Object.assign(existing, {
+      address_line: composedAddressLine,
+      address_street_type: payload.address_street_type ?? null,
+      address_street: payload.address_street,
+      address_number: payload.address_number ?? null,
+      address_block: payload.address_block ?? null,
+      address_stair: payload.address_stair ?? null,
+      address_floor: payload.address_floor ?? null,
+      address_door: payload.address_door ?? null,
+      postal_code: payload.postal_code,
+      city: payload.city,
+      address_municipality: payload.address_municipality ?? null,
+      province: payload.province ?? null,
+      country: payload.country,
+      address_reference: payload.address_reference ?? null,
+      address_notes: payload.address_notes ?? null,
+    });
+
+    return existing;
   },
 
   async exportShipmentsCsv(_: {
