@@ -34,7 +34,7 @@ Con el servidor levantado (`php artisan serve`):
 
 - Tests: `./vendor/bin/phpunit`
 
-## Desarrollo local estilo Laravel 11
+## Desarrollo local estilo Laravel 12
 
 - `composer run dev`
   - levanta `php artisan serve`
@@ -45,7 +45,7 @@ Con el servidor levantado (`php artisan serve`):
 - `composer run dev:lan`
   - detecta automáticamente la IP LAN activa del Mac
   - exporta `APP_URL` y `SANCTUM_STATEFUL_DOMAINS` con esa IP
-  - busca automáticamente puerto libre para Laravel a partir de `8001`
+  - busca automáticamente puerto libre para Laravel a partir de `8000`
   - busca automáticamente puerto libre para Vite/HMR a partir de `5173`
   - expone Vite/HMR usando esa IP
   - pensado para pruebas web/PWA desde móvil en red local

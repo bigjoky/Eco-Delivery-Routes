@@ -5,6 +5,7 @@ import laravel from 'laravel-vite-plugin';
 const devPort = Number(process.env.VITE_DEV_PORT ?? '5173');
 const devHost = process.env.VITE_DEV_HOST || undefined;
 const listenHost = process.env.VITE_LISTEN_HOST || undefined;
+const appUrl = process.env.APP_URL || undefined;
 
 export default defineConfig({
   plugins: [
@@ -18,6 +19,12 @@ export default defineConfig({
     host: listenHost,
     port: devPort,
     strictPort: true,
+    cors: appUrl
+      ? {
+          origin: appUrl,
+          credentials: true,
+        }
+      : true,
     ...(devHost
       ? {
           origin: `http://${devHost}:${devPort}`,

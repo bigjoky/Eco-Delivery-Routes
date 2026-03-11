@@ -40,9 +40,16 @@ if (typeof globalThis !== 'undefined' && typeof (globalThis as { route?: unknown
     };
 }
 
-if ('serviceWorker' in navigator) {
+const shouldDisableServiceWorker =
+    typeof window !== 'undefined' && Boolean((window as { __ECO_DISABLE_SW__?: boolean }).__ECO_DISABLE_SW__);
+
+if (!shouldDisableServiceWorker && 'serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
+            const cleanup = (window as { __ECO_SW_CLEANUP__?: Promise<unknown> }).__ECO_SW_CLEANUP__;
+            if (cleanup) {
+                await cleanup;
+            }
             const registrations = await navigator.serviceWorker.getRegistrations();
             await Promise.all(registrations.map((registration) => registration.unregister()));
             if ('caches' in window) {
