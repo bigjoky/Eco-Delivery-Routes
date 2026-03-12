@@ -19,9 +19,13 @@ apps/web/playwright-report/
 vendor/
 **/vendor/
 apps/backend/.phpunit.result.cache
+apps/backend/.idea/
+apps/backend/bootstrap/cache/*.php
+!apps/backend/bootstrap/cache/.gitignore
 apps/backend/storage/logs/*.log
 apps/backend/storage/
 apps/backend/public/hot
+apps/backend/.dist/
 apps/backend/database/*.sqlite
 
 # Android

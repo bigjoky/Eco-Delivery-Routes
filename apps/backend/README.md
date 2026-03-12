@@ -64,3 +64,60 @@ Notas:
 - si `8000` está ocupado, `php artisan serve` usará el siguiente puerto libre
 - para pruebas móviles usa `composer run dev:lan`
 - puedes forzar la IP con `LAN_IP_OVERRIDE=... composer run dev:lan`
+
+## Despliegue a /httpdocs
+
+El repositorio es código fuente Laravel. No es correcto subir solo `public/` ni tratar Git como si ya fuera el árbol final de `/httpdocs`, porque Laravel necesita también `app/`, `bootstrap/`, `config/`, `routes/`, `vendor/` y `storage/`.
+
+Para shared hosting con `/httpdocs` como raíz, genera primero un release listo para subir:
+
+```bash
+cd /Users/joaquinarevalobueno/Developer/Eco\ Delivery\ Routes/apps/backend
+composer install --no-dev --optimize-autoloader
+npm run build
+./scripts/build_httpdocs_release.sh
+```
+
+Salida:
+
+- release listo en [apps/backend/.dist/httpdocs](/Users/joaquinarevalobueno/Developer/Eco%20Delivery%20Routes/apps/backend/.dist/httpdocs)
+
+Ese directorio:
+
+- mueve el contenido de `public/` a raíz para `/httpdocs`
+- reescribe `index.php` para funcionar desde esa raíz
+- excluye runtime y basura de desarrollo
+- deja creados los directorios mínimos de `storage/` y `bootstrap/cache/`
+
+Si quieres desplegar por `git pull` en el hosting usando una rama que contenga solo el árbol final de `/httpdocs`, publica una rama de release generada:
+
+```bash
+cd /Users/joaquinarevalobueno/Developer/Eco\ Delivery\ Routes/apps/backend
+./scripts/publish_httpdocs_branch.sh
+```
+
+Por defecto publica en:
+
+- `codex/httpdocs-release`
+
+Esa rama sí contiene solo el contenido desplegable de `/httpdocs`.
+
+Además, el repositorio ya incluye workflow de GitHub Actions para mantener esa rama al día automáticamente en cada push a `main`:
+
+- [publish-httpdocs-release.yml](/Users/joaquinarevalobueno/Developer/Eco%20Delivery%20Routes/.github/workflows/publish-httpdocs-release.yml)
+
+Flujo recomendado:
+
+1. desarrollo normal sobre `main`
+2. push a GitHub
+3. GitHub publica `codex/httpdocs-release`
+4. producción hace `git pull` sobre esa rama en `/httpdocs`
+
+Archivos runtime que no deben versionarse:
+
+- `bootstrap/cache/*.php`
+- `storage/logs/*`
+- `database/*.sqlite`
+- `.env*`
+- `node_modules/`
+- `vendor/`
