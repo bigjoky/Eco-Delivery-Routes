@@ -1,0 +1,1 @@
+import{j as s,L as a}from"./app-DTlfgB1g.js";import{A as r}from"./ApplicationLogo-CDNMw0HM.js";function l({children:e}){return s.jsxs("div",{className:"guest-shell",children:[s.jsx("div",{className:"guest-brand",children:s.jsx(a,{href:"/",children:s.jsx(r,{className:"guest-logo"})})}),s.jsx("div",{className:"guest-card card",children:e})]})}export{l as G};

@@ -1,0 +1,1 @@
+import{j as s}from"./app-DTlfgB1g.js";import{c as a}from"./cn-2dOUpm6k.js";function e({className:t="",disabled:r,children:n,...o}){return s.jsx("button",{...o,className:a("btn btn-default",t),disabled:r,children:n})}export{e as P};

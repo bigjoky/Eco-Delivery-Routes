@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{REQUEST_URI} !^/build/
+    RewriteCond %{REQUEST_URI} !^/favicon
+    RewriteCond %{REQUEST_URI} !^/manifest\.json$
+    RewriteCond %{REQUEST_URI} !^/sw\.js$
+    RewriteCond %{REQUEST_URI} !^/offline\.html$
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "^(\.env|artisan|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.ts|tailwind\.config\.js|postcss\.config\.js|tsconfig\.json)$">
+    Require all denied
+</FilesMatch>

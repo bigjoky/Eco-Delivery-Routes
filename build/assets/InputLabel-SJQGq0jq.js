@@ -1,0 +1,1 @@
+import{j as o}from"./app-DTlfgB1g.js";import{c as a}from"./cn-2dOUpm6k.js";function c({value:r,className:s="",children:t,...n}){return o.jsx("label",{...n,className:a(s),children:r||t})}export{c as I};

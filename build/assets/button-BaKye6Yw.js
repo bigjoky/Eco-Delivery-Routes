@@ -1,0 +1,1 @@
+import{j as o}from"./app-DTlfgB1g.js";import{c as s}from"./cn-2dOUpm6k.js";const r={default:"btn btn-default",secondary:"btn btn-secondary",outline:"btn btn-outline",destructive:"btn btn-destructive"};function b({className:t,variant:n="default",...e}){return o.jsx("button",{className:s(r[n],t),...e})}export{b as B};
