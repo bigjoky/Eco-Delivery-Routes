@@ -88,6 +88,8 @@ Ese directorio:
 - reescribe `index.php` para funcionar desde esa raíz
 - excluye runtime y basura de desarrollo
 - deja creados los directorios mínimos de `storage/` y `bootstrap/cache/`
+- incluye un helper opcional de post-deploy:
+  - [apps/backend/scripts/post_deploy_httpdocs.sh](/Users/joaquinarevalobueno/Developer/Eco%20Delivery%20Routes/apps/backend/scripts/post_deploy_httpdocs.sh)
 
 Si quieres desplegar por `git pull` en el hosting usando una rama que contenga solo el árbol final de `/httpdocs`, publica una rama de release generada:
 
@@ -112,6 +114,25 @@ Flujo recomendado:
 2. push a GitHub
 3. GitHub publica `codex/httpdocs-release`
 4. producción hace `git pull` sobre esa rama en `/httpdocs`
+
+Post-deploy recomendado en producción:
+
+```bash
+cd /httpdocs
+./.post-deploy.sh
+```
+
+Si en ese deploy quieres ejecutar migraciones:
+
+```bash
+cd /httpdocs
+RUN_MIGRATIONS=1 ./.post-deploy.sh
+```
+
+Health check:
+
+- Laravel expone `GET /up`
+- úsalo para verificar que el despliegue quedó operativo tras el `git pull`
 
 Archivos runtime que no deben versionarse:
 

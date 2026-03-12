@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/.dist/httpdocs"
 BUILD_DIR="$ROOT_DIR/public/build"
+POST_DEPLOY_SCRIPT="$ROOT_DIR/scripts/post_deploy_httpdocs.sh"
 
 echo "Eco Delivery Routes :: build httpdocs release"
 
@@ -111,6 +112,11 @@ HTACCESS
 find "$DIST_DIR" -type d -exec chmod 755 {} \;
 find "$DIST_DIR" -type f -exec chmod 644 {} \;
 chmod 755 "$DIST_DIR/index.php"
+
+if [[ -f "$POST_DEPLOY_SCRIPT" ]]; then
+  cp "$POST_DEPLOY_SCRIPT" "$DIST_DIR/.post-deploy.sh"
+  chmod 755 "$DIST_DIR/.post-deploy.sh"
+fi
 
 echo "Release generado en: $DIST_DIR"
 echo "Sube el contenido de esa carpeta a /httpdocs en producción."
