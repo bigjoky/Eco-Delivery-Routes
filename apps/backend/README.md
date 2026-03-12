@@ -19,6 +19,15 @@ Estructura inicial compatible con Laravel para el módulo MVP-01.
 - Migraciones y seeders iniciales
 - Pruebas feature placeholder
 
+## Modelo operativo actual
+
+- `Expediciones` es la unidad principal de trabajo.
+- Cada expedición agrupa dos patas operativas:
+  - `recogida`
+  - `entrega`
+- `Shipments` y `Pickups` siguen existiendo como servicios/legs técnicas del circuito, pero la navegación principal de backoffice debe entrar por `Expediciones`.
+- `Routes` soporta carga masiva por expedición completa mediante `expedition_ids`, dejando `shipment_ids` y `pickup_ids` solo para ajustes avanzados o excepcionales.
+
 ## Credenciales seed (local)
 
 - Email: `admin@eco.local`

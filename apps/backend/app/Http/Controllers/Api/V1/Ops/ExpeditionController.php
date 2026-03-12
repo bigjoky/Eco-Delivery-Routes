@@ -21,6 +21,237 @@ class ExpeditionController extends Controller
         private readonly ContactResolver $contactResolver
     ) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.read')) {
+            return $this->forbidden();
+        }
+
+        $query = DB::table('expeditions')
+            ->leftJoin('shipments', 'shipments.id', '=', 'expeditions.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'expeditions.pickup_id')
+            ->leftJoin('contacts as sender_contacts', 'sender_contacts.id', '=', 'expeditions.sender_contact_id')
+            ->leftJoin('contacts as recipient_contacts', 'recipient_contacts.id', '=', 'expeditions.recipient_contact_id')
+            ->select(
+                'expeditions.*',
+                'shipments.reference as shipment_reference',
+                'shipments.status as shipment_status',
+                'pickups.reference as pickup_reference',
+                'pickups.status as pickup_status',
+                DB::raw('COALESCE(sender_contacts.display_name, sender_contacts.legal_name) as sender_name'),
+                DB::raw('COALESCE(recipient_contacts.display_name, recipient_contacts.legal_name, shipments.consignee_name) as recipient_name')
+            );
+
+        if ($request->filled('status')) {
+            $query->where('expeditions.status', (string) $request->query('status'));
+        }
+        if ($request->filled('id')) {
+            $query->where('expeditions.id', (string) $request->query('id'));
+        }
+        if ($request->filled('shipment_id')) {
+            $query->where('expeditions.shipment_id', (string) $request->query('shipment_id'));
+        }
+        if ($request->filled('pickup_id')) {
+            $query->where('expeditions.pickup_id', (string) $request->query('pickup_id'));
+        }
+        if ($request->filled('operation_kind')) {
+            $query->where('expeditions.operation_kind', (string) $request->query('operation_kind'));
+        }
+        if ($request->filled('leg_status')) {
+            $legStatus = (string) $request->query('leg_status');
+            $query->where(function ($inner) use ($legStatus): void {
+                $inner->where('shipments.status', $legStatus)
+                    ->orWhere('pickups.status', $legStatus);
+            });
+        }
+        if ($request->filled('q')) {
+            $like = '%' . str_replace('%', '\\%', (string) $request->query('q')) . '%';
+            $query->where(function ($inner) use ($like): void {
+                $inner->where('expeditions.reference', 'like', $like)
+                    ->orWhere('expeditions.external_reference', 'like', $like)
+                    ->orWhere('expeditions.id', 'like', $like)
+                    ->orWhere('expeditions.shipment_id', 'like', $like)
+                    ->orWhere('expeditions.pickup_id', 'like', $like)
+                    ->orWhere('shipments.reference', 'like', $like)
+                    ->orWhere('pickups.reference', 'like', $like)
+                    ->orWhere('shipments.consignee_name', 'like', $like)
+                    ->orWhere('pickups.requester_name', 'like', $like);
+            });
+        }
+
+        return response()->json([
+            'data' => $query->orderByDesc('expeditions.created_at')->limit((int) $request->query('limit', 150))->get(),
+        ]);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('shipments.read')) {
+            return $this->forbidden();
+        }
+
+        $expedition = DB::table('expeditions')->where('id', $id)->first();
+        if (!$expedition) {
+            return response()->json(['error' => ['message' => 'Expedition not found']], 404);
+        }
+
+        $shipment = !empty($expedition->shipment_id) ? DB::table('shipments')->where('id', $expedition->shipment_id)->first() : null;
+        $pickup = !empty($expedition->pickup_id) ? DB::table('pickups')->where('id', $expedition->pickup_id)->first() : null;
+        $senderContact = !empty($expedition->sender_contact_id) ? DB::table('contacts')->where('id', $expedition->sender_contact_id)->first() : null;
+        $recipientContact = !empty($expedition->recipient_contact_id) ? DB::table('contacts')->where('id', $expedition->recipient_contact_id)->first() : null;
+
+        $shipmentEvents = $shipment
+            ? DB::table('tracking_events')
+                ->where('trackable_type', 'shipment')
+                ->where('trackable_id', $shipment->id)
+                ->orderBy('occurred_at')
+                ->get()
+            : collect();
+        $pickupEvents = $pickup
+            ? DB::table('tracking_events')
+                ->where('trackable_type', 'pickup')
+                ->where('trackable_id', $pickup->id)
+                ->orderBy('occurred_at')
+                ->get()
+            : collect();
+        $trackingEvents = $pickupEvents
+            ->concat($shipmentEvents)
+            ->sortBy('occurred_at')
+            ->values();
+
+        $timeline = collect();
+        if ($pickup && $pickup->scheduled_at) {
+            $timeline->push([
+                'id' => 'pickup-scheduled-' . $pickup->id,
+                'leg' => 'pickup',
+                'label' => 'Recogida programada',
+                'detail' => $pickup->reference,
+                'at' => $pickup->scheduled_at,
+            ]);
+        }
+        if ($pickup && $pickup->completed_at) {
+            $timeline->push([
+                'id' => 'pickup-completed-' . $pickup->id,
+                'leg' => 'pickup',
+                'label' => 'Recogida completada',
+                'detail' => $pickup->reference,
+                'at' => $pickup->completed_at,
+            ]);
+        }
+        foreach ($pickupEvents as $event) {
+            $timeline->push([
+                'id' => 'pickup-event-' . $event->id,
+                'leg' => 'pickup',
+                'label' => $event->event_code,
+                'detail' => $event->status_to,
+                'at' => $event->occurred_at,
+            ]);
+        }
+        if ($shipment && $shipment->scheduled_at) {
+            $timeline->push([
+                'id' => 'delivery-scheduled-' . $shipment->id,
+                'leg' => 'delivery',
+                'label' => 'Entrega programada',
+                'detail' => $shipment->reference,
+                'at' => $shipment->scheduled_at,
+            ]);
+        }
+        foreach ($shipmentEvents as $event) {
+            $timeline->push([
+                'id' => 'delivery-event-' . $event->id,
+                'leg' => 'delivery',
+                'label' => $event->event_code,
+                'detail' => $event->status_to,
+                'at' => $event->occurred_at,
+            ]);
+        }
+        if ($shipment && $shipment->delivered_at) {
+            $timeline->push([
+                'id' => 'delivery-completed-' . $shipment->id,
+                'leg' => 'delivery',
+                'label' => 'Entrega completada',
+                'detail' => $shipment->reference,
+                'at' => $shipment->delivered_at,
+            ]);
+        }
+
+        $routeStops = DB::table('route_stops')
+            ->leftJoin('routes', 'routes.id', '=', 'route_stops.route_id')
+            ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+            ->leftJoin('expeditions', function ($join): void {
+                $join->on('expeditions.id', '=', 'shipments.expedition_id')
+                    ->orOn('expeditions.id', '=', 'pickups.expedition_id');
+            })
+            ->where(function ($query) use ($expedition): void {
+                $query->where('route_stops.shipment_id', $expedition->shipment_id)
+                    ->orWhere('route_stops.pickup_id', $expedition->pickup_id);
+            })
+            ->orderBy('routes.route_date')
+            ->orderBy('route_stops.sequence')
+            ->get([
+                'route_stops.id',
+                'route_stops.route_id',
+                'route_stops.sequence',
+                'route_stops.stop_type',
+                'route_stops.shipment_id',
+                'route_stops.pickup_id',
+                'route_stops.status',
+                'route_stops.planned_at',
+                'route_stops.completed_at',
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
+                DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
+                DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
+                'expeditions.id as expedition_id',
+                'expeditions.reference as expedition_reference',
+                'expeditions.operation_kind',
+                'expeditions.product_category',
+                DB::raw('COALESCE(shipments.service_type, pickups.service_type) as service_type'),
+                DB::raw('COALESCE(shipments.consignee_name, pickups.requester_name) as counterparty_name'),
+                DB::raw('COALESCE(shipments.address_line, pickups.address_line) as address_line'),
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN (select reference from pickups where pickups.id = expeditions.pickup_id) ELSE (select reference from shipments where shipments.id = expeditions.shipment_id) END as linked_reference"),
+            ]);
+
+        $incidents = DB::table('incidents')
+            ->where(function ($query) use ($expedition): void {
+                $query->where('incidentable_type', 'shipment')->where('incidentable_id', $expedition->shipment_id);
+            })
+            ->orWhere(function ($query) use ($expedition): void {
+                $query->where('incidentable_type', 'pickup')->where('incidentable_id', $expedition->pickup_id);
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $pods = DB::table('pods')
+            ->where(function ($query) use ($expedition): void {
+                $query->where('evidenceable_type', 'shipment')->where('evidenceable_id', $expedition->shipment_id);
+            })
+            ->orWhere(function ($query) use ($expedition): void {
+                $query->where('evidenceable_type', 'pickup')->where('evidenceable_id', $expedition->pickup_id);
+            })
+            ->orderBy('captured_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'data' => [
+                'expedition' => $expedition,
+                'shipment' => $shipment,
+                'pickup' => $pickup,
+                'sender_contact' => $senderContact,
+                'recipient_contact' => $recipientContact,
+                'timeline' => $timeline->sortBy('at')->values()->all(),
+                'tracking_events' => $trackingEvents,
+                'route_stops' => $routeStops,
+                'incidents' => $incidents,
+                'pods' => $pods,
+            ],
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         /** @var User $actor */
@@ -78,7 +309,7 @@ class ExpeditionController extends Controller
         $expeditionId = (string) Str::uuid();
         $shipmentReference = (string) $this->sequenceService->next('shipments');
         $pickupReference = (string) $this->sequenceService->next('pickups');
-        $expeditionReference = (string) $this->sequenceService->next('expeditions');
+        $expeditionReference = $this->sequenceService->nextPadded('expeditions', 14);
 
         $addressLine = $this->normalizeText($payload['address_line'] ?? '') ?: $this->composeAddressLine($payload);
         $senderAddressLine = $this->normalizeText($payload['sender_address_line'] ?? '') ?: $this->composeAddressLineWithPrefix($payload, 'sender_');

@@ -21,6 +21,102 @@ let mockShipments = [
   { id: 's-1', reference: '10001', external_reference: 'REF-CLIENTE-001', status: 'out_for_delivery', consignee_name: 'Cliente Demo', address_line: 'Calle Larios 10, Bloque B, Esc. 2, Planta 3, Puerta A, 29001 Malaga, ES', address_street_type: 'Calle', address_street: 'Larios', address_number: '10', address_block: 'B', address_stair: '2', address_floor: '3', address_door: 'A', postal_code: '29001', city: 'Malaga', address_municipality: 'Malaga', province: 'Malaga', country: 'ES', address_reference: 'Portero junto a farmacia', address_notes: 'Portal azul', scheduled_at: '2026-03-01T08:00:00Z', hub_id: 'hub-1', hub_code: 'AGP-HUB-01', service_type: 'express_1030' },
   { id: 's-2', reference: '10002', external_reference: 'REF-CLIENTE-002', status: 'delivered', consignee_name: 'Cliente Centro', address_line: 'Avenida Andalucia 20, 29002 Malaga, ES', address_street_type: 'Avenida', address_street: 'Andalucia', address_number: '20', postal_code: '29002', city: 'Malaga', address_municipality: 'Malaga', province: 'Malaga', country: 'ES', address_reference: 'Acceso por recepcion', address_notes: 'Portal azul', scheduled_at: '2026-03-01T09:30:00Z', hub_id: 'hub-2', hub_code: 'SEV-HUB-01', service_type: 'business_parcel' },
 ];
+let mockPickups: Array<{
+  id: string;
+  expedition_id?: string | null;
+  reference: string;
+  external_reference?: string | null;
+  pickup_type: 'NORMAL' | 'RETURN';
+  service_type?: string | null;
+  product_category?: 'parcel' | 'thermo' | null;
+  temperature_min_c?: number | null;
+  temperature_max_c?: number | null;
+  requires_temperature_log?: boolean;
+  thermo_notes?: string | null;
+  status: string;
+  requester_name?: string | null;
+  address_line?: string | null;
+  scheduled_at?: string | null;
+  completed_at?: string | null;
+  hub_id?: string | null;
+}> = [
+  {
+    id: 'p-1',
+    expedition_id: 'exp-1',
+    reference: '20001',
+    external_reference: 'REF-CLIENTE-001',
+    pickup_type: 'NORMAL',
+    service_type: 'express_1030',
+    product_category: 'parcel',
+    status: 'planned',
+    requester_name: 'Remitente Demo',
+    address_line: 'Calle 2, 29002 Malaga',
+    scheduled_at: '2026-03-01T07:15:00Z',
+    hub_id: 'hub-1',
+  },
+  {
+    id: 'p-2',
+    expedition_id: 'exp-2',
+    reference: '20002',
+    external_reference: 'REF-CLIENTE-002',
+    pickup_type: 'RETURN',
+    service_type: 'business_parcel',
+    product_category: 'parcel',
+    status: 'completed',
+    requester_name: 'Remitente Centro',
+    address_line: 'Avenida Andalucia 20, 29002 Malaga',
+    scheduled_at: '2026-03-01T08:15:00Z',
+    completed_at: '2026-03-01T08:50:00Z',
+    hub_id: 'hub-2',
+  },
+];
+let mockExpeditions: Array<{
+  id: string;
+  reference: string;
+  external_reference?: string | null;
+  operation_kind: 'shipment' | 'return';
+  product_category: 'parcel' | 'thermo';
+  service_type?: string | null;
+  status: string;
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  sender_contact_id?: string | null;
+  recipient_contact_id?: string | null;
+  temperature_min_c?: number | null;
+  temperature_max_c?: number | null;
+  requires_temperature_log?: boolean;
+  thermo_notes?: string | null;
+  scheduled_at?: string | null;
+}> = [
+  {
+    id: 'exp-1',
+    reference: '00000000000001',
+    external_reference: 'REF-CLIENTE-001',
+    operation_kind: 'shipment',
+    product_category: 'parcel',
+    service_type: 'express_1030',
+    status: 'in_progress',
+    shipment_id: 's-1',
+    pickup_id: 'p-1',
+    sender_contact_id: 'c-2',
+    recipient_contact_id: 'c-1',
+    scheduled_at: '2026-03-01T08:00:00Z',
+  },
+  {
+    id: 'exp-2',
+    reference: '00000000000002',
+    external_reference: 'REF-CLIENTE-002',
+    operation_kind: 'return',
+    product_category: 'parcel',
+    service_type: 'business_parcel',
+    status: 'completed',
+    shipment_id: 's-2',
+    pickup_id: 'p-2',
+    sender_contact_id: 'c-2',
+    recipient_contact_id: 'c-1',
+    scheduled_at: '2026-03-01T09:30:00Z',
+  },
+];
 let mockContacts: Array<{
   id: string;
   display_name?: string | null;
@@ -287,11 +383,11 @@ let mockRouteStops: Array<{
     sequence: 1,
     stop_type: 'DELIVERY',
     status: 'in_progress',
-    shipment_id: '00000000-0000-0000-0000-000000000101',
+    shipment_id: 's-1',
     pickup_id: null,
     entity_type: 'shipment',
-    entity_id: '00000000-0000-0000-0000-000000000101',
-    reference: 'SHP-AGP-0001',
+    entity_id: 's-1',
+    reference: '10001',
   },
   {
     id: 'st-2',
@@ -300,22 +396,92 @@ let mockRouteStops: Array<{
     stop_type: 'PICKUP',
     status: 'planned',
     shipment_id: null,
-    pickup_id: '00000000-0000-0000-0000-000000000201',
+    pickup_id: 'p-1',
     entity_type: 'pickup',
-    entity_id: '00000000-0000-0000-0000-000000000201',
-    reference: 'PCK-AGP-0001',
+    entity_id: 'p-1',
+    reference: '20001',
   },
 ];
+
+mockShipments = mockShipments.map((shipment) => {
+  const expedition = mockExpeditions.find((item) => item.shipment_id === shipment.id);
+  return expedition
+    ? {
+      ...shipment,
+      expedition_id: expedition.id,
+      operation_kind: expedition.operation_kind,
+      product_category: expedition.product_category,
+      temperature_min_c: expedition.temperature_min_c ?? null,
+      temperature_max_c: expedition.temperature_max_c ?? null,
+      requires_temperature_log: expedition.requires_temperature_log ?? false,
+      thermo_notes: expedition.thermo_notes ?? null,
+    }
+    : shipment;
+});
+
+function getExpeditionByShipmentId(shipmentId?: string | null) {
+  return shipmentId ? (mockExpeditions.find((item) => item.shipment_id === shipmentId) ?? null) : null;
+}
+
+function getExpeditionByPickupId(pickupId?: string | null) {
+  return pickupId ? (mockExpeditions.find((item) => item.pickup_id === pickupId) ?? null) : null;
+}
+
+function enrichRouteStop<T extends {
+  id: string;
+  route_id: string;
+  sequence: number;
+  stop_type: 'DELIVERY' | 'PICKUP';
+  status: string;
+  shipment_id?: string | null;
+  pickup_id?: string | null;
+  entity_type: 'shipment' | 'pickup';
+  entity_id: string;
+  reference?: string | null;
+  planned_at?: string | null;
+  completed_at?: string | null;
+}>(stop: T) {
+  const shipment = stop.shipment_id ? (mockShipments.find((item) => item.id === stop.shipment_id) ?? null) : null;
+  const pickup = stop.pickup_id ? (mockPickups.find((item) => item.id === stop.pickup_id) ?? null) : null;
+  const expedition = shipment ? getExpeditionByShipmentId(shipment.id) : getExpeditionByPickupId(pickup?.id ?? null);
+  const linkedShipment = expedition?.shipment_id ? (mockShipments.find((item) => item.id === expedition.shipment_id) ?? null) : null;
+  const linkedPickup = expedition?.pickup_id ? (mockPickups.find((item) => item.id === expedition.pickup_id) ?? null) : null;
+
+  return {
+    ...stop,
+    reference: shipment?.reference ?? pickup?.reference ?? stop.reference ?? stop.entity_id,
+    expedition_id: expedition?.id ?? null,
+    expedition_reference: expedition?.reference ?? null,
+    linked_reference: stop.stop_type === 'DELIVERY' ? (linkedPickup?.reference ?? null) : (linkedShipment?.reference ?? null),
+    operation_kind: expedition?.operation_kind ?? null,
+    product_category: expedition?.product_category ?? null,
+    service_type: shipment?.service_type ?? pickup?.service_type ?? expedition?.service_type ?? null,
+    counterparty_name: shipment?.consignee_name ?? pickup?.requester_name ?? null,
+    address_line: shipment?.address_line ?? pickup?.address_line ?? null,
+  };
+}
 let mockHubs: Array<{
   id: string;
   code: string;
   name: string;
   city?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 }> = [
-  { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', is_active: true, deleted_at: null },
-  { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', is_active: true, deleted_at: null },
+  { id: 'hub-1', code: 'AGP-HUB-01', name: 'Hub Malaga Centro', city: 'Malaga', province: 'Malaga', country: 'ES', is_active: true, deleted_at: null },
+  { id: 'hub-2', code: 'SEV-HUB-01', name: 'Hub Sevilla Norte', city: 'Sevilla', province: 'Sevilla', country: 'ES', is_active: true, deleted_at: null },
 ];
 let hubSeq = 2;
 let mockDepots: Array<{
@@ -325,10 +491,21 @@ let mockDepots: Array<{
   name: string;
   address_line?: string | null;
   city?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 }> = [
-  { id: 'dep-1', hub_id: 'hub-1', code: 'DPT-AGP-0001', name: 'Depot Malaga Centro', address_line: 'Av. Andalucia 10', city: 'Malaga', is_active: true, deleted_at: null },
+  { id: 'dep-1', hub_id: 'hub-1', code: 'DPT-AGP-0001', name: 'Depot Malaga Centro', address_line: 'Av. Andalucia 10', city: 'Malaga', province: 'Malaga', country: 'ES', is_active: true, deleted_at: null },
 ];
 let depotSeq = 1;
 let mockPoints: Array<{
@@ -339,12 +516,48 @@ let mockPoints: Array<{
   name: string;
   address_line?: string | null;
   city?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 }> = [
-  { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', is_active: true, deleted_at: null },
+  { id: 'pt-1', hub_id: 'hub-1', depot_id: 'dep-1', code: 'PNT-AGP-0001', name: 'Punto Centro 1', address_line: 'Calle Larios 5', city: 'Malaga', province: 'Malaga', country: 'ES', is_active: true, deleted_at: null },
 ];
 let pointSeq = 1;
+let mockAgencies: Array<{
+  id: string;
+  hub_id?: string | null;
+  code: string;
+  name: string;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
+  is_active: boolean;
+  deleted_at?: string | null;
+}> = [
+  { id: 'ag-1', hub_id: 'hub-1', code: '30001', name: 'Agencia Malaga Centro', legal_name: 'Agencia Malaga Centro SL', tax_id: 'B12345678', city: 'Malaga', province: 'Malaga', country: 'ES', is_active: true, deleted_at: null },
+];
+let agencySeq = 1;
 let workforceSeq = 1;
 let complianceSeq = 1;
 let vehicleControlSeq = 1;
@@ -855,7 +1068,7 @@ export const mockApi = {
         subcontractor_id: null,
       },
       totals: {
-        shipments: mockShipments.length,
+        shipments: mockExpeditions.length,
         routes: mockRoutes.length,
         incidents_open: mockIncidents.filter((item) => !item.resolved_at).length,
         quality_threshold: threshold,
@@ -903,6 +1116,7 @@ export const mockApi = {
       recent: {
         routes: mockRoutes.slice(0, 5),
         shipments: mockShipments.slice(0, 5),
+        expeditions: mockExpeditions.slice(0, 5),
         incidents: mockIncidents.filter((item) => !item.resolved_at).slice(0, 5),
       },
       productivity_by_hub: productivityByHub,
@@ -1084,17 +1298,40 @@ export const mockApi = {
   },
 
   async createHub(payload: {
-    code?: string;
     name: string;
     city: string;
+    address_line?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     hubSeq += 1;
     const row = {
       id: `hub-${hubSeq}`,
-      code: payload.code?.trim() || `HUB-${String(hubSeq).padStart(5, '0')}`,
+      code: `HUB-${String(hubSeq).padStart(5, '0')}`,
       name: payload.name,
       city: payload.city,
+      address_line: payload.address_line ?? null,
+      postal_code: payload.postal_code ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? 'ES',
+      contact_name: payload.contact_name ?? null,
+      contact_phone: payload.contact_phone ?? null,
+      contact_email: payload.contact_email ?? null,
+      manager_name: payload.manager_name ?? null,
+      opening_hours: payload.opening_hours ?? null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      notes: payload.notes ?? null,
       is_active: payload.is_active ?? true,
       deleted_at: null,
     };
@@ -1103,9 +1340,20 @@ export const mockApi = {
   },
 
   async updateHub(id: string, payload: {
-    code?: string;
     name?: string;
     city?: string;
+    address_line?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     const index = mockHubs.findIndex((item) => item.id === id);
@@ -1113,9 +1361,20 @@ export const mockApi = {
     const current = mockHubs[index];
     const next = {
       ...current,
-      ...(payload.code !== undefined ? { code: payload.code } : {}),
       ...(payload.name !== undefined ? { name: payload.name } : {}),
       ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.address_line !== undefined ? { address_line: payload.address_line } : {}),
+      ...(payload.postal_code !== undefined ? { postal_code: payload.postal_code } : {}),
+      ...(payload.province !== undefined ? { province: payload.province } : {}),
+      ...(payload.country !== undefined ? { country: payload.country } : {}),
+      ...(payload.contact_name !== undefined ? { contact_name: payload.contact_name } : {}),
+      ...(payload.contact_phone !== undefined ? { contact_phone: payload.contact_phone } : {}),
+      ...(payload.contact_email !== undefined ? { contact_email: payload.contact_email } : {}),
+      ...(payload.manager_name !== undefined ? { manager_name: payload.manager_name } : {}),
+      ...(payload.opening_hours !== undefined ? { opening_hours: payload.opening_hours } : {}),
+      ...(payload.latitude !== undefined ? { latitude: payload.latitude } : {}),
+      ...(payload.longitude !== undefined ? { longitude: payload.longitude } : {}),
+      ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
       ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
     };
     mockHubs[index] = next;
@@ -1158,20 +1417,41 @@ export const mockApi = {
 
   async createDepot(payload: {
     hub_id: string;
-    code?: string;
     name: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     depotSeq += 1;
     const row = {
       id: `dep-${depotSeq}`,
       hub_id: payload.hub_id,
-      code: payload.code?.trim() || `DPT-${String(depotSeq).padStart(5, '0')}`,
+      code: `DPT-${String(depotSeq).padStart(5, '0')}`,
       name: payload.name,
       address_line: payload.address_line ?? null,
       city: payload.city ?? null,
+      postal_code: payload.postal_code ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? 'ES',
+      contact_name: payload.contact_name ?? null,
+      contact_phone: payload.contact_phone ?? null,
+      contact_email: payload.contact_email ?? null,
+      manager_name: payload.manager_name ?? null,
+      opening_hours: payload.opening_hours ?? null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      notes: payload.notes ?? null,
       is_active: payload.is_active ?? true,
       deleted_at: null,
     };
@@ -1180,10 +1460,20 @@ export const mockApi = {
   },
 
   async updateDepot(id: string, payload: {
-    code?: string;
     name?: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     const index = mockDepots.findIndex((item) => item.id === id);
@@ -1191,10 +1481,20 @@ export const mockApi = {
     const current = mockDepots[index];
     const next = {
       ...current,
-      ...(payload.code !== undefined ? { code: payload.code } : {}),
       ...(payload.name !== undefined ? { name: payload.name } : {}),
       ...(payload.address_line !== undefined ? { address_line: payload.address_line } : {}),
       ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.postal_code !== undefined ? { postal_code: payload.postal_code } : {}),
+      ...(payload.province !== undefined ? { province: payload.province } : {}),
+      ...(payload.country !== undefined ? { country: payload.country } : {}),
+      ...(payload.contact_name !== undefined ? { contact_name: payload.contact_name } : {}),
+      ...(payload.contact_phone !== undefined ? { contact_phone: payload.contact_phone } : {}),
+      ...(payload.contact_email !== undefined ? { contact_email: payload.contact_email } : {}),
+      ...(payload.manager_name !== undefined ? { manager_name: payload.manager_name } : {}),
+      ...(payload.opening_hours !== undefined ? { opening_hours: payload.opening_hours } : {}),
+      ...(payload.latitude !== undefined ? { latitude: payload.latitude } : {}),
+      ...(payload.longitude !== undefined ? { longitude: payload.longitude } : {}),
+      ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
       ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
     };
     mockDepots[index] = next;
@@ -1237,10 +1537,20 @@ export const mockApi = {
   async createPoint(payload: {
     hub_id: string;
     depot_id?: string | null;
-    code?: string;
     name: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     pointSeq += 1;
@@ -1248,10 +1558,21 @@ export const mockApi = {
       id: `pt-${pointSeq}`,
       hub_id: payload.hub_id,
       depot_id: payload.depot_id ?? null,
-      code: payload.code?.trim() || `PNT-${String(pointSeq).padStart(5, '0')}`,
+      code: `PNT-${String(pointSeq).padStart(5, '0')}`,
       name: payload.name,
       address_line: payload.address_line ?? null,
       city: payload.city ?? null,
+      postal_code: payload.postal_code ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? 'ES',
+      contact_name: payload.contact_name ?? null,
+      contact_phone: payload.contact_phone ?? null,
+      contact_email: payload.contact_email ?? null,
+      manager_name: payload.manager_name ?? null,
+      opening_hours: payload.opening_hours ?? null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      notes: payload.notes ?? null,
       is_active: payload.is_active ?? true,
       deleted_at: null,
     };
@@ -1260,10 +1581,22 @@ export const mockApi = {
   },
 
   async updatePoint(id: string, payload: {
-    code?: string;
+    hub_id?: string;
+    depot_id?: string | null;
     name?: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }) {
     const index = mockPoints.findIndex((item) => item.id === id);
@@ -1271,10 +1604,22 @@ export const mockApi = {
     const current = mockPoints[index];
     const next = {
       ...current,
-      ...(payload.code !== undefined ? { code: payload.code } : {}),
+      ...(payload.hub_id !== undefined ? { hub_id: payload.hub_id } : {}),
+      ...(payload.depot_id !== undefined ? { depot_id: payload.depot_id } : {}),
       ...(payload.name !== undefined ? { name: payload.name } : {}),
       ...(payload.address_line !== undefined ? { address_line: payload.address_line } : {}),
       ...(payload.city !== undefined ? { city: payload.city } : {}),
+      ...(payload.postal_code !== undefined ? { postal_code: payload.postal_code } : {}),
+      ...(payload.province !== undefined ? { province: payload.province } : {}),
+      ...(payload.country !== undefined ? { country: payload.country } : {}),
+      ...(payload.contact_name !== undefined ? { contact_name: payload.contact_name } : {}),
+      ...(payload.contact_phone !== undefined ? { contact_phone: payload.contact_phone } : {}),
+      ...(payload.contact_email !== undefined ? { contact_email: payload.contact_email } : {}),
+      ...(payload.manager_name !== undefined ? { manager_name: payload.manager_name } : {}),
+      ...(payload.opening_hours !== undefined ? { opening_hours: payload.opening_hours } : {}),
+      ...(payload.latitude !== undefined ? { latitude: payload.latitude } : {}),
+      ...(payload.longitude !== undefined ? { longitude: payload.longitude } : {}),
+      ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
       ...(payload.is_active !== undefined ? { is_active: payload.is_active } : {}),
     };
     mockPoints[index] = next;
@@ -1305,6 +1650,99 @@ export const mockApi = {
     }
     mockPoints[index] = { ...mockPoints[index], deleted_at: null };
     return mockPoints[index];
+  },
+
+  async getAgencies(filters: { hubId?: string; includeDeleted?: boolean } = {}) {
+    return mockAgencies.filter((item) => {
+      if (!filters.includeDeleted && item.deleted_at) return false;
+      if (filters.hubId && item.hub_id !== filters.hubId) return false;
+      return true;
+    });
+  },
+
+  async createAgency(payload: {
+    hub_id?: string | null;
+    name: string;
+    legal_name?: string | null;
+    tax_id?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
+    is_active?: boolean;
+  }) {
+    agencySeq += 1;
+    const row = {
+      id: `ag-${agencySeq}`,
+      hub_id: payload.hub_id ?? null,
+      code: String(30000 + agencySeq),
+      name: payload.name,
+      legal_name: payload.legal_name ?? null,
+      tax_id: payload.tax_id ?? null,
+      address_line: payload.address_line ?? null,
+      postal_code: payload.postal_code ?? null,
+      city: payload.city ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? 'ES',
+      contact_name: payload.contact_name ?? null,
+      contact_phone: payload.contact_phone ?? null,
+      contact_email: payload.contact_email ?? null,
+      manager_name: payload.manager_name ?? null,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      notes: payload.notes ?? null,
+      is_active: payload.is_active ?? true,
+      deleted_at: null,
+    };
+    mockAgencies = [row, ...mockAgencies];
+    return row;
+  },
+
+  async updateAgency(id: string, payload: {
+    hub_id?: string | null;
+    name?: string;
+    legal_name?: string | null;
+    tax_id?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
+    is_active?: boolean;
+  }) {
+    const index = mockAgencies.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Agency not found');
+    mockAgencies[index] = { ...mockAgencies[index], ...payload };
+    return mockAgencies[index];
+  },
+
+  async deleteAgency(id: string) {
+    const index = mockAgencies.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Agency not found');
+    mockAgencies[index] = { ...mockAgencies[index], deleted_at: new Date().toISOString() };
+    return { id, deleted: true };
+  },
+
+  async restoreAgency(id: string) {
+    const index = mockAgencies.findIndex((item) => item.id === id);
+    if (index === -1) throw new Error('Agency not found');
+    mockAgencies[index] = { ...mockAgencies[index], deleted_at: null };
+    return mockAgencies[index];
   },
 
   async getShipments(filters: {
@@ -1687,6 +2125,26 @@ export const mockApi = {
       address_line: payload.sender_address_line ?? null,
       scheduled_at: payload.scheduled_at ?? null,
     });
+    const expedition = {
+      id: expeditionId,
+      reference: `EXP-${10000 + shipmentSeq}`,
+      external_reference: payload.external_reference ?? null,
+      operation_kind: payload.operation_kind,
+      product_category: payload.product_category,
+      service_type: payload.service_type ?? 'express_1030',
+      status: 'planned',
+      shipment_id: shipment.id,
+      pickup_id: pickup.id,
+      sender_contact_id: 'c-2',
+      recipient_contact_id: 'c-1',
+      temperature_min_c: payload.temperature_min_c ?? null,
+      temperature_max_c: payload.temperature_max_c ?? null,
+      requires_temperature_log: payload.requires_temperature_log ?? false,
+      thermo_notes: payload.thermo_notes ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
+    };
+    mockExpeditions = [expedition, ...mockExpeditions];
+
     const shipmentWithExpedition = {
       ...shipment,
       expedition_id: expeditionId,
@@ -1698,36 +2156,152 @@ export const mockApi = {
       thermo_notes: payload.thermo_notes ?? null,
     };
     mockShipments = mockShipments.map((row) => row.id === shipment.id ? shipmentWithExpedition : row);
+    mockPickups = mockPickups.map((row) => row.id === pickup.id ? {
+      ...row,
+      expedition_id: expeditionId,
+      service_type: payload.service_type ?? 'express_1030',
+      product_category: payload.product_category,
+      temperature_min_c: payload.temperature_min_c ?? null,
+      temperature_max_c: payload.temperature_max_c ?? null,
+      requires_temperature_log: payload.requires_temperature_log ?? false,
+      thermo_notes: payload.thermo_notes ?? null,
+      address_line: payload.sender_address_line ?? null,
+      scheduled_at: payload.scheduled_at ?? null,
+    } : row);
+    return {
+      expedition,
+      shipment: shipmentWithExpedition,
+      pickup: mockPickups.find((row) => row.id === pickup.id)!,
+    };
+  },
+
+  async getExpeditions(filters: {
+    id?: string;
+    shipmentId?: string;
+    pickupId?: string;
+    status?: string;
+    operationKind?: 'shipment' | 'return';
+    legStatus?: string;
+    q?: string;
+    limit?: number;
+  } = {}) {
+    let rows = mockExpeditions.map((expedition) => {
+      const shipment = expedition.shipment_id ? (mockShipments.find((item) => item.id === expedition.shipment_id) ?? null) : null;
+      const pickup = expedition.pickup_id ? (mockPickups.find((item) => item.id === expedition.pickup_id) ?? null) : null;
+      const sender = expedition.sender_contact_id ? (mockContacts.find((item) => item.id === expedition.sender_contact_id) ?? null) : null;
+      const recipient = expedition.recipient_contact_id ? (mockContacts.find((item) => item.id === expedition.recipient_contact_id) ?? null) : null;
+      return {
+        ...expedition,
+        shipment_reference: shipment?.reference ?? null,
+        shipment_status: shipment?.status ?? null,
+        pickup_reference: pickup?.reference ?? null,
+        pickup_status: pickup?.status ?? null,
+        sender_name: sender?.display_name ?? sender?.legal_name ?? null,
+        recipient_name: recipient?.display_name ?? recipient?.legal_name ?? shipment?.consignee_name ?? null,
+      };
+    });
+
+    if (filters.id) rows = rows.filter((row) => row.id === filters.id);
+    if (filters.shipmentId) rows = rows.filter((row) => row.shipment_id === filters.shipmentId);
+    if (filters.pickupId) rows = rows.filter((row) => row.pickup_id === filters.pickupId);
+    if (filters.status) rows = rows.filter((row) => row.status === filters.status);
+    if (filters.operationKind) rows = rows.filter((row) => row.operation_kind === filters.operationKind);
+    if (filters.legStatus) rows = rows.filter((row) => row.shipment_status === filters.legStatus || row.pickup_status === filters.legStatus);
+    if (filters.q) {
+      const q = filters.q.toLowerCase();
+      rows = rows.filter((row) => (
+        row.reference.toLowerCase().includes(q)
+        || (row.external_reference ?? '').toLowerCase().includes(q)
+        || (row.shipment_reference ?? '').toLowerCase().includes(q)
+        || (row.pickup_reference ?? '').toLowerCase().includes(q)
+        || (row.sender_name ?? '').toLowerCase().includes(q)
+        || (row.recipient_name ?? '').toLowerCase().includes(q)
+      ));
+    }
+    if (filters.limit) rows = rows.slice(0, Math.max(1, filters.limit));
+    return rows;
+  },
+
+  async getExpeditionDetail(id: string) {
+    const expedition = mockExpeditions.find((item) => item.id === id);
+    if (!expedition) throw new Error('Expedition not found');
+    const shipment = expedition.shipment_id ? await this.getShipmentDetail(expedition.shipment_id) : null;
+    const pickup = expedition.pickup_id ? await this.getPickupDetail(expedition.pickup_id) : null;
+    const routeStops = mockRouteStops
+      .filter((item) => item.shipment_id === expedition.shipment_id || item.pickup_id === expedition.pickup_id)
+      .map((item) => enrichRouteStop(item));
+    const incidents = mockIncidents.filter((item) => (
+      (item.incidentable_type === 'shipment' && item.incidentable_id === expedition.shipment_id)
+      || (item.incidentable_type === 'pickup' && item.incidentable_id === expedition.pickup_id)
+    ));
+    const pods = [
+      ...(shipment?.pods ?? []),
+      ...(pickup?.pods ?? []),
+    ];
+    const timeline = [
+      ...(pickup?.pickup?.scheduled_at ? [{
+        id: `pickup-scheduled-${id}`,
+        leg: 'pickup' as const,
+        label: 'Recogida programada',
+        detail: pickup.pickup.reference,
+        at: pickup.pickup.scheduled_at,
+      }] : []),
+      ...(pickup?.pickup?.completed_at ? [{
+        id: `pickup-completed-${id}`,
+        leg: 'pickup' as const,
+        label: 'Recogida completada',
+        detail: pickup.pickup.reference,
+        at: pickup.pickup.completed_at,
+      }] : []),
+      ...(pickup?.tracking_events ?? []).map((event) => ({
+        id: `pickup-event-${event.id}`,
+        leg: 'pickup' as const,
+        label: event.event_code,
+        detail: event.status_to ?? '',
+        at: event.occurred_at,
+      })),
+      ...(shipment?.shipment?.scheduled_at ? [{
+        id: `delivery-scheduled-${id}`,
+        leg: 'delivery' as const,
+        label: 'Entrega programada',
+        detail: shipment.shipment.reference,
+        at: shipment.shipment.scheduled_at,
+      }] : []),
+      ...(shipment?.tracking_events ?? []).map((event) => ({
+        id: `delivery-event-${event.id}`,
+        leg: 'delivery' as const,
+        label: event.event_code,
+        detail: event.status_to ?? '',
+        at: event.occurred_at,
+      })),
+      ...(shipment?.shipment?.delivered_at ? [{
+        id: `delivery-completed-${id}`,
+        leg: 'delivery' as const,
+        label: 'Entrega completada',
+        detail: shipment.shipment.reference,
+        at: shipment.shipment.delivered_at,
+      }] : []),
+    ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
     return {
       expedition: {
-        id: expeditionId,
-        reference: `EXP-${10000 + shipmentSeq}`,
-        external_reference: payload.external_reference ?? null,
-        operation_kind: payload.operation_kind,
-        product_category: payload.product_category,
-        service_type: payload.service_type ?? 'express_1030',
-        status: 'planned',
-        shipment_id: shipment.id,
-        pickup_id: pickup.id,
-        temperature_min_c: payload.temperature_min_c ?? null,
-        temperature_max_c: payload.temperature_max_c ?? null,
-        requires_temperature_log: payload.requires_temperature_log ?? false,
-        thermo_notes: payload.thermo_notes ?? null,
-        scheduled_at: payload.scheduled_at ?? null,
+        ...expedition,
+        hub_id: expedition.hub_id ?? null,
+        shipment_reference: shipment?.shipment.reference ?? null,
+        shipment_status: shipment?.shipment.status ?? null,
+        pickup_reference: pickup?.pickup.reference ?? null,
+        pickup_status: pickup?.pickup.status ?? null,
+        sender_name: shipment?.sender_contact?.display_name ?? shipment?.sender_contact?.legal_name ?? null,
+        recipient_name: shipment?.recipient_contact?.display_name ?? shipment?.recipient_contact?.legal_name ?? shipment?.shipment.consignee_name ?? null,
       },
-      shipment: shipmentWithExpedition,
-      pickup: {
-        ...pickup,
-        expedition_id: expeditionId,
-        service_type: payload.service_type ?? 'express_1030',
-        product_category: payload.product_category,
-        temperature_min_c: payload.temperature_min_c ?? null,
-        temperature_max_c: payload.temperature_max_c ?? null,
-        requires_temperature_log: payload.requires_temperature_log ?? false,
-        thermo_notes: payload.thermo_notes ?? null,
-        address_line: payload.sender_address_line ?? null,
-        scheduled_at: payload.scheduled_at ?? null,
-      },
+      shipment: shipment?.shipment ?? null,
+      pickup: pickup?.pickup ?? null,
+      sender_contact: shipment?.sender_contact ?? pickup?.sender_contact ?? null,
+      recipient_contact: shipment?.recipient_contact ?? pickup?.recipient_contact ?? null,
+      timeline,
+      route_stops: routeStops,
+      incidents,
+      pods,
     };
   },
 
@@ -1838,8 +2412,10 @@ export const mockApi = {
 
   async getShipmentDetail(id: string) {
     const row = mockShipments.find((item) => item.id === id);
-    const recipientContact = mockContacts.find((item) => item.kind === 'recipient' || item.kind === 'both') ?? null;
-    const senderContact = mockContacts.find((item) => item.kind === 'sender' || item.kind === 'both') ?? null;
+    const expedition = getExpeditionByShipmentId(id);
+    const linkedPickup = expedition?.pickup_id ? (mockPickups.find((item) => item.id === expedition.pickup_id) ?? null) : null;
+    const recipientContact = expedition?.recipient_contact_id ? (mockContacts.find((item) => item.id === expedition.recipient_contact_id) ?? null) : (mockContacts.find((item) => item.kind === 'recipient' || item.kind === 'both') ?? null);
+    const senderContact = expedition?.sender_contact_id ? (mockContacts.find((item) => item.id === expedition.sender_contact_id) ?? null) : (mockContacts.find((item) => item.kind === 'sender' || item.kind === 'both') ?? null);
     return {
       shipment: {
         id,
@@ -1880,23 +2456,8 @@ export const mockApi = {
         subcontractor_id: null,
         delivered_at: id === 's-2' ? '2026-03-01T10:15:00Z' : null,
       },
-      expedition: (row as { expedition_id?: string | null; external_reference?: string | null; operation_kind?: 'shipment' | 'return' | null; product_category?: 'parcel' | 'thermo' | null; service_type?: string | null; temperature_min_c?: number | null; temperature_max_c?: number | null; requires_temperature_log?: boolean; thermo_notes?: string | null; scheduled_at?: string | null } | undefined)?.expedition_id ? {
-        id: (row as { expedition_id?: string | null }).expedition_id ?? '',
-        reference: `EXP-${id}`,
-        external_reference: row?.external_reference ?? null,
-        operation_kind: (row as { operation_kind?: 'shipment' | 'return' | null }).operation_kind ?? 'shipment',
-        product_category: (row as { product_category?: 'parcel' | 'thermo' | null }).product_category ?? 'parcel',
-        service_type: row?.service_type ?? 'express_1030',
-        status: 'planned',
-        shipment_id: id,
-        pickup_id: null,
-        temperature_min_c: (row as { temperature_min_c?: number | null }).temperature_min_c ?? null,
-        temperature_max_c: (row as { temperature_max_c?: number | null }).temperature_max_c ?? null,
-        requires_temperature_log: (row as { requires_temperature_log?: boolean }).requires_temperature_log ?? false,
-        thermo_notes: (row as { thermo_notes?: string | null }).thermo_notes ?? null,
-        scheduled_at: row?.scheduled_at ?? null,
-      } : null,
-      linked_pickup: null,
+      expedition: expedition,
+      linked_pickup: linkedPickup,
       sender_contact: senderContact,
       recipient_contact: recipientContact,
       tracking_events: [
@@ -1947,19 +2508,22 @@ export const mockApi = {
           },
         ]
         : [],
-      route_stops: [
-        {
-          id: 'stop-1',
-          route_id: 'route-1',
-          route_code: 'R-AGP-001',
-          route_date: '2026-03-01',
-          sequence: 4,
-          stop_type: 'DELIVERY',
-          status: 'completed',
-          planned_at: '2026-03-01T08:00:00Z',
-          completed_at: '2026-03-01T10:10:00Z',
-        },
-      ],
+      route_stops: mockRouteStops
+        .filter((item) => item.shipment_id === id)
+        .map((item) => {
+          const route = mockRoutes.find((routeItem) => routeItem.id === item.route_id);
+          return {
+            id: item.id,
+            route_id: item.route_id,
+            route_code: route?.code ?? null,
+            route_date: route?.route_date ?? null,
+            sequence: item.sequence,
+            stop_type: item.stop_type,
+            status: item.status,
+            planned_at: (item as { planned_at?: string | null }).planned_at ?? null,
+            completed_at: (item as { completed_at?: string | null }).completed_at ?? null,
+          };
+        }),
     };
   },
 
@@ -2115,19 +2679,97 @@ export const mockApi = {
     ];
   },
 
-  async getPickups(filters: { status?: string; limit?: number } = {}) {
-    let rows = [
-      { id: '00000000-0000-0000-0000-000000000201', reference: 'PCK-AGP-0001', pickup_type: 'NORMAL', status: 'planned', requester_name: 'Cliente Pickup 1' },
-      { id: '00000000-0000-0000-0000-000000000202', reference: 'PCK-AGP-0002', pickup_type: 'RETURN', status: 'planned', requester_name: 'Cliente Pickup 2' },
-      { id: '00000000-0000-0000-0000-000000000203', reference: 'PCK-AGP-0003', pickup_type: 'NORMAL', status: 'completed', requester_name: 'Cliente Pickup 3' },
-    ];
+  async getPickups(filters: { status?: string; q?: string; limit?: number } = {}) {
+    let rows = mockPickups.map((pickup) => {
+      const expedition = getExpeditionByPickupId(pickup.id);
+      const linkedShipment = expedition?.shipment_id ? (mockShipments.find((item) => item.id === expedition.shipment_id) ?? null) : null;
+      return {
+        ...pickup,
+        expedition_reference: expedition?.reference ?? null,
+        shipment_reference: linkedShipment?.reference ?? null,
+      };
+    });
     if (filters.status) {
       rows = rows.filter((row) => row.status === filters.status);
+    }
+    if (filters.q) {
+      const query = filters.q.toLowerCase();
+      rows = rows.filter((row) => (
+        row.reference.toLowerCase().includes(query)
+        || (row.external_reference ?? '').toLowerCase().includes(query)
+        || (row.requester_name ?? '').toLowerCase().includes(query)
+        || (row.expedition_reference ?? '').toLowerCase().includes(query)
+        || (row.shipment_reference ?? '').toLowerCase().includes(query)
+      ));
     }
     if (filters.limit) {
       rows = rows.slice(0, Math.max(1, filters.limit));
     }
     return rows;
+  },
+
+  async getPickupDetail(id: string) {
+    const pickup = mockPickups.find((item) => item.id === id);
+    if (!pickup) {
+      throw new Error('Pickup not found');
+    }
+    const expedition = getExpeditionByPickupId(id);
+    const linkedShipment = expedition?.shipment_id ? (mockShipments.find((item) => item.id === expedition.shipment_id) ?? null) : null;
+    const senderContact = expedition?.sender_contact_id ? (mockContacts.find((item) => item.id === expedition.sender_contact_id) ?? null) : null;
+    const recipientContact = expedition?.recipient_contact_id ? (mockContacts.find((item) => item.id === expedition.recipient_contact_id) ?? null) : null;
+
+    return {
+      pickup: pickup,
+      expedition,
+      linked_shipment: linkedShipment,
+      sender_contact: senderContact,
+      recipient_contact: recipientContact,
+      tracking_events: [
+        {
+          id: `evt-pickup-created-${id}`,
+          trackable_type: 'pickup',
+          trackable_id: id,
+          event_code: 'PICKUP_PLANNED',
+          status_to: 'planned',
+          source: 'web',
+          occurred_at: pickup.scheduled_at ?? nowIso(),
+        },
+        ...(pickup.completed_at ? [{
+          id: `evt-pickup-completed-${id}`,
+          trackable_type: 'pickup' as const,
+          trackable_id: id,
+          event_code: 'PICKUP_COMPLETED',
+          status_to: 'completed',
+          source: 'driver',
+          occurred_at: pickup.completed_at,
+        }] : []),
+      ],
+      pods: pickup.completed_at ? [{
+        id: `pod-pickup-${id}`,
+        evidenceable_type: 'pickup' as const,
+        evidenceable_id: id,
+        signature_name: pickup.requester_name ?? 'Cliente',
+        photo_url: null,
+        captured_at: pickup.completed_at,
+      }] : [],
+      incidents: mockIncidents.filter((item) => item.incidentable_type === 'pickup' && item.incidentable_id === id),
+      route_stops: mockRouteStops
+        .filter((item) => item.pickup_id === id)
+        .map((item) => {
+          const route = mockRoutes.find((row) => row.id === item.route_id);
+          return {
+            id: item.id,
+            route_id: item.route_id,
+            route_code: route?.code ?? null,
+            route_date: route?.route_date ?? null,
+            sequence: item.sequence,
+            stop_type: item.stop_type,
+            status: item.status,
+            planned_at: (item as { planned_at?: string | null }).planned_at ?? null,
+            completed_at: (item as { completed_at?: string | null }).completed_at ?? null,
+          };
+        }),
+    };
   },
 
   async createPickup(payload: {
@@ -2138,9 +2780,9 @@ export const mockApi = {
     address_line?: string | null;
     scheduled_at?: string | null;
   }) {
-    return {
+    const created = {
       id: `p-${Math.floor(Math.random() * 10000)}`,
-      reference: String(Math.floor(100000 + Math.random() * 900000)),
+      reference: String(Math.floor(20000 + Math.random() * 80000)),
       expedition_id: null,
       pickup_type: payload.pickup_type,
       service_type: null,
@@ -2153,7 +2795,11 @@ export const mockApi = {
       requester_name: payload.requester_name ?? null,
       address_line: payload.address_line ?? null,
       scheduled_at: payload.scheduled_at ?? null,
+      completed_at: null,
+      hub_id: payload.hub_id,
     };
+    mockPickups = [created, ...mockPickups];
+    return created;
   },
 
   async getRoutes(filters: {
@@ -2267,16 +2913,19 @@ export const mockApi = {
 
   async createRoute(payload: {
     hub_id: string;
-    code: string;
     route_date: string;
     subcontractor_id?: string | null;
     driver_id?: string | null;
     vehicle_id?: string | null;
   }) {
+    const hub = mockHubs.find((item) => item.id === payload.hub_id);
+    const hubToken = (hub?.code ?? 'GEN').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase() || 'GEN';
+    const dateToken = payload.route_date.replaceAll('-', '');
+    const sameGroupCount = mockRoutes.filter((item) => item.hub_id === payload.hub_id && item.route_date === payload.route_date).length + 1;
     const route = {
       id: `r-${routeSeq++}`,
       hub_id: payload.hub_id,
-      code: payload.code,
+      code: `R-${dateToken}-${hubToken}-${String(sameGroupCount).padStart(3, '0')}`,
       route_date: payload.route_date,
       status: 'planned',
       subcontractor_id: payload.subcontractor_id ?? null,
@@ -2390,7 +3039,8 @@ export const mockApi = {
     return mockRouteStops
       .filter((row) => row.route_id === routeId)
       .slice()
-      .sort((a, b) => a.sequence - b.sequence);
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((row) => enrichRouteStop(row));
   },
 
   async createRouteStop(routeId: string, payload: {
@@ -2420,7 +3070,7 @@ export const mockApi = {
     if (routeIndex >= 0) {
       mockRoutes[routeIndex] = { ...mockRoutes[routeIndex], stops_count: mockRoutes[routeIndex].stops_count + 1 };
     }
-    return stop;
+    return enrichRouteStop(stop);
   },
 
   async updateRouteStop(routeId: string, stopId: string, payload: {
@@ -2438,7 +3088,7 @@ export const mockApi = {
       status: payload.status ?? current.status,
     };
     mockRouteStops[index] = next;
-    return next;
+    return enrichRouteStop(next);
   },
 
   async deleteRouteStop(routeId: string, stopId: string) {
@@ -2461,7 +3111,7 @@ export const mockApi = {
       mockRoutes[routeIndex] = { ...mockRoutes[routeIndex], stops_count: routeStops.length };
     }
 
-    return routeStops;
+    return routeStops.map((row) => enrichRouteStop(row));
   },
 
   async reorderRouteStops(routeId: string, stopIds: string[]) {
@@ -2485,24 +3135,35 @@ export const mockApi = {
     return mockRouteStops
       .filter((row) => row.route_id === routeId)
       .slice()
-      .sort((a, b) => a.sequence - b.sequence);
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((row) => enrichRouteStop(row));
   },
 
   async bulkAddRouteStops(routeId: string, payload: {
+    expedition_ids?: string[];
     shipment_ids?: string[];
     pickup_ids?: string[];
     status?: 'planned' | 'in_progress' | 'completed';
   }) {
+    const expeditionIds = payload.expedition_ids ?? [];
+    const expeditionShipmentIds = expeditionIds
+      .map((id) => mockExpeditions.find((row) => row.id === id)?.shipment_id)
+      .filter((value): value is string => Boolean(value));
+    const expeditionPickupIds = expeditionIds
+      .map((id) => mockExpeditions.find((row) => row.id === id)?.pickup_id)
+      .filter((value): value is string => Boolean(value));
     const existingShipmentIds = new Set(
       mockRouteStops.filter((row) => row.route_id === routeId && row.shipment_id).map((row) => row.shipment_id as string)
     );
     const existingPickupIds = new Set(
       mockRouteStops.filter((row) => row.route_id === routeId && row.pickup_id).map((row) => row.pickup_id as string)
     );
-    const newShipmentIds = (payload.shipment_ids ?? []).filter((id) => !existingShipmentIds.has(id));
-    const newPickupIds = (payload.pickup_ids ?? []).filter((id) => !existingPickupIds.has(id));
-    const skippedExistingCount = (payload.shipment_ids ?? []).length - newShipmentIds.length
-      + (payload.pickup_ids ?? []).length - newPickupIds.length;
+    const requestedShipmentIds = Array.from(new Set([...(payload.shipment_ids ?? []), ...expeditionShipmentIds]));
+    const requestedPickupIds = Array.from(new Set([...(payload.pickup_ids ?? []), ...expeditionPickupIds]));
+    const newShipmentIds = requestedShipmentIds.filter((id) => !existingShipmentIds.has(id));
+    const newPickupIds = requestedPickupIds.filter((id) => !existingPickupIds.has(id));
+    const skippedExistingCount = requestedShipmentIds.length - newShipmentIds.length
+      + requestedPickupIds.length - newPickupIds.length;
 
     const nextSequenceStart = (mockRouteStops.filter((row) => row.route_id === routeId).reduce((max, row) => Math.max(max, row.sequence), 0)) + 1;
     let nextSequence = nextSequenceStart;
@@ -2548,7 +3209,7 @@ export const mockApi = {
     return {
       created_count: newShipmentIds.length + newPickupIds.length,
       skipped_existing_count: skippedExistingCount,
-      stops: routeStops,
+      stops: routeStops.map((row) => enrichRouteStop(row)),
     };
   },
 
@@ -2594,7 +3255,7 @@ export const mockApi = {
 
     return {
       updated_count: updatedCount,
-      stops,
+      stops: stops.map((row) => enrichRouteStop(row)),
     };
   },
 
@@ -2627,7 +3288,7 @@ export const mockApi = {
         pickups,
         completed,
       },
-      stops,
+      stops: stops.map((row) => enrichRouteStop(row)),
       generated_at: new Date().toISOString(),
     };
   },
@@ -3207,6 +3868,13 @@ export const mockApi = {
   } = {}) {
     const now = new Date();
     const addIncidentMeta = (item: typeof mockIncidents[number]) => {
+      const expedition = mockExpeditions.find((row) => (
+        (item.incidentable_type === 'shipment' && row.shipment_id === item.incidentable_id)
+        || (item.incidentable_type === 'pickup' && row.pickup_id === item.incidentable_id)
+      ));
+      const linkedPickup = item.incidentable_type === 'pickup'
+        ? mockPickups.find((row) => row.id === item.incidentable_id)
+        : expedition?.pickup_id ? mockPickups.find((row) => row.id === expedition.pickup_id) : null;
       const priority = item.category === 'failed' ? 'high' : item.category === 'general' ? 'low' : 'medium';
       const slaHours = priority === 'high' ? 4 : priority === 'medium' ? 8 : 24;
       const dueAt = new Date(new Date(item.created_at ?? now.toISOString()).getTime() + slaHours * 3600 * 1000);
@@ -3220,6 +3888,8 @@ export const mockApi = {
       }
       return {
         ...item,
+        pickup_reference: linkedPickup?.reference ?? null,
+        expedition_reference: expedition?.reference ?? null,
         priority,
         sla_due_at: dueAt.toISOString(),
         sla_status: slaStatus,
@@ -3761,15 +4431,43 @@ export const mockApi = {
   async createSubcontractor(payload: {
     legal_name: string;
     tax_id: string;
+    trade_name?: string;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
+    contact_name?: string;
+    phone?: string;
+    email?: string;
+    billing_email?: string;
+    address_line?: string;
+    postal_code?: string;
+    city?: string;
+    province?: string;
+    country?: string;
+    iban?: string;
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string;
   }) {
     const created = {
       id: `sc-${subcontractorSeq++}`,
       legal_name: payload.legal_name,
+      trade_name: payload.trade_name ?? null,
       tax_id: payload.tax_id,
       status: payload.status ?? 'active',
       payment_terms: payload.payment_terms ?? 'monthly',
+      contact_name: payload.contact_name ?? null,
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      billing_email: payload.billing_email ?? null,
+      address_line: payload.address_line ?? null,
+      postal_code: payload.postal_code ?? null,
+      city: payload.city ?? null,
+      province: payload.province ?? null,
+      country: payload.country ?? 'ES',
+      iban: payload.iban ?? null,
+      contract_start: payload.contract_start ?? null,
+      contract_end: payload.contract_end ?? null,
+      notes: payload.notes ?? null,
       updated_at: nowIso(),
       last_editor_name: 'Admin Demo',
     };
@@ -3779,9 +4477,23 @@ export const mockApi = {
 
   async updateSubcontractor(id: string, payload: {
     legal_name?: string;
+    trade_name?: string | null;
     tax_id?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
+    contact_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    billing_email?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    iban?: string | null;
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string | null;
   }) {
     const index = mockSubcontractors.findIndex((item) => item.id === id);
     if (index < 0) throw new Error('Subcontractor not found');
@@ -3841,6 +4553,10 @@ export const mockApi = {
     code: string;
     dni: string;
     name: string;
+    phone?: string;
+    email?: string;
+    license_number?: string;
+    license_expires_at?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string;
@@ -3852,6 +4568,10 @@ export const mockApi = {
       code: payload.code,
       dni: payload.dni,
       name: payload.name,
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      license_number: payload.license_number ?? null,
+      license_expires_at: payload.license_expires_at ?? null,
       status: payload.status ?? 'active',
       employment_type: payload.employment_type ?? 'subcontractor',
       user_id: payload.user_id ?? null,
@@ -3867,6 +4587,10 @@ export const mockApi = {
   async updateDriver(id: string, payload: {
     name?: string;
     dni?: string;
+    phone?: string | null;
+    email?: string | null;
+    license_number?: string | null;
+    license_expires_at?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string | null;
@@ -3931,7 +4655,17 @@ export const mockApi = {
     code: string;
     plate_number?: string;
     vehicle_type?: string;
+    brand?: string;
+    model?: string;
+    fuel_type?: string;
+    ownership_type?: string;
     capacity_kg?: number;
+    volume_m3?: number;
+    is_refrigerated?: boolean;
+    thermo_cert_expires_at?: string | null;
+    insurance_expires_at?: string | null;
+    itv_expires_at?: string | null;
+    notes?: string;
     status?: 'active' | 'inactive' | 'maintenance';
     subcontractor_id?: string;
     home_hub_id?: string;
@@ -3942,7 +4676,17 @@ export const mockApi = {
       code: payload.code,
       plate_number: payload.plate_number ?? null,
       vehicle_type: payload.vehicle_type ?? 'van',
+      brand: payload.brand ?? null,
+      model: payload.model ?? null,
+      fuel_type: payload.fuel_type ?? null,
+      ownership_type: payload.ownership_type ?? null,
       capacity_kg: payload.capacity_kg ?? null,
+      volume_m3: payload.volume_m3 ?? null,
+      is_refrigerated: payload.is_refrigerated ?? false,
+      thermo_cert_expires_at: payload.thermo_cert_expires_at ?? null,
+      insurance_expires_at: payload.insurance_expires_at ?? null,
+      itv_expires_at: payload.itv_expires_at ?? null,
+      notes: payload.notes ?? null,
       status: payload.status ?? 'active',
       subcontractor_id: payload.subcontractor_id ?? null,
       home_hub_id: payload.home_hub_id ?? null,
@@ -3957,7 +4701,17 @@ export const mockApi = {
   async updateVehicle(id: string, payload: {
     plate_number?: string | null;
     vehicle_type?: string;
+    brand?: string | null;
+    model?: string | null;
+    fuel_type?: string | null;
+    ownership_type?: string | null;
     capacity_kg?: number | null;
+    volume_m3?: number | null;
+    is_refrigerated?: boolean;
+    thermo_cert_expires_at?: string | null;
+    insurance_expires_at?: string | null;
+    itv_expires_at?: string | null;
+    notes?: string | null;
     status?: 'active' | 'inactive' | 'maintenance';
     subcontractor_id?: string | null;
     home_hub_id?: string | null;

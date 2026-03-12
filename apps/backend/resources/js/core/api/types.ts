@@ -131,6 +131,7 @@ export type PickupSummary = {
   id: string;
   expedition_id?: string | null;
   reference: string;
+  external_reference?: string | null;
   pickup_type: 'NORMAL' | 'RETURN';
   service_type?: string | null;
   product_category?: 'parcel' | 'thermo' | null;
@@ -142,6 +143,10 @@ export type PickupSummary = {
   requester_name?: string | null;
   address_line?: string | null;
   scheduled_at?: string | null;
+  completed_at?: string | null;
+  hub_id?: string | null;
+  expedition_reference?: string | null;
+  shipment_reference?: string | null;
 };
 
 export type ExpeditionSummary = {
@@ -152,13 +157,28 @@ export type ExpeditionSummary = {
   product_category: 'parcel' | 'thermo';
   service_type?: string | null;
   status: string;
+  hub_id?: string | null;
   shipment_id?: string | null;
   pickup_id?: string | null;
+  shipment_reference?: string | null;
+  shipment_status?: string | null;
+  pickup_reference?: string | null;
+  pickup_status?: string | null;
+  sender_name?: string | null;
+  recipient_name?: string | null;
   temperature_min_c?: number | null;
   temperature_max_c?: number | null;
   requires_temperature_log?: boolean;
   thermo_notes?: string | null;
   scheduled_at?: string | null;
+};
+
+export type ExpeditionTimelineItem = {
+  id: string;
+  leg: 'pickup' | 'delivery' | 'expedition';
+  label: string;
+  detail?: string | null;
+  at: string;
 };
 
 export type RouteSummary = {
@@ -179,6 +199,18 @@ export type HubSummary = {
   code: string;
   name: string;
   city?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 };
@@ -190,6 +222,17 @@ export type DepotSummary = {
   name: string;
   address_line?: string | null;
   city?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 };
@@ -202,6 +245,40 @@ export type PointSummary = {
   name: string;
   address_line?: string | null;
   city?: string | null;
+  postal_code?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  opening_hours?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
+  is_active: boolean;
+  deleted_at?: string | null;
+};
+
+export type AgencySummary = {
+  id: string;
+  hub_id?: string | null;
+  code: string;
+  name: string;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  manager_name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
   is_active: boolean;
   deleted_at?: string | null;
 };
@@ -217,6 +294,14 @@ export type RouteStopSummary = {
   entity_type: 'shipment' | 'pickup';
   entity_id: string;
   reference?: string | null;
+  expedition_id?: string | null;
+  expedition_reference?: string | null;
+  linked_reference?: string | null;
+  operation_kind?: 'shipment' | 'return' | null;
+  product_category?: 'parcel' | 'thermo' | null;
+  service_type?: string | null;
+  counterparty_name?: string | null;
+  address_line?: string | null;
   planned_at?: string | null;
   completed_at?: string | null;
 };
@@ -327,6 +412,35 @@ export type ShipmentDetail = {
   pods: PodSummary[];
   incidents: IncidentSummary[];
   route_stops: ShipmentRouteStopSummary[];
+};
+
+export type PickupDetail = {
+  pickup: PickupSummary & {
+    route_id?: string | null;
+    driver_id?: string | null;
+    subcontractor_id?: string | null;
+  };
+  expedition?: ExpeditionSummary | null;
+  linked_shipment?: ShipmentSummary | null;
+  sender_contact?: ContactSummary | null;
+  recipient_contact?: ContactSummary | null;
+  tracking_events: TrackingEventSummary[];
+  pods: PodSummary[];
+  incidents: IncidentSummary[];
+  route_stops: ShipmentRouteStopSummary[];
+};
+
+export type ExpeditionDetail = {
+  expedition: ExpeditionSummary;
+  shipment?: ShipmentDetail['shipment'] | null;
+  pickup?: PickupDetail['pickup'] | null;
+  sender_contact?: ContactSummary | null;
+  recipient_contact?: ContactSummary | null;
+  timeline: ExpeditionTimelineItem[];
+  tracking_events: TrackingEventSummary[];
+  route_stops: RouteStopSummary[];
+  incidents: IncidentSummary[];
+  pods: PodSummary[];
 };
 
 export type QualitySnapshot = {
@@ -464,6 +578,7 @@ export type DashboardOverview = {
   recent: {
     routes: RouteSummary[];
     shipments: ShipmentSummary[];
+    expeditions?: ExpeditionSummary[];
     incidents: IncidentSummary[];
   };
   productivity_by_hub: Array<{
@@ -606,6 +721,8 @@ export type IncidentSummary = {
   incidentable_type: 'shipment' | 'pickup';
   incidentable_id: string;
   shipment_reference?: string | null;
+  pickup_reference?: string | null;
+  expedition_reference?: string | null;
   catalog_code: string;
   category: 'failed' | 'absent' | 'retry' | 'general';
   priority?: 'high' | 'medium' | 'low';
@@ -811,9 +928,23 @@ export type SettlementBulkReconcilePreview = {
 export type SubcontractorSummary = {
   id: string;
   legal_name: string;
+  trade_name?: string | null;
   tax_id?: string | null;
   status: string;
   payment_terms?: string | null;
+  contact_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  billing_email?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+  iban?: string | null;
+  contract_start?: string | null;
+  contract_end?: string | null;
+  notes?: string | null;
   updated_at?: string | null;
   last_editor_name?: string | null;
 };
@@ -823,6 +954,10 @@ export type DriverSummary = {
   code: string;
   dni?: string | null;
   name: string;
+  phone?: string | null;
+  email?: string | null;
+  license_number?: string | null;
+  license_expires_at?: string | null;
   status: string;
   employment_type: string;
   user_id?: string | null;
@@ -838,7 +973,17 @@ export type VehicleSummary = {
   code: string;
   plate_number?: string | null;
   vehicle_type: string;
+  brand?: string | null;
+  model?: string | null;
+  fuel_type?: string | null;
+  ownership_type?: string | null;
   capacity_kg?: number | null;
+  volume_m3?: number | null;
+  is_refrigerated?: boolean;
+  thermo_cert_expires_at?: string | null;
+  insurance_expires_at?: string | null;
+  itv_expires_at?: string | null;
+  notes?: string | null;
   status: string;
   subcontractor_id?: string | null;
   subcontractor_name?: string | null;

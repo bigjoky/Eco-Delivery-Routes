@@ -13,6 +13,7 @@ import { apiClient } from '../../services/apiClient';
 
 type AuditResource =
   | ''
+  | 'expedition'
   | 'settlement'
   | 'adjustment'
   | 'advance'
@@ -51,6 +52,8 @@ export function parseMetadata(metadata: AuditLogEntry['metadata']): Record<strin
 
 export function getEntityLink(row: AuditLogEntry): { to: string; label: string } | null {
   const metadata = parseMetadata(row.metadata);
+  const expeditionId = typeof metadata.expedition_id === 'string' ? metadata.expedition_id : null;
+  const expeditionReference = typeof metadata.expedition_reference === 'string' ? metadata.expedition_reference : null;
   const settlementId = typeof metadata.settlement_id === 'string' ? metadata.settlement_id : null;
   const routeId = typeof metadata.route_id === 'string' ? metadata.route_id : null;
   const shipmentId = typeof metadata.shipment_id === 'string' ? metadata.shipment_id : null;
@@ -65,7 +68,9 @@ export function getEntityLink(row: AuditLogEntry): { to: string; label: string }
 
   if (settlementId) return { to: `/settlements/${settlementId}`, label: 'Liquidación' };
   if (routeId) return { to: `/routes/${routeId}`, label: 'Ruta' };
-  if (shipmentId) return { to: `/shipments/${shipmentId}`, label: 'Envío' };
+  if (expeditionId) return { to: `/expeditions?id=${encodeURIComponent(expeditionId)}`, label: 'Expedición' };
+  if (expeditionReference) return { to: `/expeditions?q=${encodeURIComponent(expeditionReference)}`, label: 'Expedición' };
+  if (shipmentId) return { to: `/expeditions?shipment_id=${encodeURIComponent(shipmentId)}`, label: 'Expedición' };
   if (incidentId) return { to: `/incidents?incident_id=${encodeURIComponent(incidentId)}`, label: 'Incidencia' };
   if (userId) return { to: `/users/${userId}`, label: 'Usuario' };
   if (roleId) return { to: `/roles/${roleId}`, label: 'Rol' };
@@ -129,12 +134,13 @@ export function AuditOpsPage() {
               <label htmlFor="audit-resource">Recurso</label>
               <Select id="audit-resource" value={resource} onChange={(event) => setResource(event.target.value as AuditResource)}>
                 <option value="">Todos</option>
+                <option value="expedition">Expediciones</option>
                 <option value="settlement">Liquidaciones</option>
                 <option value="advance">Anticipos</option>
                 <option value="subcontractor">Subcontratas</option>
                 <option value="driver">Conductores</option>
                 <option value="vehicle">Vehículos</option>
-                <option value="shipment">Envíos</option>
+                <option value="shipment">Envíos (pata)</option>
                 <option value="route">Rutas</option>
                 <option value="incident">Incidencias</option>
                 <option value="workforce">Personal</option>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Pdf\BrandedPdfDocument;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -252,7 +253,7 @@ class QualityController extends Controller
             );
         }
 
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildBreakdownPdf('Ruta', (string) ($payload['scope_label'] ?? $payload['scope_id']), $payload), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="quality_route_breakdown.pdf"',
         ]);
@@ -391,7 +392,7 @@ class QualityController extends Controller
             );
         }
 
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildBreakdownPdf('Conductor', (string) ($payload['scope_label'] ?? $payload['scope_id']), $payload), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="quality_driver_breakdown.pdf"',
         ]);
@@ -530,7 +531,7 @@ class QualityController extends Controller
             );
         }
 
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildBreakdownPdf('Subcontrata', (string) ($payload['scope_label'] ?? $payload['scope_id']), $payload), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="quality_subcontractor_breakdown.pdf"',
         ]);
@@ -590,26 +591,7 @@ class QualityController extends Controller
             : 0.0;
         $belowThreshold = $rows->filter(fn ($row) => (float) $row->service_quality_score < $threshold)->count();
 
-        $lines = [
-            'Eco Delivery Routes - Quality Routes Report',
-            sprintf('Snapshots considered: %d', $rows->count()),
-            sprintf('Average score (route): %.2f%%', $avg),
-            sprintf('Routes below threshold %.2f%%: %d', $threshold, $belowThreshold),
-        ];
-
-        foreach ($rows as $row) {
-            $lines[] = sprintf(
-                '%s | %s to %s | %.2f%% | completed %d/%d',
-                (string) ($row->scope_label ?? $row->scope_id),
-                (string) $row->period_start,
-                (string) $row->period_end,
-                (float) $row->service_quality_score,
-                (int) $row->delivered_completed + (int) $row->pickups_completed,
-                (int) $row->assigned_with_attempt
-            );
-        }
-
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildOverviewPdf($rows, $threshold, $avg, $belowThreshold), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="quality_routes_export.pdf"',
         ]);
@@ -1156,30 +1138,7 @@ class QualityController extends Controller
         }
 
         $rows = $this->buildThresholdHistoryQuery($request)->limit(120)->get();
-        $lines = [
-            'Eco Delivery Routes - Quality Threshold History',
-            sprintf('Rows exported: %d', $rows->count()),
-        ];
-        foreach ($rows as $row) {
-            $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
-            $before = is_array($metadata['before'] ?? null) ? $metadata['before'] : [];
-            $after = is_array($metadata['after'] ?? null) ? $metadata['after'] : [];
-            $scopeType = (string) ($metadata['scope_type'] ?? '');
-            $scopeId = (string) ($metadata['scope_id'] ?? '');
-            $beforeThreshold = isset($before['threshold']) ? (string) ((float) $before['threshold']) : '-';
-            $afterThreshold = isset($after['threshold']) ? (string) ((float) $after['threshold']) : '-';
-            $lines[] = sprintf(
-                '%s | %s:%s | %s -> %s | %s',
-                (string) $row->created_at,
-                $scopeType,
-                $scopeId,
-                $beforeThreshold,
-                $afterThreshold,
-                (string) $row->event
-            );
-        }
-
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildThresholdHistoryPdf($rows), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="quality_threshold_history.pdf"',
         ]);
@@ -1506,39 +1465,123 @@ class QualityController extends Controller
      */
     private function buildSimplePdf(array $lines): string
     {
-        $escape = static fn (string $text): string => str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
-        $content = "BT\n/F1 12 Tf\n50 780 Td\n";
-        foreach ($lines as $i => $line) {
-            if ($i > 0) {
-                $content .= "0 -18 Td\n";
+        return BrandedPdfDocument::renderListDocument(
+            title: 'Calidad de servicio',
+            subtitle: 'Export corporativo de KPI por expedición, ruta, conductor y subcontrata',
+            lines: $lines
+        );
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, object> $rows
+     */
+    private function buildOverviewPdf($rows, float $threshold, float $avg, int $belowThreshold): string
+    {
+        $summary = [
+            ['label' => 'Snapshots', 'value' => (string) $rows->count()],
+            ['label' => 'Media KPI', 'value' => number_format($avg, 2, ',', '.') . '%'],
+            ['label' => 'Umbral', 'value' => number_format($threshold, 2, ',', '.') . '%'],
+            ['label' => 'Bajo umbral', 'value' => (string) $belowThreshold],
+        ];
+
+        $series = [];
+        foreach ($rows as $row) {
+            $completed = (int) $row->delivered_completed + (int) $row->pickups_completed;
+            $series[] = [
+                'label' => (string) ($row->scope_label ?? $row->scope_id),
+                'value' => number_format((float) $row->service_quality_score, 2, ',', '.') . '%',
+                'ratio' => (float) $row->service_quality_score,
+                'detail' => sprintf('%s/%s completados · %s a %s', $completed, (int) $row->assigned_with_attempt, (string) $row->period_start, (string) $row->period_end),
+            ];
+        }
+
+        return BrandedPdfDocument::renderAnalyticsDocument(
+            title: 'Calidad de servicio',
+            subtitle: 'Resumen visual de calidad por ruta',
+            summaryBoxes: $summary,
+            series: $series,
+            details: []
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function buildBreakdownPdf(string $scopeLabel, string $labelValue, array $payload): string
+    {
+        $summary = [
+            ['label' => 'Scope', 'value' => $scopeLabel],
+            ['label' => 'Entidad', 'value' => mb_substr($labelValue, 0, 24)],
+            ['label' => 'KPI', 'value' => number_format((float) $payload['service_quality_score'], 2, ',', '.') . '%'],
+            ['label' => 'Granularidad', 'value' => (string) $payload['granularity']],
+            ['label' => 'Asignados', 'value' => (string) ($payload['components']['assigned_with_attempt'] ?? 0)],
+            ['label' => 'Completados', 'value' => (string) ($payload['components']['completed_total'] ?? 0)],
+        ];
+
+        $series = [];
+        foreach (($payload['periods'] ?? []) as $period) {
+            $series[] = [
+                'label' => (string) ($period['period_key'] ?? '-'),
+                'value' => number_format((float) ($period['components']['completion_ratio'] ?? 0), 2, ',', '.') . '%',
+                'ratio' => (float) ($period['components']['completion_ratio'] ?? 0),
+                'detail' => sprintf(
+                    '%s/%s completados · fallidas %s · ausencias %s · reintentos %s',
+                    (string) ($period['components']['completed_total'] ?? 0),
+                    (string) ($period['components']['assigned_with_attempt'] ?? 0),
+                    (string) ($period['components']['failed_count'] ?? 0),
+                    (string) ($period['components']['absent_count'] ?? 0),
+                    (string) ($period['components']['retry_count'] ?? 0)
+                ),
+            ];
+        }
+
+        return BrandedPdfDocument::renderAnalyticsDocument(
+            title: 'Desglose KPI calidad',
+            subtitle: sprintf('%s · %s', $scopeLabel, $labelValue),
+            summaryBoxes: $summary,
+            series: $series,
+            details: []
+        );
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, object> $rows
+     */
+    private function buildThresholdHistoryPdf($rows): string
+    {
+        $details = [];
+        $changes = 0;
+        foreach ($rows as $row) {
+            $metadata = json_decode((string) ($row->metadata ?? '{}'), true);
+            $before = is_array($metadata['before'] ?? null) ? $metadata['before'] : [];
+            $after = is_array($metadata['after'] ?? null) ? $metadata['after'] : [];
+            $scopeType = (string) ($metadata['scope_type'] ?? '');
+            $scopeId = (string) ($metadata['scope_id'] ?? '');
+            $beforeThreshold = isset($before['threshold']) ? (string) ((float) $before['threshold']) : '-';
+            $afterThreshold = isset($after['threshold']) ? (string) ((float) $after['threshold']) : '-';
+            if ($beforeThreshold !== $afterThreshold) {
+                $changes++;
             }
-            $content .= sprintf("(%s) Tj\n", $escape($line));
-        }
-        $content .= "ET";
-
-        $objects = [];
-        $objects[] = "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n";
-        $objects[] = "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n";
-        $objects[] = "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj\n";
-        $objects[] = "4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n";
-        $objects[] = "5 0 obj<< /Length " . strlen($content) . " >>stream\n" . $content . "\nendstream endobj\n";
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-        foreach ($objects as $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= $object;
+            $details[] = sprintf(
+                '%s · %s:%s · %s → %s · %s',
+                (string) $row->created_at,
+                $scopeType,
+                $scopeId,
+                $beforeThreshold,
+                $afterThreshold,
+                (string) $row->event
+            );
         }
 
-        $xrefOffset = strlen($pdf);
-        $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
-        $pdf .= "0000000000 65535 f \n";
-        for ($i = 1; $i <= count($objects); $i++) {
-            $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]);
-        }
-        $pdf .= "trailer<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
-        $pdf .= "startxref\n" . $xrefOffset . "\n%%EOF";
-
-        return $pdf;
+        return BrandedPdfDocument::renderAnalyticsDocument(
+            title: 'Histórico de umbrales KPI',
+            subtitle: 'Trazabilidad de cambios y alertas de calidad',
+            summaryBoxes: [
+                ['label' => 'Filas', 'value' => (string) $rows->count()],
+                ['label' => 'Cambios reales', 'value' => (string) $changes],
+            ],
+            series: [],
+            details: $details
+        );
     }
 }

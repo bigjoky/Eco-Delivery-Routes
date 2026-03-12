@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ops;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Pdf\BrandedPdfDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -159,37 +160,55 @@ class DashboardController extends Controller
             subcontractorId: is_string($subcontractorId) && $subcontractorId !== '' ? $subcontractorId : null
         );
 
-        $label = sprintf(
-            'Dashboard %s to %s | Shipments %s | Routes %s | Incidents Open %s',
-            (string) ($payload['period']['from'] ?? ''),
-            (string) ($payload['period']['to'] ?? ''),
-            (string) ($payload['totals']['shipments'] ?? 0),
-            (string) ($payload['totals']['routes'] ?? 0),
-            (string) ($payload['totals']['incidents_open'] ?? 0)
-        );
+        $lines = [
+            sprintf('Periodo: %s a %s (%s)', (string) ($payload['period']['from'] ?? ''), (string) ($payload['period']['to'] ?? ''), (string) ($payload['period']['preset'] ?? 'custom')),
+            sprintf('Filtros: hub=%s | subcontrata=%s', (string) ($payload['filters']['hub_id'] ?? '-'), (string) ($payload['filters']['subcontractor_id'] ?? '-')),
+            '',
+            sprintf('Expediciones: %s', (string) ($payload['totals']['shipments'] ?? 0)),
+            sprintf('Rutas: %s', (string) ($payload['totals']['routes'] ?? 0)),
+            sprintf('Incidencias abiertas: %s', (string) ($payload['totals']['incidents_open'] ?? 0)),
+            sprintf('SLA vencidas: %s', (string) ($payload['sla']['overdue_count'] ?? 0)),
+            sprintf('Calidad media: %s%%', (string) ($payload['quality']['average_score'] ?? 0)),
+            '',
+            'Tendencia expediciones:',
+        ];
+        foreach (($payload['trends']['shipments'] ?? []) as $row) {
+            $lines[] = sprintf(
+                '%s | creadas=%s | entregadas=%s',
+                (string) ($row['date'] ?? '-'),
+                (string) ($row['created'] ?? 0),
+                (string) ($row['delivered'] ?? 0)
+            );
+        }
 
-        $safeLabel = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $label);
-        $stream = "BT /F1 12 Tf 50 780 Td (" . $safeLabel . ") Tj ET";
-        $len = strlen($stream);
-        $pdf = "%PDF-1.4\n"
-            . "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n"
-            . "2 0 obj << /Type /Pages /Count 1 /Kids [3 0 R] >> endobj\n"
-            . "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n"
-            . "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n"
-            . "5 0 obj << /Length $len >> stream\n"
-            . $stream . "\n"
-            . "endstream endobj\n"
-            . "xref\n0 6\n"
-            . "0000000000 65535 f \n"
-            . "0000000010 00000 n \n"
-            . "0000000060 00000 n \n"
-            . "0000000117 00000 n \n"
-            . "0000000243 00000 n \n"
-            . "0000000313 00000 n \n"
-            . "trailer << /Size 6 /Root 1 0 R >>\n"
-            . "startxref\n"
-            . "410\n"
-            . "%%EOF";
+        $lines[] = '';
+        $lines[] = 'Tendencia rutas:';
+        foreach (($payload['trends']['routes'] ?? []) as $row) {
+            $lines[] = sprintf(
+                '%s | planned=%s | in_progress=%s | completed=%s',
+                (string) ($row['date'] ?? '-'),
+                (string) ($row['planned'] ?? 0),
+                (string) ($row['in_progress'] ?? 0),
+                (string) ($row['completed'] ?? 0)
+            );
+        }
+
+        $lines[] = '';
+        $lines[] = 'Tendencia incidencias:';
+        foreach (($payload['trends']['incidents'] ?? []) as $row) {
+            $lines[] = sprintf(
+                '%s | abiertas=%s | resueltas=%s',
+                (string) ($row['date'] ?? '-'),
+                (string) ($row['open'] ?? 0),
+                (string) ($row['resolved'] ?? 0)
+            );
+        }
+
+        $pdf = BrandedPdfDocument::renderListDocument(
+            title: 'Dashboard operativo',
+            subtitle: 'Resumen corporativo de expediciones, rutas, incidencias y calidad',
+            lines: $lines
+        );
 
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
@@ -209,6 +228,12 @@ class DashboardController extends Controller
             ->where('scope_type', 'global')
             ->orderByDesc('updated_at')
             ->value('threshold') ?? 95);
+
+        $expeditionsWindow = DB::table('expeditions')
+            ->leftJoin('shipments', 'shipments.id', '=', 'expeditions.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'expeditions.pickup_id')
+            ->whereBetween(DB::raw('DATE(COALESCE(expeditions.scheduled_at, expeditions.created_at))'), [$from, $to]);
+        $this->applyExpeditionFilters($expeditionsWindow, $hubId, $subcontractorId);
 
         $shipmentsWindow = DB::table('shipments')
             ->whereBetween(DB::raw('DATE(COALESCE(scheduled_at, created_at))'), [$from, $to]);
@@ -306,11 +331,42 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
         $recentShipments = DB::table('shipments')
-            ->whereBetween(DB::raw('DATE(COALESCE(scheduled_at, created_at))'), [$from, $to])
-            ->when($hubId !== null, fn ($query) => $query->where('hub_id', $hubId))
-            ->when($subcontractorId !== null, fn ($query) => $query->where('subcontractor_id', $subcontractorId))
-            ->select('id', 'reference', 'external_reference', 'status', 'consignee_name', 'service_type')
-            ->orderByDesc('created_at')
+            ->leftJoin('expeditions', 'expeditions.shipment_id', '=', 'shipments.id')
+            ->whereBetween(DB::raw('DATE(COALESCE(shipments.scheduled_at, shipments.created_at))'), [$from, $to])
+            ->when($hubId !== null, fn ($query) => $query->where('shipments.hub_id', $hubId))
+            ->when($subcontractorId !== null, fn ($query) => $query->where('shipments.subcontractor_id', $subcontractorId))
+            ->select('shipments.id', 'shipments.reference', 'shipments.external_reference', 'shipments.status', 'shipments.consignee_name', 'shipments.service_type', 'expeditions.reference as expedition_reference')
+            ->orderByDesc('shipments.created_at')
+            ->limit(5)
+            ->get();
+        $recentExpeditions = DB::table('expeditions')
+            ->leftJoin('shipments', 'shipments.id', '=', 'expeditions.shipment_id')
+            ->leftJoin('pickups', 'pickups.id', '=', 'expeditions.pickup_id')
+            ->leftJoin('contacts as sender_contacts', 'sender_contacts.id', '=', 'expeditions.sender_contact_id')
+            ->leftJoin('contacts as recipient_contacts', 'recipient_contacts.id', '=', 'expeditions.recipient_contact_id')
+            ->whereBetween(DB::raw('DATE(COALESCE(expeditions.scheduled_at, expeditions.created_at))'), [$from, $to])
+            ->when($hubId !== null || $subcontractorId !== null, function ($query) use ($hubId, $subcontractorId): void {
+                $this->applyExpeditionFilters($query, $hubId, $subcontractorId);
+            })
+            ->select(
+                'expeditions.id',
+                'expeditions.reference',
+                'expeditions.external_reference',
+                'expeditions.operation_kind',
+                'expeditions.product_category',
+                'expeditions.service_type',
+                'expeditions.status',
+                'expeditions.hub_id',
+                'expeditions.shipment_id',
+                'expeditions.pickup_id',
+                'shipments.reference as shipment_reference',
+                'shipments.status as shipment_status',
+                'pickups.reference as pickup_reference',
+                'pickups.status as pickup_status',
+                DB::raw('COALESCE(sender_contacts.display_name, sender_contacts.legal_name) as sender_name'),
+                DB::raw('COALESCE(recipient_contacts.display_name, recipient_contacts.legal_name, shipments.consignee_name) as recipient_name')
+            )
+            ->orderByDesc('expeditions.created_at')
             ->limit(5)
             ->get();
         $recentIncidents = DB::table('incidents')
@@ -415,7 +471,12 @@ class DashboardController extends Controller
             ->values();
 
         $incidentsOpenCount = (clone $incidentsWindow)->whereNull('resolved_at')->count();
-        $shipmentsIncidentCount = (clone $shipmentsWindow)->where('status', 'incident')->count();
+        $expeditionsWithIncidentCount = (clone $expeditionsWindow)
+            ->where(function ($query): void {
+                $query->where('shipments.status', 'incident')
+                    ->orWhere('pickups.status', 'incident');
+            })
+            ->count();
         $plannedWithoutDriver = DB::table('routes')
             ->whereBetween('route_date', [$from, $to])
             ->where('status', 'planned')
@@ -444,12 +505,12 @@ class DashboardController extends Controller
                 'count' => $belowThresholdRoutes,
             ],
             [
-                'id' => 'shipments-with-incident',
+                'id' => 'expeditions-with-incident',
                 'severity' => 'medium',
-                'title' => 'Envíos en incidencia',
-                'message' => 'Envíos con estado incident en el periodo seleccionado.',
-                'href' => '/shipments?status=incident',
-                'count' => $shipmentsIncidentCount,
+                'title' => 'Expediciones con incidencia',
+                'message' => 'Expediciones con al menos una pata en incidencia en el periodo seleccionado.',
+                'href' => '/expeditions?leg_status=incident',
+                'count' => $expeditionsWithIncidentCount,
             ],
             [
                 'id' => 'planned-routes-without-driver',
@@ -468,7 +529,7 @@ class DashboardController extends Controller
                 'subcontractor_id' => $subcontractorId,
             ],
             'totals' => [
-                'shipments' => (clone $shipmentsWindow)->count(),
+                'shipments' => (clone $expeditionsWindow)->count(),
                 'routes' => (clone $routesWindow)->count(),
                 'incidents_open' => $incidentsOpenCount,
                 'quality_threshold' => $threshold,
@@ -490,6 +551,7 @@ class DashboardController extends Controller
             'recent' => [
                 'routes' => $recentRoutes,
                 'shipments' => $recentShipments,
+                'expeditions' => $recentExpeditions,
                 'incidents' => $recentIncidents,
             ],
             'productivity_by_hub' => $productivityByHub,
@@ -511,9 +573,11 @@ class DashboardController extends Controller
         for ($cursor = $start->copy(); $cursor->lessThanOrEqualTo($end); $cursor->addDay()) {
             $date = $cursor->toDateString();
 
-            $shipmentsQuery = DB::table('shipments')
-                ->whereDate(DB::raw('COALESCE(scheduled_at, created_at)'), $date);
-            $this->applyShipmentFilters($shipmentsQuery, $hubId, $subcontractorId);
+            $shipmentsQuery = DB::table('expeditions')
+                ->leftJoin('shipments', 'shipments.id', '=', 'expeditions.shipment_id')
+                ->leftJoin('pickups', 'pickups.id', '=', 'expeditions.pickup_id')
+                ->whereDate(DB::raw('COALESCE(expeditions.scheduled_at, expeditions.created_at)'), $date);
+            $this->applyExpeditionFilters($shipmentsQuery, $hubId, $subcontractorId);
 
             $routesQuery = DB::table('routes')->whereDate('route_date', $date);
             $this->applyRouteFilters($routesQuery, $hubId, $subcontractorId);
@@ -539,8 +603,11 @@ class DashboardController extends Controller
             $shipments[] = [
                 'date' => $date,
                 'total' => (clone $shipmentsQuery)->count(),
-                'delivered' => (clone $shipmentsQuery)->where('status', 'delivered')->count(),
-                'incident' => (clone $shipmentsQuery)->where('status', 'incident')->count(),
+                'delivered' => (clone $shipmentsQuery)->where('shipments.status', 'delivered')->count(),
+                'incident' => (clone $shipmentsQuery)->where(function ($query): void {
+                    $query->where('shipments.status', 'incident')
+                        ->orWhere('pickups.status', 'incident');
+                })->count(),
             ];
             $routes[] = [
                 'date' => $date,
@@ -573,6 +640,23 @@ class DashboardController extends Controller
         }
         if ($subcontractorId !== null) {
             $query->where('subcontractor_id', $subcontractorId);
+        }
+    }
+
+    private function applyExpeditionFilters($query, ?string $hubId, ?string $subcontractorId): void
+    {
+        if ($hubId !== null) {
+            $query->where(function ($inner) use ($hubId): void {
+                $inner->where('expeditions.hub_id', $hubId)
+                    ->orWhere('shipments.hub_id', $hubId)
+                    ->orWhere('pickups.hub_id', $hubId);
+            });
+        }
+        if ($subcontractorId !== null) {
+            $query->where(function ($inner) use ($subcontractorId): void {
+                $inner->where('shipments.subcontractor_id', $subcontractorId)
+                    ->orWhere('pickups.subcontractor_id', $subcontractorId);
+            });
         }
     }
 

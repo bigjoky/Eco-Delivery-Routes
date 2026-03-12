@@ -33,7 +33,6 @@ export function RoutesPage() {
   const [drivers, setDrivers] = useState<DriverSummary[]>([]);
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [createHubId, setCreateHubId] = useState('');
-  const [createCode, setCreateCode] = useState('');
   const [createRouteDate, setCreateRouteDate] = useState('');
   const [createSubcontractorId, setCreateSubcontractorId] = useState('');
   const [subcontractorFilter, setSubcontractorFilter] = useState('');
@@ -231,7 +230,6 @@ export function RoutesPage() {
   const createRoute = async () => {
     const nextErrors: string[] = [];
     if (!createHubId) nextErrors.push('Hub obligatorio.');
-    if (!createCode) nextErrors.push('Codigo obligatorio.');
     if (!createRouteDate) nextErrors.push('Fecha obligatoria.');
     const selectedDriver = createDriverId ? drivers.find((item) => item.id === createDriverId) : null;
     const selectedVehicle = createVehicleId ? vehicles.find((item) => item.id === createVehicleId) : null;
@@ -269,13 +267,11 @@ export function RoutesPage() {
     try {
       await apiClient.createRoute({
         hub_id: createHubId,
-        code: createCode,
         route_date: createRouteDate,
         subcontractor_id: createSubcontractorId || null,
         driver_id: createDriverId || null,
         vehicle_id: createVehicleId || null,
       });
-      setCreateCode('');
       setCreateSubcontractorId('');
       setCreateDriverId('');
       setCreateVehicleId('');
@@ -577,15 +573,6 @@ export function RoutesPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="create-route-code">Codigo</label>
-              <input
-                id="create-route-code"
-                value={createCode}
-                onChange={(event) => setCreateCode(event.target.value)}
-                placeholder="R-AGP-20260305-01"
-              />
-            </div>
-            <div>
               <label htmlFor="create-route-date">Fecha</label>
               <input
                 id="create-route-date"
@@ -632,6 +619,7 @@ export function RoutesPage() {
             <Button type="button" onClick={createRoute} disabled={creating}>
               {creating ? 'Creando...' : 'Crear ruta'}
             </Button>
+            <span className="helper">El código se genera automáticamente en formato `R-YYYYMMDD-HUB-###`.</span>
           </div>
           {createPreviewConflicts.length > 0 ? (
             <div className="helper error">{createPreviewConflicts.join(' ')}</div>

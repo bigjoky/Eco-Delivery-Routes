@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\Ops\AdvanceController;
+use App\Http\Controllers\Api\V1\Ops\AgencyController;
 use App\Http\Controllers\Api\V1\Ops\AddressSuggestionController;
 use App\Http\Controllers\Api\V1\Ops\ContactController;
 use App\Http\Controllers\Api\V1\Ops\DashboardController;
@@ -78,6 +79,8 @@ Route::prefix('v1')->group(function () {
             ->middleware('can:shipments.import');
         Route::get('shipments/{id}', [ShipmentController::class, 'show']);
         Route::post('shipments', [ShipmentController::class, 'store']);
+        Route::get('expeditions', [ExpeditionController::class, 'index']);
+        Route::get('expeditions/{id}', [ExpeditionController::class, 'show']);
         Route::post('expeditions', [ExpeditionController::class, 'store']);
         Route::patch('shipments/{id}', [ShipmentController::class, 'update']);
         Route::post('shipments/bulk-update/preview', [ShipmentController::class, 'bulkUpdatePreview']);
@@ -103,6 +106,11 @@ Route::prefix('v1')->group(function () {
         Route::patch('points/{id}', [PointController::class, 'update']);
         Route::delete('points/{id}', [PointController::class, 'destroy']);
         Route::post('points/{id}/restore', [PointController::class, 'restore']);
+        Route::get('agencies', [AgencyController::class, 'index']);
+        Route::post('agencies', [AgencyController::class, 'store']);
+        Route::patch('agencies/{id}', [AgencyController::class, 'update']);
+        Route::delete('agencies/{id}', [AgencyController::class, 'destroy']);
+        Route::post('agencies/{id}/restore', [AgencyController::class, 'restore']);
 
         Route::get('routes', [RouteController::class, 'index']);
         Route::get('routes/bulk-templates', [RouteBulkTemplateController::class, 'index']);
@@ -128,6 +136,7 @@ Route::prefix('v1')->group(function () {
         Route::get('routes/{id}/manifest/export.pdf', [RouteController::class, 'manifestExportPdf']);
 
         Route::get('pickups', [PickupController::class, 'index']);
+        Route::get('pickups/{id}', [PickupController::class, 'show']);
         Route::post('pickups', [PickupController::class, 'store']);
         Route::post('pickups/{id}/complete', [PickupController::class, 'complete']);
 

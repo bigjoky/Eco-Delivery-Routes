@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Modal } from '../../components/ui/modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DriverSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
+import { DriverSummary, ExpeditionSummary, PickupSummary, RouteManifest, RouteStopSummary, RouteSummary, ShipmentSummary, SubcontractorSummary, VehicleSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
@@ -20,6 +20,29 @@ function stopStatusHelp(status: string): string {
     completed: 'Finalizada y cerrada.',
   };
   return help[status] ?? status;
+}
+
+function routeStopTypeLabel(value: 'DELIVERY' | 'PICKUP') {
+  return value === 'PICKUP' ? 'Recogida' : 'Entrega';
+}
+
+function routeServiceTypeLabel(value?: string | null) {
+  if (!value) return '-';
+  const labels: Record<string, string> = {
+    express_1030: 'Express 10:30',
+    express_1400: 'Express 14:00',
+    express_1900: 'Express 19:00',
+    economy_parcel: 'Economy Parcel',
+    business_parcel: 'Business Parcel',
+    thermo_parcel: 'Thermo Parcel',
+  };
+  return labels[value] ?? value;
+}
+
+function routeOperationKindLabel(value?: 'shipment' | 'return' | null) {
+  if (value === 'return') return 'Devolución';
+  if (value === 'shipment') return 'Envío';
+  return '-';
 }
 
 type RouteBulkActionTemplate = {
@@ -49,6 +72,7 @@ export function RouteDetailPage() {
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [shipments, setShipments] = useState<ShipmentSummary[]>([]);
   const [pickups, setPickups] = useState<PickupSummary[]>([]);
+  const [expeditions, setExpeditions] = useState<ExpeditionSummary[]>([]);
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [subcontractorId, setSubcontractorId] = useState('');
   const [driverId, setDriverId] = useState('');
@@ -71,6 +95,9 @@ export function RouteDetailPage() {
   const [reorderingStops, setReorderingStops] = useState(false);
   const [bulkShipmentIds, setBulkShipmentIds] = useState<string[]>([]);
   const [bulkPickupIds, setBulkPickupIds] = useState<string[]>([]);
+  const [bulkExpeditionIds, setBulkExpeditionIds] = useState<string[]>([]);
+  const [expeditionQuery, setExpeditionQuery] = useState('');
+  const [showAdvancedLegSelectors, setShowAdvancedLegSelectors] = useState(false);
   const [bulkAdding, setBulkAdding] = useState(false);
   const [selectedStopIds, setSelectedStopIds] = useState<string[]>([]);
   const [bulkDeletingStops, setBulkDeletingStops] = useState(false);
@@ -131,6 +158,7 @@ export function RouteDetailPage() {
     apiClient.getSubcontractors({ limit: 100 }).then(setSubcontractors).catch(() => setSubcontractors([]));
     apiClient.getShipments({ perPage: 100, page: 1 }).then((result) => setShipments(result.data)).catch(() => setShipments([]));
     apiClient.getPickups({ status: 'planned', limit: 100 }).then(setPickups).catch(() => setPickups([]));
+    apiClient.getExpeditions({ limit: 100 }).then(setExpeditions).catch(() => setExpeditions([]));
     void refreshManifest(id);
     apiClient
       .getDrivers({ status: 'active', limit: 100 })
@@ -175,6 +203,17 @@ export function RouteDetailPage() {
     if (!pickupQuery) return true;
     const query = pickupQuery.toLowerCase();
     return item.reference.toLowerCase().includes(query) || item.id.toLowerCase().includes(query);
+  });
+  const filteredExpeditions = expeditions.filter((item) => {
+    if (!expeditionQuery) return true;
+    const query = expeditionQuery.toLowerCase();
+    return (
+      item.reference.toLowerCase().includes(query)
+      || (item.shipment_reference ?? '').toLowerCase().includes(query)
+      || (item.pickup_reference ?? '').toLowerCase().includes(query)
+      || (item.sender_name ?? '').toLowerCase().includes(query)
+      || (item.recipient_name ?? '').toLowerCase().includes(query)
+    );
   });
 
   const saveVehicleAssignment = async () => {
@@ -418,20 +457,22 @@ export function RouteDetailPage() {
 
   const bulkAddStops = async () => {
     if (!id) return;
-    if (bulkShipmentIds.length === 0 && bulkPickupIds.length === 0) {
-      setError('Selecciona al menos un envio o una recogida para carga masiva.');
+    if (bulkExpeditionIds.length === 0 && bulkShipmentIds.length === 0 && bulkPickupIds.length === 0) {
+      setError('Selecciona al menos una expedición o una pata operativa para carga masiva.');
       return;
     }
     setBulkAdding(true);
     setError('');
     try {
       const result = await apiClient.bulkAddRouteStops(id, {
+        expedition_ids: bulkExpeditionIds,
         shipment_ids: bulkShipmentIds,
         pickup_ids: bulkPickupIds,
         status: 'planned',
       });
       setStops(result.stops);
       appendOpsAudit('stops.bulk_add', `Agregadas ${result.created_count} paradas en lote.`);
+      setBulkExpeditionIds([]);
       setBulkShipmentIds([]);
       setBulkPickupIds([]);
       void refreshManifest(id);
@@ -730,6 +771,46 @@ export function RouteDetailPage() {
     });
     return suggestions;
   }, [route?.route_date, stops]);
+  const manifestStops = manifest?.stops ?? stops;
+  const manifestExpeditionCount = useMemo(
+    () => new Set(manifestStops.map((stop) => stop.expedition_reference).filter((value): value is string => Boolean(value))).size,
+    [manifestStops]
+  );
+  const manifestPickupLegs = useMemo(
+    () => manifestStops.filter((stop) => stop.stop_type === 'PICKUP').length,
+    [manifestStops]
+  );
+  const manifestDeliveryLegs = useMemo(
+    () => manifestStops.filter((stop) => stop.stop_type === 'DELIVERY').length,
+    [manifestStops]
+  );
+  const manifestGroupedByExpedition = useMemo(() => {
+    const grouped = new Map<string, {
+      expedition_reference: string;
+      operation_kind?: 'shipment' | 'return' | null;
+      product_category?: 'parcel' | 'thermo' | null;
+      pickup?: RouteStopSummary | null;
+      delivery?: RouteStopSummary | null;
+    }>();
+
+    manifestStops.forEach((stop) => {
+      const key = stop.expedition_reference ?? `standalone-${stop.id}`;
+      const current = grouped.get(key) ?? {
+        expedition_reference: stop.expedition_reference ?? 'Sin expedición',
+        operation_kind: stop.operation_kind,
+        product_category: stop.product_category,
+        pickup: null,
+        delivery: null,
+      };
+
+      if (stop.stop_type === 'PICKUP') current.pickup = stop;
+      if (stop.stop_type === 'DELIVERY') current.delivery = stop;
+
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values());
+  }, [manifestStops]);
 
   const applySuggestedEta = async () => {
     if (!id || stops.length === 0) return;
@@ -1089,8 +1170,9 @@ export function RouteDetailPage() {
               <span className="helper">Cargando...</span>
             ) : (
               <span className="helper">
-                Stops {manifest?.totals.stops ?? stops.length} | Deliveries {manifest?.totals.deliveries ?? 0}
-                {' | '}Pickups {manifest?.totals.pickups ?? 0} | Completed {manifest?.totals.completed ?? 0}
+                Expediciones {manifestExpeditionCount} | Patas {manifest?.totals.stops ?? stops.length}
+                {' | '}Entrega {manifestDeliveryLegs} | Recogida {manifestPickupLegs}
+                {' | '}Completadas {manifest?.totals.completed ?? 0}
               </span>
             )}
             <ExportActionsModal
@@ -1128,47 +1210,172 @@ export function RouteDetailPage() {
           </div>
           </div>
           <div className="modal-section">
-            <div className="modal-section-title">Carga masiva</div>
-          <div className="inline-actions">
-            <label htmlFor="bulk-shipment-ids">Envios</label>
-            <select
-              id="bulk-shipment-ids"
-              multiple
-              value={bulkShipmentIds}
-              onChange={(event) => {
-                const values = Array.from(event.target.selectedOptions).map((option) => option.value);
-                setBulkShipmentIds(values);
-              }}
-            >
-              {filteredShipments.map((shipment) => (
-                <option key={shipment.id} value={shipment.id}>
-                  {shipment.reference} ({shipment.status})
-                </option>
+            <div className="modal-section-title">Servicios asignados</div>
+            <div className="mobile-ops-list">
+              {manifestGroupedByExpedition.map((group) => (
+                <article key={`manifest-group-${group.expedition_reference}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <div>
+                      <strong>{group.expedition_reference}</strong>
+                      <div className="helper">{routeOperationKindLabel(group.operation_kind)} · {group.product_category === 'thermo' ? 'Thermo' : group.product_category === 'parcel' ? 'Paquetería' : '-'}</div>
+                    </div>
+                    <Badge variant="outline">{group.pickup && group.delivery ? 'Circuito completo' : 'Pata única'}</Badge>
+                  </div>
+                  <div className="mobile-ops-card-grid">
+                    <div><div className="kpi-label">Recogida</div><div>{group.pickup?.reference ?? '-'}</div></div>
+                    <div><div className="kpi-label">Entrega</div><div>{group.delivery?.reference ?? '-'}</div></div>
+                    <div><div className="kpi-label">Estado recogida</div><div>{group.pickup?.status ?? '-'}</div></div>
+                    <div><div className="kpi-label">Estado entrega</div><div>{group.delivery?.status ?? '-'}</div></div>
+                  </div>
+                </article>
               ))}
-            </select>
-            <label htmlFor="bulk-pickup-ids">Recogidas</label>
+            </div>
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sec.</TableHead>
+                    <TableHead>Servicio / pata</TableHead>
+                    <TableHead>Expedición</TableHead>
+                    <TableHead>Circuito</TableHead>
+                    <TableHead>Operación</TableHead>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Contraparte</TableHead>
+                    <TableHead>Dirección</TableHead>
+                    <TableHead>Ventana</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {manifestStops.map((stop) => (
+                    <TableRow key={`manifest-${stop.id}`}>
+                      <TableCell>{stop.sequence}</TableCell>
+                      <TableCell>
+                        <strong>{stop.reference ?? stop.entity_id}</strong>
+                        <div className="helper">{routeStopTypeLabel(stop.stop_type)} · {routeServiceTypeLabel(stop.service_type)}</div>
+                        <div className="helper">
+                          {stop.stop_type === 'PICKUP' ? 'Pata de recogida' : 'Pata de entrega'}
+                          {stop.linked_reference ? ` · Vinculado con ${stop.linked_reference}` : ''}
+                        </div>
+                      </TableCell>
+                      <TableCell>{stop.expedition_reference ?? '-'}</TableCell>
+                      <TableCell>
+                        <div>{stop.stop_type === 'PICKUP' ? 'Recogida -> Entrega' : 'Entrega <- Recogida'}</div>
+                        <div className="helper">{stop.linked_reference ?? '-'}</div>
+                      </TableCell>
+                      <TableCell>{routeOperationKindLabel(stop.operation_kind)}</TableCell>
+                      <TableCell>{stop.product_category === 'thermo' ? 'Thermo' : stop.product_category === 'parcel' ? 'Paquetería' : '-'}</TableCell>
+                      <TableCell>{stop.counterparty_name ?? '-'}</TableCell>
+                      <TableCell>{stop.address_line ?? '-'}</TableCell>
+                      <TableCell>
+                        <div>{stop.planned_at ? new Date(stop.planned_at).toLocaleString('es-ES') : '-'}</div>
+                        <div className="helper">{stop.completed_at ? `Comp. ${new Date(stop.completed_at).toLocaleString('es-ES')}` : 'Pendiente'}</div>
+                      </TableCell>
+                      <TableCell><Badge variant="secondary">{stop.status}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
+            <div className="mobile-ops-list">
+              {manifestStops.map((stop) => (
+                <article key={`manifest-mobile-${stop.id}`} className="mobile-ops-card">
+                  <div className="mobile-ops-card-header">
+                    <div>
+                      <strong>{stop.reference ?? stop.entity_id}</strong>
+                      <div className="helper">{routeStopTypeLabel(stop.stop_type)} · {routeServiceTypeLabel(stop.service_type)}</div>
+                      <div className="helper">
+                        {stop.stop_type === 'PICKUP' ? 'Pata de recogida' : 'Pata de entrega'}
+                        {stop.linked_reference ? ` · Vinculado con ${stop.linked_reference}` : ''}
+                      </div>
+                    </div>
+                    <Badge variant="secondary">{stop.status}</Badge>
+                  </div>
+                  <div className="mobile-ops-card-grid">
+                    <div><div className="kpi-label">Expedición</div><div>{stop.expedition_reference ?? '-'}</div></div>
+                    <div><div className="kpi-label">Circuito</div><div>{stop.linked_reference ?? '-'}</div></div>
+                    <div><div className="kpi-label">Operación</div><div>{routeOperationKindLabel(stop.operation_kind)}</div></div>
+                    <div><div className="kpi-label">Producto</div><div>{stop.product_category === 'thermo' ? 'Thermo' : stop.product_category === 'parcel' ? 'Paquetería' : '-'}</div></div>
+                    <div><div className="kpi-label">Contraparte</div><div>{stop.counterparty_name ?? '-'}</div></div>
+                    <div><div className="kpi-label">Dirección</div><div>{stop.address_line ?? '-'}</div></div>
+                    <div><div className="kpi-label">Ventana</div><div>{stop.planned_at ? new Date(stop.planned_at).toLocaleString('es-ES') : '-'}</div></div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="modal-section">
+            <div className="modal-section-title">Carga principal por expedición</div>
+          <div className="inline-actions">
+            <label htmlFor="bulk-expedition-ids">Expediciones</label>
+            <input
+              id="bulk-expedition-search"
+              value={expeditionQuery}
+              onChange={(event) => setExpeditionQuery(event.target.value)}
+              placeholder="Buscar expedición por referencia, contraparte o pata"
+            />
             <select
-              id="bulk-pickup-ids"
+              id="bulk-expedition-ids"
               multiple
-              value={bulkPickupIds}
+              value={bulkExpeditionIds}
               onChange={(event) => {
                 const values = Array.from(event.target.selectedOptions).map((option) => option.value);
-                setBulkPickupIds(values);
+                setBulkExpeditionIds(values);
               }}
             >
-              {filteredPickups.map((pickup) => (
-                <option key={pickup.id} value={pickup.id}>
-                  {pickup.reference} ({pickup.pickup_type})
+              {filteredExpeditions.map((expedition) => (
+                <option key={expedition.id} value={expedition.id}>
+                  {expedition.reference} · {routeOperationKindLabel(expedition.operation_kind)} · {expedition.pickup_reference ?? 'Sin recogida'} {'->'} {expedition.shipment_reference ?? 'Sin entrega'}
                 </option>
               ))}
             </select>
             <Button type="button" onClick={bulkAddStops} disabled={bulkAdding}>
               {bulkAdding ? 'Agregando...' : 'Agregar seleccionados'}
             </Button>
+            <Button type="button" variant="outline" onClick={() => setShowAdvancedLegSelectors((value) => !value)}>
+              {showAdvancedLegSelectors ? 'Ocultar ajustes por pata' : 'Ajustes avanzados'}
+            </Button>
           </div>
+          {showAdvancedLegSelectors ? (
+            <div className="inline-actions">
+              <label htmlFor="bulk-shipment-ids">Entregas sueltas</label>
+              <select
+                id="bulk-shipment-ids"
+                multiple
+                value={bulkShipmentIds}
+                onChange={(event) => {
+                  const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                  setBulkShipmentIds(values);
+                }}
+              >
+                {filteredShipments.map((shipment) => (
+                  <option key={shipment.id} value={shipment.id}>
+                    {shipment.reference} ({shipment.status})
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="bulk-pickup-ids">Recogidas sueltas</label>
+              <select
+                id="bulk-pickup-ids"
+                multiple
+                value={bulkPickupIds}
+                onChange={(event) => {
+                  const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                  setBulkPickupIds(values);
+                }}
+              >
+                {filteredPickups.map((pickup) => (
+                  <option key={pickup.id} value={pickup.id}>
+                    {pickup.reference} ({pickup.pickup_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          <div className="helper">La carga principal añade automáticamente recogida y entrega de cada expedición. Los selectores por pata quedan reservados para incidencias operativas o correcciones puntuales.</div>
           </div>
           <div className="modal-section">
-            <div className="modal-section-title">Alta individual y utilidades</div>
+            <div className="modal-section-title">Alta manual excepcional</div>
           <div className="inline-actions">
             <label htmlFor="stop-type">Tipo</label>
             <select id="stop-type" value={stopType} onChange={(event) => setStopType(event.target.value as 'DELIVERY' | 'PICKUP')}>
@@ -1183,20 +1390,20 @@ export function RouteDetailPage() {
               value={stopSequence}
               onChange={(event) => setStopSequence(Number(event.target.value) || 1)}
             />
-            <label htmlFor="stop-entity-id">{stopType === 'DELIVERY' ? 'Shipment ID' : 'Pickup ID'}</label>
+            <label htmlFor="stop-entity-id">{stopType === 'DELIVERY' ? 'Entrega' : 'Recogida'}</label>
             {stopType === 'DELIVERY' ? (
               <>
                 <input
                   id="stop-entity-search"
                   value={shipmentQuery}
                   onChange={(event) => setShipmentQuery(event.target.value)}
-                  placeholder="Buscar envio por referencia o ID"
+                  placeholder="Buscar entrega por referencia o ID"
                 />
                 <select id="stop-entity-id" value={selectedShipmentId} onChange={(event) => setSelectedShipmentId(event.target.value)}>
-                  <option value="">Selecciona envio</option>
+                  <option value="">Selecciona entrega</option>
                   {filteredShipments.map((shipment) => (
                     <option key={shipment.id} value={shipment.id}>
-                      {shipment.reference} ({shipment.status})
+                      {shipment.reference} · {shipment.consignee_name ?? 'Sin destinatario'} · {routeServiceTypeLabel(shipment.service_type)} · {shipment.status}
                     </option>
                   ))}
                 </select>
@@ -1213,14 +1420,14 @@ export function RouteDetailPage() {
                   <option value="">Selecciona recogida</option>
                   {filteredPickups.map((pickup) => (
                     <option key={pickup.id} value={pickup.id}>
-                      {pickup.reference} ({pickup.pickup_type})
+                      {pickup.reference} · {pickup.requester_name ?? 'Sin solicitante'} · {pickup.pickup_type === 'RETURN' ? 'Devolución' : 'Recogida'} · {pickup.expedition_reference ?? 'Sin expedición'}
                     </option>
                   ))}
                 </select>
               </>
             )}
             <Button type="button" onClick={createStop} disabled={savingStop}>
-              {savingStop ? 'Creando...' : 'Agregar parada'}
+              {savingStop ? 'Creando...' : 'Agregar parada manual'}
             </Button>
             {lastDeletedStop ? (
               <Button type="button" variant="outline" disabled={undoDeleting} onClick={undoDeleteStop}>
@@ -1231,6 +1438,7 @@ export function RouteDetailPage() {
               {recalculatingEta ? 'Recalculando ETA...' : 'Recalcular ETA'}
             </Button>
           </div>
+          <div className="helper">Este bloque queda para excepciones. La planificación normal debe entrar por expediciones completas.</div>
           </div>
           <div className="modal-section">
             <div className="modal-section-title">Selección y limpieza</div>

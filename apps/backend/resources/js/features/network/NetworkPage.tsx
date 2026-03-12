@@ -7,15 +7,16 @@ import { Input } from '../../components/ui/input';
 import { Modal } from '../../components/ui/modal';
 import { Select } from '../../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
-import { DepotSummary, HubSummary, PointSummary } from '../../core/api/types';
+import { AgencySummary, DepotSummary, HubSummary, PointSummary } from '../../core/api/types';
 import { apiClient } from '../../services/apiClient';
 
-type CreateType = '' | 'hub' | 'depot' | 'point';
+type CreateType = '' | 'hub' | 'depot' | 'point' | 'agency';
 
 export function NetworkPage() {
   const [hubs, setHubs] = useState<HubSummary[]>([]);
   const [depots, setDepots] = useState<DepotSummary[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
+  const [agencies, setAgencies] = useState<AgencySummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -34,6 +35,9 @@ export function NetworkPage() {
   const [editingPointId, setEditingPointId] = useState('');
   const [editingPointName, setEditingPointName] = useState('');
   const [editingPointCity, setEditingPointCity] = useState('');
+  const [editingAgencyId, setEditingAgencyId] = useState('');
+  const [editingAgencyName, setEditingAgencyName] = useState('');
+  const [editingAgencyCity, setEditingAgencyCity] = useState('');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<CreateType>('');
@@ -47,6 +51,18 @@ export function NetworkPage() {
   const [createPointDepotId, setCreatePointDepotId] = useState('');
   const [createPointName, setCreatePointName] = useState('');
   const [createPointCity, setCreatePointCity] = useState('');
+  const [createAgencyHubId, setCreateAgencyHubId] = useState('');
+  const [createAgencyName, setCreateAgencyName] = useState('');
+  const [createAgencyCity, setCreateAgencyCity] = useState('');
+  const [createAgencyTaxId, setCreateAgencyTaxId] = useState('');
+  const [createAddressLine, setCreateAddressLine] = useState('');
+  const [createPostalCode, setCreatePostalCode] = useState('');
+  const [createProvince, setCreateProvince] = useState('');
+  const [createContactName, setCreateContactName] = useState('');
+  const [createContactPhone, setCreateContactPhone] = useState('');
+  const [createContactEmail, setCreateContactEmail] = useState('');
+  const [createManagerName, setCreateManagerName] = useState('');
+  const [createNotes, setCreateNotes] = useState('');
 
   const activeHubs = useMemo(() => hubs.filter((item) => item.is_active), [hubs]);
   const depotsForPointHub = useMemo(() => depots.filter((item) => item.hub_id === createPointHubId), [depots, createPointHubId]);
@@ -56,16 +72,19 @@ export function NetworkPage() {
     setLoading(true);
     setError('');
     try {
-      const [hubRows, depotRows, pointRows] = await Promise.all([
+      const [hubRows, depotRows, pointRows, agencyRows] = await Promise.all([
         apiClient.getHubs({ onlyActive: false, includeDeleted }),
         apiClient.getDepots({ includeDeleted }),
         apiClient.getPoints({ includeDeleted }),
+        apiClient.getAgencies({ includeDeleted }),
       ]);
       setHubs(hubRows);
       setDepots(depotRows);
       setPoints(pointRows);
+      setAgencies(agencyRows);
       if (!createDepotHubId && hubRows[0]?.id) setCreateDepotHubId(hubRows[0].id);
       if (!createPointHubId && hubRows[0]?.id) setCreatePointHubId(hubRows[0].id);
+      if (!createAgencyHubId && hubRows[0]?.id) setCreateAgencyHubId(hubRows[0].id);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar red operativa.');
     } finally {
@@ -101,6 +120,17 @@ export function NetworkPage() {
     setCreateDepotCity('');
     setCreatePointName('');
     setCreatePointCity('');
+    setCreateAgencyName('');
+    setCreateAgencyCity('');
+    setCreateAgencyTaxId('');
+    setCreateAddressLine('');
+    setCreatePostalCode('');
+    setCreateProvince('');
+    setCreateContactName('');
+    setCreateContactPhone('');
+    setCreateContactEmail('');
+    setCreateManagerName('');
+    setCreateNotes('');
   };
 
   const openCreateWizard = (nextType: CreateType = '') => {
@@ -136,7 +166,18 @@ export function NetworkPage() {
           setError('Hub requiere nombre y ciudad.');
           return;
         }
-        await apiClient.createHub({ name: createHubName.trim(), city: createHubCity.trim() });
+        await apiClient.createHub({
+          name: createHubName.trim(),
+          city: createHubCity.trim(),
+          address_line: createAddressLine.trim() || null,
+          postal_code: createPostalCode.trim() || null,
+          province: createProvince.trim() || null,
+          contact_name: createContactName.trim() || null,
+          contact_phone: createContactPhone.trim() || null,
+          contact_email: createContactEmail.trim() || null,
+          manager_name: createManagerName.trim() || null,
+          notes: createNotes.trim() || null,
+        });
         setMessage('Hub creado.');
       } else if (createType === 'depot') {
         if (!createDepotHubId || !createDepotName.trim()) {
@@ -147,6 +188,14 @@ export function NetworkPage() {
           hub_id: createDepotHubId,
           name: createDepotName.trim(),
           city: createDepotCity.trim() || null,
+          address_line: createAddressLine.trim() || null,
+          postal_code: createPostalCode.trim() || null,
+          province: createProvince.trim() || null,
+          contact_name: createContactName.trim() || null,
+          contact_phone: createContactPhone.trim() || null,
+          contact_email: createContactEmail.trim() || null,
+          manager_name: createManagerName.trim() || null,
+          notes: createNotes.trim() || null,
         });
         setMessage('Depot creado.');
       } else if (createType === 'point') {
@@ -159,8 +208,37 @@ export function NetworkPage() {
           depot_id: createPointDepotId || null,
           name: createPointName.trim(),
           city: createPointCity.trim() || null,
+          address_line: createAddressLine.trim() || null,
+          postal_code: createPostalCode.trim() || null,
+          province: createProvince.trim() || null,
+          contact_name: createContactName.trim() || null,
+          contact_phone: createContactPhone.trim() || null,
+          contact_email: createContactEmail.trim() || null,
+          manager_name: createManagerName.trim() || null,
+          notes: createNotes.trim() || null,
         });
         setMessage('Punto creado.');
+      } else if (createType === 'agency') {
+        if (!createAgencyName.trim()) {
+          setError('Agencia requiere nombre.');
+          return;
+        }
+        await apiClient.createAgency({
+          hub_id: createAgencyHubId || null,
+          name: createAgencyName.trim(),
+          legal_name: createAgencyName.trim(),
+          tax_id: createAgencyTaxId.trim() || null,
+          city: createAgencyCity.trim() || null,
+          address_line: createAddressLine.trim() || null,
+          postal_code: createPostalCode.trim() || null,
+          province: createProvince.trim() || null,
+          contact_name: createContactName.trim() || null,
+          contact_phone: createContactPhone.trim() || null,
+          contact_email: createContactEmail.trim() || null,
+          manager_name: createManagerName.trim() || null,
+          notes: createNotes.trim() || null,
+        });
+        setMessage('Agencia creada.');
       } else {
         setError('Selecciona qué tipo de nodo deseas crear.');
         return;
@@ -191,6 +269,12 @@ export function NetworkPage() {
     setEditingPointId(item.id);
     setEditingPointName(item.name);
     setEditingPointCity(item.city ?? '');
+  };
+
+  const startEditAgency = (item: AgencySummary) => {
+    setEditingAgencyId(item.id);
+    setEditingAgencyName(item.name);
+    setEditingAgencyCity(item.city ?? '');
   };
 
   const saveHub = async () => {
@@ -232,6 +316,20 @@ export function NetworkPage() {
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'No se pudo actualizar punto.');
+    }
+  };
+
+  const saveAgency = async () => {
+    if (!editingAgencyId) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.updateAgency(editingAgencyId, { name: editingAgencyName.trim(), city: editingAgencyCity.trim() || null });
+      setEditingAgencyId('');
+      setMessage('Agencia actualizada.');
+      await load();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'No se pudo actualizar agencia.');
     }
   };
 
@@ -310,8 +408,92 @@ export function NetworkPage() {
     }
   };
 
+  const removeAgency = async (item: AgencySummary) => {
+    if (!window.confirm(`Archivar agencia ${item.code}?`)) return;
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.deleteAgency(item.id);
+      setMessage('Agencia archivada.');
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : 'No se pudo archivar agencia.');
+    }
+  };
+
+  const restoreAgency = async (item: AgencySummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.restoreAgency(item.id);
+      setMessage('Agencia restaurada.');
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'No se pudo restaurar agencia.');
+    }
+  };
+
+  const toggleHubActive = async (item: HubSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.updateHub(item.id, { is_active: !item.is_active });
+      setMessage(`Hub ${item.is_active ? 'desactivado' : 'activado'}.`);
+      await load();
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : 'No se pudo cambiar el estado del hub.');
+    }
+  };
+
+  const toggleDepotActive = async (item: DepotSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.updateDepot(item.id, { is_active: !item.is_active });
+      setMessage(`Depot ${item.is_active ? 'desactivado' : 'activado'}.`);
+      await load();
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : 'No se pudo cambiar el estado del depot.');
+    }
+  };
+
+  const togglePointActive = async (item: PointSummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.updatePoint(item.id, { is_active: !item.is_active });
+      setMessage(`Punto ${item.is_active ? 'desactivado' : 'activado'}.`);
+      await load();
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : 'No se pudo cambiar el estado del punto.');
+    }
+  };
+
+  const toggleAgencyActive = async (item: AgencySummary) => {
+    setError('');
+    setMessage('');
+    try {
+      await apiClient.updateAgency(item.id, { is_active: !item.is_active });
+      setMessage(`Agencia ${item.is_active ? 'desactivada' : 'activada'}.`);
+      await load();
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : 'No se pudo cambiar el estado de la agencia.');
+    }
+  };
+
   const hubCode = new Map(hubs.map((item) => [item.id, item.code]));
   const depotCode = new Map(depots.map((item) => [item.id, item.code]));
+  const filteredAgencies = useMemo(() => agencies.filter((item) => {
+    if (!includeDeleted && item.deleted_at) return false;
+    if (statusFilter === 'active' && !item.is_active) return false;
+    if (statusFilter === 'inactive' && item.is_active) return false;
+    if (hubFilter && item.hub_id !== hubFilter) return false;
+    if (normalizedQuery) {
+      const haystack = `${item.code} ${item.name} ${item.city ?? ''} ${item.tax_id ?? ''}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) return false;
+    }
+    return true;
+  }), [agencies, includeDeleted, statusFilter, hubFilter, normalizedQuery]);
   const filteredHubs = useMemo(() => hubs.filter((item) => {
     if (!includeDeleted && item.deleted_at) return false;
     if (statusFilter === 'active' && !item.is_active) return false;
@@ -384,6 +566,7 @@ export function NetworkPage() {
             <Button type="button" variant={createType === 'hub' ? 'secondary' : 'outline'} onClick={() => setCreateType('hub')}>Hub</Button>
             <Button type="button" variant={createType === 'depot' ? 'secondary' : 'outline'} onClick={() => setCreateType('depot')}>Depot</Button>
             <Button type="button" variant={createType === 'point' ? 'secondary' : 'outline'} onClick={() => setCreateType('point')}>Punto</Button>
+            <Button type="button" variant={createType === 'agency' ? 'secondary' : 'outline'} onClick={() => setCreateType('agency')}>Agencia</Button>
           </div>
           </div>
           {createType === 'hub' ? (
@@ -452,12 +635,77 @@ export function NetworkPage() {
             </div>
             </div>
           ) : null}
+          {createType === 'agency' ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 2 · Datos de la agencia</div>
+              <div className="form-row">
+                <div>
+                  <label htmlFor="create-node-agency-hub">Hub</label>
+                  <Select id="create-node-agency-hub" value={createAgencyHubId} onChange={(event) => setCreateAgencyHubId(event.target.value)}>
+                    <option value="">Sin hub principal</option>
+                    {activeHubs.map((item) => <option key={item.id} value={item.id}>{item.code} - {item.name}</option>)}
+                  </Select>
+                </div>
+                <div>
+                  <label htmlFor="create-node-agency-name">Nombre</label>
+                  <Input id="create-node-agency-name" value={createAgencyName} onChange={(event) => setCreateAgencyName(event.target.value)} placeholder="Agencia Costa Oeste" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-agency-tax">CIF</label>
+                  <Input id="create-node-agency-tax" value={createAgencyTaxId} onChange={(event) => setCreateAgencyTaxId(event.target.value)} placeholder="B12345678" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-agency-city">Ciudad</label>
+                  <Input id="create-node-agency-city" value={createAgencyCity} onChange={(event) => setCreateAgencyCity(event.target.value)} placeholder="Malaga" />
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {createType ? (
+            <div className="modal-section">
+              <div className="modal-section-title">Paso 3 · Dirección y contacto</div>
+              <div className="form-row">
+                <div>
+                  <label htmlFor="create-node-address-line">Dirección</label>
+                  <Input id="create-node-address-line" value={createAddressLine} onChange={(event) => setCreateAddressLine(event.target.value)} placeholder="Calle, número, nave..." />
+                </div>
+                <div>
+                  <label htmlFor="create-node-postal">CP</label>
+                  <Input id="create-node-postal" value={createPostalCode} onChange={(event) => setCreatePostalCode(event.target.value)} placeholder="29004" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-province">Provincia</label>
+                  <Input id="create-node-province" value={createProvince} onChange={(event) => setCreateProvince(event.target.value)} placeholder="Málaga" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-contact-name">Contacto</label>
+                  <Input id="create-node-contact-name" value={createContactName} onChange={(event) => setCreateContactName(event.target.value)} placeholder="Responsable operativo" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-contact-phone">Teléfono</label>
+                  <Input id="create-node-contact-phone" value={createContactPhone} onChange={(event) => setCreateContactPhone(event.target.value)} placeholder="+34 600 000 000" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-contact-email">Email</label>
+                  <Input id="create-node-contact-email" value={createContactEmail} onChange={(event) => setCreateContactEmail(event.target.value)} placeholder="operativa@eco.test" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-manager">Manager</label>
+                  <Input id="create-node-manager" value={createManagerName} onChange={(event) => setCreateManagerName(event.target.value)} placeholder="Nombre responsable" />
+                </div>
+                <div>
+                  <label htmlFor="create-node-notes">Notas</label>
+                  <Input id="create-node-notes" value={createNotes} onChange={(event) => setCreateNotes(event.target.value)} placeholder="Horario, acceso, observaciones" />
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </Modal>
 
       <div className="page-header">
         <h1 className="page-title">Red operativa</h1>
-        <div className="page-subtitle">Gestiona hubs, depots y puntos con numeración propia automática.</div>
+        <div className="page-subtitle">Gestiona hubs, depots, puntos y agencias con numeración propia automática y baja lógica.</div>
       </div>
 
       <div className="inline-actions">
@@ -467,7 +715,7 @@ export function NetworkPage() {
         </Button>
         <Button type="button" className="btn btn-outline" onClick={load} disabled={loading}>{loading ? 'Cargando...' : 'Recargar'}</Button>
         <span className="helper">
-          Hubs {filteredHubs.length}/{hubs.length} | Depots {filteredDepots.length}/{depots.length} | Puntos {filteredPoints.length}/{points.length}
+          Hubs {filteredHubs.length}/{hubs.length} | Depots {filteredDepots.length}/{depots.length} | Puntos {filteredPoints.length}/{points.length} | Agencias {filteredAgencies.length}/{agencies.length}
         </span>
         {hasActiveFilters ? (
           <Button type="button" variant="outline" onClick={resetFilters}>Reset filtros</Button>
@@ -485,6 +733,7 @@ export function NetworkPage() {
             <div className="kpi-item"><div className="kpi-label">Hubs</div><div className="kpi-value">{hubs.length}</div></div>
             <div className="kpi-item"><div className="kpi-label">Depots</div><div className="kpi-value">{depots.length}</div></div>
             <div className="kpi-item"><div className="kpi-label">Puntos</div><div className="kpi-value">{points.length}</div></div>
+            <div className="kpi-item"><div className="kpi-label">Agencias</div><div className="kpi-value">{agencies.length}</div></div>
           </div>
         </CardContent>
       </Card>
@@ -528,6 +777,101 @@ export function NetworkPage() {
       ) : null}
 
       <Card>
+        <CardHeader><CardTitle>Agencias</CardTitle></CardHeader>
+        <CardContent>
+          <TableWrapper className="desktop-table-only">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Hub</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Ciudad</TableHead>
+                  <TableHead>CIF</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAgencies.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.code}</TableCell>
+                    <TableCell>{item.hub_id ? (hubCode.get(item.hub_id) ?? item.hub_id) : '-'}</TableCell>
+                    <TableCell>{editingAgencyId === item.id ? <Input value={editingAgencyName} onChange={(event) => setEditingAgencyName(event.target.value)} /> : `${item.name}${item.deleted_at ? ' (Archivada)' : ''}`}</TableCell>
+                    <TableCell>{editingAgencyId === item.id ? <Input value={editingAgencyCity} onChange={(event) => setEditingAgencyCity(event.target.value)} /> : (item.city ?? '-')}</TableCell>
+                    <TableCell>{item.tax_id ?? '-'}</TableCell>
+                    <TableCell>
+                      <div className="inline-actions">
+                        {item.deleted_at
+                          ? <Button type="button" variant="outline" onClick={() => restoreAgency(item)}>Restaurar</Button>
+                          : (
+                            <>
+                              {editingAgencyId === item.id
+                                ? <Button type="button" variant="outline" onClick={saveAgency}>Guardar</Button>
+                                : <Button type="button" variant="outline" onClick={() => startEditAgency(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => toggleAgencyActive(item)}>
+                                {item.is_active ? 'Dar de baja' : 'Activar'}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => removeAgency(item)}>Archivar</Button>
+                            </>
+                          )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrapper>
+          <div className="mobile-ops-list">
+            {filteredAgencies.map((item) => (
+              <article key={`agency-mobile-${item.id}`} className="mobile-ops-card">
+                <div className="mobile-ops-card-header">
+                  <div>
+                    <strong>{item.code}</strong>
+                    <div className="helper">{item.name}</div>
+                  </div>
+                  <Badge variant="secondary">{item.deleted_at ? 'archivada' : (item.is_active ? 'activa' : 'inactiva')}</Badge>
+                </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Hub</div>
+                    <div>{item.hub_id ? (hubCode.get(item.hub_id) ?? item.hub_id) : '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">CIF</div>
+                    <div>{item.tax_id ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Ciudad</div>
+                    <div>{item.city ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Contacto</div>
+                    <div>{item.contact_name ?? item.contact_phone ?? '-'}</div>
+                  </div>
+                </div>
+                {(item.address_line || item.notes) ? (
+                  <div className="helper">{item.address_line ?? item.notes}</div>
+                ) : null}
+                <div className="mobile-ops-card-actions">
+                  {item.deleted_at ? (
+                    <Button type="button" variant="outline" onClick={() => restoreAgency(item)}>Restaurar</Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => startEditAgency(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => toggleAgencyActive(item)}>
+                        {item.is_active ? 'Dar de baja' : 'Activar'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => removeAgency(item)}>Archivar</Button>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Hubs</CardTitle></CardHeader>
         <CardContent>
           <TableWrapper className="desktop-table-only">
@@ -555,6 +899,9 @@ export function NetworkPage() {
                               {editingHubId === item.id
                                 ? <Button type="button" variant="outline" onClick={saveHub}>Guardar</Button>
                                 : <Button type="button" variant="outline" onClick={() => startEditHub(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => toggleHubActive(item)}>
+                                {item.is_active ? 'Dar de baja' : 'Activar'}
+                              </Button>
                               <Button type="button" variant="outline" onClick={() => removeHub(item)}>Archivar</Button>
                             </>
                           )}
@@ -576,6 +923,9 @@ export function NetworkPage() {
                   <Badge variant="secondary">{item.deleted_at ? 'archivado' : (item.is_active ? 'activo' : 'inactivo')}</Badge>
                 </div>
                 <div className="helper">{item.city ?? '-'}</div>
+                {(item.contact_name || item.contact_phone || item.address_line) ? (
+                  <div className="helper">{item.contact_name ?? item.contact_phone ?? item.address_line}</div>
+                ) : null}
                 <div className="mobile-ops-card-actions">
                   {item.deleted_at ? (
                     <Button type="button" variant="outline" onClick={() => restoreHub(item)}>Restaurar</Button>
@@ -583,6 +933,9 @@ export function NetworkPage() {
                     <>
                       <Button type="button" variant="outline" onClick={() => openCreateDepotFromHub(item.id)}>Nuevo depot</Button>
                       <Button type="button" variant="outline" onClick={() => startEditHub(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => toggleHubActive(item)}>
+                        {item.is_active ? 'Dar de baja' : 'Activar'}
+                      </Button>
                       <Button type="button" variant="outline" onClick={() => removeHub(item)}>Archivar</Button>
                     </>
                   )}
@@ -623,6 +976,9 @@ export function NetworkPage() {
                               {editingDepotId === item.id
                                 ? <Button type="button" variant="outline" onClick={saveDepot}>Guardar</Button>
                                 : <Button type="button" variant="outline" onClick={() => startEditDepot(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => toggleDepotActive(item)}>
+                                {item.is_active ? 'Dar de baja' : 'Activar'}
+                              </Button>
                               <Button type="button" variant="outline" onClick={() => removeDepot(item)}>Archivar</Button>
                             </>
                           )}
@@ -652,6 +1008,10 @@ export function NetworkPage() {
                     <div className="kpi-label">Ciudad</div>
                     <div>{item.city ?? '-'}</div>
                   </div>
+                  <div>
+                    <div className="kpi-label">Contacto</div>
+                    <div>{item.contact_name ?? item.contact_phone ?? '-'}</div>
+                  </div>
                 </div>
                 <div className="mobile-ops-card-actions">
                   {item.deleted_at ? (
@@ -660,6 +1020,9 @@ export function NetworkPage() {
                     <>
                       <Button type="button" variant="outline" onClick={() => openCreatePointFromDepot(item.hub_id, item.id)}>Nuevo punto</Button>
                       <Button type="button" variant="outline" onClick={() => startEditDepot(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => toggleDepotActive(item)}>
+                        {item.is_active ? 'Dar de baja' : 'Activar'}
+                      </Button>
                       <Button type="button" variant="outline" onClick={() => removeDepot(item)}>Archivar</Button>
                     </>
                   )}
@@ -702,6 +1065,9 @@ export function NetworkPage() {
                               {editingPointId === item.id
                                 ? <Button type="button" variant="outline" onClick={savePoint}>Guardar</Button>
                                 : <Button type="button" variant="outline" onClick={() => startEditPoint(item)}>Editar</Button>}
+                              <Button type="button" variant="outline" onClick={() => togglePointActive(item)}>
+                                {item.is_active ? 'Dar de baja' : 'Activar'}
+                              </Button>
                               <Button type="button" variant="outline" onClick={() => removePoint(item)}>Archivar</Button>
                             </>
                           )}
@@ -735,6 +1101,10 @@ export function NetworkPage() {
                     <div className="kpi-label">Ciudad</div>
                     <div>{item.city ?? '-'}</div>
                   </div>
+                  <div>
+                    <div className="kpi-label">Contacto</div>
+                    <div>{item.contact_name ?? item.contact_phone ?? '-'}</div>
+                  </div>
                 </div>
                 <div className="mobile-ops-card-actions">
                   {item.deleted_at ? (
@@ -742,6 +1112,9 @@ export function NetworkPage() {
                   ) : (
                     <>
                       <Button type="button" variant="outline" onClick={() => startEditPoint(item)}>Editar</Button>
+                      <Button type="button" variant="outline" onClick={() => togglePointActive(item)}>
+                        {item.is_active ? 'Dar de baja' : 'Activar'}
+                      </Button>
                       <Button type="button" variant="outline" onClick={() => removePoint(item)}>Archivar</Button>
                     </>
                   )}

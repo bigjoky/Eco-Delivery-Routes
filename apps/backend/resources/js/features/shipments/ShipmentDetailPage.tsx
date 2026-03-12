@@ -135,7 +135,7 @@ export function ShipmentDetailPage() {
           <div className="inline-actions">
             <Link to="/dashboard" className="helper">Dashboard</Link>
             <span className="helper">/</span>
-            <Link to="/shipments" className="btn btn-outline">Volver</Link>
+            <Link to="/expeditions" className="btn btn-outline">Volver</Link>
             {shipment?.route_id ? (
               <Link to={`/routes/${shipment.route_id}`} className="btn btn-outline">Ir a ruta</Link>
             ) : null}

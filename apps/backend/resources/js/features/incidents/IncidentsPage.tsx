@@ -45,11 +45,9 @@ function formatSlaTimeline(item: IncidentSummary): string {
   return `Vencida hace ${hours}h ${minutes}m`;
 }
 
-function getIncidentEntityHref(item: IncidentSummary): string | null {
-  if (item.incidentable_type === 'shipment') {
-    return `/shipments/${item.incidentable_id}`;
-  }
-  return null;
+function getIncidentEntityHref(item: IncidentSummary): string {
+  const reference = item.expedition_reference ?? item.shipment_reference ?? item.pickup_reference ?? item.incidentable_id;
+  return `/expeditions?q=${encodeURIComponent(reference)}`;
 }
 
 function getIncidentSlaPriority(item: IncidentSummary): number {
@@ -1293,13 +1291,15 @@ export function IncidentsPage() {
                       <Badge variant="outline">{item.incidentable_type}</Badge>
                     </TableCell>
                     <TableCell>
-                      {getIncidentEntityHref(item) ? (
-                        <Link to={getIncidentEntityHref(item) as string}>{item.incidentable_id}</Link>
-                      ) : item.incidentable_id}
+                      <Link to={getIncidentEntityHref(item)}>{item.incidentable_id}</Link>
                     </TableCell>
                     <TableCell>
-                      {item.shipment_reference ? (
-                        <Link to={`/shipments?q=${encodeURIComponent(item.shipment_reference)}`}>{item.shipment_reference}</Link>
+                      {item.expedition_reference ? (
+                        <Link to={`/expeditions?q=${encodeURIComponent(item.expedition_reference)}`}>{item.expedition_reference}</Link>
+                      ) : item.shipment_reference ? (
+                        <Link to={`/expeditions?q=${encodeURIComponent(item.shipment_reference)}`}>{item.shipment_reference}</Link>
+                      ) : item.pickup_reference ? (
+                        <Link to={`/expeditions?q=${encodeURIComponent(item.pickup_reference)}`}>{item.pickup_reference}</Link>
                       ) : '-'}
                     </TableCell>
                     <TableCell>{item.catalog_code}</TableCell>
@@ -1326,9 +1326,7 @@ export function IncidentsPage() {
                             <Button type="button" variant="outline" onClick={() => onEscalatePriority(item)}>Escalar alta</Button>
                           ) : null}
                           <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>Ajustar SLA</Button>
-                          {item.incidentable_type === 'shipment' ? (
-                            <Link to={`/shipments/${item.incidentable_id}`} className="btn btn-outline">Ver envío</Link>
-                          ) : null}
+                          <Link to={getIncidentEntityHref(item)} className="btn btn-outline">Ver expedición</Link>
                         </div>
                       )}
                     </TableCell>
@@ -1355,7 +1353,7 @@ export function IncidentsPage() {
                 <div className="mobile-ops-card-grid">
                   <div>
                     <div className="kpi-label">Referencia</div>
-                    <div>{item.shipment_reference ?? item.incidentable_id}</div>
+                    <div>{item.expedition_reference ?? item.shipment_reference ?? item.pickup_reference ?? item.incidentable_id}</div>
                   </div>
                   <div>
                     <div className="kpi-label">SLA</div>
@@ -1394,11 +1392,9 @@ export function IncidentsPage() {
                   <Button type="button" variant="outline" onClick={() => openSingleOverride(item)}>
                     Ajustar SLA
                   </Button>
-                  {item.incidentable_type === 'shipment' ? (
-                    <Link to={`/shipments/${item.incidentable_id}`} className="btn btn-outline">
-                      Ver envío
-                    </Link>
-                  ) : null}
+                  <Link to={getIncidentEntityHref(item)} className="btn btn-outline">
+                    Ver expedición
+                  </Link>
                 </div>
               </article>
             ))}

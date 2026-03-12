@@ -40,6 +40,19 @@ function shipmentStatusHelp(status: string): string {
   return help[status] ?? status;
 }
 
+function formatDateTimeLabel(value?: string | null) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function serviceTypeLabel(value?: string | null) {
   if (!value) return '-';
   const labels: Record<string, string> = {
@@ -163,15 +176,46 @@ export function ShipmentDetailPanel({
   error,
   onShipmentUpdated,
   onDetailUpdated,
+  onOpenLinkedPickup,
 }: {
   detail: ShipmentDetail | null;
   loading: boolean;
   error: string;
   onShipmentUpdated?: (shipment: ShipmentDetail['shipment']) => void;
   onDetailUpdated?: (detail: Partial<ShipmentDetail>) => void;
+  onOpenLinkedPickup?: (pickupId: string) => void;
 }) {
   const shipment = detail?.shipment;
   const senderContact = detail?.sender_contact ?? null;
+  const primaryRouteStop = detail?.route_stops?.[0] ?? null;
+  const expeditionTimeline = detail ? [
+    {
+      id: 'pickup-scheduled',
+      label: 'Recogida programada',
+      at: detail.linked_pickup?.scheduled_at,
+      detail: detail.linked_pickup?.reference ?? '',
+    },
+    {
+      id: 'pickup-completed',
+      label: 'Recogida completada',
+      at: detail.linked_pickup?.completed_at,
+      detail: detail.linked_pickup?.reference ?? '',
+    },
+    ...detail.tracking_events.map((event) => ({
+      id: event.id,
+      label: event.event_code,
+      at: event.occurred_at,
+      detail: event.status_to ?? shipment?.reference ?? '',
+    })),
+    {
+      id: 'delivery-completed',
+      label: 'Entrega completada',
+      at: detail.shipment.delivered_at,
+      detail: detail.shipment.reference,
+    },
+  ]
+    .filter((item) => item.at)
+    .sort((a, b) => Date.parse(a.at ?? '') - Date.parse(b.at ?? '')) : [];
   const [editingAddress, setEditingAddress] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
   const [addressError, setAddressError] = useState('');
@@ -751,15 +795,122 @@ export function ShipmentDetailPanel({
           Paradas
         </Button>
         {shipment?.route_id ? <Link to={`/routes/${shipment.route_id}`} className="btn btn-outline">Ir a ruta</Link> : null}
-        {shipment ? <Link to={`/shipments/${shipment.id}`} className="btn btn-outline">Abrir página completa</Link> : null}
+        {shipment ? <Link to={`/expeditions?shipment_id=${encodeURIComponent(shipment.id)}`} className="btn btn-outline">Abrir expedición</Link> : null}
         {loading ? <span className="helper">Cargando detalle...</span> : null}
         {error ? <span className="helper error">{error}</span> : null}
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Circuito de servicio</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {shipment ? (
+            <div className="stack-lg">
+              <div className="kpi-grid">
+                <div>
+                  <div className="helper">Expedición</div>
+                  <div>{detail?.expedition?.reference ?? shipment.expedition_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Ruta asociada</div>
+                  <div>{primaryRouteStop?.route_code ?? primaryRouteStop?.route_id ?? shipment.route_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Secuencia en ruta</div>
+                  <div>{primaryRouteStop?.sequence ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Operación</div>
+                  <div>{shipment.operation_kind === 'return' ? 'Devolución' : 'Envío'}</div>
+                </div>
+                <div>
+                  <div className="helper">Producto</div>
+                  <div>{shipment.product_category === 'thermo' ? 'Thermo' : 'Paquetería normal'}</div>
+                </div>
+                <div>
+                  <div className="helper">Servicio</div>
+                  <div>{serviceTypeLabel(shipment.service_type)}</div>
+                </div>
+              </div>
+              <div className="page-grid two">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="page-title">Pata de recogida</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="kpi-grid">
+                      <div>
+                        <div className="helper">Referencia</div>
+                        <div>{detail?.linked_pickup?.reference ?? 'Pendiente de vincular'}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Tipo</div>
+                        <div>{detail?.linked_pickup?.pickup_type === 'RETURN' ? 'Devolución' : detail?.linked_pickup?.pickup_type === 'NORMAL' ? 'Recogida' : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Estado</div>
+                        <div>{detail?.linked_pickup?.status ?? '-'}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Programada</div>
+                        <div>{formatDateTimeLabel(detail?.linked_pickup?.scheduled_at)}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Completada</div>
+                        <div>{formatDateTimeLabel(detail?.linked_pickup?.completed_at)}</div>
+                      </div>
+                    </div>
+                    {detail?.linked_pickup?.id && onOpenLinkedPickup ? (
+                      <div className="inline-actions">
+                        <Button type="button" variant="outline" onClick={() => onOpenLinkedPickup(detail.linked_pickup!.id)}>
+                          Abrir recogida
+                        </Button>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="page-title">Pata de entrega</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="kpi-grid">
+                      <div>
+                        <div className="helper">Referencia</div>
+                        <div>{shipment.reference}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Estado</div>
+                        <div>{shipment.status}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Hub</div>
+                        <div>{shipment.hub_code ?? shipment.hub_id ?? '-'}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Programada</div>
+                        <div>{formatDateTimeLabel(shipment.scheduled_at)}</div>
+                      </div>
+                      <div>
+                        <div className="helper">Completada</div>
+                        <div>{formatDateTimeLabel(shipment.delivered_at)}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            <div className="helper">{loading ? 'Cargando...' : 'No se pudo cargar el circuito del envio.'}</div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card id={shipmentDetailSectionIds.summary}>
         <CardHeader>
           <div className="inline-actions" style={{ justifyContent: 'space-between' }}>
-            <CardTitle className="page-title">Ficha del envio</CardTitle>
+            <CardTitle className="page-title">Datos del envío</CardTitle>
             {shipment ? (
               <Button type="button" variant="outline" onClick={() => {
                 setMetaError('');
@@ -814,8 +965,16 @@ export function ShipmentDetailPanel({
             ) : (
               <div className="kpi-grid">
                 <div>
+                  <div className="helper">Referencia</div>
+                  <div>{shipment.reference}</div>
+                </div>
+                <div>
                   <div className="helper">ID</div>
                   <div>{shipment.id}</div>
+                </div>
+                <div>
+                  <div className="helper">Referencia externa</div>
+                  <div>{shipment.external_reference ?? '-'}</div>
                 </div>
                 <div>
                   <div className="helper">Estado</div>
@@ -828,32 +987,24 @@ export function ShipmentDetailPanel({
                   <div>{serviceTypeLabel(shipment.service_type)}</div>
                 </div>
                 <div>
-                  <div className="helper">Operación</div>
-                  <div>{shipment.operation_kind === 'return' ? 'Devolución' : 'Envío'}</div>
-                </div>
-                <div>
-                  <div className="helper">Producto</div>
-                  <div>{shipment.product_category === 'thermo' ? 'Thermo' : 'Paquetería normal'}</div>
-                </div>
-                <div>
-                  <div className="helper">Hub</div>
-                  <div>{shipment.hub_code ?? shipment.hub_id ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="helper">Expedición</div>
-                  <div>{detail?.expedition?.reference ?? shipment.expedition_id ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="helper">Recogida enlazada</div>
-                  <div>{detail?.linked_pickup?.reference ?? '-'}</div>
-                </div>
-                <div>
                   <div className="helper">Destinatario</div>
                   <div>{shipment.consignee_name ?? '-'}</div>
                 </div>
                 <div>
                   <div className="helper">Direccion</div>
                   <div>{shipment.address_line ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Documento destinatario</div>
+                  <div>{shipment.consignee_document_id ?? detail?.recipient_contact?.document_id ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Telefono destinatario</div>
+                  <div>{shipment.consignee_phone ?? detail?.recipient_contact?.phone ?? '-'}</div>
+                </div>
+                <div>
+                  <div className="helper">Email destinatario</div>
+                  <div>{shipment.consignee_email ?? detail?.recipient_contact?.email ?? '-'}</div>
                 </div>
                 {shipment.product_category === 'thermo' ? (
                   <>
@@ -871,6 +1022,38 @@ export function ShipmentDetailPanel({
             )
           ) : (
             <div className="helper">{loading ? 'Cargando...' : 'No se pudo cargar el envio.'}</div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="page-title">Timeline de expedición</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {expeditionTimeline.length === 0 ? (
+            <div className="helper">Sin eventos operativos.</div>
+          ) : (
+            <TableWrapper>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Detalle</TableHead>
+                    <TableHead>Fecha</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expeditionTimeline.map((event) => (
+                    <TableRow key={event.id}>
+                      <TableCell>{event.label}</TableCell>
+                      <TableCell>{event.detail || '-'}</TableCell>
+                      <TableCell>{formatDateTimeLabel(event.at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrapper>
           )}
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
 import { Input } from '../../components/ui/input';
 import { Select } from '../../components/ui/select';
@@ -395,6 +395,9 @@ export function QualityPage() {
       <Card>
         <CardHeader>
           <CardTitle className="page-title">Calidad de Servicio</CardTitle>
+          <CardDescription>
+            Seguimiento de calidad centrado en expediciones y su ejecución por ruta, conductor y subcontrata.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="kpi-grid">

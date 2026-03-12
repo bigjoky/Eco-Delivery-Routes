@@ -1877,6 +1877,78 @@ paths:
       responses:
         '200': { description: OK }
 
+  /expeditions:
+    get:
+      tags: [Expeditions]
+      summary: Listado de expediciones
+      parameters:
+        - in: query
+          name: id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: shipment_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: pickup_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: operation_kind
+          schema: { type: string, enum: [shipment, return] }
+        - in: query
+          name: leg_status
+          schema: { type: string, enum: [planned, in_progress, completed, out_for_delivery, delivered, incident] }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 150 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpeditionSummary'
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Expeditions]
+      summary: Crear expedición completa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201': { description: Creada }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { description: Validation error }
+
+  /expeditions/{id}:
+    get:
+      tags: [Expeditions]
+      summary: Detalle de expedición
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpeditionDetailResponse'
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Expedición no encontrada }
+
   /shipments/bulk-update:
     post:
       tags: [Shipments]
@@ -2486,6 +2558,9 @@ paths:
             schema:
               type: object
               properties:
+                expedition_ids:
+                  type: array
+                  items: { type: string, format: uuid }
                 shipment_ids:
                   type: array
                   items: { type: string, format: uuid }
@@ -3596,6 +3671,129 @@ components:
                   status: { type: string }
                   planned_at: { type: string, format: date-time, nullable: true }
                   completed_at: { type: string, format: date-time, nullable: true }
+    ExpeditionSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reference: { type: string }
+        external_reference: { type: string, nullable: true }
+        operation_kind: { type: string, enum: [shipment, return] }
+        product_category: { type: string, enum: [parcel, thermo] }
+        service_type: { type: string, nullable: true }
+        status: { type: string }
+        hub_id: { type: string, format: uuid, nullable: true }
+        shipment_id: { type: string, format: uuid, nullable: true }
+        pickup_id: { type: string, format: uuid, nullable: true }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        shipment_reference: { type: string, nullable: true }
+        shipment_status: { type: string, nullable: true }
+        pickup_reference: { type: string, nullable: true }
+        pickup_status: { type: string, nullable: true }
+        sender_name: { type: string, nullable: true }
+        recipient_name: { type: string, nullable: true }
+    ExpeditionDetailResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            expedition:
+              $ref: '#/components/schemas/ExpeditionSummary'
+            shipment:
+              type: object
+              nullable: true
+              properties:
+                id: { type: string, format: uuid }
+                reference: { type: string, nullable: true }
+                status: { type: string, nullable: true }
+                service_type: { type: string, nullable: true }
+                consignee_name: { type: string, nullable: true }
+                address_line: { type: string, nullable: true }
+                scheduled_at: { type: string, format: date-time, nullable: true }
+                delivered_at: { type: string, format: date-time, nullable: true }
+            pickup:
+              type: object
+              nullable: true
+              properties:
+                id: { type: string, format: uuid }
+                reference: { type: string, nullable: true }
+                status: { type: string, nullable: true }
+                service_type: { type: string, nullable: true }
+                requester_name: { type: string, nullable: true }
+                address_line: { type: string, nullable: true }
+                pickup_type: { type: string, nullable: true }
+                scheduled_at: { type: string, format: date-time, nullable: true }
+                completed_at: { type: string, format: date-time, nullable: true }
+            sender_contact:
+              type: object
+              nullable: true
+              additionalProperties: true
+            recipient_contact:
+              type: object
+              nullable: true
+              additionalProperties: true
+            timeline:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  leg: { type: string, enum: [pickup, delivery] }
+                  label: { type: string }
+                  detail: { type: string, nullable: true }
+                  at: { type: string, format: date-time }
+            route_stops:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  route_id: { type: string, format: uuid }
+                  sequence: { type: integer }
+                  stop_type: { type: string, enum: [DELIVERY, PICKUP] }
+                  shipment_id: { type: string, format: uuid, nullable: true }
+                  pickup_id: { type: string, format: uuid, nullable: true }
+                  status: { type: string }
+                  planned_at: { type: string, format: date-time, nullable: true }
+                  completed_at: { type: string, format: date-time, nullable: true }
+                  entity_type: { type: string, enum: [shipment, pickup] }
+                  entity_id: { type: string, format: uuid, nullable: true }
+                  reference: { type: string, nullable: true }
+                  expedition_id: { type: string, format: uuid, nullable: true }
+                  expedition_reference: { type: string, nullable: true }
+                  operation_kind: { type: string, enum: [shipment, return], nullable: true }
+                  product_category: { type: string, enum: [parcel, thermo], nullable: true }
+                  service_type: { type: string, nullable: true }
+                  counterparty_name: { type: string, nullable: true }
+                  address_line: { type: string, nullable: true }
+                  linked_reference: { type: string, nullable: true }
+            incidents:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  incidentable_type: { type: string, enum: [shipment, pickup] }
+                  incidentable_id: { type: string, format: uuid }
+                  catalog_code: { type: string, nullable: true }
+                  category: { type: string, nullable: true }
+                  notes: { type: string, nullable: true }
+                  resolved_at: { type: string, format: date-time, nullable: true }
+                  created_at: { type: string, format: date-time, nullable: true }
+            pods:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  evidenceable_type: { type: string, enum: [shipment, pickup] }
+                  evidenceable_id: { type: string, format: uuid }
+                  signature_name: { type: string, nullable: true }
+                  photo_url: { type: string, nullable: true }
+                  geo_lat: { type: number, format: float, nullable: true }
+                  geo_lng: { type: number, format: float, nullable: true }
+                  captured_at: { type: string, format: date-time, nullable: true }
     CreateRouteRequest:
       type: object
       required: [hub_id, code, route_date]

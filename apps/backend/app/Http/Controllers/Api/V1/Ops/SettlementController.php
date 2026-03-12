@@ -6,6 +6,7 @@ use App\Application\Settlements\SettlementPreviewBuilder;
 use App\Domain\Settlements\SettlementStateMachine;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Pdf\BrandedPdfDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -167,24 +168,7 @@ class SettlementController extends Controller
             ->orderByDesc('lines_count')
             ->get();
 
-        $lines = [
-            'Eco Delivery Routes - Reconciliation Summary',
-            sprintf('Filters: period=%s subcontractor=%s hub=%s', (string) $request->query('period', '-'), (string) $request->query('subcontractor_id', '-'), (string) $request->query('hub_id', '-')),
-            '---',
-        ];
-        foreach ($rows as $row) {
-            $lines[] = sprintf(
-                '%s | lines=%d | excluded=%.2f EUR',
-                (string) $row->exclusion_code,
-                (int) $row->lines_count,
-                ((int) $row->excluded_amount_cents) / 100
-            );
-        }
-        if ($rows->isEmpty()) {
-            $lines[] = 'No data for current filters.';
-        }
-
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildReconciliationSummaryPdf($rows, $request), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="settlement_reconciliation_summary.pdf"',
         ]);
@@ -1025,20 +1009,7 @@ class SettlementController extends Controller
             ->whereRaw("json_extract(metadata, '$.settlement_id') = ?", [$id])
             ->count();
 
-        $lines = [
-            'Eco Delivery Routes - Settlement Report',
-            sprintf('Settlement ID: %s', $id),
-            sprintf('Subcontractor: %s', (string) ($settlement->subcontractor_name ?? $settlement->subcontractor_id)),
-            sprintf('Period: %s to %s', (string) $settlement->period_start, (string) $settlement->period_end),
-            sprintf('Gross: %.2f EUR', ((int) $settlement->gross_amount_cents) / 100),
-            sprintf('Advances: %.2f EUR', ((int) $settlement->advances_amount_cents) / 100),
-            sprintf('Adjustments: %.2f EUR', ((int) $settlement->adjustments_amount_cents) / 100),
-            sprintf('Net: %.2f EUR', ((int) $settlement->net_amount_cents) / 100),
-            sprintf('Quality KPI (subcontractor): %s', $quality ? $quality->service_quality_score . '%' : 'N/A'),
-            sprintf('Audit events linked: %d', $auditCount),
-        ];
-
-        $pdfContent = $this->buildSimplePdf($lines);
+        $pdfContent = $this->buildSettlementReportPdf($id, $settlement, $quality, $auditCount);
         $filename = sprintf('settlement_%s.pdf', $id);
 
         DB::transaction(function () use ($id, $actor): void {
@@ -1542,39 +1513,112 @@ class SettlementController extends Controller
      */
     private function buildSimplePdf(array $lines): string
     {
-        $escape = static fn (string $text): string => str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
-        $content = "BT\n/F1 12 Tf\n50 780 Td\n";
-        foreach ($lines as $i => $line) {
-            if ($i > 0) {
-                $content .= "0 -18 Td\n";
-            }
-            $content .= sprintf("(%s) Tj\n", $escape($line));
+        return BrandedPdfDocument::renderListDocument(
+            title: 'Liquidaciones y conciliación',
+            subtitle: 'Export corporativo de liquidaciones, anticipos y ajustes',
+            lines: $lines,
+            orientation: 'landscape'
+        );
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, object> $rows
+     */
+    private function buildReconciliationSummaryPdf($rows, Request $request): string
+    {
+        $totalLines = 0;
+        $totalExcluded = 0;
+        foreach ($rows as $row) {
+            $totalLines += (int) $row->lines_count;
+            $totalExcluded += (int) $row->excluded_amount_cents;
         }
-        $content .= "ET";
-
-        $objects = [];
-        $objects[] = "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n";
-        $objects[] = "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n";
-        $objects[] = "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj\n";
-        $objects[] = "4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n";
-        $objects[] = "5 0 obj<< /Length " . strlen($content) . " >>stream\n" . $content . "\nendstream endobj\n";
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-        foreach ($objects as $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= $object;
+        $series = [];
+        foreach ($rows as $row) {
+            $series[] = [
+                'label' => (string) $row->exclusion_code,
+                'value' => number_format(((int) $row->excluded_amount_cents) / 100, 2, ',', '.') . ' EUR',
+                'ratio' => $totalExcluded > 0 ? (((int) $row->excluded_amount_cents) / $totalExcluded) * 100 : 0,
+                'detail' => sprintf('%d líneas excluidas', (int) $row->lines_count),
+            ];
         }
 
-        $xrefOffset = strlen($pdf);
-        $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
-        $pdf .= "0000000000 65535 f \n";
-        for ($i = 1; $i <= count($objects); $i++) {
-            $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]);
-        }
-        $pdf .= "trailer<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
-        $pdf .= "startxref\n" . $xrefOffset . "\n%%EOF";
+        return BrandedPdfDocument::renderAnalyticsDocument(
+            title: 'Conciliación de liquidaciones',
+            subtitle: sprintf(
+                'Periodo %s · Subcontrata %s · Hub %s',
+                (string) $request->query('period', '-'),
+                (string) $request->query('subcontractor_id', '-'),
+                (string) $request->query('hub_id', '-')
+            ),
+            summaryBoxes: [
+                ['label' => 'Motivos', 'value' => (string) $rows->count()],
+                ['label' => 'Líneas excluidas', 'value' => (string) $totalLines],
+                ['label' => 'Importe excluido', 'value' => number_format($totalExcluded / 100, 2, ',', '.') . ' EUR'],
+            ],
+            series: $series,
+            details: $rows->isEmpty() ? ['No hay datos para los filtros seleccionados.'] : []
+        );
+    }
 
-        return $pdf;
+    private function buildSettlementReportPdf(string $id, object $settlement, ?object $quality, int $auditCount): string
+    {
+        $gross = ((int) $settlement->gross_amount_cents) / 100;
+        $advances = ((int) $settlement->advances_amount_cents) / 100;
+        $adjustments = ((int) $settlement->adjustments_amount_cents) / 100;
+        $net = ((int) $settlement->net_amount_cents) / 100;
+        $series = [
+            [
+                'label' => 'Bruto',
+                'value' => number_format($gross, 2, ',', '.') . ' EUR',
+                'ratio' => $gross > 0 ? 100 : 0,
+                'detail' => 'Base liquidable del periodo',
+                'color' => '0.13 0.23 0.54',
+            ],
+            [
+                'label' => 'Anticipos',
+                'value' => number_format($advances, 2, ',', '.') . ' EUR',
+                'ratio' => $gross > 0 ? ($advances / $gross) * 100 : 0,
+                'detail' => 'Descuentos aplicados',
+                'color' => '0.72 0.39 0.05',
+            ],
+            [
+                'label' => 'Ajustes',
+                'value' => number_format($adjustments, 2, ',', '.') . ' EUR',
+                'ratio' => $gross > 0 ? (abs($adjustments) / $gross) * 100 : 0,
+                'detail' => 'Ajustes manuales del periodo',
+                'color' => '0.35 0.41 0.47',
+            ],
+            [
+                'label' => 'Neto',
+                'value' => number_format($net, 2, ',', '.') . ' EUR',
+                'ratio' => $gross > 0 ? ($net / $gross) * 100 : 0,
+                'detail' => 'Importe final exportado',
+                'color' => '0.10 0.45 0.24',
+            ],
+        ];
+
+        $details = [
+            sprintf('Liquidación %s', $id),
+            sprintf('Subcontrata: %s', (string) ($settlement->subcontractor_name ?? $settlement->subcontractor_id)),
+            sprintf('Periodo: %s a %s', (string) $settlement->period_start, (string) $settlement->period_end),
+            sprintf('Estado: %s', (string) $settlement->status),
+            sprintf('KPI calidad subcontrata: %s', $quality ? number_format((float) $quality->service_quality_score, 2, ',', '.') . '%' : 'N/A'),
+            sprintf('Eventos de auditoría enlazados: %d', $auditCount),
+        ];
+
+        return BrandedPdfDocument::renderAnalyticsDocument(
+            title: 'Informe de liquidación',
+            subtitle: 'Resumen financiero corporativo por subcontrata',
+            summaryBoxes: [
+                ['label' => 'Liquidación', 'value' => mb_substr($id, 0, 12)],
+                ['label' => 'Subcontrata', 'value' => mb_substr((string) ($settlement->subcontractor_name ?? $settlement->subcontractor_id), 0, 22)],
+                ['label' => 'Periodo', 'value' => (string) $settlement->period_start],
+                ['label' => 'Estado', 'value' => (string) $settlement->status],
+                ['label' => 'KPI', 'value' => $quality ? number_format((float) $quality->service_quality_score, 2, ',', '.') . '%' : 'N/A'],
+                ['label' => 'Auditoría', 'value' => (string) $auditCount],
+            ],
+            series: $series,
+            details: $details
+        );
     }
 }

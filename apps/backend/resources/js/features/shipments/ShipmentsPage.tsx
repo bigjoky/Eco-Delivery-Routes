@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from '../../components/ui/table';
 import { Modal } from '../../components/ui/modal';
 import { ExportActionsModal } from '../../components/common/ExportActionsModal';
-import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PointSummary, ShipmentDetail, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
+import { AuditLogEntry, ContactSummary, DepotSummary, HubSummary, IncidentCatalogItem, PaginationMeta, PickupDetail, PointSummary, ShipmentDetail, ShipmentImportJob, ShipmentSummary } from '../../core/api/types';
 import { sessionStore } from '../../core/auth/sessionStore';
 import { hasExportAccess } from '../../core/auth/exportAccess';
 import { apiClient } from '../../services/apiClient';
@@ -53,6 +53,19 @@ function serviceTypeLabel(value?: string | null) {
     delivery: 'Delivery',
   };
   return labels[value] ?? value;
+}
+
+function toLocalDateTimeLabel(value?: string | null) {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 type ShipmentFiltersProps = {
@@ -477,6 +490,10 @@ export function ShipmentsPage() {
   const [shipmentDetailData, setShipmentDetailData] = useState<ShipmentDetail | null>(null);
   const [shipmentDetailLoading, setShipmentDetailLoading] = useState(false);
   const [shipmentDetailError, setShipmentDetailError] = useState('');
+  const [linkedPickupDetailOpen, setLinkedPickupDetailOpen] = useState(false);
+  const [linkedPickupDetail, setLinkedPickupDetail] = useState<PickupDetail | null>(null);
+  const [linkedPickupLoading, setLinkedPickupLoading] = useState(false);
+  const [linkedPickupError, setLinkedPickupError] = useState('');
   const [roles, setRoles] = useState(sessionStore.getRoles());
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
@@ -1715,6 +1732,21 @@ export function ShipmentsPage() {
       setShipmentDetailError(exception instanceof Error ? exception.message : 'No se pudo cargar el envío');
     } finally {
       setShipmentDetailLoading(false);
+    }
+  };
+
+  const openLinkedPickupDetail = async (pickupId: string) => {
+    setLinkedPickupDetailOpen(true);
+    setLinkedPickupDetail(null);
+    setLinkedPickupLoading(true);
+    setLinkedPickupError('');
+    try {
+      const detail = await apiClient.getPickupDetail(pickupId);
+      setLinkedPickupDetail(detail);
+    } catch (exception) {
+      setLinkedPickupError(exception instanceof Error ? exception.message : 'No se pudo cargar la recogida vinculada');
+    } finally {
+      setLinkedPickupLoading(false);
     }
   };
 
@@ -3477,6 +3509,9 @@ export function ShipmentsPage() {
           detail={shipmentDetailData}
           loading={shipmentDetailLoading}
           error={shipmentDetailError}
+          onOpenLinkedPickup={(pickupId) => {
+            void openLinkedPickupDetail(pickupId);
+          }}
           onShipmentUpdated={(updatedShipment) => {
             setShipmentDetailData((current) => (
               current ? { ...current, shipment: { ...current.shipment, ...updatedShipment } } : current
@@ -3489,9 +3524,79 @@ export function ShipmentsPage() {
         />
         {shipmentDetailId ? (
           <div className="inline-actions ops-toolbar">
-            <Link to={`/shipments/${shipmentDetailId}`} className="btn btn-outline" onClick={() => setShipmentDetailOpen(false)}>
-              Abrir página completa
+            <Link to={`/expeditions?shipment_id=${encodeURIComponent(shipmentDetailId)}`} className="btn btn-outline" onClick={() => setShipmentDetailOpen(false)}>
+              Abrir expedición
             </Link>
+          </div>
+        ) : null}
+      </Modal>
+      <Modal
+        open={linkedPickupDetailOpen}
+        onClose={() => {
+          setLinkedPickupDetailOpen(false);
+          setLinkedPickupDetail(null);
+          setLinkedPickupError('');
+        }}
+        title={linkedPickupDetail?.pickup.reference ? `Recogida vinculada · ${linkedPickupDetail.pickup.reference}` : 'Recogida vinculada'}
+        size="xl"
+      >
+        {linkedPickupLoading ? <div className="helper">Cargando recogida...</div> : null}
+        {linkedPickupError ? <div className="helper error">{linkedPickupError}</div> : null}
+        {!linkedPickupLoading && !linkedPickupError && linkedPickupDetail ? (
+          <div className="stack-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle className="page-title">Circuito de recogida</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="kpi-grid">
+                  <div><div className="helper">Expedición</div><div>{linkedPickupDetail.expedition?.reference ?? '-'}</div></div>
+                  <div><div className="helper">Envío enlazado</div><div>{linkedPickupDetail.linked_shipment?.reference ?? '-'}</div></div>
+                  <div><div className="helper">Tipo</div><div>{linkedPickupDetail.pickup.pickup_type === 'RETURN' ? 'Devolución' : 'Recogida'}</div></div>
+                  <div><div className="helper">Estado</div><div>{linkedPickupDetail.pickup.status}</div></div>
+                  <div><div className="helper">Programada</div><div>{toLocalDateTimeLabel(linkedPickupDetail.pickup.scheduled_at)}</div></div>
+                  <div><div className="helper">Completada</div><div>{toLocalDateTimeLabel(linkedPickupDetail.pickup.completed_at)}</div></div>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="page-grid two">
+              <Card>
+                <CardHeader><CardTitle className="page-title">Datos de recogida</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="kpi-grid">
+                    <div><div className="helper">Solicitante</div><div>{linkedPickupDetail.pickup.requester_name ?? '-'}</div></div>
+                    <div><div className="helper">Dirección</div><div>{linkedPickupDetail.pickup.address_line ?? '-'}</div></div>
+                    <div><div className="helper">Servicio</div><div>{serviceTypeLabel(linkedPickupDetail.pickup.service_type ?? linkedPickupDetail.expedition?.service_type)}</div></div>
+                    <div><div className="helper">Producto</div><div>{linkedPickupDetail.expedition?.product_category === 'thermo' ? 'Thermo' : 'Paquetería normal'}</div></div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="page-title">Rutas asociadas</CardTitle></CardHeader>
+                <CardContent>
+                  {linkedPickupDetail.route_stops.length === 0 ? (
+                    <div className="helper">No asignada a ruta.</div>
+                  ) : (
+                    <TableWrapper>
+                      <Table>
+                        <TableHeader>
+                          <TableRow><TableHead>Ruta</TableHead><TableHead>Secuencia</TableHead><TableHead>Estado</TableHead></TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {linkedPickupDetail.route_stops.map((stop) => (
+                            <TableRow key={stop.id}>
+                              <TableCell>{stop.route_code ?? stop.route_id}</TableCell>
+                              <TableCell>{stop.sequence}</TableCell>
+                              <TableCell>{stop.status}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableWrapper>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         ) : null}
       </Modal>

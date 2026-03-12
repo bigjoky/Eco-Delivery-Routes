@@ -1,6 +1,7 @@
 import {
   AuditLogEntry,
   AdvanceSummary,
+  AgencySummary,
   CurrentUserProfile,
   DepotSummary,
   HubSummary,
@@ -51,8 +52,10 @@ import {
   AddressSuggestion,
   ShipmentSummary,
   ExpeditionSummary,
+  ExpeditionDetail,
   ShipmentDetail,
   PickupSummary,
+  PickupDetail,
   TariffSummary,
   UserSummary,
   DriverRouteMeResponse,
@@ -534,9 +537,20 @@ export const apiClient = {
   },
 
   async createHub(payload: {
-    code?: string;
     name: string;
     city: string;
+    address_line?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<HubSummary> {
     if (USE_MOCK) return mockApi.createHub(payload) as Promise<HubSummary>;
@@ -551,9 +565,20 @@ export const apiClient = {
   },
 
   async updateHub(id: string, payload: {
-    code?: string;
     name?: string;
     city?: string;
+    address_line?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<HubSummary> {
     if (USE_MOCK) return mockApi.updateHub(id, payload) as Promise<HubSummary>;
@@ -599,10 +624,20 @@ export const apiClient = {
 
   async createDepot(payload: {
     hub_id: string;
-    code?: string;
     name: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<DepotSummary> {
     if (USE_MOCK) return mockApi.createDepot(payload) as Promise<DepotSummary>;
@@ -617,10 +652,20 @@ export const apiClient = {
   },
 
   async updateDepot(id: string, payload: {
-    code?: string;
     name?: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<DepotSummary> {
     if (USE_MOCK) return mockApi.updateDepot(id, payload) as Promise<DepotSummary>;
@@ -668,10 +713,20 @@ export const apiClient = {
   async createPoint(payload: {
     hub_id: string;
     depot_id?: string | null;
-    code?: string;
     name: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<PointSummary> {
     if (USE_MOCK) return mockApi.createPoint(payload) as Promise<PointSummary>;
@@ -686,10 +741,22 @@ export const apiClient = {
   },
 
   async updatePoint(id: string, payload: {
-    code?: string;
+    hub_id?: string;
+    depot_id?: string | null;
     name?: string;
     address_line?: string | null;
     city?: string | null;
+    postal_code?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    opening_hours?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
     is_active?: boolean;
   }): Promise<PointSummary> {
     if (USE_MOCK) return mockApi.updatePoint(id, payload) as Promise<PointSummary>;
@@ -721,6 +788,92 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot restore point');
     return json.data as PointSummary;
+  },
+
+  async getAgencies(filters: { hubId?: string; includeDeleted?: boolean } = {}): Promise<AgencySummary[]> {
+    if (USE_MOCK) return mockApi.getAgencies(filters) as Promise<AgencySummary[]>;
+    const params = new URLSearchParams();
+    if (filters.hubId) params.set('hub_id', filters.hubId);
+    if (filters.includeDeleted !== undefined) params.set('include_deleted', filters.includeDeleted ? '1' : '0');
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/agencies${suffix}`);
+    return parseData<AgencySummary>(response);
+  },
+
+  async createAgency(payload: {
+    hub_id?: string | null;
+    name: string;
+    legal_name?: string | null;
+    tax_id?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
+    is_active?: boolean;
+  }): Promise<AgencySummary> {
+    if (USE_MOCK) return mockApi.createAgency(payload) as Promise<AgencySummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/agencies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot create agency');
+    return json.data as AgencySummary;
+  },
+
+  async updateAgency(id: string, payload: {
+    hub_id?: string | null;
+    name?: string;
+    legal_name?: string | null;
+    tax_id?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    contact_name?: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
+    manager_name?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    notes?: string | null;
+    is_active?: boolean;
+  }): Promise<AgencySummary> {
+    if (USE_MOCK) return mockApi.updateAgency(id, payload) as Promise<AgencySummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/agencies/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot update agency');
+    return json.data as AgencySummary;
+  },
+
+  async deleteAgency(id: string): Promise<{ id: string; deleted: boolean }> {
+    if (USE_MOCK) return mockApi.deleteAgency(id) as Promise<{ id: string; deleted: boolean }>;
+    const response = await authorizedFetch(`${API_BASE_URL}/agencies/${id}`, { method: 'DELETE' });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot delete agency');
+    return json.data as { id: string; deleted: boolean };
+  },
+
+  async restoreAgency(id: string): Promise<AgencySummary> {
+    if (USE_MOCK) return mockApi.restoreAgency(id) as Promise<AgencySummary>;
+    const response = await authorizedFetch(`${API_BASE_URL}/agencies/${id}/restore`, { method: 'POST' });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json?.error?.message ?? 'Cannot restore agency');
+    return json.data as AgencySummary;
   },
 
   async getShipments(filters: {
@@ -989,6 +1142,39 @@ export const apiClient = {
     const json = await response.json();
     if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot create expedition'));
     return json.data as { expedition: ExpeditionSummary; shipment: ShipmentSummary; pickup: PickupSummary };
+  },
+
+  async getExpeditions(filters: {
+    id?: string;
+    shipmentId?: string;
+    pickupId?: string;
+    status?: string;
+    operationKind?: 'shipment' | 'return';
+    legStatus?: string;
+    q?: string;
+    limit?: number;
+  } = {}): Promise<ExpeditionSummary[]> {
+    if (USE_MOCK) return mockApi.getExpeditions(filters) as Promise<ExpeditionSummary[]>;
+    const params = new URLSearchParams();
+    if (filters.id) params.set('id', filters.id);
+    if (filters.shipmentId) params.set('shipment_id', filters.shipmentId);
+    if (filters.pickupId) params.set('pickup_id', filters.pickupId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.operationKind) params.set('operation_kind', filters.operationKind);
+    if (filters.legStatus) params.set('leg_status', filters.legStatus);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/expeditions${suffix}`);
+    return parseData<ExpeditionSummary>(response);
+  },
+
+  async getExpeditionDetail(id: string): Promise<ExpeditionDetail> {
+    if (USE_MOCK) return mockApi.getExpeditionDetail(id) as Promise<ExpeditionDetail>;
+    const response = await authorizedFetch(`${API_BASE_URL}/expeditions/${id}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot load expedition detail'));
+    return json.data as ExpeditionDetail;
   },
 
   async updateShipment(id: string, payload: {
@@ -1265,18 +1451,41 @@ export const apiClient = {
     return parsePaginatedData<ShipmentImportJob>(response);
   },
 
-  async getPickups(filters: { status?: string; limit?: number } = {}): Promise<PickupSummary[]> {
+  async getPickups(filters: { status?: string; q?: string; limit?: number } = {}): Promise<PickupSummary[]> {
     if (USE_MOCK) return mockApi.getPickups(filters) as Promise<PickupSummary[]>;
-    const response = await authorizedFetch(`${API_BASE_URL}/pickups`);
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await authorizedFetch(`${API_BASE_URL}/pickups${suffix}`);
     const rows = await parseData<PickupSummary>(response);
     let filtered = rows;
     if (filters.status) {
       filtered = filtered.filter((row) => row.status === filters.status);
     }
+    if (filters.q) {
+      const query = filters.q.toLowerCase();
+      filtered = filtered.filter((row) => (
+        row.reference.toLowerCase().includes(query)
+        || (row.external_reference ?? '').toLowerCase().includes(query)
+        || (row.requester_name ?? '').toLowerCase().includes(query)
+        || (row.expedition_reference ?? '').toLowerCase().includes(query)
+        || (row.shipment_reference ?? '').toLowerCase().includes(query)
+      ));
+    }
     if (filters.limit) {
       filtered = filtered.slice(0, Math.max(1, filters.limit));
     }
     return filtered;
+  },
+
+  async getPickupDetail(id: string): Promise<PickupDetail> {
+    if (USE_MOCK) return mockApi.getPickupDetail(id) as Promise<PickupDetail>;
+    const response = await authorizedFetch(`${API_BASE_URL}/pickups/${id}`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(readApiErrorMessage(json, 'Cannot load pickup detail'));
+    return json.data as PickupDetail;
   },
 
   async createPickup(payload: {
@@ -1427,7 +1636,6 @@ export const apiClient = {
 
   async createRoute(payload: {
     hub_id: string;
-    code: string;
     route_date: string;
     subcontractor_id?: string | null;
     driver_id?: string | null;
@@ -1570,6 +1778,7 @@ export const apiClient = {
   },
 
   async bulkAddRouteStops(routeId: string, payload: {
+    expedition_ids?: string[];
     shipment_ids?: string[];
     pickup_ids?: string[];
     status?: 'planned' | 'in_progress' | 'completed';
@@ -3159,8 +3368,22 @@ export const apiClient = {
   async createSubcontractor(payload: {
     legal_name: string;
     tax_id: string;
+    trade_name?: string;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
+    contact_name?: string;
+    phone?: string;
+    email?: string;
+    billing_email?: string;
+    address_line?: string;
+    postal_code?: string;
+    city?: string;
+    province?: string;
+    country?: string;
+    iban?: string;
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string;
   }): Promise<SubcontractorSummary> {
     if (USE_MOCK) return mockApi.createSubcontractor(payload) as Promise<SubcontractorSummary>;
     const response = await authorizedFetch(`${API_BASE_URL}/subcontractors`, {
@@ -3175,9 +3398,23 @@ export const apiClient = {
 
   async updateSubcontractor(id: string, payload: {
     legal_name?: string;
+    trade_name?: string | null;
     tax_id?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     payment_terms?: string;
+    contact_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    billing_email?: string | null;
+    address_line?: string | null;
+    postal_code?: string | null;
+    city?: string | null;
+    province?: string | null;
+    country?: string | null;
+    iban?: string | null;
+    contract_start?: string | null;
+    contract_end?: string | null;
+    notes?: string | null;
   }): Promise<SubcontractorSummary> {
     if (USE_MOCK) return mockApi.updateSubcontractor(id, payload) as Promise<SubcontractorSummary>;
     const response = await authorizedFetch(`${API_BASE_URL}/subcontractors/${id}`, {
@@ -3236,6 +3473,10 @@ export const apiClient = {
     code: string;
     dni: string;
     name: string;
+    phone?: string;
+    email?: string;
+    license_number?: string;
+    license_expires_at?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string;
@@ -3256,6 +3497,10 @@ export const apiClient = {
   async updateDriver(id: string, payload: {
     name?: string;
     dni?: string;
+    phone?: string | null;
+    email?: string | null;
+    license_number?: string | null;
+    license_expires_at?: string | null;
     status?: 'active' | 'inactive' | 'suspended';
     employment_type?: 'employee' | 'subcontractor';
     user_id?: string | null;
@@ -3319,7 +3564,17 @@ export const apiClient = {
     code: string;
     plate_number?: string;
     vehicle_type?: string;
+    brand?: string;
+    model?: string;
+    fuel_type?: string;
+    ownership_type?: string;
     capacity_kg?: number;
+    volume_m3?: number;
+    is_refrigerated?: boolean;
+    thermo_cert_expires_at?: string | null;
+    insurance_expires_at?: string | null;
+    itv_expires_at?: string | null;
+    notes?: string;
     status?: 'active' | 'inactive' | 'maintenance';
     subcontractor_id?: string;
     home_hub_id?: string;
@@ -3339,7 +3594,17 @@ export const apiClient = {
   async updateVehicle(id: string, payload: {
     plate_number?: string | null;
     vehicle_type?: string;
+    brand?: string | null;
+    model?: string | null;
+    fuel_type?: string | null;
+    ownership_type?: string | null;
     capacity_kg?: number | null;
+    volume_m3?: number | null;
+    is_refrigerated?: boolean;
+    thermo_cert_expires_at?: string | null;
+    insurance_expires_at?: string | null;
+    itv_expires_at?: string | null;
+    notes?: string | null;
     status?: 'active' | 'inactive' | 'maintenance';
     subcontractor_id?: string | null;
     home_hub_id?: string | null;

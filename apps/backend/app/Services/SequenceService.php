@@ -35,4 +35,9 @@ final class SequenceService
             return $next;
         });
     }
+
+    public function nextPadded(string $entity, int $length): string
+    {
+        return str_pad((string) $this->next($entity), $length, '0', STR_PAD_LEFT);
+    }
 }

@@ -34,24 +34,62 @@ export function SettlementsPage() {
   const [preview, setPreview] = useState<SettlementPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
+  const [pageLoading, setPageLoading] = useState(false);
+  const [pageError, setPageError] = useState('');
+  const [workflowMessage, setWorkflowMessage] = useState('');
+  const [busySettlementId, setBusySettlementId] = useState('');
   const [advanceAmountEur, setAdvanceAmountEur] = useState('');
   const [advanceReason, setAdvanceReason] = useState('');
   const [advanceMessage, setAdvanceMessage] = useState('');
-  const canExport = hasExportAccess('settlements', sessionStore.getRoles());
+  const roles = sessionStore.getRoles();
+  const canExport = hasExportAccess('settlements', roles);
+  const canWrite = roles.includes('accountant') || roles.includes('super_admin');
+  const canApprove = roles.includes('operations_manager') || roles.includes('super_admin');
+  const canPay = roles.includes('accountant') || roles.includes('super_admin');
+
+  const loadDashboardData = async (page: number, currentStatus = status, currentPeriod = period, currentSubcontractorId = subcontractorId, currentHubId = hubId, currentGranularity = trendGranularity) => {
+    setPageLoading(true);
+    setPageError('');
+    try {
+      const [result, summary, trends] = await Promise.all([
+        apiClient.getSettlements({
+          status: currentStatus || undefined,
+          period: currentPeriod || undefined,
+          subcontractorId: currentSubcontractorId || undefined,
+          page,
+          perPage: meta.per_page,
+        }),
+        apiClient.getSettlementReconciliationSummary({
+          hubId: currentHubId || undefined,
+          period: currentPeriod || undefined,
+          subcontractorId: currentSubcontractorId || undefined,
+        }),
+        apiClient.getSettlementReconciliationTrends({
+          granularity: currentGranularity,
+          limit: 12,
+          hubId: currentHubId || undefined,
+          period: currentPeriod || undefined,
+          subcontractorId: currentSubcontractorId || undefined,
+        }),
+      ]);
+      setItems(result.data);
+      setMeta(result.meta);
+      setReconciliationSummary(summary);
+      setReconciliationTrends(trends);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'No se pudo cargar liquidaciones.');
+      setItems([]);
+      setReconciliationSummary([]);
+      setReconciliationTrends([]);
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors);
-    apiClient.getHubs({ onlyActive: true }).then(setHubs);
-    Promise.all([
-      apiClient.getSettlements({ page: 1, perPage: 10 }),
-      apiClient.getSettlementReconciliationSummary({}),
-      apiClient.getSettlementReconciliationTrends({ granularity: 'month', limit: 12 }),
-    ]).then(([settlementsResult, summaryResult, trendsResult]) => {
-      setItems(settlementsResult.data);
-      setMeta(settlementsResult.meta);
-      setReconciliationSummary(summaryResult);
-      setReconciliationTrends(trendsResult);
-    });
+    apiClient.getSubcontractors({ limit: 20 }).then(setSubcontractors).catch(() => setSubcontractors([]));
+    apiClient.getHubs({ onlyActive: true }).then(setHubs).catch(() => setHubs([]));
+    loadDashboardData(1, '', '', '', '', 'month');
   }, []);
 
   useEffect(() => {
@@ -63,31 +101,7 @@ export function SettlementsPage() {
   }, [subcontractorQuery]);
 
   const search = async (page: number) => {
-    const [result, summary, trends] = await Promise.all([
-      apiClient.getSettlements({
-        status: status || undefined,
-        period: period || undefined,
-        subcontractorId: subcontractorId || undefined,
-        page,
-        perPage: meta.per_page,
-      }),
-      apiClient.getSettlementReconciliationSummary({
-        hubId: hubId || undefined,
-        period: period || undefined,
-        subcontractorId: subcontractorId || undefined,
-      }),
-      apiClient.getSettlementReconciliationTrends({
-        granularity: trendGranularity,
-        limit: 12,
-        hubId: hubId || undefined,
-        period: period || undefined,
-        subcontractorId: subcontractorId || undefined,
-      }),
-    ]);
-    setItems(result.data);
-    setMeta(result.meta);
-    setReconciliationSummary(summary);
-    setReconciliationTrends(trends);
+    await loadDashboardData(page);
   };
 
   const onSearch = async (event: React.FormEvent) => {
@@ -98,6 +112,7 @@ export function SettlementsPage() {
   const runPreview = async () => {
     setPreviewError('');
     setAdvanceMessage('');
+    setWorkflowMessage('');
     if (!subcontractorId || !period) {
       setPreviewError('Selecciona subcontrata y periodo (YYYY-MM) para previsualizar.');
       return;
@@ -117,6 +132,7 @@ export function SettlementsPage() {
   const createAdvance = async () => {
     setPreviewError('');
     setAdvanceMessage('');
+    setWorkflowMessage('');
     if (!subcontractorId) {
       setPreviewError('Selecciona subcontrata para registrar anticipo.');
       return;
@@ -137,8 +153,51 @@ export function SettlementsPage() {
       setAdvanceAmountEur('');
       setAdvanceReason('');
       setAdvanceMessage('Anticipo registrado correctamente.');
+      if (period) {
+        await runPreview();
+      }
     } catch (exception) {
       setPreviewError(exception instanceof Error ? exception.message : 'No se pudo registrar el anticipo');
+    }
+  };
+
+  const finalizePreview = async () => {
+    setPreviewError('');
+    setWorkflowMessage('');
+    if (!subcontractorId || !period) {
+      setPreviewError('Selecciona subcontrata y periodo para finalizar.');
+      return;
+    }
+    try {
+      const result = await apiClient.finalizeSettlement({ subcontractorId, period });
+      setWorkflowMessage(`Liquidación creada: ${result.id}`);
+      setPreview(null);
+      await loadDashboardData(1);
+    } catch (exception) {
+      setPreviewError(exception instanceof Error ? exception.message : 'No se pudo finalizar la liquidación');
+    }
+  };
+
+  const handleRowAction = async (settlementId: string, action: 'approve' | 'pdf' | 'paid') => {
+    setBusySettlementId(settlementId);
+    setWorkflowMessage('');
+    setPageError('');
+    try {
+      if (action === 'approve') {
+        await apiClient.approveSettlement(settlementId);
+        setWorkflowMessage(`Liquidación ${settlementId} aprobada.`);
+      } else if (action === 'pdf') {
+        await apiClient.exportSettlementPdf(settlementId);
+        setWorkflowMessage(`PDF de liquidación ${settlementId} exportado.`);
+      } else {
+        await apiClient.markSettlementPaid(settlementId);
+        setWorkflowMessage(`Liquidación ${settlementId} marcada como pagada.`);
+      }
+      await loadDashboardData(meta.page || 1);
+    } catch (exception) {
+      setPageError(exception instanceof Error ? exception.message : 'La acción sobre la liquidación no se pudo completar.');
+    } finally {
+      setBusySettlementId('');
     }
   };
 
@@ -150,6 +209,8 @@ export function SettlementsPage() {
           <CardDescription>Filtro por estado, periodo y subcontrata.</CardDescription>
         </CardHeader>
         <CardContent>
+          {pageError ? <div className="helper error">{pageError}</div> : null}
+          {workflowMessage ? <div className="helper">{workflowMessage}</div> : null}
           <form className="page-grid" onSubmit={onSearch}>
             <div className="form-row">
               <Select value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -192,6 +253,9 @@ export function SettlementsPage() {
             <Button type="button" variant="outline" onClick={runPreview} disabled={previewLoading}>
               {previewLoading ? 'Previsualizando...' : 'Previsualizar liquidacion'}
             </Button>
+            <Button type="button" variant="secondary" onClick={finalizePreview} disabled={!canWrite || previewLoading || !preview}>
+              Finalizar desde preview
+            </Button>
             <Input
               type="number"
               step="0.01"
@@ -211,20 +275,48 @@ export function SettlementsPage() {
           {previewError ? <div className="helper error">{previewError}</div> : null}
           {advanceMessage ? <div className="helper">{advanceMessage}</div> : null}
           {preview ? (
-            <div className="kpi-grid">
-              <div className="kpi-item">
-                <div className="kpi-label">Preview bruto</div>
-                <div className="kpi-value">{(preview.totals.gross_amount_cents / 100).toFixed(2)} EUR</div>
+            <>
+              <div className="kpi-grid">
+                <div className="kpi-item">
+                  <div className="kpi-label">Preview bruto</div>
+                  <div className="kpi-value">{(preview.totals.gross_amount_cents / 100).toFixed(2)} EUR</div>
+                </div>
+                <div className="kpi-item">
+                  <div className="kpi-label">Preview anticipos</div>
+                  <div className="kpi-value">{(preview.totals.advances_amount_cents / 100).toFixed(2)} EUR</div>
+                </div>
+                <div className="kpi-item">
+                  <div className="kpi-label">Preview neto</div>
+                  <div className="kpi-value">{(preview.totals.net_amount_cents / 100).toFixed(2)} EUR</div>
+                </div>
+                <div className="kpi-item">
+                  <div className="kpi-label">Líneas</div>
+                  <div className="kpi-value">{preview.lines.length}</div>
+                </div>
               </div>
-              <div className="kpi-item">
-                <div className="kpi-label">Preview anticipos</div>
-                <div className="kpi-value">{(preview.totals.advances_amount_cents / 100).toFixed(2)} EUR</div>
-              </div>
-              <div className="kpi-item">
-                <div className="kpi-label">Preview neto</div>
-                <div className="kpi-value">{(preview.totals.net_amount_cents / 100).toFixed(2)} EUR</div>
-              </div>
-            </div>
+              <TableWrapper>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {preview.lines.slice(0, 8).map((line, index) => (
+                      <TableRow key={`${line.line_type}-${index}`}>
+                        <TableCell>{line.line_type}</TableCell>
+                        <TableCell>{line.source_ref ?? '-'}</TableCell>
+                        <TableCell><Badge variant={line.status === 'payable' ? 'success' : 'warning'}>{line.status}</Badge></TableCell>
+                        <TableCell>{(line.line_total_cents / 100).toFixed(2)} EUR</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableWrapper>
+            </>
           ) : null}
 
           <TableWrapper>
@@ -239,6 +331,11 @@ export function SettlementsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {!pageLoading && items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5}>Sin liquidaciones para los filtros actuales.</TableCell>
+                  </TableRow>
+                )}
                 {items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>{item.subcontractor_name ?? item.subcontractor_id}</TableCell>
@@ -246,7 +343,24 @@ export function SettlementsPage() {
                     <TableCell><Badge variant={statusVariant(item.status)}>{item.status}</Badge></TableCell>
                     <TableCell>{(item.net_amount_cents / 100).toFixed(2)} {item.currency}</TableCell>
                     <TableCell>
-                      <Link to={`/settlements/${item.id}`} className="helper">detalle</Link>
+                      <div className="inline-actions">
+                        <Link to={`/settlements/${item.id}`} className="helper">detalle</Link>
+                        {item.status === 'draft' && canApprove ? (
+                          <Button type="button" variant="outline" disabled={busySettlementId === item.id} onClick={() => handleRowAction(item.id, 'approve')}>
+                            Aprobar
+                          </Button>
+                        ) : null}
+                        {(item.status === 'approved' || item.status === 'exported') && canExport ? (
+                          <Button type="button" variant="outline" disabled={busySettlementId === item.id} onClick={() => handleRowAction(item.id, 'pdf')}>
+                            PDF
+                          </Button>
+                        ) : null}
+                        {item.status === 'exported' && canPay ? (
+                          <Button type="button" variant="outline" disabled={busySettlementId === item.id} onClick={() => handleRowAction(item.id, 'paid')}>
+                            Marcar pagada
+                          </Button>
+                        ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

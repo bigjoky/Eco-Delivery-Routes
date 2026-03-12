@@ -126,7 +126,6 @@ class RouteController extends Controller
 
         $payload = $request->validate([
             'hub_id' => ['required', 'uuid', 'exists:hubs,id'],
-            'code' => ['nullable', 'string', 'max:60'],
             'route_date' => ['required', 'date'],
             'driver_id' => ['nullable', 'uuid', 'exists:drivers,id'],
             'subcontractor_id' => ['nullable', 'uuid', 'exists:subcontractors,id'],
@@ -135,10 +134,7 @@ class RouteController extends Controller
         $this->assertAssignmentConsistency($payload);
 
         $id = (string) Str::uuid();
-        $code = $payload['code'] ?? null;
-        if (!$code) {
-            $code = (string) $this->sequenceService->next('routes');
-        }
+        $code = $this->generateRouteCode((string) $payload['hub_id'], (string) $payload['route_date']);
         DB::table('routes')->insert([
             'id' => $id,
             'hub_id' => $payload['hub_id'],
@@ -153,6 +149,17 @@ class RouteController extends Controller
         ]);
 
         return response()->json(['data' => $this->fetchRouteWithAssignments($id)], 201);
+    }
+
+    private function generateRouteCode(string $hubId, string $routeDate): string
+    {
+        $hubCode = (string) DB::table('hubs')->where('id', $hubId)->value('code');
+        $hubToken = strtoupper((string) preg_replace('/[^A-Z0-9]/', '', $hubCode));
+        $hubToken = substr($hubToken !== '' ? $hubToken : 'GEN', 0, 8);
+        $dateToken = str_replace('-', '', $routeDate);
+        $sequence = str_pad((string) $this->sequenceService->next(sprintf('routes:%s:%s', $dateToken, $hubToken)), 3, '0', STR_PAD_LEFT);
+
+        return sprintf('R-%s-%s-%s', $dateToken, $hubToken, $sequence);
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -720,6 +727,8 @@ class RouteController extends Controller
         }
 
         $payload = $request->validate([
+            'expedition_ids' => ['nullable', 'array'],
+            'expedition_ids.*' => ['required', 'uuid', 'exists:expeditions,id'],
             'shipment_ids' => ['nullable', 'array'],
             'shipment_ids.*' => ['required', 'uuid', 'exists:shipments,id'],
             'pickup_ids' => ['nullable', 'array'],
@@ -727,11 +736,23 @@ class RouteController extends Controller
             'status' => ['nullable', 'in:planned,in_progress,completed'],
         ]);
 
-        $shipmentIds = array_values(array_unique($payload['shipment_ids'] ?? []));
-        $pickupIds = array_values(array_unique($payload['pickup_ids'] ?? []));
+        $expeditionIds = array_values(array_unique($payload['expedition_ids'] ?? []));
+        $expeditionLegs = $expeditionIds !== []
+            ? DB::table('expeditions')
+                ->whereIn('id', $expeditionIds)
+                ->get(['id', 'shipment_id', 'pickup_id'])
+            : collect();
+        $shipmentIds = array_values(array_unique(array_merge(
+            $payload['shipment_ids'] ?? [],
+            $expeditionLegs->pluck('shipment_id')->filter()->values()->all()
+        )));
+        $pickupIds = array_values(array_unique(array_merge(
+            $payload['pickup_ids'] ?? [],
+            $expeditionLegs->pluck('pickup_id')->filter()->values()->all()
+        )));
         if ($shipmentIds === [] && $pickupIds === []) {
             throw ValidationException::withMessages([
-                'shipment_ids' => ['Provide at least one shipment_id or pickup_id.'],
+                'expedition_ids' => ['Provide at least one expedition_id, shipment_id or pickup_id.'],
             ]);
         }
 
@@ -792,6 +813,7 @@ class RouteController extends Controller
             }
         });
         $this->writeRouteAudit($actor, $id, 'route.stops.bulk_added', [
+            'requested_expeditions_count' => count($expeditionIds),
             'requested_shipments_count' => count($shipmentIds),
             'requested_pickups_count' => count($pickupIds),
             'created_count' => $createdCount,
@@ -999,7 +1021,7 @@ class RouteController extends Controller
         }
 
         $rows = [];
-        $rows[] = 'route_code,route_date,status,driver_code,vehicle_code,sequence,stop_type,reference,stop_status';
+        $rows[] = 'route_code,route_date,status,driver_code,vehicle_code,sequence,stop_type,reference,expedition_reference,linked_reference,operation_kind,product_category,service_type,counterparty_name,address_line,stop_status';
         foreach ($payload['stops'] as $stop) {
             $rows[] = implode(',', [
                 $this->csvValue((string) $payload['route']->code),
@@ -1010,6 +1032,13 @@ class RouteController extends Controller
                 (int) $stop->sequence,
                 $this->csvValue((string) $stop->stop_type),
                 $this->csvValue((string) ($stop->reference ?? $stop->entity_id)),
+                $this->csvValue((string) ($stop->expedition_reference ?? '')),
+                $this->csvValue((string) ($stop->linked_reference ?? '')),
+                $this->csvValue((string) ($stop->operation_kind ?? '')),
+                $this->csvValue((string) ($stop->product_category ?? '')),
+                $this->csvValue((string) ($stop->service_type ?? '')),
+                $this->csvValue((string) ($stop->counterparty_name ?? '')),
+                $this->csvValue((string) ($stop->address_line ?? '')),
                 $this->csvValue((string) $stop->status),
             ]);
         }
@@ -1039,40 +1068,11 @@ class RouteController extends Controller
             ], 404);
         }
 
-        $lines = [
-            'Eco Delivery Routes - Route Manifest',
-            sprintf(
-                '%s | %s | status=%s | driver=%s | vehicle=%s',
-                (string) $payload['route']->code,
-                (string) $payload['route']->route_date,
-                (string) $payload['route']->status,
-                (string) ($payload['route']->driver_code ?? '-'),
-                (string) ($payload['route']->vehicle_code ?? '-')
-            ),
-            sprintf(
-                'Totals: stops=%d deliveries=%d pickups=%d completed=%d',
-                (int) $payload['totals']['stops'],
-                (int) $payload['totals']['deliveries'],
-                (int) $payload['totals']['pickups'],
-                (int) $payload['totals']['completed']
-            ),
-            '---',
-        ];
-        foreach ($payload['stops'] as $stop) {
-            $lines[] = sprintf(
-                '#%d %s %s (%s)',
-                (int) $stop->sequence,
-                (string) $stop->stop_type,
-                (string) ($stop->reference ?? $stop->entity_id),
-                (string) $stop->status
-            );
-        }
-
         $this->writeRouteAudit($actor, $id, 'route.manifest.exported.pdf', [
             'rows_count' => count($payload['stops']),
         ]);
 
-        return response($this->buildSimplePdf($lines), 200, [
+        return response($this->buildRouteManifestPdf($payload), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="route_manifest_' . $id . '.pdf"',
         ]);
@@ -1345,6 +1345,12 @@ class RouteController extends Controller
         return DB::table('route_stops')
             ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
             ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+            ->leftJoin('expeditions', function ($join): void {
+                $join->on('expeditions.id', '=', 'shipments.expedition_id')
+                    ->orOn('expeditions.id', '=', 'pickups.expedition_id');
+            })
+            ->leftJoin('shipments as linked_shipments', 'linked_shipments.id', '=', 'expeditions.shipment_id')
+            ->leftJoin('pickups as linked_pickups', 'linked_pickups.id', '=', 'expeditions.pickup_id')
             ->where('route_stops.id', $stopId)
             ->first([
                 'route_stops.id',
@@ -1361,6 +1367,14 @@ class RouteController extends Controller
                 DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
                 DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
                 DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
+                'expeditions.id as expedition_id',
+                'expeditions.reference as expedition_reference',
+                'expeditions.operation_kind',
+                'expeditions.product_category',
+                DB::raw('COALESCE(shipments.service_type, pickups.service_type) as service_type'),
+                DB::raw('COALESCE(shipments.consignee_name, pickups.requester_name) as counterparty_name'),
+                DB::raw('COALESCE(shipments.address_line, pickups.address_line) as address_line'),
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN linked_pickups.reference ELSE linked_shipments.reference END as linked_reference"),
             ]);
     }
 
@@ -1372,6 +1386,12 @@ class RouteController extends Controller
         return DB::table('route_stops')
             ->leftJoin('shipments', 'shipments.id', '=', 'route_stops.shipment_id')
             ->leftJoin('pickups', 'pickups.id', '=', 'route_stops.pickup_id')
+            ->leftJoin('expeditions', function ($join): void {
+                $join->on('expeditions.id', '=', 'shipments.expedition_id')
+                    ->orOn('expeditions.id', '=', 'pickups.expedition_id');
+            })
+            ->leftJoin('shipments as linked_shipments', 'linked_shipments.id', '=', 'expeditions.shipment_id')
+            ->leftJoin('pickups as linked_pickups', 'linked_pickups.id', '=', 'expeditions.pickup_id')
             ->where('route_stops.route_id', $routeId)
             ->orderBy('route_stops.sequence')
             ->get([
@@ -1389,6 +1409,14 @@ class RouteController extends Controller
                 DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN 'shipment' ELSE 'pickup' END as entity_type"),
                 DB::raw('COALESCE(route_stops.shipment_id, route_stops.pickup_id) as entity_id'),
                 DB::raw('COALESCE(shipments.reference, pickups.reference) as reference'),
+                'expeditions.id as expedition_id',
+                'expeditions.reference as expedition_reference',
+                'expeditions.operation_kind',
+                'expeditions.product_category',
+                DB::raw('COALESCE(shipments.service_type, pickups.service_type) as service_type'),
+                DB::raw('COALESCE(shipments.consignee_name, pickups.requester_name) as counterparty_name'),
+                DB::raw('COALESCE(shipments.address_line, pickups.address_line) as address_line'),
+                DB::raw("CASE WHEN route_stops.shipment_id IS NOT NULL THEN linked_pickups.reference ELSE linked_shipments.reference END as linked_reference"),
             ])
             ->all();
     }
@@ -1469,6 +1497,251 @@ class RouteController extends Controller
     }
 
     /**
+     * @param array<string, mixed> $payload
+     */
+    private function buildRouteManifestPdf(array $payload): string
+    {
+        $pageWidth = 842;
+        $pageHeight = 595;
+        $left = 28;
+        $right = 814;
+        $logoPath = public_path('logo-print-header.jpg');
+        $logoData = is_file($logoPath) ? file_get_contents($logoPath) : false;
+        $pages = [];
+        $commands = [];
+
+        $drawText = function (float $x, float $y, int $size, string $text, string $rgb = '0.10 0.14 0.20'): string {
+            return sprintf('%s rg BT /F1 %d Tf %.2F %.2F Td (%s) Tj ET', $rgb, $size, $x, $y, $this->pdfEscape($text));
+        };
+        $drawFill = static function (float $x, float $y, float $w, float $h, string $rgb): string {
+            return sprintf('%s rg %.2F %.2F %.2F %.2F re f', $rgb, $x, $y, $w, $h);
+        };
+        $drawStroke = static function (float $x, float $y, float $w, float $h, string $rgb = '0.85 0.89 0.94'): string {
+            return sprintf('%s RG %.2F %.2F %.2F %.2F re S', $rgb, $x, $y, $w, $h);
+        };
+
+        $route = $payload['route'];
+        $summaryBoxes = [
+            ['Ruta', (string) $route->code],
+            ['Fecha', (string) $route->route_date],
+            ['Estado', (string) $route->status],
+            ['Conductor', (string) ($route->driver_code ?? '-')],
+            ['Vehículo', (string) ($route->vehicle_code ?? '-')],
+            ['Paradas', (string) $payload['totals']['stops']],
+            ['Recogidas', (string) $payload['totals']['pickups']],
+            ['Entregas', (string) $payload['totals']['deliveries']],
+            ['Completadas', (string) $payload['totals']['completed']],
+        ];
+
+        $notes = trim((string) ($route->manifest_notes ?? ''));
+        $notesText = $notes !== '' ? $notes : 'Sin notas operativas.';
+        $statusLegend = [
+            ['Planificada', '0.10 0.14 0.20'],
+            ['En curso', '0.13 0.23 0.54'],
+            ['Completada', '0.10 0.45 0.24'],
+            ['Incidencia', '0.72 0.39 0.05'],
+        ];
+        $columns = [
+            ['x' => 28, 'label' => 'Sec.'],
+            ['x' => 58, 'label' => 'Pata'],
+            ['x' => 112, 'label' => 'Referencia'],
+            ['x' => 196, 'label' => 'Vinculada'],
+            ['x' => 280, 'label' => 'Operación'],
+            ['x' => 344, 'label' => 'Producto'],
+            ['x' => 402, 'label' => 'Servicio'],
+            ['x' => 480, 'label' => 'Contraparte'],
+            ['x' => 612, 'label' => 'Dirección'],
+            ['x' => 756, 'label' => 'Estado'],
+        ];
+
+        $appendPageHeader = function (array &$pageCommands, int $pageNumber) use (
+            $drawFill,
+            $drawStroke,
+            $drawText,
+            $logoData,
+            $left,
+            $right,
+            $pageWidth,
+            $pageHeight,
+            $route,
+            $summaryBoxes,
+            $notesText,
+            $statusLegend,
+            $columns
+        ): float {
+            $pageCommands[] = $drawFill(0, 0, $pageWidth, $pageHeight, '1 1 1');
+            $pageCommands[] = $drawFill(0, 535, $pageWidth, 60, '0.06 0.11 0.18');
+            if ($logoData !== false) {
+                $pageCommands[] = 'q 26 0 0 26 28 548 cm /Im1 Do Q';
+            }
+            $pageCommands[] = $drawText(62, 564, 22, 'Eco Delivery Routes', '1 1 1');
+            $pageCommands[] = $drawText(62, 545, 11, 'Manifiesto de ruta operativo', '0.86 0.90 0.95');
+            $pageCommands[] = $drawText(648, 560, 10, 'Generado: ' . now()->format('d/m/Y H:i'), '0.86 0.90 0.95');
+            $pageCommands[] = $drawText(744, 545, 9, 'Página ' . $pageNumber, '0.86 0.90 0.95');
+
+            $boxWidth = 82;
+            $boxHeight = 42;
+            $boxGap = 6;
+            $boxX = $left;
+            $boxY = 480;
+            foreach ($summaryBoxes as [$label, $value]) {
+                $pageCommands[] = $drawFill($boxX, $boxY, $boxWidth, $boxHeight, '0.97 0.98 0.99');
+                $pageCommands[] = $drawStroke($boxX, $boxY, $boxWidth, $boxHeight);
+                $pageCommands[] = $drawText($boxX + 8, $boxY + 26, 8, $label);
+                $pageCommands[] = $drawText($boxX + 8, $boxY + 10, 12, $value);
+                $boxX += $boxWidth + $boxGap;
+            }
+
+            $pageCommands[] = $drawFill($left, 430, $right - $left, 38, '0.99 0.99 1');
+            $pageCommands[] = $drawStroke($left, 430, $right - $left, 38);
+            $pageCommands[] = $drawText($left + 8, 452, 8, 'Notas operativas');
+            $pageCommands[] = $drawText($left + 8, 438, 10, mb_substr($notesText, 0, 120));
+
+            $legendY = 408;
+            $pageCommands[] = $drawText($left + 8, $legendY + 7, 8, 'Leyenda de estados');
+            $legendX = $left + 106;
+            foreach ($statusLegend as [$label, $color]) {
+                $pageCommands[] = $drawFill($legendX, $legendY + 2, 10, 10, $color);
+                $pageCommands[] = $drawStroke($legendX, $legendY + 2, 10, 10, '0.85 0.89 0.94');
+                $pageCommands[] = $drawText($legendX + 16, $legendY + 4, 8, $label);
+                $legendX += 110;
+            }
+
+            $headerY = 384;
+            $pageCommands[] = $drawFill($left, $headerY, $right - $left, 18, '0.10 0.16 0.24');
+            foreach ($columns as $column) {
+                $pageCommands[] = $drawText($column['x'] + 4, $headerY + 5, 8, $column['label'], '1 1 1');
+            }
+
+            return 376.0;
+        };
+
+        $currentPage = 1;
+        $cursorY = $appendPageHeader($commands, $currentPage);
+        $groupedStops = collect($payload['stops'])->groupBy(fn ($stop) => (string) ($stop->expedition_reference ?? 'SIN-EXPEDICION'));
+        foreach ($groupedStops as $expeditionReference => $groupStops) {
+            /** @var object $first */
+            $first = $groupStops->first();
+            $groupHeight = 18 + (count($groupStops) * 18) + 8;
+            if ($cursorY - $groupHeight < 48) {
+                $commands[] = $drawText($left, 22, 8, 'Documento operativo para tráfico y almacén · Eco Delivery Routes');
+                $pages[] = implode("\n", $commands) . "\n";
+                $commands = [];
+                $currentPage++;
+                $cursorY = $appendPageHeader($commands, $currentPage);
+            }
+
+            $cursorY -= (18 + (count($groupStops) * 18));
+            $commands[] = $drawFill($left, $cursorY + (count($groupStops) * 18), $right - $left, 18, '0.92 0.95 0.98');
+            $commands[] = $drawStroke($left, $cursorY, $right - $left, 18 + (count($groupStops) * 18));
+            $commands[] = $drawText($left + 8, $cursorY + (count($groupStops) * 18) + 5, 10, sprintf(
+                'EXPEDICIÓN %s · %s · %s · %s · HUB %s',
+                $expeditionReference,
+                (string) ($first->operation_kind ?? '-'),
+                (string) ($first->product_category ?? '-'),
+                (string) ($first->service_type ?? '-'),
+                (string) ($route->hub_code ?? '-')
+            ));
+
+            $rowY = $cursorY + (count($groupStops) * 18) - 11;
+            foreach ($groupStops as $stop) {
+                $statusColor = match ((string) $stop->status) {
+                    'completed', 'delivered' => '0.10 0.45 0.24',
+                    'in_progress', 'out_for_delivery' => '0.13 0.23 0.54',
+                    'incident' => '0.72 0.39 0.05',
+                    default => '0.10 0.14 0.20',
+                };
+                $commands[] = $drawText(32, $rowY, 8, (string) $stop->sequence);
+                $commands[] = $drawText(62, $rowY, 8, $stop->stop_type === 'PICKUP' ? 'RECOGIDA' : 'ENTREGA');
+                $commands[] = $drawText(116, $rowY, 8, mb_substr((string) ($stop->reference ?? $stop->entity_id), 0, 16));
+                $commands[] = $drawText(200, $rowY, 8, mb_substr((string) ($stop->linked_reference ?? '-'), 0, 16));
+                $commands[] = $drawText(284, $rowY, 8, mb_substr(mb_strtoupper((string) ($stop->operation_kind ?? '-')), 0, 11));
+                $commands[] = $drawText(348, $rowY, 8, mb_substr((string) ($stop->product_category ?? '-'), 0, 10));
+                $commands[] = $drawText(406, $rowY, 8, mb_substr((string) ($stop->service_type ?? '-'), 0, 13));
+                $commands[] = $drawText(484, $rowY, 7, mb_substr((string) ($stop->counterparty_name ?? '-'), 0, 27));
+                $commands[] = $drawText(616, $rowY, 7, mb_substr((string) ($stop->address_line ?? '-'), 0, 30));
+                $commands[] = $drawText(760, $rowY, 8, mb_substr((string) $stop->status, 0, 10), $statusColor);
+                $rowY -= 18;
+            }
+            $cursorY -= 8;
+        }
+        $commands[] = $drawText($left, 22, 8, 'Documento operativo para tráfico y almacén · Eco Delivery Routes');
+        $pages[] = implode("\n", $commands) . "\n";
+
+        $objects = [];
+        $objects[] = '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj';
+
+        $pageCount = count($pages);
+        $pageObjectStart = 3;
+        $contentObjectStart = $pageObjectStart + $pageCount;
+        $fontObjectNum = $contentObjectStart + $pageCount;
+        $imageObjectNum = $fontObjectNum + 1;
+        $kids = [];
+        for ($index = 0; $index < $pageCount; $index++) {
+            $kids[] = ($pageObjectStart + $index) . ' 0 R';
+        }
+        $objects[] = '2 0 obj << /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . $pageCount . ' >> endobj';
+
+        for ($index = 0; $index < $pageCount; $index++) {
+            $pageObjectNum = $pageObjectStart + $index;
+            $contentObjectNum = $contentObjectStart + $index;
+            $resources = '<< /Font << /F1 ' . $fontObjectNum . ' 0 R >>';
+            if ($logoData !== false) {
+                $resources .= ' /XObject << /Im1 ' . $imageObjectNum . ' 0 R >>';
+            }
+            $resources .= ' >>';
+            $objects[] = sprintf(
+                '%d 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents %d 0 R /Resources %s >> endobj',
+                $pageObjectNum,
+                $contentObjectNum,
+                $resources
+            );
+        }
+
+        foreach ($pages as $content) {
+            $length = strlen($content);
+            $objects[] = "0 0 obj << /Length {$length} >> stream\n{$content}endstream endobj";
+        }
+        for ($index = 0; $index < $pageCount; $index++) {
+            $contentIndex = 2 + $pageCount + $index;
+            $objects[$contentIndex] = str_replace('0 0 obj', ($contentObjectStart + $index) . ' 0 obj', $objects[$contentIndex]);
+        }
+
+        $objects[] = $fontObjectNum . ' 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj';
+        if ($logoData !== false) {
+            $objects[] = $imageObjectNum . ' 0 obj << /Type /XObject /Subtype /Image /Width 980 /Height 1024 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' . strlen($logoData) . " >> stream\n" . $logoData . "\nendstream endobj";
+        }
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = [];
+        foreach ($objects as $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= $object . "\n";
+        }
+
+        $xrefOffset = strlen($pdf);
+        $pdf .= "xref\n";
+        $pdf .= '0 ' . (count($objects) + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+        foreach ($offsets as $offset) {
+            $pdf .= sprintf('%010d 00000 n ', $offset) . "\n";
+        }
+        $pdf .= "trailer << /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
+        $pdf .= "startxref\n{$xrefOffset}\n%%EOF";
+
+        return $pdf;
+    }
+
+    private function pdfEscape(string $value): string
+    {
+        $encoded = iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $value);
+        if ($encoded === false) {
+            $encoded = $value;
+        }
+        return str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $encoded);
+    }
+
+    /**
      * @param array<int, string> $lines
      */
     private function buildSimplePdf(array $lines): string
@@ -1496,7 +1769,7 @@ class RouteController extends Controller
         $objects[] = '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj';
         $objects[] = '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj';
         $objects[] = "4 0 obj << /Length {$length} >> stream\n{$content}endstream endobj";
-        $objects[] = '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj';
+        $objects[] = '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj';
 
         $pdf = "%PDF-1.4\n";
         $offsets = [];

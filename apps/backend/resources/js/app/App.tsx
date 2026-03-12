@@ -10,6 +10,7 @@ import { apiClient } from '../services/apiClient';
 const AuditOpsPage = lazy(() => import('../features/audit/AuditOpsPage').then((module) => ({ default: module.AuditOpsPage })));
 const AdvancesPage = lazy(() => import('../features/advances/AdvancesPage').then((module) => ({ default: module.AdvancesPage })));
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })));
+const ExpeditionsPage = lazy(() => import('../features/expeditions/ExpeditionsPage').then((module) => ({ default: module.ExpeditionsPage })));
 const FleetControlsPage = lazy(() => import('../features/fleet/FleetControlsPage').then((module) => ({ default: module.FleetControlsPage })));
 const IncidentsPage = lazy(() => import('../features/incidents/IncidentsPage').then((module) => ({ default: module.IncidentsPage })));
 const NetworkPage = lazy(() => import('../features/network/NetworkPage').then((module) => ({ default: module.NetworkPage })));
@@ -24,7 +25,6 @@ const RoutesPage = lazy(() => import('../features/routes/RoutesPage').then((modu
 const SettlementDetailPage = lazy(() => import('../features/settlements/SettlementDetailPage').then((module) => ({ default: module.SettlementDetailPage })));
 const SettlementsPage = lazy(() => import('../features/settlements/SettlementsPage').then((module) => ({ default: module.SettlementsPage })));
 const SettlementPreviewPage = lazy(() => import('../features/settlements/SettlementPreviewPage').then((module) => ({ default: module.SettlementPreviewPage })));
-const ShipmentsPage = lazy(() => import('../features/shipments/ShipmentsPage').then((module) => ({ default: module.ShipmentsPage })));
 const ShipmentDetailPage = lazy(() => import('../features/shipments/ShipmentDetailPage').then((module) => ({ default: module.ShipmentDetailPage })));
 const TariffsPage = lazy(() => import('../features/tariffs/TariffsPage').then((module) => ({ default: module.TariffsPage })));
 const WorkforcePage = lazy(() => import('../features/workforce/WorkforcePage').then((module) => ({ default: module.WorkforcePage })));
@@ -161,8 +161,16 @@ export function App({
         <Route path="/" element={authResolved ? (isAuthenticated ? <Navigate to="/dashboard" replace /> : <ExternalRedirect href="/login" />) : authLoadingView()} />
         <Route path="/dashboard" element={protectedRoute(null, <DashboardPage />)} />
         <Route
+          path="/expeditions"
+          element={protectedRoute('expeditions', <ExpeditionsPage />)}
+        />
+        <Route
           path="/shipments"
-          element={protectedRoute('shipments', <ShipmentsPage />)}
+          element={<Navigate to="/expeditions" replace />}
+        />
+        <Route
+          path="/pickups"
+          element={<Navigate to="/expeditions" replace />}
         />
         <Route
           path="/shipments/:id"

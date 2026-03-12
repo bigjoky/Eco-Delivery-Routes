@@ -23,8 +23,112 @@ class PickupController extends Controller
             return $this->forbidden();
         }
 
+        $query = DB::table('pickups')
+            ->leftJoin('expeditions', 'expeditions.id', '=', 'pickups.expedition_id')
+            ->leftJoin('shipments', 'shipments.id', '=', 'expeditions.shipment_id')
+            ->select(
+                'pickups.*',
+                'expeditions.reference as expedition_reference',
+                'shipments.reference as shipment_reference'
+            );
+
+        if ($request->filled('status')) {
+            $query->where('pickups.status', (string) $request->query('status'));
+        }
+        if ($request->filled('q')) {
+            $like = '%' . str_replace('%', '\\%', (string) $request->query('q')) . '%';
+            $query->where(function ($inner) use ($like): void {
+                $inner->where('pickups.reference', 'like', $like)
+                    ->orWhere('pickups.external_reference', 'like', $like)
+                    ->orWhere('pickups.requester_name', 'like', $like)
+                    ->orWhere('expeditions.reference', 'like', $like)
+                    ->orWhere('shipments.reference', 'like', $like);
+            });
+        }
+
         return response()->json([
-            'data' => DB::table('pickups')->orderByDesc('created_at')->limit(100)->get(),
+            'data' => $query->orderByDesc('pickups.created_at')->limit(150)->get(),
+        ]);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        /** @var User $actor */
+        $actor = $request->user();
+        if (!$actor->hasPermission('pickups.read')) {
+            return $this->forbidden();
+        }
+
+        $pickup = DB::table('pickups')->where('id', $id)->first();
+        if (!$pickup) {
+            return response()->json(['error' => ['message' => 'Pickup not found']], 404);
+        }
+
+        $expedition = null;
+        $linkedShipment = null;
+        $senderContact = null;
+        $recipientContact = null;
+        if (!empty($pickup->expedition_id)) {
+            $expedition = DB::table('expeditions')->where('id', $pickup->expedition_id)->first();
+            if ($expedition) {
+                if (!empty($expedition->shipment_id)) {
+                    $linkedShipment = DB::table('shipments')->where('id', $expedition->shipment_id)->first();
+                }
+                if (!empty($expedition->sender_contact_id)) {
+                    $senderContact = DB::table('contacts')->where('id', $expedition->sender_contact_id)->first();
+                }
+                if (!empty($expedition->recipient_contact_id)) {
+                    $recipientContact = DB::table('contacts')->where('id', $expedition->recipient_contact_id)->first();
+                }
+            }
+        }
+
+        $trackingEvents = DB::table('tracking_events')
+            ->where('trackable_type', 'pickup')
+            ->where('trackable_id', $id)
+            ->orderBy('occurred_at', 'desc')
+            ->get();
+
+        $pods = DB::table('pods')
+            ->where('evidenceable_type', 'pickup')
+            ->where('evidenceable_id', $id)
+            ->orderBy('captured_at', 'desc')
+            ->get();
+
+        $incidents = DB::table('incidents')
+            ->where('incidentable_type', 'pickup')
+            ->where('incidentable_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $routeStops = DB::table('route_stops')
+            ->leftJoin('routes', 'routes.id', '=', 'route_stops.route_id')
+            ->where('route_stops.pickup_id', $id)
+            ->orderBy('route_stops.sequence')
+            ->get([
+                'route_stops.id',
+                'route_stops.route_id',
+                'routes.code as route_code',
+                'routes.route_date',
+                'route_stops.sequence',
+                'route_stops.stop_type',
+                'route_stops.status',
+                'route_stops.planned_at',
+                'route_stops.completed_at',
+            ]);
+
+        return response()->json([
+            'data' => [
+                'pickup' => $pickup,
+                'expedition' => $expedition,
+                'linked_shipment' => $linkedShipment,
+                'sender_contact' => $senderContact,
+                'recipient_contact' => $recipientContact,
+                'tracking_events' => $trackingEvents,
+                'pods' => $pods,
+                'incidents' => $incidents,
+                'route_stops' => $routeStops,
+            ],
         ]);
     }
 

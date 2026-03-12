@@ -5,7 +5,7 @@ import { canAccess } from '../../core/auth/access';
 
 const menu = [
   { to: '/dashboard', label: 'Dashboard', feature: null },
-  { to: '/shipments', label: 'Envios', feature: 'shipments' },
+  { to: '/expeditions', label: 'Expediciones', feature: 'expeditions' },
   { to: '/routes', label: 'Rutas', feature: 'routes' },
   { to: '/routes/board', label: 'Rutas Live', feature: 'routes' },
   { to: '/incidents', label: 'Incidencias', feature: 'incidents' },
@@ -29,7 +29,7 @@ const sections = [
     label: 'Operativa',
     items: [
       '/dashboard',
-      '/shipments',
+      '/expeditions',
       '/routes',
       '/routes/board',
       '/incidents',
@@ -68,7 +68,7 @@ export function AppShell({
   const isMock = !apiBase || apiBase === 'undefined' || apiBase === 'null';
   const location = useLocation();
   const canAccessOpenApi = roles.includes('super_admin') || roles.includes('admin');
-  const mobileCorePaths = new Set(['/dashboard', '/shipments', '/routes', '/incidents', '/network']);
+  const mobileCorePaths = new Set(['/dashboard', '/expeditions', '/routes', '/incidents', '/network']);
   const visibleMenu = menu.filter((item) => {
     if (!item.feature) return true;
     if (!isAuthenticated) return false;

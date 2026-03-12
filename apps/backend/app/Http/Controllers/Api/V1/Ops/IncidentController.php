@@ -697,6 +697,8 @@ class IncidentController extends Controller
         $allRows = $query->get([
             'incidents.*',
             'shipments.reference as shipment_reference',
+            'pickups.reference as pickup_reference',
+            DB::raw('COALESCE(shipment_expeditions.reference, pickup_expeditions.reference) as expedition_reference'),
         ]);
 
         $rows = $allRows->map(function ($row) {
@@ -726,7 +728,13 @@ class IncidentController extends Controller
             ->leftJoin('shipments', function ($join) {
                 $join->on('shipments.id', '=', 'incidents.incidentable_id')
                     ->where('incidents.incidentable_type', '=', 'shipment');
-            });
+            })
+            ->leftJoin('pickups', function ($join) {
+                $join->on('pickups.id', '=', 'incidents.incidentable_id')
+                    ->where('incidents.incidentable_type', '=', 'pickup');
+            })
+            ->leftJoin('expeditions as shipment_expeditions', 'shipment_expeditions.shipment_id', '=', 'shipments.id')
+            ->leftJoin('expeditions as pickup_expeditions', 'pickup_expeditions.pickup_id', '=', 'pickups.id');
 
         foreach (['incidentable_type', 'incidentable_id', 'category', 'catalog_code'] as $field) {
             $value = $request->query($field);
@@ -743,7 +751,10 @@ class IncidentController extends Controller
                     ->orWhere('incidents.incidentable_id', 'like', $like)
                     ->orWhere('incidents.notes', 'like', $like)
                     ->orWhere('incidents.catalog_code', 'like', $like)
-                    ->orWhere('shipments.reference', 'like', $like);
+                    ->orWhere('shipments.reference', 'like', $like)
+                    ->orWhere('pickups.reference', 'like', $like)
+                    ->orWhere('shipment_expeditions.reference', 'like', $like)
+                    ->orWhere('pickup_expeditions.reference', 'like', $like);
             });
         }
 

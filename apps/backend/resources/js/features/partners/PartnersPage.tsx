@@ -44,33 +44,67 @@ export function PartnersPage() {
   const [createSaving, setCreateSaving] = useState(false);
 
   const [subcontractorName, setSubcontractorName] = useState('');
+  const [subcontractorTradeName, setSubcontractorTradeName] = useState('');
   const [subcontractorTaxId, setSubcontractorTaxId] = useState('');
+  const [subcontractorContactName, setSubcontractorContactName] = useState('');
+  const [subcontractorPhone, setSubcontractorPhone] = useState('');
+  const [subcontractorEmail, setSubcontractorEmail] = useState('');
+  const [subcontractorBillingEmail, setSubcontractorBillingEmail] = useState('');
+  const [subcontractorCity, setSubcontractorCity] = useState('');
   const [driverCode, setDriverCode] = useState('');
   const [driverDni, setDriverDni] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverSubcontractorId, setDriverSubcontractorId] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [driverEmail, setDriverEmail] = useState('');
+  const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
+  const [driverLicenseExpiresAt, setDriverLicenseExpiresAt] = useState('');
   const [vehicleCode, setVehicleCode] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [vehicleSubcontractorId, setVehicleSubcontractorId] = useState('');
   const [vehicleDriverId, setVehicleDriverId] = useState('');
+  const [vehicleBrand, setVehicleBrand] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleFuelType, setVehicleFuelType] = useState('');
+  const [vehicleVolumeM3, setVehicleVolumeM3] = useState('');
+  const [vehicleRefrigerated, setVehicleRefrigerated] = useState<'0' | '1'>('0');
+  const [vehicleInsuranceExpiresAt, setVehicleInsuranceExpiresAt] = useState('');
+  const [vehicleItvExpiresAt, setVehicleItvExpiresAt] = useState('');
 
   const [editingSubcontractorId, setEditingSubcontractorId] = useState('');
   const [editSubcontractorName, setEditSubcontractorName] = useState('');
+  const [editSubcontractorTradeName, setEditSubcontractorTradeName] = useState('');
   const [editSubcontractorTaxId, setEditSubcontractorTaxId] = useState('');
   const [editSubcontractorStatus, setEditSubcontractorStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
   const [editSubcontractorPaymentTerms, setEditSubcontractorPaymentTerms] = useState('monthly');
+  const [editSubcontractorContactName, setEditSubcontractorContactName] = useState('');
+  const [editSubcontractorPhone, setEditSubcontractorPhone] = useState('');
+  const [editSubcontractorEmail, setEditSubcontractorEmail] = useState('');
+  const [editSubcontractorBillingEmail, setEditSubcontractorBillingEmail] = useState('');
+  const [editSubcontractorCity, setEditSubcontractorCity] = useState('');
 
   const [editingDriverId, setEditingDriverId] = useState('');
   const [editDriverName, setEditDriverName] = useState('');
   const [editDriverDni, setEditDriverDni] = useState('');
   const [editDriverStatus, setEditDriverStatus] = useState<'active' | 'inactive' | 'suspended'>('active');
   const [editDriverSubcontractorId, setEditDriverSubcontractorId] = useState('');
+  const [editDriverPhone, setEditDriverPhone] = useState('');
+  const [editDriverEmail, setEditDriverEmail] = useState('');
+  const [editDriverLicenseNumber, setEditDriverLicenseNumber] = useState('');
+  const [editDriverLicenseExpiresAt, setEditDriverLicenseExpiresAt] = useState('');
 
   const [editingVehicleId, setEditingVehicleId] = useState('');
   const [editVehiclePlate, setEditVehiclePlate] = useState('');
   const [editVehicleStatus, setEditVehicleStatus] = useState<'active' | 'inactive' | 'maintenance'>('active');
   const [editVehicleSubcontractorId, setEditVehicleSubcontractorId] = useState('');
   const [editVehicleDriverId, setEditVehicleDriverId] = useState('');
+  const [editVehicleBrand, setEditVehicleBrand] = useState('');
+  const [editVehicleModel, setEditVehicleModel] = useState('');
+  const [editVehicleFuelType, setEditVehicleFuelType] = useState('');
+  const [editVehicleVolumeM3, setEditVehicleVolumeM3] = useState('');
+  const [editVehicleRefrigerated, setEditVehicleRefrigerated] = useState<'0' | '1'>('0');
+  const [editVehicleInsuranceExpiresAt, setEditVehicleInsuranceExpiresAt] = useState('');
+  const [editVehicleItvExpiresAt, setEditVehicleItvExpiresAt] = useState('');
   const [selectedSubcontractorIds, setSelectedSubcontractorIds] = useState<string[]>([]);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<string[]>([]);
@@ -232,11 +266,23 @@ export function PartnersPage() {
       await apiClient.createSubcontractor({
         legal_name: subcontractorName,
         tax_id: subcontractorTaxId,
+        trade_name: subcontractorTradeName || undefined,
         status: 'active',
         payment_terms: 'monthly',
+        contact_name: subcontractorContactName || undefined,
+        phone: subcontractorPhone || undefined,
+        email: subcontractorEmail || undefined,
+        billing_email: subcontractorBillingEmail || undefined,
+        city: subcontractorCity || undefined,
       });
       setSubcontractorName('');
+      setSubcontractorTradeName('');
       setSubcontractorTaxId('');
+      setSubcontractorContactName('');
+      setSubcontractorPhone('');
+      setSubcontractorEmail('');
+      setSubcontractorBillingEmail('');
+      setSubcontractorCity('');
       setMessage('Subcontrata creada');
       await load();
     } catch (createError) {
@@ -252,12 +298,20 @@ export function PartnersPage() {
         code: driverCode,
         dni: driverDni,
         name: driverName,
+        phone: driverPhone || undefined,
+        email: driverEmail || undefined,
+        license_number: driverLicenseNumber || undefined,
+        license_expires_at: driverLicenseExpiresAt || undefined,
         employment_type: 'subcontractor',
         subcontractor_id: driverSubcontractorId || undefined,
       });
       setDriverCode('');
       setDriverDni('');
       setDriverName('');
+      setDriverPhone('');
+      setDriverEmail('');
+      setDriverLicenseNumber('');
+      setDriverLicenseExpiresAt('');
       setMessage('Driver creado');
       await load();
     } catch (createError) {
@@ -286,6 +340,13 @@ export function PartnersPage() {
         code: vehicleCode,
         plate_number: vehiclePlate,
         vehicle_type: 'van',
+        brand: vehicleBrand || undefined,
+        model: vehicleModel || undefined,
+        fuel_type: vehicleFuelType || undefined,
+        volume_m3: vehicleVolumeM3.trim() ? Number(vehicleVolumeM3) : undefined,
+        is_refrigerated: vehicleRefrigerated === '1',
+        insurance_expires_at: vehicleInsuranceExpiresAt || undefined,
+        itv_expires_at: vehicleItvExpiresAt || undefined,
         status: 'active',
         subcontractor_id: nextSubcontractorId || undefined,
         assigned_driver_id: vehicleDriverId || undefined,
@@ -294,6 +355,13 @@ export function PartnersPage() {
       setVehiclePlate('');
       setVehicleSubcontractorId('');
       setVehicleDriverId('');
+      setVehicleBrand('');
+      setVehicleModel('');
+      setVehicleFuelType('');
+      setVehicleVolumeM3('');
+      setVehicleRefrigerated('0');
+      setVehicleInsuranceExpiresAt('');
+      setVehicleItvExpiresAt('');
       setMessage('Vehiculo creado');
       await load();
     } catch (createError) {
@@ -346,9 +414,15 @@ export function PartnersPage() {
   const startEditSubcontractor = (row: SubcontractorSummary) => {
     setEditingSubcontractorId(row.id);
     setEditSubcontractorName(row.legal_name);
+    setEditSubcontractorTradeName(row.trade_name ?? '');
     setEditSubcontractorTaxId(row.tax_id ?? '');
     setEditSubcontractorStatus((row.status as 'active' | 'inactive' | 'suspended') ?? 'active');
     setEditSubcontractorPaymentTerms(row.payment_terms ?? 'monthly');
+    setEditSubcontractorContactName(row.contact_name ?? '');
+    setEditSubcontractorPhone(row.phone ?? '');
+    setEditSubcontractorEmail(row.email ?? '');
+    setEditSubcontractorBillingEmail(row.billing_email ?? '');
+    setEditSubcontractorCity(row.city ?? '');
   };
 
   const saveSubcontractor = async () => {
@@ -358,9 +432,15 @@ export function PartnersPage() {
     try {
       await apiClient.updateSubcontractor(editingSubcontractorId, {
         legal_name: editSubcontractorName,
+        trade_name: editSubcontractorTradeName || null,
         tax_id: editSubcontractorTaxId,
         status: editSubcontractorStatus,
         payment_terms: editSubcontractorPaymentTerms,
+        contact_name: editSubcontractorContactName || null,
+        phone: editSubcontractorPhone || null,
+        email: editSubcontractorEmail || null,
+        billing_email: editSubcontractorBillingEmail || null,
+        city: editSubcontractorCity || null,
       });
       setEditingSubcontractorId('');
       setMessage('Subcontrata actualizada');
@@ -376,6 +456,10 @@ export function PartnersPage() {
     setEditDriverDni(row.dni ?? '');
     setEditDriverStatus((row.status as 'active' | 'inactive' | 'suspended') ?? 'active');
     setEditDriverSubcontractorId(row.subcontractor_id ?? '');
+    setEditDriverPhone(row.phone ?? '');
+    setEditDriverEmail(row.email ?? '');
+    setEditDriverLicenseNumber(row.license_number ?? '');
+    setEditDriverLicenseExpiresAt(row.license_expires_at ?? '');
   };
 
   const saveDriver = async () => {
@@ -395,6 +479,10 @@ export function PartnersPage() {
       await apiClient.updateDriver(editingDriverId, {
         name: editDriverName,
         dni: editDriverDni,
+        phone: editDriverPhone || null,
+        email: editDriverEmail || null,
+        license_number: editDriverLicenseNumber || null,
+        license_expires_at: editDriverLicenseExpiresAt || null,
         status: editDriverStatus,
         subcontractor_id: nextSubcontractorId,
       });
@@ -412,6 +500,13 @@ export function PartnersPage() {
     setEditVehicleStatus((row.status as 'active' | 'inactive' | 'maintenance') ?? 'active');
     setEditVehicleSubcontractorId(row.subcontractor_id ?? '');
     setEditVehicleDriverId(row.assigned_driver_id ?? '');
+    setEditVehicleBrand(row.brand ?? '');
+    setEditVehicleModel(row.model ?? '');
+    setEditVehicleFuelType(row.fuel_type ?? '');
+    setEditVehicleVolumeM3(row.volume_m3 != null ? String(row.volume_m3) : '');
+    setEditVehicleRefrigerated(row.is_refrigerated ? '1' : '0');
+    setEditVehicleInsuranceExpiresAt(row.insurance_expires_at ?? '');
+    setEditVehicleItvExpiresAt(row.itv_expires_at ?? '');
   };
 
   const saveVehicle = async () => {
@@ -434,6 +529,13 @@ export function PartnersPage() {
     try {
       await apiClient.updateVehicle(editingVehicleId, {
         plate_number: editVehiclePlate,
+        brand: editVehicleBrand || null,
+        model: editVehicleModel || null,
+        fuel_type: editVehicleFuelType || null,
+        volume_m3: editVehicleVolumeM3.trim() ? Number(editVehicleVolumeM3) : null,
+        is_refrigerated: editVehicleRefrigerated === '1',
+        insurance_expires_at: editVehicleInsuranceExpiresAt || null,
+        itv_expires_at: editVehicleItvExpiresAt || null,
         status: editVehicleStatus,
         subcontractor_id: nextSubcontractorId || null,
         assigned_driver_id: editVehicleDriverId || null,
@@ -669,7 +771,13 @@ export function PartnersPage() {
               <div className="modal-section-title">Paso 2 · Datos de subcontrata</div>
             <div className="form-row">
               <div><label>Nombre</label><Input value={subcontractorName} onChange={(e) => setSubcontractorName(e.target.value)} placeholder="Eco Partner Málaga" /></div>
+              <div><label>Nombre comercial</label><Input value={subcontractorTradeName} onChange={(e) => setSubcontractorTradeName(e.target.value)} placeholder="Eco Partner" /></div>
               <div><label>CIF/NIF</label><Input value={subcontractorTaxId} onChange={(e) => setSubcontractorTaxId(e.target.value)} placeholder="B12345678" /></div>
+              <div><label>Contacto</label><Input value={subcontractorContactName} onChange={(e) => setSubcontractorContactName(e.target.value)} placeholder="Responsable" /></div>
+              <div><label>Teléfono</label><Input value={subcontractorPhone} onChange={(e) => setSubcontractorPhone(e.target.value)} placeholder="+34 600 000 000" /></div>
+              <div><label>Email</label><Input value={subcontractorEmail} onChange={(e) => setSubcontractorEmail(e.target.value)} placeholder="operativa@partner.es" /></div>
+              <div><label>Email facturación</label><Input value={subcontractorBillingEmail} onChange={(e) => setSubcontractorBillingEmail(e.target.value)} placeholder="facturas@partner.es" /></div>
+              <div><label>Ciudad</label><Input value={subcontractorCity} onChange={(e) => setSubcontractorCity(e.target.value)} placeholder="Málaga" /></div>
             </div>
             </div>
           ) : null}
@@ -680,6 +788,10 @@ export function PartnersPage() {
               <div><label>Código</label><Input value={driverCode} onChange={(e) => setDriverCode(e.target.value)} placeholder="DRV-001" /></div>
               <div><label>DNI/NIE</label><Input value={driverDni} onChange={(e) => setDriverDni(e.target.value)} placeholder="12345678Z" /></div>
               <div><label>Nombre</label><Input value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="Nombre completo" /></div>
+              <div><label>Teléfono</label><Input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} placeholder="+34 600 000 000" /></div>
+              <div><label>Email</label><Input value={driverEmail} onChange={(e) => setDriverEmail(e.target.value)} placeholder="driver@eco.test" /></div>
+              <div><label>Permiso</label><Input value={driverLicenseNumber} onChange={(e) => setDriverLicenseNumber(e.target.value)} placeholder="B / C / CAP" /></div>
+              <div><label>Caduca permiso</label><Input type="date" value={driverLicenseExpiresAt} onChange={(e) => setDriverLicenseExpiresAt(e.target.value)} /></div>
               <div>
                 <label>Subcontrata</label>
                 <Select value={driverSubcontractorId} onChange={(e) => setDriverSubcontractorId(e.target.value)}>
@@ -698,6 +810,19 @@ export function PartnersPage() {
             <div className="form-row">
               <div><label>Código</label><Input value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} placeholder="VEH-001" /></div>
               <div><label>Matrícula</label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value)} placeholder="1234-ABC" /></div>
+              <div><label>Marca</label><Input value={vehicleBrand} onChange={(e) => setVehicleBrand(e.target.value)} placeholder="Ford" /></div>
+              <div><label>Modelo</label><Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Transit" /></div>
+              <div><label>Combustible</label><Input value={vehicleFuelType} onChange={(e) => setVehicleFuelType(e.target.value)} placeholder="Diesel / Eléctrico" /></div>
+              <div><label>Volumen m3</label><Input value={vehicleVolumeM3} onChange={(e) => setVehicleVolumeM3(e.target.value)} placeholder="12.5" /></div>
+              <div>
+                <label>Refrigerado</label>
+                <Select value={vehicleRefrigerated} onChange={(e) => setVehicleRefrigerated(e.target.value as '0' | '1')}>
+                  <option value="0">No</option>
+                  <option value="1">Sí</option>
+                </Select>
+              </div>
+              <div><label>Seguro</label><Input type="date" value={vehicleInsuranceExpiresAt} onChange={(e) => setVehicleInsuranceExpiresAt(e.target.value)} /></div>
+              <div><label>ITV</label><Input type="date" value={vehicleItvExpiresAt} onChange={(e) => setVehicleItvExpiresAt(e.target.value)} /></div>
               <div>
                 <label>Subcontrata</label>
                 <Select value={vehicleSubcontractorId} onChange={(e) => setVehicleSubcontractorId(e.target.value)}>
@@ -863,6 +988,7 @@ export function PartnersPage() {
                   </TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tax ID</TableHead>
+                  <TableHead>Contacto</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Ult. edicion</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -880,6 +1006,7 @@ export function PartnersPage() {
                     </TableCell>
                     <TableCell>{subcontractor.legal_name}</TableCell>
                     <TableCell>{subcontractor.tax_id ?? '-'}</TableCell>
+                    <TableCell>{subcontractor.contact_name ?? subcontractor.phone ?? '-'}</TableCell>
                     <TableCell>{subcontractor.status}</TableCell>
                     <TableCell>{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</TableCell>
                     <TableCell>
@@ -903,6 +1030,16 @@ export function PartnersPage() {
                   </div>
                   <Badge variant="secondary">{subcontractor.status}</Badge>
                 </div>
+                <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Contacto</div>
+                    <div>{subcontractor.contact_name ?? '-'}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Ciudad</div>
+                    <div>{subcontractor.city ?? '-'}</div>
+                  </div>
+                </div>
                 <div className="helper">{subcontractor.last_editor_name ?? '-'} · {formatDateTime(subcontractor.updated_at)}</div>
                 <div className="mobile-ops-card-actions">
                   <Button data-testid={`edit-subcontractor-mobile-${subcontractor.id}`} type="button" variant="outline" onClick={() => startEditSubcontractor(subcontractor)}>Editar</Button>
@@ -920,17 +1057,27 @@ export function PartnersPage() {
           </div>
 
           {editingSubcontractorId ? (
-            <div className="inline-actions">
+            <div className="filters-panel">
+              <div className="form-row">
               <Input value={editSubcontractorName} onChange={(e) => setEditSubcontractorName(e.target.value)} placeholder="Nombre" />
+              <Input value={editSubcontractorTradeName} onChange={(e) => setEditSubcontractorTradeName(e.target.value)} placeholder="Nombre comercial" />
               <Input value={editSubcontractorTaxId} onChange={(e) => setEditSubcontractorTaxId(e.target.value)} placeholder="CIF/NIF" />
+              <Input value={editSubcontractorContactName} onChange={(e) => setEditSubcontractorContactName(e.target.value)} placeholder="Contacto" />
+              <Input value={editSubcontractorPhone} onChange={(e) => setEditSubcontractorPhone(e.target.value)} placeholder="Teléfono" />
+              <Input value={editSubcontractorEmail} onChange={(e) => setEditSubcontractorEmail(e.target.value)} placeholder="Email" />
+              <Input value={editSubcontractorBillingEmail} onChange={(e) => setEditSubcontractorBillingEmail(e.target.value)} placeholder="Email facturación" />
+              <Input value={editSubcontractorCity} onChange={(e) => setEditSubcontractorCity(e.target.value)} placeholder="Ciudad" />
               <Select value={editSubcontractorStatus} onChange={(e) => setEditSubcontractorStatus(e.target.value as 'active' | 'inactive' | 'suspended')}>
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
                 <option value="suspended">suspended</option>
               </Select>
               <Input value={editSubcontractorPaymentTerms} onChange={(e) => setEditSubcontractorPaymentTerms(e.target.value)} placeholder="payment terms" />
+              </div>
+              <div className="inline-actions">
               <Button data-testid="save-subcontractor" type="button" onClick={saveSubcontractor}>Guardar subcontrata</Button>
               <Button type="button" variant="outline" onClick={() => setEditingSubcontractorId('')}>Cancelar</Button>
+              </div>
             </div>
           ) : null}
 
@@ -982,6 +1129,7 @@ export function PartnersPage() {
                   <TableHead>DNI</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Subcontrata</TableHead>
+                  <TableHead>Contacto</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Ult. edicion</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -997,11 +1145,12 @@ export function PartnersPage() {
                         onChange={(event) => toggleSelected(setSelectedDriverIds, driver.id, event.target.checked)}
                       />
                     </TableCell>
-                    <TableCell>{driver.code}</TableCell>
-                    <TableCell>{driver.dni ?? '-'}</TableCell>
-                    <TableCell>{driver.name}</TableCell>
-                    <TableCell>{driver.subcontractor_name ?? '-'}</TableCell>
-                    <TableCell>{driver.status}</TableCell>
+                  <TableCell>{driver.code}</TableCell>
+                  <TableCell>{driver.dni ?? '-'}</TableCell>
+                  <TableCell>{driver.name}</TableCell>
+                  <TableCell>{driver.subcontractor_name ?? '-'}</TableCell>
+                  <TableCell>{driver.phone ?? driver.email ?? '-'}</TableCell>
+                  <TableCell>{driver.status}</TableCell>
                     <TableCell>{driver.last_editor_name ?? '-'} · {formatDateTime(driver.updated_at)}</TableCell>
                     <TableCell>
                       <div className="inline-actions">
@@ -1030,6 +1179,10 @@ export function PartnersPage() {
                     <div>{driver.subcontractor_name ?? '-'}</div>
                   </div>
                   <div>
+                    <div className="kpi-label">Contacto</div>
+                    <div>{driver.phone ?? driver.email ?? '-'}</div>
+                  </div>
+                  <div>
                     <div className="kpi-label">Última edición</div>
                     <div>{formatDateTime(driver.updated_at)}</div>
                   </div>
@@ -1050,9 +1203,14 @@ export function PartnersPage() {
           </div>
 
           {editingDriverId ? (
-            <div className="inline-actions">
+            <div className="filters-panel">
+              <div className="form-row">
               <Input value={editDriverName} onChange={(e) => setEditDriverName(e.target.value)} placeholder="Nombre" />
               <Input value={editDriverDni} onChange={(e) => setEditDriverDni(e.target.value)} placeholder="DNI/NIE" />
+              <Input value={editDriverPhone} onChange={(e) => setEditDriverPhone(e.target.value)} placeholder="Teléfono" />
+              <Input value={editDriverEmail} onChange={(e) => setEditDriverEmail(e.target.value)} placeholder="Email" />
+              <Input value={editDriverLicenseNumber} onChange={(e) => setEditDriverLicenseNumber(e.target.value)} placeholder="Permiso" />
+              <Input type="date" value={editDriverLicenseExpiresAt} onChange={(e) => setEditDriverLicenseExpiresAt(e.target.value)} />
               <Select value={editDriverStatus} onChange={(e) => setEditDriverStatus(e.target.value as 'active' | 'inactive' | 'suspended')}>
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
@@ -1064,8 +1222,11 @@ export function PartnersPage() {
                   <option key={subcontractor.id} value={subcontractor.id}>{subcontractor.legal_name}</option>
                 ))}
               </Select>
+              </div>
+              <div className="inline-actions">
               <Button data-testid="save-driver" type="button" onClick={saveDriver}>Guardar driver</Button>
               <Button type="button" variant="outline" onClick={() => setEditingDriverId('')}>Cancelar</Button>
+              </div>
             </div>
           ) : null}
 
@@ -1115,6 +1276,7 @@ export function PartnersPage() {
                   </TableHead>
                   <TableHead>Codigo</TableHead>
                   <TableHead>Matricula</TableHead>
+                  <TableHead>Vehículo</TableHead>
                   <TableHead>Subcontrata</TableHead>
                   <TableHead>Driver</TableHead>
                   <TableHead>Estado</TableHead>
@@ -1132,10 +1294,11 @@ export function PartnersPage() {
                         onChange={(event) => toggleSelected(setSelectedVehicleIds, vehicle.id, event.target.checked)}
                       />
                     </TableCell>
-                    <TableCell>{vehicle.code}</TableCell>
-                    <TableCell>{vehicle.plate_number ?? '-'}</TableCell>
-                    <TableCell>{vehicle.subcontractor_name ?? '-'}</TableCell>
-                    <TableCell>{vehicle.assigned_driver_code ?? '-'}</TableCell>
+                  <TableCell>{vehicle.code}</TableCell>
+                  <TableCell>{vehicle.plate_number ?? '-'}</TableCell>
+                  <TableCell>{[vehicle.brand, vehicle.model].filter(Boolean).join(' ') || '-'}</TableCell>
+                  <TableCell>{vehicle.subcontractor_name ?? '-'}</TableCell>
+                  <TableCell>{vehicle.assigned_driver_code ?? '-'}</TableCell>
                     <TableCell>{vehicle.status}</TableCell>
                     <TableCell>{vehicle.last_editor_name ?? '-'} · {formatDateTime(vehicle.updated_at)}</TableCell>
                     <TableCell>
@@ -1160,6 +1323,10 @@ export function PartnersPage() {
                   <Badge variant="secondary">{vehicle.status}</Badge>
                 </div>
                 <div className="mobile-ops-card-grid">
+                  <div>
+                    <div className="kpi-label">Vehículo</div>
+                    <div>{[vehicle.brand, vehicle.model].filter(Boolean).join(' ') || '-'}</div>
+                  </div>
                   <div>
                     <div className="kpi-label">Subcontrata</div>
                     <div>{vehicle.subcontractor_name ?? '-'}</div>
@@ -1186,8 +1353,19 @@ export function PartnersPage() {
           </div>
 
           {editingVehicleId ? (
-            <div className="inline-actions">
+            <div className="filters-panel">
+              <div className="form-row">
               <Input value={editVehiclePlate} onChange={(e) => setEditVehiclePlate(e.target.value)} placeholder="Matricula" />
+              <Input value={editVehicleBrand} onChange={(e) => setEditVehicleBrand(e.target.value)} placeholder="Marca" />
+              <Input value={editVehicleModel} onChange={(e) => setEditVehicleModel(e.target.value)} placeholder="Modelo" />
+              <Input value={editVehicleFuelType} onChange={(e) => setEditVehicleFuelType(e.target.value)} placeholder="Combustible" />
+              <Input value={editVehicleVolumeM3} onChange={(e) => setEditVehicleVolumeM3(e.target.value)} placeholder="Volumen m3" />
+              <Select value={editVehicleRefrigerated} onChange={(e) => setEditVehicleRefrigerated(e.target.value as '0' | '1')}>
+                <option value="0">No refrigerado</option>
+                <option value="1">Refrigerado</option>
+              </Select>
+              <Input type="date" value={editVehicleInsuranceExpiresAt} onChange={(e) => setEditVehicleInsuranceExpiresAt(e.target.value)} />
+              <Input type="date" value={editVehicleItvExpiresAt} onChange={(e) => setEditVehicleItvExpiresAt(e.target.value)} />
               <Select value={editVehicleStatus} onChange={(e) => setEditVehicleStatus(e.target.value as 'active' | 'inactive' | 'maintenance')}>
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
@@ -1205,8 +1383,11 @@ export function PartnersPage() {
                   <option key={driver.id} value={driver.id}>{driver.code} - {driver.name}</option>
                 ))}
               </Select>
+              </div>
+              <div className="inline-actions">
               <Button data-testid="save-vehicle" type="button" onClick={saveVehicle}>Guardar vehiculo</Button>
               <Button type="button" variant="outline" onClick={() => setEditingVehicleId('')}>Cancelar</Button>
+              </div>
             </div>
           ) : null}
 

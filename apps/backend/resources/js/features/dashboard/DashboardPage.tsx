@@ -20,15 +20,15 @@ const initialOverview: DashboardOverview = {
   quality: { route_avg: 0, driver_avg: 0, below_threshold_routes: 0 },
   trends: { shipments: [], routes: [], incidents: [], quality: [] },
   sla: { on_track: 0, at_risk: 0, breached: 0, resolved: 0 },
-  recent: { routes: [], shipments: [], incidents: [] },
+  recent: { routes: [], shipments: [], expeditions: [], incidents: [] },
   productivity_by_hub: [],
   productivity_by_route: [],
   alerts: [],
 };
 
-export function buildDashboardRangeQuery(from: string, to: string, mode: 'routes' | 'shipments' | 'incidents'): string {
+export function buildDashboardRangeQuery(from: string, to: string, mode: 'routes' | 'expeditions' | 'incidents'): string {
   if (!from || !to) return '';
-  if (mode === 'shipments') {
+  if (mode === 'expeditions') {
     return `scheduled_from=${encodeURIComponent(from)}&scheduled_to=${encodeURIComponent(to)}`;
   }
   return `date_from=${encodeURIComponent(from)}&date_to=${encodeURIComponent(to)}`;
@@ -58,7 +58,7 @@ function alertVariant(severity: 'high' | 'medium' | 'low'): 'destructive' | 'war
 }
 
 type DashboardBulkAuditItem = {
-  key: 'shipments' | 'routes' | 'incidents' | 'partners' | 'settlements' | 'quality';
+  key: 'expeditions' | 'routes' | 'incidents' | 'partners' | 'settlements' | 'quality';
   label: string;
   href: string;
   row: AuditLogEntry | null;
@@ -172,7 +172,7 @@ export function DashboardPage() {
       const qualityLatest = pickLatestAudit([qualityUpdated, qualityAlerts]);
 
       setBulkAuditSummary([
-        { key: 'shipments', label: 'Envíos', href: '/shipments', row: shipmentsBulk },
+        { key: 'expeditions', label: 'Expediciones', href: '/expeditions', row: shipmentsBulk },
         { key: 'routes', label: 'Rutas', href: '/routes', row: routesBulk },
         { key: 'incidents', label: 'Incidencias', href: '/incidents', row: incidentsLatest },
         { key: 'partners', label: 'Partners', href: '/partners', row: partnerLatest },
@@ -213,7 +213,7 @@ export function DashboardPage() {
     [overview.period.from, overview.period.to]
   );
   const shipmentRangeQuery = useMemo(
-    () => buildDashboardRangeQuery(overview.period.from, overview.period.to, 'shipments'),
+    () => buildDashboardRangeQuery(overview.period.from, overview.period.to, 'expeditions'),
     [overview.period.from, overview.period.to]
   );
 
@@ -228,7 +228,7 @@ export function DashboardPage() {
         <div>
           <h1 className="page-title">Everything at a glance</h1>
           <p className="page-subtitle">
-            Estado operativo global entre {overview.period.from || '-'} y {overview.period.to || '-'}.
+            Estado operativo global de expediciones, rutas, incidencias y calidad entre {overview.period.from || '-'} y {overview.period.to || '-'}.
           </p>
         </div>
         <div className="dashboard-controls">
@@ -277,19 +277,19 @@ export function DashboardPage() {
 
       <div className="ops-summary-strip">
         <div className="ops-summary-chip">
-          <div className="ops-summary-label">Envíos</div>
+          <div className="ops-summary-label">Expediciones</div>
           <div className="ops-summary-value">{overview.totals.shipments}</div>
-          <div className="ops-summary-caption">Created {overview.shipments_by_status.created} · Delivered {overview.shipments_by_status.delivered}</div>
+          <div className="ops-summary-caption">Creadas {overview.shipments_by_status.created} · Entregadas {overview.shipments_by_status.delivered}</div>
         </div>
         <div className="ops-summary-chip">
           <div className="ops-summary-label">Rutas</div>
           <div className="ops-summary-value">{overview.totals.routes}</div>
-          <div className="ops-summary-caption">Planned {overview.routes_by_status.planned} · In progress {overview.routes_by_status.in_progress}</div>
+          <div className="ops-summary-caption">Planificadas {overview.routes_by_status.planned} · En curso {overview.routes_by_status.in_progress}</div>
         </div>
         <div className="ops-summary-chip">
           <div className="ops-summary-label">Incidencias</div>
           <div className="ops-summary-value">{overview.totals.incidents_open}</div>
-          <div className="ops-summary-caption">At risk {overview.sla.at_risk} · Breached {overview.sla.breached}</div>
+          <div className="ops-summary-caption">En riesgo {overview.sla.at_risk} · Vencidas {overview.sla.breached}</div>
         </div>
         <div className="ops-summary-chip">
           <div className="ops-summary-label">Calidad ruta</div>
@@ -299,10 +299,10 @@ export function DashboardPage() {
       </div>
 
       <div className="ops-summary-strip">
-        <Link to="/shipments" className="ops-summary-chip">
+        <Link to="/expeditions" className="ops-summary-chip">
           <div className="ops-summary-label">Operativa</div>
-          <div className="ops-summary-value">Envíos</div>
-          <div className="ops-summary-caption">Alta rápida, filtros y ejecución diaria</div>
+          <div className="ops-summary-value">Expediciones</div>
+          <div className="ops-summary-caption">Circuito completo: recogida, entrega y trazabilidad</div>
         </Link>
         <Link to="/routes" className="ops-summary-chip">
           <div className="ops-summary-label">Planificación</div>
@@ -373,13 +373,13 @@ export function DashboardPage() {
       <div className="page-grid four dashboard-kpi-grid">
         <Card className="dashboard-kpi-card">
           <CardHeader>
-            <CardDescription>Envíos</CardDescription>
+            <CardDescription>Expediciones</CardDescription>
             <CardTitle>{overview.totals.shipments}</CardTitle>
           </CardHeader>
           <CardContent className="dashboard-kpi-content">
-            <Link className="helper" to={`/shipments?status=created${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Created: {overview.shipments_by_status.created}</Link>
-            <Link className="helper" to={`/shipments?status=out_for_delivery${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Out: {overview.shipments_by_status.out_for_delivery}</Link>
-            <Link className="helper" to={`/shipments?status=delivered${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Delivered: {overview.shipments_by_status.delivered}</Link>
+            <Link className="helper" to={`/expeditions?leg_status=created${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Creadas: {overview.shipments_by_status.created}</Link>
+            <Link className="helper" to={`/expeditions?leg_status=out_for_delivery${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>En reparto: {overview.shipments_by_status.out_for_delivery}</Link>
+            <Link className="helper" to={`/expeditions?leg_status=delivered${shipmentRangeQuery ? `&${shipmentRangeQuery}` : ''}`}>Entregadas: {overview.shipments_by_status.delivered}</Link>
             <TrendBars values={shipmentTrendValues} max={maxShipmentTrend} />
           </CardContent>
         </Card>
@@ -390,8 +390,8 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="dashboard-kpi-content">
             <Link className="helper" to={`/routes?status=planned${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Planned: {overview.routes_by_status.planned}</Link>
-            <Link className="helper" to={`/routes?status=in_progress${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>In progress: {overview.routes_by_status.in_progress}</Link>
-            <Link className="helper" to={`/routes?status=completed${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Completed: {overview.routes_by_status.completed}</Link>
+            <Link className="helper" to={`/routes?status=in_progress${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>En curso: {overview.routes_by_status.in_progress}</Link>
+            <Link className="helper" to={`/routes?status=completed${sharedRangeQuery ? `&${sharedRangeQuery}` : ''}`}>Completadas: {overview.routes_by_status.completed}</Link>
             <TrendBars values={routeTrendValues} max={maxRouteTrend} />
           </CardContent>
         </Card>
@@ -662,44 +662,44 @@ export function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Envíos recientes</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Expediciones recientes</CardTitle></CardHeader>
           <CardContent>
             <TableWrapper className="desktop-table-only">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Referencia</TableHead>
+                    <TableHead>Entrega</TableHead>
                     <TableHead>Destinatario</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Estado de entrega</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {overview.recent.shipments.length === 0 && <TableRow><TableCell colSpan={3}>Sin envíos</TableCell></TableRow>}
-                  {overview.recent.shipments.map((item) => (
+                  {(overview.recent.expeditions ?? []).length === 0 && <TableRow><TableCell colSpan={3}>Sin expediciones</TableCell></TableRow>}
+                  {(overview.recent.expeditions ?? []).map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell><Link to={`/shipments/${item.id}`}>{item.reference}</Link></TableCell>
-                      <TableCell>{item.consignee_name ?? '-'}</TableCell>
-                      <TableCell>{item.status}</TableCell>
+                      <TableCell><Link to={`/expeditions?q=${encodeURIComponent(item.reference)}`}>{item.reference}</Link></TableCell>
+                      <TableCell>{item.recipient_name ?? '-'}</TableCell>
+                      <TableCell>{item.shipment_status ?? item.status}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableWrapper>
             <div className="mobile-ops-list">
-              {overview.recent.shipments.map((item) => (
-                <article key={`recent-shipment-${item.id}`} className="mobile-ops-card">
+              {(overview.recent.expeditions ?? []).map((item) => (
+                <article key={`recent-expedition-${item.id}`} className="mobile-ops-card">
                   <div className="mobile-ops-card-header">
-                    <Link to={`/shipments/${item.id}`}>{item.reference}</Link>
-                    <Badge variant="secondary">{item.status}</Badge>
+                    <Link to={`/expeditions?q=${encodeURIComponent(item.reference)}`}>{item.reference}</Link>
+                    <Badge variant="secondary">{item.shipment_status ?? item.status}</Badge>
                   </div>
-                  <div className="helper">{item.consignee_name ?? '-'}</div>
+                  <div className="helper">{item.recipient_name ?? '-'} · {item.pickup_reference ?? 'Sin recogida'} {'->'} {item.shipment_reference ?? 'Sin entrega'}</div>
                   <div className="mobile-ops-card-actions">
-                    <Link to={`/shipments/${item.id}`} className="btn btn-outline">Abrir</Link>
-                    <Link to={`/shipments?q=${encodeURIComponent(item.reference)}`} className="btn btn-outline">Listado</Link>
+                    <Link to={`/expeditions?q=${encodeURIComponent(item.reference)}`} className="btn btn-outline">Ver expedición</Link>
+                    <Link to={`/expeditions?leg_status=${encodeURIComponent(item.shipment_status ?? item.status)}`} className="btn btn-outline">Mismo estado</Link>
                   </div>
                 </article>
               ))}
-              {overview.recent.shipments.length === 0 ? <div className="mobile-ops-empty">Sin envíos</div> : null}
+              {(overview.recent.expeditions ?? []).length === 0 ? <div className="mobile-ops-empty">Sin expediciones</div> : null}
             </div>
           </CardContent>
         </Card>
@@ -753,7 +753,7 @@ export function DashboardPage() {
                 <div className="mobile-ops-card-actions">
                   <Link to={`/incidents?q=${encodeURIComponent(item.id)}`} className="btn btn-outline">Abrir</Link>
                   {item.shipment_reference ? (
-                    <Link to={`/shipments?q=${encodeURIComponent(item.shipment_reference)}`} className="btn btn-outline">Ver envío</Link>
+                    <Link to={`/expeditions?q=${encodeURIComponent(item.shipment_reference)}`} className="btn btn-outline">Ver expedición</Link>
                   ) : null}
                 </div>
               </article>

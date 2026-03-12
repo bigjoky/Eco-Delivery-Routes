@@ -1,5 +1,7 @@
 export type FeatureAccess =
+  | 'expeditions'
   | 'shipments'
+  | 'pickups'
   | 'routes'
   | 'incidents'
   | 'partners'
@@ -16,7 +18,9 @@ export type FeatureAccess =
   | 'audit';
 
 const accessMap: Record<FeatureAccess, string[]> = {
+  expeditions: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
   shipments: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
+  pickups: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
   routes: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
   incidents: ['super_admin', 'operations_manager', 'traffic_operator', 'warehouse_operator', 'accountant', 'viewer'],
   partners: ['super_admin', 'operations_manager', 'traffic_operator', 'accountant'],
